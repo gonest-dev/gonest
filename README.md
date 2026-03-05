@@ -72,6 +72,6 @@ Contributions are welcome! Please check our [Contributing Guide](https://www.goo
 
 ---
 
-Developed with ❤️ by [leandroluk](https://www.google.com/search?q=https://github.com/leandroluk)
+Developed with ❤️ by [team](https://www.google.com/search?q=https://gonest.dev)
 
 Would you like me to help you draft the `CONTRIBUTING.md` or a specific technical section for the `Documentation` mentioned in your roadmap?
