@@ -6,7 +6,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/leandroluk/gonest/di"
+	"github.com/gonest-dev/gonest/di"
 )
 
 // ========================================

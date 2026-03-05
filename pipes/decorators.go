@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // UsePipes creates a middleware that applies pipes to request data

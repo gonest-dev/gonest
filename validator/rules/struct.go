@@ -3,7 +3,7 @@ package rules
 import (
 	"context"
 
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // Validatable interface for structs that can validate themselves

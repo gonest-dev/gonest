@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // ControllerBuilder helps build controllers with a fluent API

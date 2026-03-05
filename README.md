@@ -27,8 +27,8 @@ GoNest provides an out-of-the-box application architecture which allows develope
 package main
 
 import (
-	"github.com/leandroluk/gonest/core"
-	"github.com/leandroluk/gonest/common"
+	"github.com/gonest-dev/gonest/core"
+	"github.com/gonest-dev/gonest/common"
 )
 
 type AppController struct {}

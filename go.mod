@@ -1,4 +1,4 @@
-module github.com/leandroluk/gonest
+module github.com/gonest-dev/gonest
 
 go 1.25.0
 

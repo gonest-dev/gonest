@@ -775,7 +775,7 @@ This roadmap is a living document. Community feedback is essential for prioritiz
 
 ## Quick Links
 
-- [GitHub Repository](https://github.com/leandroluk/gonest)
+- [GitHub Repository](https://github.com/gonest-dev/gonest)
 - [Documentation](https://gonest.dev/docs)
 - [Discord Community](https://discord.gg/gonest)
 - [Contributing Guide](./CONTRIBUTING.md)

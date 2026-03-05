@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // HttpException represents an HTTP error with status code

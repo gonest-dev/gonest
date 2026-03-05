@@ -3,7 +3,7 @@ package rules
 import (
 	"time"
 
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // DateAfter validates that date is after the specified date

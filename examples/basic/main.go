@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // ========================================

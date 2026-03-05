@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // EchoAdapter adapts GoNest to Echo framework

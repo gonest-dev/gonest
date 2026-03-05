@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // HTTPMethod represents HTTP methods

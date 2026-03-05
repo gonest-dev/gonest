@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // AsyncCustom creates an async custom validator

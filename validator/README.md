@@ -61,8 +61,8 @@ Both styles are type-safe and provide the same functionality!
 
 ```go
 import (
-    "github.com/leandroluk/gonest/validator"
-    "github.com/leandroluk/gonest/validator/rules"
+    "github.com/gonest-dev/gonest/validator"
+    "github.com/gonest-dev/gonest/validator/rules"
 )
 
 // Define validators

@@ -3,7 +3,7 @@ package rules
 import (
 	"golang.org/x/exp/constraints"
 
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // EqualTo validates that value equals another value

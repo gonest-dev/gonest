@@ -3,7 +3,7 @@ package interceptors
 import (
 	"time"
 
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // UseInterceptors creates a middleware that applies interceptors

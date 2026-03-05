@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // ArrayMinSize validates minimum array size

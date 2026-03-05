@@ -1,7 +1,7 @@
 package exceptions
 
 import (
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // ValidationException represents validation errors

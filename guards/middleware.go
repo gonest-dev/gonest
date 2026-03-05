@@ -1,7 +1,7 @@
 package guards
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // UseGuards creates a middleware that applies guards

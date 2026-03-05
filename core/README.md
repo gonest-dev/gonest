@@ -14,7 +14,7 @@ The core module provides the fundamental architecture for building NestJS-style 
 ## Installation
 
 ```bash
-go get github.com/leandroluk/gonest
+go get github.com/gonest-dev/gonest
 ```
 
 ## Quick Start
@@ -24,7 +24,7 @@ go get github.com/leandroluk/gonest
 ```go
 package main
 
-import "github.com/leandroluk/gonest/core"
+import "github.com/gonest-dev/gonest/core"
 
 type AppModule struct{}
 

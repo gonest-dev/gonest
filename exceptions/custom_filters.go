@@ -1,7 +1,7 @@
 package exceptions
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // NotFoundExceptionFilter handles 404 errors

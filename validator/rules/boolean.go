@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // IsTrue validates that boolean value is true

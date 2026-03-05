@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // MinLength validates minimum string length

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/leandroluk/gonest/core"
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/core"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // Validatable interface for DTOs that can validate themselves

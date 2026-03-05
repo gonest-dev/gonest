@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // FiberAdapter adapts GoNest to Fiber framework

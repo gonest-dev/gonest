@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/leandroluk/gonest/swagger"
+	"github.com/gonest-dev/gonest/swagger"
 )
 
 // ========================================
@@ -140,7 +140,7 @@ func BuildSwaggerDocument() *swagger.OpenAPIDocument {
 	// Set Contact
 	builder.SetContact(
 		"API Support",
-		"https://github.com/leandroluk/gonest",
+		"https://github.com/gonest-dev/gonest",
 		"support@example.com",
 	)
 

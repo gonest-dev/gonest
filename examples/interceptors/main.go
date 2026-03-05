@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/leandroluk/gonest/controller"
-	"github.com/leandroluk/gonest/core"
-	"github.com/leandroluk/gonest/interceptors"
+	"github.com/gonest-dev/gonest/controller"
+	"github.com/gonest-dev/gonest/core"
+	"github.com/gonest-dev/gonest/interceptors"
 )
 
 // ========================================

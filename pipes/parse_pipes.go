@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // ParseIntPipe parses string to int

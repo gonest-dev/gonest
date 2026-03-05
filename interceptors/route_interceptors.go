@@ -1,7 +1,7 @@
 package interceptors
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // RouteInterceptor wraps an interceptor for route-level use

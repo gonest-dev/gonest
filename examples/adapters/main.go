@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/leandroluk/gonest/adapters"
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/adapters"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // ========================================

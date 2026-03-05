@@ -3,7 +3,7 @@ package exceptions
 import (
 	"log"
 
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // GlobalExceptionFilter handles all unhandled exceptions

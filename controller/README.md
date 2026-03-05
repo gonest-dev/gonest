@@ -17,8 +17,8 @@ NestJS-inspired controller system for Go with type-safe routing and parameter ha
 
 ```go
 import (
-    "github.com/leandroluk/gonest/controller"
-    "github.com/leandroluk/gonest/core"
+    "github.com/gonest-dev/gonest/controller"
+    "github.com/gonest-dev/gonest/core"
 )
 
 func NewUserController() controller.Controller {

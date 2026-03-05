@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"github.com/leandroluk/gonest/validator"
+	"github.com/gonest-dev/gonest/validator"
 )
 
 // Required validates that a value is not zero/empty

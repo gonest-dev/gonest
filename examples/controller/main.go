@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 
-	"github.com/leandroluk/gonest/controller"
-	"github.com/leandroluk/gonest/core"
-	"github.com/leandroluk/gonest/validator"
-	"github.com/leandroluk/gonest/validator/rules"
+	"github.com/gonest-dev/gonest/controller"
+	"github.com/gonest-dev/gonest/core"
+	"github.com/gonest-dev/gonest/validator"
+	"github.com/gonest-dev/gonest/validator/rules"
 )
 
 // ========================================

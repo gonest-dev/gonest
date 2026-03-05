@@ -44,8 +44,8 @@ e.GET("/user/:id", adapters.ToEchoHandler(GetUser))
 ```go
 import (
     "net/http"
-    "github.com/leandroluk/gonest/adapters"
-    "github.com/leandroluk/gonest/core"
+    "github.com/gonest-dev/gonest/adapters"
+    "github.com/gonest-dev/gonest/core"
 )
 
 func HelloHandler(ctx *core.Context) error {
@@ -64,7 +64,7 @@ func main() {
 ```go
 import (
     "github.com/gin-gonic/gin"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
@@ -79,7 +79,7 @@ func main() {
 ```go
 import (
     "github.com/gofiber/fiber/v2"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
@@ -94,7 +94,7 @@ func main() {
 ```go
 import (
     "github.com/labstack/echo/v4"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
@@ -109,7 +109,7 @@ func main() {
 ```go
 import (
     "github.com/go-chi/chi/v5"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
@@ -217,11 +217,11 @@ package main
 
 import (
     "github.com/gin-gonic/gin"
-    "github.com/leandroluk/gonest/adapters"
-    "github.com/leandroluk/gonest/core"
-    "github.com/leandroluk/gonest/guards"
-    "github.com/leandroluk/gonest/interceptors"
-    "github.com/leandroluk/gonest/pipes"
+    "github.com/gonest-dev/gonest/adapters"
+    "github.com/gonest-dev/gonest/core"
+    "github.com/gonest-dev/gonest/guards"
+    "github.com/gonest-dev/gonest/interceptors"
+    "github.com/gonest-dev/gonest/pipes"
 )
 
 // GoNest handler (platform-agnostic)

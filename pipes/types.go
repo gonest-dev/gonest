@@ -1,7 +1,7 @@
 package pipes
 
 import (
-	"github.com/leandroluk/gonest/core"
+	"github.com/gonest-dev/gonest/core"
 )
 
 // PipeTransform is the interface that all pipes must implement
