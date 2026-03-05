@@ -1,0 +1,56 @@
+{
+  // #region editor
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": true,
+  "editor.detectIndentation": false,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always",
+    "source.organizeImports": "always",
+    "source.sortImports": "always"
+  },
+  "editor.rulers": [
+    80,
+    100,
+    120
+  ],
+  // #endregion
+  // #region files
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "files.insertFinalNewline": false,
+  "files.trimFinalNewlines": true,
+  "files.associations": {
+    ".env*": "shellscript",
+    "*.tmpl": "markdown"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    ".terraform": true,
+    ".terraform.*": true,
+    "terraform.tfstate.*": true,
+    "coverage.out": true,
+    "*.coverage.out": true
+  },
+  // #endregion
+  // #region xml
+  "[xml]": {
+    "editor.formatOnSave": false,
+    "editor.formatOnPaste": false,
+    "editor.formatOnType": false
+  },
+  // #endregion
+  // #region golang
+  "[go]": {
+    "editor.foldingStrategy": "indentation",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+  },
+}
