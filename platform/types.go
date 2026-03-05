@@ -1,4 +1,4 @@
-package adapters
+package platform
 
 import (
 	"github.com/gonest-dev/gonest/core"

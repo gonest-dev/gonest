@@ -1,14 +1,33 @@
 # GoNest Platform Adapters
 
-Run GoNest applications on any Go web framework with zero code changes. Write once, deploy anywhere.
+Run GoNest applications on any Go web framework with **full type-safety** and zero code changes. Write once, deploy anywhere.
+
+## Features
+
+- ✅ **Type-Safe** - No `any` casts, full compile-time checking
+- ✅ **Native Integration** - Direct access to framework Request/Response
+- ✅ **Full Feature Support** - All GoNest features work seamlessly
+- ✅ **Zero Overhead** - Minimal wrapper, native performance
+- ✅ **IDE Support** - Full autocomplete and type inference
 
 ## Supported Platforms
 
-- ✅ **Mux (net/http)** - Built-in Go HTTP server
-- ✅ **Gin** - Most popular Go web framework
-- ✅ **Fiber** - Express-inspired, high performance
-- ✅ **Echo** - Minimalist, extensible framework
-- ✅ **Chi** - Lightweight, composable router
+All adapters provide **full support** with complete Request/Response access:
+
+- ✅ **Mux (net/http)** - Direct `http.ResponseWriter` and `*http.Request`
+- ✅ **Gin** - Uses `gin.Context` with full access to `Writer` and `Request`
+- ✅ **Fiber** - Converts `fiber.Ctx` (fasthttp) to net/http compatible
+- ✅ **Echo** - Uses `echo.Context` with direct `Response().Writer` and `Request()`
+- ✅ **Chi** - Direct `http.ResponseWriter` and `*http.Request`
+
+### Framework Dependencies
+
+Adapters use the actual framework types for complete functionality:
+```go
+import "github.com/gin-gonic/gin"          // Gin adapter
+import "github.com/gofiber/fiber/v2"       // Fiber adapter
+import "github.com/labstack/echo/v4"       // Echo adapter
+```
 
 ## Why Adapters?
 
@@ -37,6 +56,53 @@ app.Get("/user/:id", adapters.ToFiberHandler(GetUser))
 e.GET("/user/:id", adapters.ToEchoHandler(GetUser))
 ```
 
+## Type-Safety Benefits
+
+### ✅ Before (with types)
+```go
+// Gin - Full type-safety
+func ToGinHandler(handler core.HandlerFunc) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        ctx := core.NewContext(c.Writer, c.Request) // ✅ Direct access!
+        handler(ctx)
+    }
+}
+
+// Usage - No casts needed!
+router.GET("/hello", adapters.ToGinHandler(HelloHandler))
+//                                         ^^^^^^^^^^^^^ Type-safe!
+```
+
+### ❌ Alternative (generic)
+```go
+// Generic - Loses type information
+func WrapHandler(handler core.HandlerFunc) any {
+    return func(ginCtx any) { // ⚠️ Lost type info
+        // Can't access c.Writer or c.Request
+    }
+}
+
+// Usage - Manual cast required
+router.GET("/hello", adapters.ToGinHandler(HelloHandler).(gin.HandlerFunc))
+//                                                       ^^^^^^^^^^^^^^^^^ Yuck!
+```
+
+## Full Feature Integration
+
+All adapters have **complete access** to Request/Response:
+
+- ✅ **Gin** - Direct access to `c.Writer` and `c.Request`
+- ✅ **Echo** - Direct access to `c.Response().Writer` and `c.Request()`
+- ✅ **Fiber** - Converts fasthttp to net/http using `fasthttpadaptor`
+- ✅ **Mux/Chi** - Native net/http, no conversion needed
+
+This means all GoNest features work perfectly:
+- JSON responses
+- Request body parsing
+- Headers, cookies, params
+- File uploads
+- Streaming responses
+
 ## Quick Start
 
 ### Mux (net/http)
@@ -44,8 +110,8 @@ e.GET("/user/:id", adapters.ToEchoHandler(GetUser))
 ```go
 import (
     "net/http"
-    "github.com/gonest-dev/gonest/adapters"
-    "github.com/gonest-dev/gonest/core"
+    "github.com/leandroluk/gonest/adapters"
+    "github.com/leandroluk/gonest/core"
 )
 
 func HelloHandler(ctx *core.Context) error {
@@ -64,52 +130,98 @@ func main() {
 ```go
 import (
     "github.com/gin-gonic/gin"
-    "github.com/gonest-dev/gonest/adapters"
+    "github.com/leandroluk/gonest/adapters"
 )
 
 func main() {
     router := gin.Default()
+    
+    // Full support: path params, query, headers, body
     router.GET("/hello", adapters.ToGinHandler(HelloHandler))
+    router.GET("/users/:id", adapters.ToGinHandler(GetUser))
+    
+    // Middleware support
+    router.Use(adapters.ToGinMiddleware(LoggingMiddleware()))
+    
     router.Run(":3000")
 }
 ```
+
+**Full Features:**
+- ✅ Path parameters (`:id`)
+- ✅ Query parameters
+- ✅ Request headers
+- ✅ Request body
+- ✅ Response writing
+- ✅ Status codes
+- ✅ Middleware chain
+- ✅ Access to original `gin.Context` via `ctx.Get("gin_context")`
 
 ### Fiber
 
 ```go
 import (
     "github.com/gofiber/fiber/v2"
-    "github.com/gonest-dev/gonest/adapters"
+    "github.com/leandroluk/gonest/adapters"
 )
 
 func main() {
     app := fiber.New()
+    
+    // Full support with fasthttp to net/http conversion
     app.Get("/hello", adapters.ToFiberHandler(HelloHandler))
+    app.Get("/users/:id", adapters.ToFiberHandler(GetUser))
+    
+    // Middleware support
+    app.Use(adapters.ToFiberMiddleware(LoggingMiddleware()))
+    
     app.Listen(":3000")
 }
 ```
+
+**Full Features:**
+- ✅ Path parameters (`:id`)
+- ✅ Fasthttp to net/http conversion
+- ✅ Request/Response adaptation
+- ✅ Custom response writer wrapper
+- ✅ Middleware chain
+- ✅ Access to original `fiber.Ctx` via `ctx.Get("fiber_context")`
 
 ### Echo
 
 ```go
 import (
     "github.com/labstack/echo/v4"
-    "github.com/gonest-dev/gonest/adapters"
+    "github.com/leandroluk/gonest/adapters"
 )
 
 func main() {
     e := echo.New()
+    
+    // Full support with direct Request/Response access
     e.GET("/hello", adapters.ToEchoHandler(HelloHandler))
+    e.GET("/users/:id", adapters.ToEchoHandler(GetUser))
+    
+    // Middleware support
+    e.Use(adapters.ToEchoMiddleware(LoggingMiddleware()))
+    
     e.Start(":3000")
 }
 ```
+
+**Full Features:**
+- ✅ Path parameters (`:id`)
+- ✅ Direct access to `Request()` and `Response().Writer`
+- ✅ Full HTTP support
+- ✅ Middleware chain
+- ✅ Access to original `echo.Context` via `ctx.Get("echo_context")`
 
 ### Chi
 
 ```go
 import (
     "github.com/go-chi/chi/v5"
-    "github.com/gonest-dev/gonest/adapters"
+    "github.com/leandroluk/gonest/adapters"
 )
 
 func main() {
@@ -217,11 +329,11 @@ package main
 
 import (
     "github.com/gin-gonic/gin"
-    "github.com/gonest-dev/gonest/adapters"
-    "github.com/gonest-dev/gonest/core"
-    "github.com/gonest-dev/gonest/guards"
-    "github.com/gonest-dev/gonest/interceptors"
-    "github.com/gonest-dev/gonest/pipes"
+    "github.com/leandroluk/gonest/adapters"
+    "github.com/leandroluk/gonest/core"
+    "github.com/leandroluk/gonest/guards"
+    "github.com/leandroluk/gonest/interceptors"
+    "github.com/leandroluk/gonest/pipes"
 )
 
 // GoNest handler (platform-agnostic)

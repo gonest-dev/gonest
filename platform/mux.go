@@ -1,4 +1,4 @@
-package adapters
+package platform
 
 import (
 	"encoding/json"
