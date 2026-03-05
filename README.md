@@ -67,7 +67,7 @@ Contributions are welcome! Please check our [Contributing Guide](https://www.goo
 ## 🔗 Links
 
 * **Website:** [gonest.dev](https://www.google.com/search?q=https://gonest.dev)
-* **Discord:** [Join Community](https://discord.gg/gonest)
+* **Discord:** [Join Community](https://discord.gg/tFVyqzyVWk)
 * **License:** [MIT](https://www.google.com/search?q=./LICENSE)
 
 ---
