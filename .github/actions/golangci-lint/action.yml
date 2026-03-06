@@ -1,6 +1,11 @@
 name: 'Cached Golangci-Lint'
 description: 'Runs golangci-lint with manual binary caching for speed'
 
+inputs:
+  module:
+    description: 'Module path to lint'
+    required: true
+
 runs:
   using: "composite"
   steps:
@@ -18,4 +23,4 @@ runs:
 
     - name: Run Lint
       shell: bash
-      run: $(go env GOPATH)/bin/golangci-lint run --timeout=5m ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
+      run: $(go env GOPATH)/bin/golangci-lint run --timeout=5m ${{ inputs.module }}
