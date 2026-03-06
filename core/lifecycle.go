@@ -1,3 +1,4 @@
+// gonest/core/lifecycle.go
 package core
 
 import (

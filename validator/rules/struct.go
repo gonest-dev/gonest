@@ -1,3 +1,4 @@
+// gonest/validator/rules/struct.go
 package rules
 
 import (

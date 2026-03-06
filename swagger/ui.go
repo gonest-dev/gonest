@@ -1,3 +1,4 @@
+// gonest/swagger/ui.go
 package swagger
 
 import (

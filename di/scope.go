@@ -1,3 +1,4 @@
+// gonest/di/scope.go
 package di
 
 import (

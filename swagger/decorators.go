@@ -1,3 +1,4 @@
+// gonest/swagger/decorators.go
 package swagger
 
 // APIOperation defines operation metadata

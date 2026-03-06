@@ -1,3 +1,4 @@
+// gonest/core/metadata.go
 package core
 
 import (

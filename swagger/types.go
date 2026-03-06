@@ -1,3 +1,4 @@
+// gonest/swagger/types.go
 package swagger
 
 // OpenAPIVersion represents OpenAPI specification version

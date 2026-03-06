@@ -1,3 +1,4 @@
+// gonest/swagger/descriptor.go
 package swagger
 
 import (
