@@ -110,8 +110,8 @@ This means all GoNest features work perfectly:
 ```go
 import (
     "net/http"
-    "github.com/leandroluk/gonest/adapters"
-    "github.com/leandroluk/gonest/core"
+    "github.com/gonest-dev/gonest/adapters"
+    "github.com/gonest-dev/gonest/core"
 )
 
 func HelloHandler(ctx *core.Context) error {
@@ -130,19 +130,19 @@ func main() {
 ```go
 import (
     "github.com/gin-gonic/gin"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
     router := gin.Default()
-    
+
     // Full support: path params, query, headers, body
     router.GET("/hello", adapters.ToGinHandler(HelloHandler))
     router.GET("/users/:id", adapters.ToGinHandler(GetUser))
-    
+
     // Middleware support
     router.Use(adapters.ToGinMiddleware(LoggingMiddleware()))
-    
+
     router.Run(":3000")
 }
 ```
@@ -162,19 +162,19 @@ func main() {
 ```go
 import (
     "github.com/gofiber/fiber/v2"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
     app := fiber.New()
-    
+
     // Full support with fasthttp to net/http conversion
     app.Get("/hello", adapters.ToFiberHandler(HelloHandler))
     app.Get("/users/:id", adapters.ToFiberHandler(GetUser))
-    
+
     // Middleware support
     app.Use(adapters.ToFiberMiddleware(LoggingMiddleware()))
-    
+
     app.Listen(":3000")
 }
 ```
@@ -192,19 +192,19 @@ func main() {
 ```go
 import (
     "github.com/labstack/echo/v4"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
     e := echo.New()
-    
+
     // Full support with direct Request/Response access
     e.GET("/hello", adapters.ToEchoHandler(HelloHandler))
     e.GET("/users/:id", adapters.ToEchoHandler(GetUser))
-    
+
     // Middleware support
     e.Use(adapters.ToEchoMiddleware(LoggingMiddleware()))
-    
+
     e.Start(":3000")
 }
 ```
@@ -221,7 +221,7 @@ func main() {
 ```go
 import (
     "github.com/go-chi/chi/v5"
-    "github.com/leandroluk/gonest/adapters"
+    "github.com/gonest-dev/gonest/adapters"
 )
 
 func main() {
@@ -277,7 +277,7 @@ func CreateUser(ctx *core.Context) error {
     if err != nil {
         return err
     }
-    
+
     // Create user...
     return ctx.JSON(201, user)
 }
@@ -329,11 +329,11 @@ package main
 
 import (
     "github.com/gin-gonic/gin"
-    "github.com/leandroluk/gonest/adapters"
-    "github.com/leandroluk/gonest/core"
-    "github.com/leandroluk/gonest/guards"
-    "github.com/leandroluk/gonest/interceptors"
-    "github.com/leandroluk/gonest/pipes"
+    "github.com/gonest-dev/gonest/adapters"
+    "github.com/gonest-dev/gonest/core"
+    "github.com/gonest-dev/gonest/guards"
+    "github.com/gonest-dev/gonest/interceptors"
+    "github.com/gonest-dev/gonest/pipes"
 )
 
 // GoNest handler (platform-agnostic)
@@ -352,22 +352,22 @@ func CreateUser(ctx *core.Context) error {
 
 func main() {
     router := gin.Default()
-    
+
     // Setup guards and interceptors
     authGuard := guards.SimpleAuthGuard("secret")
     logging := interceptors.SimpleLoggingInterceptor()
-    
+
     // Public route
     router.GET("/health", adapters.ToGinHandler(GetUser))
-    
+
     // Protected route with guard
     protected := guards.ApplyGuards(GetUser, authGuard)
     router.GET("/users/:id", adapters.ToGinHandler(protected))
-    
+
     // Route with interceptor
     logged := interceptors.ApplyInterceptors(CreateUser, logging)
     router.POST("/users", adapters.ToGinHandler(logged))
-    
+
     router.Run(":3000")
 }
 ```
