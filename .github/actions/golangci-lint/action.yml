@@ -18,6 +18,4 @@ runs:
 
     - name: Run Lint
       shell: bash
-      run: |
-        $(go env GOPATH)/bin/golangci-lint run --timeout=5m \
-        ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
+      run: $(go env GOPATH)/bin/golangci-lint run --timeout=5m ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
