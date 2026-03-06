@@ -11,6 +11,9 @@ permissions:
 jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gonest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,7 +23,7 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: gonest/go.work.sum
 
       - name: Test
         run: make test
@@ -34,7 +37,7 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
-          files: coverage.out
+          files: gonest/coverage.out
           fail_ci_if_error: false
 
       - name: Commit badges
@@ -49,6 +52,8 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      GOWORK: off
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,6 +68,8 @@ jobs:
         with:
           version: latest
           install-mode: goinstall
+          working-directory: gonest
+
           args: --timeout=5m ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./adapters/...
 
   build:
@@ -70,15 +77,17 @@ jobs:
     strategy:
       matrix:
         module:
-          - core
-          - validator
-          - controller
-          - pipes
-          - guards
-          - interceptors
-          - exceptions
-          - swagger
-          - adapters
+          [
+            core,
+            validator,
+            controller,
+            pipes,
+            guards,
+            interceptors,
+            exceptions,
+            swagger,
+            adapters,
+          ]
     env:
       GOWORK: off
     steps:
@@ -91,4 +100,5 @@ jobs:
           go-version: "1.25"
 
       - name: Build ${{ matrix.module }}
-        run: cd ${{ matrix.module }} && go build -v ./...
+
+        run: cd gonest/${{ matrix.module }} && go build -v ./...
