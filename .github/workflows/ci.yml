@@ -20,36 +20,31 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-          cache-dependency-path: gonest/go.sum
+          cache-dependency-path: go.work.sum
 
-      - name: Test gonest
-        working-directory: gonest
+      - name: Test
         run: make test
 
       - name: Coverage
-        working-directory: gonest
         run: make coverage
 
       - name: Generate badges
-        working-directory: gonest
         run: make badges
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
-          files: gonest/coverage.out
-          flags: gonest
+          files: coverage.out
           fail_ci_if_error: false
 
       - name: Commit badges
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        working-directory: gonest
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .public/*.svg
           git diff --cached --quiet && exit 0
-          git commit -m "chore(gonest): update coverage badges [skip ci]"
+          git commit -m "chore: update coverage badges [skip ci]"
           git push
 
   lint:
@@ -64,11 +59,11 @@ jobs:
           go-version: "1.25"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          working-directory: gonest
-          args: --timeout=5m
+          install-mode: goinstall
+          args: --timeout=5m ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./adapters/...
 
   build:
     runs-on: ubuntu-latest
@@ -94,5 +89,4 @@ jobs:
           go-version: "1.25"
 
       - name: Build ${{ matrix.module }}
-        working-directory: gonest/${{ matrix.module }}
-        run: go build -v ./...
+        run: cd ${{ matrix.module }} && go build -v ./...
