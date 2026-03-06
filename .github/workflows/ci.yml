@@ -42,13 +42,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+          cache: false # Desativamos aqui para não conflitar com o cache da action de lint
 
-
-      - name: Install & Run golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
-          export PATH=$(go env GOPATH)/bin:$PATH
-          make lint
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
+          # A action detecta o go.work e usa o cache automaticamente
+          args: --timeout=5m
 
   build:
     runs-on: ubuntu-latest
