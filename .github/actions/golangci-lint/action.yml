@@ -1,0 +1,23 @@
+name: 'Cached Golangci-Lint'
+description: 'Runs golangci-lint with manual binary caching for speed'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache golangci-lint binary
+      id: cache-lint
+      uses: actions/cache@v4
+      with:
+        path: ~/go/bin/golangci-lint
+        key: ${{ runner.os }}-lint-v1.64.5-go1.25
+
+    - name: Install golangci-lint
+      if: steps.cache-lint.outputs.cache-hit != 'true'
+      shell: bash
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.5
+
+    - name: Run Lint
+      shell: bash
+      run: |
+        $(go env GOPATH)/bin/golangci-lint run --timeout=5m \
+        ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
