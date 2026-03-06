@@ -1,89 +1,130 @@
-GO           ?= go
-COVERMODE    ?= atomic
+.PHONY: help test coverage lint build clean ci badge tag tag-create tag-push tag-delete tag-minor tag-major tag-purge format mod-tidy
 
-BADGE_DIR    ?= .public
-BADGE_LABEL  ?= coverage
+GO        ?= go
+COVERMODE ?= atomic
+
+BADGE_DIR   ?= .public
+BADGE_LABEL ?= coverage
 
 COVERPROFILE_ALL ?= coverage.out
 
-# Módulos definidos no Phase 1, 2 e 3 do Roadmap
-WORK_MODULES   ?= adapters common controller core di exceptions guards interceptors pipes swagger validator
-WORK_PACKAGES  := $(addsuffix /...,$(addprefix ./,$(WORK_MODULES)))
+# Automatically discover modules
+MODULES := core validator controller pipes guards interceptors exceptions swagger adapters
+MODULE_PACKAGES := ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./adapters/...
 
-# Caminho para as ferramentas (agora tratadas como pacotes do módulo raiz)
-BADGE_TOOL_PKG ?= ./_tools/badge
-TAG_TOOL_PKG   ?= ./_tools/tag
-CLEAN_TOOL_PKG ?= ./_tools/clean
+# Detect OS for path separator
+ifeq ($(OS),Windows_NT)
+	TOOLS_DIR := ..\gonest-tools
+else
+	TOOLS_DIR := ../gonest-tools
+endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help
-help:
-	@echo "GoNest Framework - Targets:"
-	@echo "  make build                # Compila todos os pacotes do framework"
-	@echo "  make test                 # Executa testes em todos os módulos"
-	@echo "  make cover                # Gera relatório de cobertura $(COVERPROFILE_ALL)"
-	@echo "  make badge                # Gera o badge de cobertura geral"
-	@echo "  make ci                   # Fluxo completo: build + test + badges"
-	@echo "  make tag <version>        # Gerencia versões (ex: make tag v0.1.0)"
+help: ## Show this help
+	@echo "GoNest Framework - Available Commands"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make test                 # Run tests on all modules"
+	@echo "  make coverage             # Generate coverage profile"
+	@echo "  make badge                # Generate coverage badge"
+	@echo "  make ci                   # Run CI (test + coverage + badge)"
+	@echo ""
+	@echo "Building:"
+	@echo "  make build                # Build all modules"
+	@echo "  make lint                 # Run linter"
+	@echo "  make clean                # Clean artifacts"
+	@echo ""
+	@echo "Tag Management:"
+	@echo "  make tag v0.1.0           # Create and push tags"
+	@echo "  make tag-create v0.1.0    # Create tags locally"
+	@echo "  make tag-push v0.1.0      # Push tags to remote"
+	@echo "  make tag-delete v0.1.0    # Delete tags"
+	@echo "  make tag-minor            # Bump patch (0.1.0 -> 0.1.1)"
+	@echo "  make tag-major            # Bump minor (0.1.0 -> 0.2.0)"
+	@echo ""
+	@echo "Development:"
+	@echo "  make format               # Format code"
+	@echo "  make mod-tidy             # Tidy all modules"
 
-.PHONY: build
-build:
-	$(GO) build $(WORK_PACKAGES)
+test: ## Run tests
+	@echo Running tests...
+	$(GO) test $(MODULE_PACKAGES)
 
-.PHONY: test
-test:
-	$(GO) test $(WORK_PACKAGES)
+coverage: ## Generate coverage
+	@echo Running tests with coverage...
+	$(GO) test $(MODULE_PACKAGES) -coverprofile=$(COVERPROFILE_ALL) -covermode=$(COVERMODE)
 
-.PHONY: cover
-cover:
-	$(GO) test $(WORK_PACKAGES) -coverprofile=$(COVERPROFILE_ALL) -covermode=$(COVERMODE)
+badge: coverage ## Generate coverage badge
+	@echo Generating coverage badge...
+	@if not exist $(BADGE_DIR) mkdir $(BADGE_DIR)
+	$(GO) run $(TOOLS_DIR)/badge -in $(COVERPROFILE_ALL) -out $(BADGE_DIR)/coverage.svg -label $(BADGE_LABEL)
 
-# Badge Geral
-$(BADGE_DIR)/coverage.svg: $(COVERPROFILE_ALL)
-	$(GO) run $(BADGE_TOOL_PKG) -in $< -out $@ -label $(BADGE_LABEL)
+ci: coverage badge ## Run CI tasks
+	@echo CI completed successfully!
 
-.PHONY: badge
-badge: $(BADGE_DIR)/coverage.svg
+lint: ## Run linter
+	@echo Running linter...
+	golangci-lint run --timeout=5m
 
-# Regras dinâmicas por módulo
-define module_rules
-.PHONY: $(1).cover
-$(1).cover:
-	$(GO) test ./$(1)/... -coverprofile=$(1).coverage.out -covermode=$(COVERMODE)
+build: ## Build all modules
+	@echo Building all modules...
+	cd core && $(GO) build -v ./... && cd ..
+	cd validator && $(GO) build -v ./... && cd ..
+	cd controller && $(GO) build -v ./... && cd ..
+	cd pipes && $(GO) build -v ./... && cd ..
+	cd guards && $(GO) build -v ./... && cd ..
+	cd interceptors && $(GO) build -v ./... && cd ..
+	cd exceptions && $(GO) build -v ./... && cd ..
+	cd swagger && $(GO) build -v ./... && cd ..
+	cd adapters && $(GO) build -v ./... && cd ..
+	@echo All modules built successfully!
 
-$(BADGE_DIR)/$(1)-coverage.svg: $(1).cover
-	$(GO) run $(BADGE_TOOL_PKG) -in $(1).coverage.out -out $$@ -label $(BADGE_LABEL)
-endef
-
-$(foreach m,$(WORK_MODULES),$(eval $(call module_rules,$(m))))
-
-.PHONY: module-badges
-module-badges: $(foreach m,$(WORK_MODULES),$(BADGE_DIR)/$(m)-coverage.svg)
-
-.PHONY: badges
-badges: badge module-badges
-
-.PHONY: ci
-ci: build cover badges
-
-.PHONY: clean
-clean:
+clean: ## Clean artifacts
+	@echo Cleaning...
 	$(GO) clean -testcache
-	$(GO) run $(CLEAN_TOOL_PKG) $(COVERPROFILE_ALL) "*.coverage.out" "$(BADGE_DIR)/*.svg"
+	$(GO) run $(TOOLS_DIR)/clean $(COVERPROFILE_ALL) "*.coverage.out" "$(BADGE_DIR)/*.svg"
+	@echo Cleaned!
 
-# Gerenciamento de Tags e Versões (Phase 18)
-.PHONY: tag
-tag:
-	$(GO) run $(TAG_TOOL_PKG) --create --push "$(filter-out $@,$(MAKECMDGOALS))"
+format: ## Format code
+	@echo Formatting code...
+	$(GO) fmt ./...
 
-.PHONY: tag-minor
-tag-minor:
-	$(GO) run $(TAG_TOOL_PKG) --bump patch
+mod-tidy: ## Tidy all modules
+	@echo Tidying modules...
+	cd core && $(GO) mod tidy && cd ..
+	cd validator && $(GO) mod tidy && cd ..
+	cd controller && $(GO) mod tidy && cd ..
+	cd pipes && $(GO) mod tidy && cd ..
+	cd guards && $(GO) mod tidy && cd ..
+	cd interceptors && $(GO) mod tidy && cd ..
+	cd exceptions && $(GO) mod tidy && cd ..
+	cd swagger && $(GO) mod tidy && cd ..
+	cd adapters && $(GO) mod tidy && cd ..
+	@echo All modules tidied!
 
-.PHONY: tag-major
-tag-major:
-	$(GO) run $(TAG_TOOL_PKG) --bump minor
+# Tag management
+tag-create: ## Create tags locally
+	$(GO) run $(TOOLS_DIR)/tag --create "$(filter-out $@,$(MAKECMDGOALS))"
 
+tag-push: ## Push tags to remote
+	$(GO) run $(TOOLS_DIR)/tag --push "$(filter-out $@,$(MAKECMDGOALS))"
+
+tag-delete: ## Delete tags
+	$(GO) run $(TOOLS_DIR)/tag --delete "$(filter-out $@,$(MAKECMDGOALS))"
+
+tag: ## Create and push tags
+	$(GO) run $(TOOLS_DIR)/tag --create --push "$(filter-out $@,$(MAKECMDGOALS))"
+
+tag-minor: ## Bump patch version
+	$(GO) run $(TOOLS_DIR)/tag --bump patch
+
+tag-major: ## Bump minor version
+	$(GO) run $(TOOLS_DIR)/tag --bump minor
+
+tag-purge: ## Purge old tags
+	$(GO) run $(TOOLS_DIR)/tag --purge "$(filter-out $@,$(MAKECMDGOALS))"
+
+# Prevent make from treating arguments as targets
 %:
 	@:

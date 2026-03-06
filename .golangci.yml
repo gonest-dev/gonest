@@ -1,0 +1,26 @@
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  enable:
+    - errcheck
+    - gocritic
+    - gofmt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - stylecheck
+    - unconvert
+    - unused
+
+run:
+  timeout: 10m
+  tests: true
+  allow-parallel-runners: true
+
+version: "2"

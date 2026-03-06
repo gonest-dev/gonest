@@ -1,11 +1,10 @@
-module github.com/gonest-dev/gonest
+module github.com/gonest-dev/gonest/platform
 
-go 1.25.0
+go 1.25
 
-require (
-	github.com/labstack/echo/v4 v4.15.1
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
-)
+toolchain go1.25.0
+
+require github.com/labstack/echo/v4 v4.15.1
 
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect

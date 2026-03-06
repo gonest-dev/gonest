@@ -1,77 +1,196 @@
+<div align="center">
+
 # GoNest Framework
 
-<p align="center">
-  <a href="https://gonest.dev/" target="blank">
-    <img src=".public/icon.svg" width="120" alt="GoNest Logo">
-  </a>
-</p>
+<img src="https://raw.githubusercontent.com/gonest-dev/gonest/refs/heads/master/.images/icon.svg?token=GHSAT0AAAAAADV7OB46WBALRD6NAXUSMCJ42NKC75Q" alt="GoNest Logo" width="200"/>
 
-A NestJS-inspired framework for **Go** designed for building efficient, reliable, and scalable server-side applications. It leverages Go's performance and type safety while providing a familiar architectural pattern for developers coming from the NestJS ecosystem.
+**A NestJS-inspired framework for Go with complete type-safety**
 
-## 🚀 Overview
+[![CI](https://github.com/gonest-dev/gonest/workflows/ci/badge.svg)](https://github.com/gonest-dev/gonest/actions)
+[![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/coverage.svg)](https://github.com/gonest-dev/gonest)
+[![Go Version](https://img.shields.io/badge/go-1.23-blue.svg)](https://go.dev)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-GoNest provides an out-of-the-box application architecture which allows developers and teams to create highly testable, scalable, loosely coupled, and easily maintainable applications. It combines the power of Go's concurrency with advanced Dependency Injection and a metadata-driven API.
+[Documentation](https://gonest.dev) • [Workspace](https://github.com/gonest-dev/workspace) • [Examples](https://github.com/gonest-dev/gonest-examples)
 
-## ✨ Features
+</div>
 
-* **Advanced Dependency Injection:** Fully featured DI container supporting Singleton, Transient, and Request scopes.
-* **Type-Safe Validation:** Built-in validator core with 86+ rules across 9 categories (String, Number, Date, Array, etc.).
-* **Decorator-inspired API:** Controller and Routing system using struct tags and reflection to mimic the NestJS developer experience.
-* **Modular Architecture:** Easily organize code into modules with circular dependency detection.
-* **Context System:** Integrated request context with middleware chain support.
-* **Lifecycle Hooks:** Manage application stages with `OnModuleInit`, `OnApplicationBootstrap`, and more.
+---
 
-## 🛠️ Quick Start
+## 🚀 Quick Start
+
+```bash
+go get github.com/gonest-dev/gonest
+```
 
 ```go
 package main
 
 import (
-	"github.com/gonest-dev/gonest/core"
-	"github.com/gonest-dev/gonest/common"
+    "github.com/gonest-dev/gonest/core"
+    "github.com/gonest-dev/gonest/controller"
 )
 
-type AppController struct {}
-
-func (c *AppController) GetHello() string {
-	return "Hello GoNest!"
-}
-
 func main() {
-	app := core.Create(AppModule)
-	app.Listen(3000)
+    app := core.NewApplication()
+
+    ctrl := controller.NewController(
+        controller.WithPrefix("/"),
+    )
+
+    ctrl.Get("/", func(ctx *core.Context) error {
+        return ctx.JSON(200, map[string]any{
+            "message": "Hello, GoNest!",
+        })
+    })
+
+    app.RegisterController(ctrl)
+    app.Listen(":3000")
 }
-
 ```
-
-## 📈 Roadmap & Status
-
-GoNest is currently in **v0.1.0 Alpha** (March 2026).
-
-### Completed Milestones
-
-* ✅ **Phase 1: Foundation** (Core Architecture, DI, Context)
-* ✅ **Phase 2: Type-Safe Validation** (86+ rules, Async support)
-* ✅ **Phase 3: Decorators & Routing** (Controller system, Pipes)
-
-### Upcoming
-
-* 🚧 **Phase 4: Guards & Security** (Auth, JWT, RBAC)
-* 🚧 **Phase 5: Interceptors & Middleware**
-* 🚧 **Phase 7: Swagger/OpenAPI Integration**
-
-## 🤝 Contributing
-
-Contributions are welcome! Please check our [Contributing Guide](https://www.google.com/search?q=./CONTRIBUTING.md) and the [Roadmap](https://www.google.com/search?q=./ROADMAP.md) for current priorities.
-
-## 🔗 Links
-
-* **Website:** [gonest.dev](https://www.google.com/search?q=https://gonest.dev)
-* **Discord:** [Join Community](https://discord.gg/tFVyqzyVWk)
-* **License:** [MIT](https://www.google.com/search?q=./LICENSE)
 
 ---
 
-Developed with ❤️ by [gonest team](https://www.google.com/search?q=https://gonest.dev)
+## 📦 Modules
 
-Would you like me to help you draft the `CONTRIBUTING.md` or a specific technical section for the `Documentation` mentioned in your roadmap?
+| Module                         | Description            | Coverage                                                                                                |
+| ------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| [core](./core)                 | DI, Modules, Lifecycle | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/core-coverage.svg)         |
+| [validator](./validator)       | 86+ validation rules   | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/validator-coverage.svg)    |
+| [controller](./controller)     | HTTP routing           | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/controller-coverage.svg)   |
+| [pipes](./pipes)               | Data transformation    | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/pipes-coverage.svg)        |
+| [guards](./guards)             | Security & auth        | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/guards-coverage.svg)       |
+| [interceptors](./interceptors) | Request/response       | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/interceptors-coverage.svg) |
+| [exceptions](./exceptions)     | Error handling         | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/exceptions-coverage.svg)   |
+| [swagger](./swagger)           | OpenAPI 3.0.3          | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/swagger-coverage.svg)      |
+| [adapters](./adapters)         | Platform support       | ![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/adapters-coverage.svg)     |
+
+---
+
+## ✨ Features
+
+- 🎯 **Type-Safe** - Full compile-time checking with generics
+- 🔒 **Secure** - Built-in guards and authentication
+- 📝 **Validated** - 86+ validation rules
+- 📖 **Documented** - Auto-generated OpenAPI docs
+- 🚀 **Fast** - Zero reflection in hot paths
+- 🔌 **Platform Agnostic** - Gin, Fiber, Echo, Chi, Mux
+- 🧩 **Modular** - Clean architecture with DI
+- 🎨 **Familiar** - API inspired by NestJS
+
+---
+
+## 📚 Documentation
+
+- 📖 [Full Documentation](https://gonest.dev)
+- 🚀 [Getting Started](https://gonest.dev/getting-started)
+- 📘 [Core Concepts](https://gonest.dev/core-concepts)
+- 🎯 [API Reference](https://gonest.dev/api)
+
+---
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Go 1.23+
+- Make
+- [gonest-tools](https://github.com/gonest-dev/gonest-tools) (optional, for badges and tags)
+
+### Setup
+
+```bash
+git clone https://github.com/gonest-dev/gonest.git
+cd gonest
+```
+
+### Commands
+
+```bash
+# Testing
+make test              # Run tests
+make coverage          # Generate coverage
+make ci                # Test + coverage + badges
+
+# Building
+make build             # Build all modules
+make lint              # Run linter
+
+# Development
+make format            # Format code
+make mod-tidy          # Tidy modules
+
+# Cleanup
+make clean             # Remove artifacts
+```
+
+### Installing gonest-tools
+
+For badge generation and tag management:
+
+```bash
+# Clone tools repo
+git clone https://github.com/gonest-dev/gonest-tools.git
+cd gonest-tools
+
+# Install globally
+make install
+
+# Now you can use in gonest repo:
+cd ../gonest
+make badges            # Generate coverage badges
+make tag v0.1.0        # Create and push tags
+```
+
+---
+
+## 🏷️ Release Management
+
+Using [gonest-tag](https://github.com/gonest-dev/gonest-tools):
+
+```bash
+# Create and push tags for all modules
+make tag v0.1.0
+
+# Bump patch (0.1.0 -> 0.1.1)
+make tag-minor
+
+# Bump minor (0.1.0 -> 0.2.0)
+make tag-major
+```
+
+This creates tags for:
+- `v0.1.0` (root)
+- `core/v0.1.0`
+- `validator/v0.1.0`
+- `controller/v0.1.0`
+- ... (all modules)
+
+---
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](https://github.com/gonest-dev/workspace/blob/main/CONTRIBUTING.md) in the workspace repo.
+
+---
+
+## 📜 License
+
+[MIT](LICENSE) © 2024 GoNest Contributors
+
+---
+
+## 🔗 Related Repositories
+
+- [workspace](https://github.com/gonest-dev/workspace) - Monorepo
+- [gonest-tools](https://github.com/gonest-dev/gonest-tools) - Development tools
+- [gonest-examples](https://github.com/gonest-dev/gonest-examples) - Example apps
+- [gonest-docs](https://github.com/gonest-dev/gonest-docs) - Documentation
+
+---
+
+<div align="center">
+
+**Made with ❤️ by the GoNest team**
+
+</div>

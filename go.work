@@ -1,0 +1,15 @@
+go 1.25
+
+use (
+	..\gonest-tools\tag
+	./controller
+	./core
+	./di
+	./exceptions
+	./guards
+	./interceptors
+	./pipes
+	./platform
+	./swagger
+	./validator
+)
