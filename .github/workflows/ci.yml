@@ -1,0 +1,98 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+          cache-dependency-path: gonest/go.sum
+
+      - name: Test gonest
+        working-directory: gonest
+        run: make test
+
+      - name: Coverage
+        working-directory: gonest
+        run: make coverage
+
+      - name: Generate badges
+        working-directory: gonest
+        run: make badges
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: gonest/coverage.out
+          flags: gonest
+          fail_ci_if_error: false
+
+      - name: Commit badges
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: gonest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .public/*.svg
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(gonest): update coverage badges [skip ci]"
+          git push
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: gonest
+          args: --timeout=5m
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - core
+          - validator
+          - controller
+          - pipes
+          - guards
+          - interceptors
+          - exceptions
+          - swagger
+          - adapters
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Build ${{ matrix.module }}
+        working-directory: gonest/${{ matrix.module }}
+        run: go build -v ./...

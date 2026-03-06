@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/gonest-dev/gonest/workflows/ci/badge.svg)](https://github.com/gonest-dev/gonest/actions)
 [![Coverage](https://raw.githubusercontent.com/gonest-dev/gonest/main/.public/coverage.svg)](https://github.com/gonest-dev/gonest)
-[![Go Version](https://img.shields.io/badge/go-1.23-blue.svg)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Documentation](https://gonest.dev) • [Workspace](https://github.com/gonest-dev/workspace) • [Examples](https://github.com/gonest-dev/gonest-examples)
@@ -93,7 +93,7 @@ func main() {
 
 ### Prerequisites
 
-- Go 1.23+
+- Go 1.25+
 - Make
 - [gonest-tools](https://github.com/gonest-dev/gonest-tools) (optional, for badges and tags)
 

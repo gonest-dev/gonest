@@ -1,0 +1,30 @@
+# GoNest Code Owners
+# These owners will be the default owners for everything in the repo.
+# Unless a later match takes precedence, they will be requested for
+# review when someone opens a pull request.
+
+# Root
+* @gonest-dev/core-team
+
+# Framework modules
+/gonest/core/          @gonest-dev/core-team
+/gonest/validator/     @gonest-dev/core-team
+/gonest/controller/    @gonest-dev/core-team
+/gonest/pipes/         @gonest-dev/core-team
+/gonest/guards/        @gonest-dev/core-team
+/gonest/interceptors/  @gonest-dev/core-team
+/gonest/exceptions/    @gonest-dev/core-team
+/gonest/swagger/       @gonest-dev/core-team
+/gonest/adapters/      @gonest-dev/core-team
+
+# Tools
+/gonest-tools/         @gonest-dev/core-team
+
+# Documentation
+/gonest-docs/          @gonest-dev/docs-team
+
+# Examples
+/gonest-examples/      @gonest-dev/core-team
+
+# CI/CD
+/.github/              @gonest-dev/core-team
