@@ -15,7 +15,7 @@ GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
 
 # Path to testing tools
 TOOLS_PKG := github.com/gonest-dev/gonest-tools
-LINT_TOOL := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+LINT_TOOL := github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.1
 
 # Bypass Go proxy for private/recently public tools
 export GOPRIVATE := github.com/gonest-dev/*
