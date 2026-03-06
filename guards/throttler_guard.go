@@ -45,9 +45,7 @@ func NewThrottlerGuard(opts *ThrottlerGuardOptions) *ThrottlerGuard {
 
 	if opts.KeyGen == nil {
 		// Default: use IP address as key
-		opts.KeyGen = func(ctx *ExecutionContext) string {
-			return ctx.Context.Get("X-Real-IP").(string)
-		}
+		opts.KeyGen = getClientIP
 	}
 
 	guard := &ThrottlerGuard{
@@ -122,6 +120,28 @@ func (g *ThrottlerGuard) cleanup() {
 	}
 }
 
+// getClientIP extracts client IP from various headers
+func getClientIP(ctx *ExecutionContext) string {
+	// Try X-Real-IP header first
+	if ip := ctx.Context.Header("X-Real-IP"); ip != "" {
+		return ip
+	}
+
+	// Try X-Forwarded-For header
+	if ip := ctx.Context.Header("X-Forwarded-For"); ip != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		return ip
+	}
+
+	// Fallback to request's remote address
+	// Note: This might need adjustment based on your core.Context implementation
+	if ip := ctx.Context.GetString("remote_addr"); ip != "" {
+		return ip
+	}
+
+	return ""
+}
+
 // SimpleThrottler creates a basic rate limiter
 func SimpleThrottler(limit int, ttl time.Duration) *ThrottlerGuard {
 	return NewThrottlerGuard(&ThrottlerGuardOptions{
@@ -133,19 +153,9 @@ func SimpleThrottler(limit int, ttl time.Duration) *ThrottlerGuard {
 // IPThrottler creates a rate limiter based on IP address
 func IPThrottler(limit int, ttl time.Duration) *ThrottlerGuard {
 	return NewThrottlerGuard(&ThrottlerGuardOptions{
-		Limit: limit,
-		TTL:   ttl,
-		KeyGen: func(ctx *ExecutionContext) string {
-			// Try multiple headers for IP
-			ip := ctx.Context.Get("X-Real-IP")
-			if ip == "" {
-				ip = ctx.Context.Get("X-Forwarded-For")
-			}
-			if ip == "" {
-				ip = ctx.Context.Get("RemoteAddr")
-			}
-			return ip.(string)
-		},
+		Limit:  limit,
+		TTL:    ttl,
+		KeyGen: getClientIP,
 	})
 }
 
@@ -155,7 +165,10 @@ func UserThrottler(limit int, ttl time.Duration) *ThrottlerGuard {
 		Limit: limit,
 		TTL:   ttl,
 		KeyGen: func(ctx *ExecutionContext) string {
-			userID, _ := ctx.Context.Get("user:id").(string)
+			userID := ctx.Context.GetString("user:id")
+			if userID == "" {
+				return ""
+			}
 			return fmt.Sprintf("user:%s", userID)
 		},
 	})

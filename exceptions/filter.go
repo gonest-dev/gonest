@@ -46,7 +46,7 @@ func (f *GlobalExceptionFilter) Catch(err error, ctx *core.Context) error {
 	if httpErr, ok := err.(*HTTPException); ok {
 		// Log the error
 		f.logger.Printf("[ERROR] %s %s: %s",
-			ctx.Get("method"), ctx.Get("path"), httpErr.Message)
+			ctx.Method(), ctx.Path(), httpErr.Message)
 
 		// Return JSON response
 		response := httpErr.ToJSON()
@@ -60,7 +60,7 @@ func (f *GlobalExceptionFilter) Catch(err error, ctx *core.Context) error {
 
 	// Unknown error - return 500
 	f.logger.Printf("[ERROR] %s %s: %v",
-		ctx.Get("method"), ctx.Get("path"), err)
+		ctx.Method(), ctx.Path(), err)
 
 	return ctx.JSON(500, map[string]any{
 		"statusCode": 500,

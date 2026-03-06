@@ -2,13 +2,16 @@
 package platform
 
 import (
+	"net/http"
+
 	"github.com/gonest-dev/gonest/core"
 	"github.com/labstack/echo/v4"
 )
 
-// EchoAdapter adapts GoNest to Echo framework
+// EchoAdapter implements PlatformAdapter for Echo framework
 type EchoAdapter struct {
 	config *AdapterConfig
+	echo   *echo.Echo
 }
 
 // NewEchoAdapter creates an Echo adapter
@@ -21,76 +24,86 @@ func NewEchoAdapter(config ...*AdapterConfig) *EchoAdapter {
 		cfg = config[0]
 	}
 
+	// Create Echo instance
+	e := echo.New()
+
+	// Disable Echo's default logger
+	e.HideBanner = true
+	e.HidePort = true
+
 	return &EchoAdapter{
 		config: cfg,
+		echo:   e,
 	}
 }
 
-// Name returns adapter name
+// Name returns the adapter name
 func (a *EchoAdapter) Name() string {
 	return "echo"
 }
 
-// WrapHandler wraps GoNest handler for Echo
-func (a *EchoAdapter) WrapHandler(handler core.HandlerFunc) echo.HandlerFunc {
+// RegisterRoute registers a route with the platform
+func (a *EchoAdapter) RegisterRoute(route core.RouteDefinition) error {
+	// Convert GoNest handler to Echo handler
+	handler := a.wrapHandler(route)
+
+	// Register with Echo
+	a.echo.Add(route.Method, route.Path, handler)
+
+	return nil
+}
+
+// Handler returns the http.Handler for the platform
+func (a *EchoAdapter) Handler() http.Handler {
+	return a.echo
+}
+
+// Use registers global middleware
+func (a *EchoAdapter) Use(middleware core.MiddlewareFunc) {
+	// Convert GoNest middleware to Echo middleware
+	echoMiddleware := func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Create GoNest context
+			ctx := core.NewContext(c.Response().Writer, c.Request())
+			ctx.Set("adapter", "echo")
+			ctx.Set("echo_context", c)
+
+			// Wrap next handler
+			wrapped := middleware(func(_ *core.Context) error {
+				return next(c)
+			})
+
+			// Execute
+			return wrapped(ctx)
+		}
+	}
+
+	a.echo.Use(echoMiddleware)
+}
+
+// wrapHandler wraps a GoNest route to Echo handler
+func (a *EchoAdapter) wrapHandler(route core.RouteDefinition) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// Echo exposes Request() and Response().Writer
-		request := c.Request()
-		response := c.Response().Writer
-
-		// Create GoNest context with full access
-		ctx := core.NewContext(response, request)
+		// Create GoNest context
+		ctx := core.NewContext(c.Response().Writer, c.Request())
 		ctx.Set("adapter", "echo")
-		ctx.Set("echo_context", c) // Store for Echo-specific features
+		ctx.Set("echo_context", c)
 
+		// Apply route middlewares
+		handler := route.Handler
+		for i := len(route.Middlewares) - 1; i >= 0; i-- {
+			handler = route.Middlewares[i](handler)
+		}
+
+		// Execute handler
 		return handler(ctx)
 	}
 }
 
-// WrapMiddleware wraps GoNest middleware for Echo
-func (a *EchoAdapter) WrapMiddleware(middleware core.MiddlewareFunc) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			request := c.Request()
-			response := c.Response().Writer
-
-			ctx := core.NewContext(response, request)
-			ctx.Set("adapter", "echo")
-			ctx.Set("echo_context", c)
-
-			wrapped := middleware(func(_ *core.Context) error { return next(c) })
-			return wrapped(ctx)
-		}
-	}
+// GetEcho returns the underlying Echo instance for advanced configuration
+func (a *EchoAdapter) GetEcho() *echo.Echo {
+	return a.echo
 }
 
-// ExtractContext extracts context from echo.Context
-func (a *EchoAdapter) ExtractContext(platformCtx any) *core.Context {
-	c, ok := platformCtx.(echo.Context)
-	if !ok {
-		return &core.Context{}
-	}
-
-	return core.NewContext(c.Response().Writer, c.Request())
-}
-
-// CreateContext creates GoNest context from echo.Context
-func (a *EchoAdapter) CreateContext(c echo.Context) *core.Context {
-	ctx := core.NewContext(c.Response().Writer, c.Request())
-	ctx.Set("adapter", "echo")
-	ctx.Set("echo_context", c)
-	return ctx
-}
-
-// ToEchoHandler converts GoNest handler to Echo handler
-// Usage: e.GET("/path", adapters.ToEchoHandler(gonestHandler))
-func ToEchoHandler(handler core.HandlerFunc) echo.HandlerFunc {
-	adapter := NewEchoAdapter()
-	return adapter.WrapHandler(handler)
-}
-
-// ToEchoMiddleware converts GoNest middleware to Echo middleware
-func ToEchoMiddleware(middleware core.MiddlewareFunc) echo.MiddlewareFunc {
-	adapter := NewEchoAdapter()
-	return adapter.WrapMiddleware(middleware)
-}
+// Compile-time check
+var _ PlatformAdapter = (*EchoAdapter)(nil)

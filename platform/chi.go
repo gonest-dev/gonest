@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/gonest-dev/gonest/core"
 )
 
-// ChiAdapter adapts GoNest to Chi router
+// ChiAdapter implements PlatformAdapter for Chi router
 type ChiAdapter struct {
 	config *AdapterConfig
+	router *chi.Mux
 }
 
 // NewChiAdapter creates a Chi adapter
@@ -25,60 +27,84 @@ func NewChiAdapter(config ...*AdapterConfig) *ChiAdapter {
 
 	return &ChiAdapter{
 		config: cfg,
+		router: chi.NewRouter(),
 	}
 }
 
-// Name returns adapter name
+// Name returns the adapter name
 func (a *ChiAdapter) Name() string {
 	return "chi"
 }
 
-// WrapHandler wraps GoNest handler for Chi
-func (a *ChiAdapter) WrapHandler(handler core.HandlerFunc) any {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := core.NewContext(w, r)
-		ctx.Set("adapter", "chi")
+// RegisterRoute registers a route with the platform
+func (a *ChiAdapter) RegisterRoute(route core.RouteDefinition) error {
+	// Convert GoNest handler to Chi handler
+	handler := a.wrapHandler(route)
 
-		if err := handler(ctx); err != nil {
-			a.handleError(w, err)
-		}
-	}
+	// Register with Chi
+	a.router.Method(route.Method, route.Path, handler)
+
+	return nil
 }
 
-// WrapMiddleware wraps GoNest middleware for Chi
-func (a *ChiAdapter) WrapMiddleware(middleware core.MiddlewareFunc) any {
-	return func(next http.Handler) http.Handler {
+// Handler returns the http.Handler for the platform
+func (a *ChiAdapter) Handler() http.Handler {
+	return a.router
+}
+
+// Use registers global middleware
+func (a *ChiAdapter) Use(middleware core.MiddlewareFunc) {
+	// Convert GoNest middleware to Chi middleware
+	chiMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Create GoNest context
 			ctx := core.NewContext(w, r)
 			ctx.Set("adapter", "chi")
 
+			// Wrap next handler
 			wrapped := middleware(func(_ *core.Context) error {
 				next.ServeHTTP(w, r)
 				return nil
 			})
 
+			// Execute
 			if err := wrapped(ctx); err != nil {
 				a.handleError(w, err)
 			}
 		})
 	}
+
+	a.router.Use(chiMiddleware)
 }
 
-// ExtractContext extracts context from http.Request
-func (a *ChiAdapter) ExtractContext(platformCtx any) *core.Context {
-	r, ok := platformCtx.(*http.Request)
-	if !ok {
-		return &core.Context{}
+// wrapHandler wraps a GoNest route to Chi handler
+func (a *ChiAdapter) wrapHandler(route core.RouteDefinition) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Create GoNest context
+		ctx := core.NewContext(w, r)
+		ctx.Set("adapter", "chi")
+
+		// Extract Chi URL params
+		chiCtx := chi.RouteContext(r.Context())
+		if chiCtx != nil {
+			for i, key := range chiCtx.URLParams.Keys {
+				if i < len(chiCtx.URLParams.Values) {
+					ctx.SetParam(key, chiCtx.URLParams.Values[i])
+				}
+			}
+		}
+
+		// Apply route middlewares
+		handler := route.Handler
+		for i := len(route.Middlewares) - 1; i >= 0; i-- {
+			handler = route.Middlewares[i](handler)
+		}
+
+		// Execute handler
+		if err := handler(ctx); err != nil {
+			a.handleError(w, err)
+		}
 	}
-
-	return core.NewContext(nil, r)
-}
-
-// CreateContext creates GoNest context from http.Request
-func (a *ChiAdapter) CreateContext(r *http.Request) *core.Context {
-	ctx := core.NewContext(nil, r)
-	ctx.Set("adapter", "chi")
-	return ctx
 }
 
 // handleError handles errors
@@ -96,16 +122,10 @@ func (a *ChiAdapter) handleError(w http.ResponseWriter, err error) {
 	})
 }
 
-// ToChiHandler converts GoNest handler to Chi handler
-func ToChiHandler(handler core.HandlerFunc) http.HandlerFunc {
-	adapter := NewChiAdapter()
-	wrappedHandler := adapter.WrapHandler(handler)
-	return wrappedHandler.(func(http.ResponseWriter, *http.Request))
+// GetRouter returns the underlying Chi router for advanced configuration
+func (a *ChiAdapter) GetRouter() *chi.Mux {
+	return a.router
 }
 
-// ToChiMiddleware converts GoNest middleware to Chi middleware
-func ToChiMiddleware(middleware core.MiddlewareFunc) func(http.Handler) http.Handler {
-	adapter := NewChiAdapter()
-	wrappedMiddleware := adapter.WrapMiddleware(middleware)
-	return wrappedMiddleware.(func(http.Handler) http.Handler)
-}
+// Compile-time check
+var _ PlatformAdapter = (*ChiAdapter)(nil)

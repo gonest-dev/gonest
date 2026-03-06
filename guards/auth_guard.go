@@ -38,15 +38,15 @@ func NewAuthGuard(opts *AuthGuardOptions) *AuthGuard {
 
 // CanActivate checks if request has valid authentication
 func (g *AuthGuard) CanActivate(ctx *ExecutionContext) (bool, error) {
-	// Get authorization header
-	authHeader := ctx.Context.Get(g.headerName)
+	// Get authorization header (use Header() method, not Get())
+	authHeader := ctx.Context.Header(g.headerName)
 
 	if authHeader == "" {
 		return false, NewGuardError("Missing authentication token", 401)
 	}
 
 	// Extract token
-	token := g.extractToken(authHeader.(string))
+	token := g.extractToken(authHeader)
 	if token == "" {
 		return false, NewGuardError("Invalid token format", 401)
 	}

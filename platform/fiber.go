@@ -5,14 +5,15 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gonest-dev/gonest/core"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
-// FiberAdapter adapts GoNest to Fiber framework
-// Note: Fiber uses fasthttp instead of net/http, so we need adapters
+// FiberAdapter implements PlatformAdapter for Fiber framework
 type FiberAdapter struct {
 	config *AdapterConfig
+	app    *fiber.App
 }
 
 // NewFiberAdapter creates a Fiber adapter
@@ -25,26 +26,47 @@ func NewFiberAdapter(config ...*AdapterConfig) *FiberAdapter {
 		cfg = config[0]
 	}
 
+	// Create Fiber app
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
+
 	return &FiberAdapter{
 		config: cfg,
+		app:    app,
 	}
 }
 
-// Name returns adapter name
+// Name returns the adapter name
 func (a *FiberAdapter) Name() string {
 	return "fiber"
 }
 
-// WrapHandler wraps GoNest handler for Fiber
-func (a *FiberAdapter) WrapHandler(handler core.HandlerFunc) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		// Fiber uses fasthttp, not net/http
-		// We need to convert fasthttp.RequestCtx to net/http Request/ResponseWriter
+// RegisterRoute registers a route with the platform
+func (a *FiberAdapter) RegisterRoute(route core.RouteDefinition) error {
+	// Convert GoNest handler to Fiber handler
+	handler := a.wrapHandler(route)
 
+	// Register with Fiber
+	a.app.Add(route.Method, route.Path, handler)
+
+	return nil
+}
+
+// Handler returns the http.Handler for the platform
+// Fiber uses fasthttp, so we need to adapt it to net/http
+func (a *FiberAdapter) Handler() http.Handler {
+	return adaptor.FiberApp(a.app)
+}
+
+// Use registers global middleware
+func (a *FiberAdapter) Use(middleware core.MiddlewareFunc) {
+	// Convert GoNest middleware to Fiber middleware
+	fiberMiddleware := func(c *fiber.Ctx) error {
 		var req *http.Request
 		var w http.ResponseWriter
 
-		// Convert using fasthttpadaptor
+		// Convert fasthttp to net/http
 		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			req = r
 			w = rw
@@ -53,75 +75,52 @@ func (a *FiberAdapter) WrapHandler(handler core.HandlerFunc) fiber.Handler {
 		// Create GoNest context
 		ctx := core.NewContext(w, req)
 		ctx.Set("adapter", "fiber")
-		ctx.Set("fiber_context", c) // Store for Fiber-specific features
+		ctx.Set("fiber_context", c)
 
-		return handler(ctx)
+		// Wrap next handler
+		wrapped := middleware(func(_ *core.Context) error {
+			return c.Next()
+		})
+
+		// Execute
+		return wrapped(ctx)
 	}
+
+	a.app.Use(fiberMiddleware)
 }
 
-// WrapMiddleware wraps GoNest middleware for Fiber
-func (a *FiberAdapter) WrapMiddleware(middleware core.MiddlewareFunc) fiber.Handler {
+// wrapHandler wraps a GoNest route to Fiber handler
+func (a *FiberAdapter) wrapHandler(route core.RouteDefinition) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req *http.Request
 		var w http.ResponseWriter
 
+		// Convert fasthttp to net/http
 		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			req = r
 			w = rw
 		}))(c.Context())
 
+		// Create GoNest context
 		ctx := core.NewContext(w, req)
 		ctx.Set("adapter", "fiber")
 		ctx.Set("fiber_context", c)
 
-		wrapped := middleware(func(_ *core.Context) error { return c.Next() })
-		return wrapped(ctx)
+		// Apply route middlewares
+		handler := route.Handler
+		for i := len(route.Middlewares) - 1; i >= 0; i-- {
+			handler = route.Middlewares[i](handler)
+		}
+
+		// Execute handler
+		return handler(ctx)
 	}
 }
 
-// ExtractContext extracts context from fiber.Ctx
-func (a *FiberAdapter) ExtractContext(platformCtx any) *core.Context {
-	c, ok := platformCtx.(*fiber.Ctx)
-	if !ok {
-		return &core.Context{}
-	}
-
-	var req *http.Request
-	var w http.ResponseWriter
-
-	fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		req = r
-		w = rw
-	}))(c.Context())
-
-	return core.NewContext(w, req)
+// GetApp returns the underlying Fiber app for advanced configuration
+func (a *FiberAdapter) GetApp() *fiber.App {
+	return a.app
 }
 
-// CreateContext creates GoNest context from fiber.Ctx
-func (a *FiberAdapter) CreateContext(c *fiber.Ctx) *core.Context {
-	var req *http.Request
-	var w http.ResponseWriter
-
-	fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		req = r
-		w = rw
-	}))(c.Context())
-
-	ctx := core.NewContext(w, req)
-	ctx.Set("adapter", "fiber")
-	ctx.Set("fiber_context", c)
-	return ctx
-}
-
-// ToFiberHandler converts GoNest handler to Fiber handler
-// Usage: app.Get("/path", adapters.ToFiberHandler(gonestHandler))
-func ToFiberHandler(handler core.HandlerFunc) fiber.Handler {
-	adapter := NewFiberAdapter()
-	return adapter.WrapHandler(handler)
-}
-
-// ToFiberMiddleware converts GoNest middleware to Fiber middleware
-func ToFiberMiddleware(middleware core.MiddlewareFunc) fiber.Handler {
-	adapter := NewFiberAdapter()
-	return adapter.WrapMiddleware(middleware)
-}
+// Compile-time check
+var _ PlatformAdapter = (*FiberAdapter)(nil)

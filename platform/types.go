@@ -2,25 +2,25 @@
 package platform
 
 import (
+	"net/http"
+
 	"github.com/gonest-dev/gonest/core"
 )
 
 // PlatformAdapter defines the interface for platform adapters
-type Adapter interface {
-	// Name returns the adapter name
+// This is implemented by each framework adapter (Gin, Fiber, Echo, etc)
+type PlatformAdapter interface {
+	// Name returns the platform name
 	Name() string
 
-	// WrapHandler wraps a GoNest handler for the platform
-	WrapHandler(handler core.HandlerFunc) any
+	// RegisterRoute registers a route with the platform
+	RegisterRoute(route core.RouteDefinition) error
 
-	// WrapMiddleware wraps a GoNest middleware for the platform
-	WrapMiddleware(middleware core.MiddlewareFunc) any
+	// Handler returns the http.Handler for the platform
+	Handler() http.Handler
 
-	// ExtractContext extracts GoNest context from platform context
-	ExtractContext(platformCtx any) *core.Context
-
-	// CreateContext creates a GoNest context from platform context
-	CreateContext(platformCtx any) *core.Context
+	// Use registers global middleware
+	Use(middleware core.MiddlewareFunc)
 }
 
 // AdapterConfig configures an adapter

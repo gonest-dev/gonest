@@ -1,7 +1,11 @@
 // gonest/core/types.go
 package core
 
-import "context"
+import (
+	"context"
+	"net/http"
+	"reflect"
+)
 
 // Module defines the interface that all modules must implement
 type Module interface {
@@ -9,7 +13,29 @@ type Module interface {
 }
 
 // Provider represents a dependency that can be injected
+// Can be a simple type, or one of the provider descriptors below
 type Provider any
+
+// ProviderClass represents a class-based provider
+// Example: { provide: UserService, useClass: UserServiceImpl }
+type ProviderClass struct {
+	Provide  reflect.Type
+	UseClass any
+}
+
+// ProviderFactory represents a factory-based provider
+// Example: { provide: Connection, useFactory: createConnection }
+type ProviderFactory struct {
+	Provide    reflect.Type
+	UseFactory any // func(...deps) T
+}
+
+// ProviderValue represents a value-based provider
+// Example: { provide: CONFIG_TOKEN, useValue: config }
+type ProviderValue struct {
+	Provide  reflect.Type
+	UseValue any
+}
 
 // Controller represents a request handler with routes
 type Controller interface {
@@ -42,6 +68,7 @@ type RouteDefinition struct {
 	Path        string
 	Handler     HandlerFunc
 	Middlewares []MiddlewareFunc
+	Metadata    map[string]any // For swagger, guards, etc
 }
 
 // HandlerFunc is the signature for route handlers
@@ -52,3 +79,27 @@ type MiddlewareFunc func(HandlerFunc) HandlerFunc
 
 // ApplicationOption configures the NestApplication
 type ApplicationOption func(*NestApplication)
+
+// PlatformAdapter abstracts different HTTP frameworks
+type PlatformAdapter interface {
+	// Name returns the platform name (e.g., "gin", "fiber", "echo")
+	Name() string
+
+	// RegisterRoute registers a route with the platform
+	RegisterRoute(route RouteDefinition) error
+
+	// Handler returns the http.Handler for the platform
+	Handler() http.Handler
+
+	// Use registers global middleware
+	Use(middleware MiddlewareFunc)
+}
+
+// Helper function to get reflect.Type from provider
+func getProviderType(provider any) reflect.Type {
+	t := reflect.TypeOf(provider)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t
+}

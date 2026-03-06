@@ -190,7 +190,7 @@ func (c *Context) BindJSON(obj any) error {
 		return json.Unmarshal([]byte("{}"), obj)
 	}
 
-	defer c.Request.Body.Close()
+	defer func() { _ = c.Request.Body.Close() }()
 	decoder := json.NewDecoder(c.Request.Body)
 	return decoder.Decode(obj)
 }
@@ -201,7 +201,7 @@ func (c *Context) Body() ([]byte, error) {
 		return []byte{}, nil
 	}
 
-	defer c.Request.Body.Close()
+	defer func() { _ = c.Request.Body.Close() }()
 	return io.ReadAll(c.Request.Body)
 }
 

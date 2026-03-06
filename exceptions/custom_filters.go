@@ -5,30 +5,10 @@ import (
 	"github.com/gonest-dev/gonest/core"
 )
 
-// NotFoundExceptionFilter handles 404 errors
-type NotFoundExceptionFilter struct{}
-
-func NewNotFoundExceptionFilter() *NotFoundExceptionFilter {
-	return &NotFoundExceptionFilter{}
-}
-
-func (f *NotFoundExceptionFilter) Catch(err error, ctx *core.Context) error {
-	if httpErr, ok := err.(*HTTPException); ok {
-		if httpErr.StatusCode == 404 {
-			return ctx.JSON(404, map[string]any{
-				"statusCode": 404,
-				"message":    "Resource not found",
-				"path":       ctx.Get("path"),
-			})
-		}
-	}
-
-	// Not a 404, pass through
-	return err
-}
-
-// ValidationExceptionFilter handles validation errors
+// ValidationExceptionFilter handles 400 validation errors
 type ValidationExceptionFilter struct{}
+
+var _ ExceptionFilter = (*ValidationExceptionFilter)(nil)
 
 func NewValidationExceptionFilter() *ValidationExceptionFilter {
 	return &ValidationExceptionFilter{}
@@ -38,13 +18,13 @@ func (f *ValidationExceptionFilter) Catch(err error, ctx *core.Context) error {
 	if validationErr, ok := err.(*ValidationException); ok {
 		return ctx.JSON(400, validationErr.ToJSON())
 	}
-
-	// Not a validation error, pass through
 	return err
 }
 
 // UnauthorizedExceptionFilter handles 401 errors
 type UnauthorizedExceptionFilter struct{}
+
+var _ ExceptionFilter = (*UnauthorizedExceptionFilter)(nil)
 
 func NewUnauthorizedExceptionFilter() *UnauthorizedExceptionFilter {
 	return &UnauthorizedExceptionFilter{}
@@ -67,6 +47,8 @@ func (f *UnauthorizedExceptionFilter) Catch(err error, ctx *core.Context) error 
 // ForbiddenExceptionFilter handles 403 errors
 type ForbiddenExceptionFilter struct{}
 
+var _ ExceptionFilter = (*ForbiddenExceptionFilter)(nil)
+
 func NewForbiddenExceptionFilter() *ForbiddenExceptionFilter {
 	return &ForbiddenExceptionFilter{}
 }
@@ -82,6 +64,30 @@ func (f *ForbiddenExceptionFilter) Catch(err error, ctx *core.Context) error {
 		}
 	}
 
+	return err
+}
+
+// NotFoundExceptionFilter handles 404 errors
+type NotFoundExceptionFilter struct{}
+
+var _ ExceptionFilter = (*NotFoundExceptionFilter)(nil)
+
+func NewNotFoundExceptionFilter() *NotFoundExceptionFilter {
+	return &NotFoundExceptionFilter{}
+}
+
+func (f *NotFoundExceptionFilter) Catch(err error, ctx *core.Context) error {
+	if httpErr, ok := err.(*HTTPException); ok {
+		if httpErr.StatusCode == 404 {
+			return ctx.JSON(404, map[string]any{
+				"statusCode": 404,
+				"message":    "Resource not found",
+				"path":       ctx.Path(),
+			})
+		}
+	}
+
+	// Not a 404, pass through
 	return err
 }
 

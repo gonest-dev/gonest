@@ -7,7 +7,7 @@ import (
 
 // Builder helps build controllers with a fluent API
 type Builder struct {
-	routes  []*Route
+	routes  []core.RouteDefinition
 	options *Options
 }
 
@@ -24,7 +24,7 @@ func NewController(opts ...*Options) *Builder {
 	}
 
 	return &Builder{
-		routes:  make([]*Route, 0),
+		routes:  make([]core.RouteDefinition, 0),
 		options: options,
 	}
 }
@@ -32,54 +32,54 @@ func NewController(opts ...*Options) *Builder {
 // RouteBuilder helps build individual routes
 type RouteBuilder struct {
 	controller *Builder
-	route      *Route
+	route      *core.RouteDefinition
+	params     []*ParamConfig
 }
 
 // Get adds a GET route
-func (cb *Builder) Get(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodGET, path, handler)
+func (cb *Builder) Get(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("GET", path, handler)
 }
 
 // Post adds a POST route
-func (cb *Builder) Post(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodPOST, path, handler)
+func (cb *Builder) Post(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("POST", path, handler)
 }
 
 // Put adds a PUT route
-func (cb *Builder) Put(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodPUT, path, handler)
+func (cb *Builder) Put(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("PUT", path, handler)
 }
 
 // Patch adds a PATCH route
-func (cb *Builder) Patch(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodPATCH, path, handler)
+func (cb *Builder) Patch(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("PATCH", path, handler)
 }
 
 // Delete adds a DELETE route
-func (cb *Builder) Delete(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodDELETE, path, handler)
+func (cb *Builder) Delete(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("DELETE", path, handler)
 }
 
 // Options adds an OPTIONS route
-func (cb *Builder) Options(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodOPTIONS, path, handler)
+func (cb *Builder) Options(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("OPTIONS", path, handler)
 }
 
 // Head adds a HEAD route
-func (cb *Builder) Head(path string, handler HandlerFunc) *RouteBuilder {
-	return cb.addRoute(HTTPMethodHEAD, path, handler)
+func (cb *Builder) Head(path string, handler core.HandlerFunc) *RouteBuilder {
+	return cb.addRoute("HEAD", path, handler)
 }
 
 // addRoute is a helper to add routes
-func (cb *Builder) addRoute(method HTTPMethod, path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) addRoute(method string, path string, handler core.HandlerFunc) *RouteBuilder {
 	// Prepend controller prefix to path
 	fullPath := cb.options.Prefix + path
 
-	route := &Route{
+	route := core.RouteDefinition{
 		Method:      method,
 		Path:        fullPath,
 		Handler:     handler,
-		Params:      make([]*ParamConfig, 0),
 		Middlewares: make([]core.MiddlewareFunc, 0),
 		Metadata:    make(map[string]any),
 	}
@@ -87,11 +87,17 @@ func (cb *Builder) addRoute(method HTTPMethod, path string, handler HandlerFunc)
 	// Add controller-level middlewares
 	route.Middlewares = append(route.Middlewares, cb.options.Middlewares...)
 
+	// Copy controller metadata
+	for k, v := range cb.options.Metadata {
+		route.Metadata[k] = v
+	}
+
 	cb.routes = append(cb.routes, route)
 
 	return &RouteBuilder{
 		controller: cb,
-		route:      route,
+		route:      &cb.routes[len(cb.routes)-1],
+		params:     make([]*ParamConfig, 0),
 	}
 }
 
@@ -103,41 +109,45 @@ func (rb *RouteBuilder) Use(middleware ...core.MiddlewareFunc) *RouteBuilder {
 
 // Body adds a body parameter
 func (rb *RouteBuilder) Body(name string) *RouteBuilder {
-	rb.route.Params = append(rb.route.Params, &ParamConfig{
+	rb.params = append(rb.params, &ParamConfig{
 		Type:     ParamTypeBODY,
 		Name:     name,
 		Required: true,
 	})
+	rb.route.Metadata["params"] = rb.params
 	return rb
 }
 
 // Query adds a query parameter
 func (rb *RouteBuilder) Query(name string, required bool) *RouteBuilder {
-	rb.route.Params = append(rb.route.Params, &ParamConfig{
+	rb.params = append(rb.params, &ParamConfig{
 		Type:     ParamTypeQUERY,
 		Name:     name,
 		Required: required,
 	})
+	rb.route.Metadata["params"] = rb.params
 	return rb
 }
 
 // Param adds a path parameter
 func (rb *RouteBuilder) Param(name string) *RouteBuilder {
-	rb.route.Params = append(rb.route.Params, &ParamConfig{
+	rb.params = append(rb.params, &ParamConfig{
 		Type:     ParamTypePARAM,
 		Name:     name,
 		Required: true,
 	})
+	rb.route.Metadata["params"] = rb.params
 	return rb
 }
 
 // Header adds a header parameter
 func (rb *RouteBuilder) Header(name string, required bool) *RouteBuilder {
-	rb.route.Params = append(rb.route.Params, &ParamConfig{
+	rb.params = append(rb.params, &ParamConfig{
 		Type:     ParamTypeHEADER,
 		Name:     name,
 		Required: required,
 	})
+	rb.route.Metadata["params"] = rb.params
 	return rb
 }
 
@@ -152,8 +162,8 @@ func (rb *RouteBuilder) Build() *Builder {
 	return rb.controller
 }
 
-// GetRoutes implements the Controller interface
-func (cb *Builder) GetRoutes() []*Route {
+// Routes implements the core.Controller interface
+func (cb *Builder) Routes() []core.RouteDefinition {
 	return cb.routes
 }
 
