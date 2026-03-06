@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: set-modules
         run: |
-          # Extrai os módulos do go.work e gera um JSON para a matriz
+          # Extrai os módulos do go.work e gera um JSON para a matriz dinâmica
           MODULES=$(grep '^\s*\./' go.work | sed 's|^\s*\./||; s/[[:space:]]*$//' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "modules=$MODULES" >> $GITHUB_OUTPUT
 
@@ -32,7 +32,7 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-          # Alinhado com o workspace para evitar warnings
+          # Corrigido para go.work.sum para evitar o erro de arquivo não encontrado
           cache-dependency-path: "go.work.sum"
 
       - name: Test & Coverage
@@ -83,6 +83,7 @@ jobs:
 
       - name: Build ${{ matrix.module }}
         run: |
+          # Prioriza o diretório vindo da matriz para evitar erros de prefixo
           if [ -d "${{ matrix.module }}" ]; then
             cd "${{ matrix.module }}" && go build -v ./...
           else
