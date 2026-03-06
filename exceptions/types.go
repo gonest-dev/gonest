@@ -7,8 +7,8 @@ import (
 	"github.com/gonest-dev/gonest/core"
 )
 
-// HttpException represents an HTTP error with status code
-type HttpException struct {
+// HTTPException represents an HTTP error with status code
+type HTTPException struct {
 	StatusCode int
 	Message    string
 	Details    map[string]any
@@ -16,7 +16,7 @@ type HttpException struct {
 }
 
 // Error implements error interface
-func (e *HttpException) Error() string {
+func (e *HTTPException) Error() string {
 	if e.Cause != nil {
 		return fmt.Sprintf("%s: %v", e.Message, e.Cause)
 	}
@@ -24,7 +24,7 @@ func (e *HttpException) Error() string {
 }
 
 // WithDetail adds a detail to the exception
-func (e *HttpException) WithDetail(key string, value any) *HttpException {
+func (e *HTTPException) WithDetail(key string, value any) *HTTPException {
 	if e.Details == nil {
 		e.Details = make(map[string]any)
 	}
@@ -33,7 +33,7 @@ func (e *HttpException) WithDetail(key string, value any) *HttpException {
 }
 
 // ToJSON converts exception to JSON response
-func (e *HttpException) ToJSON() map[string]any {
+func (e *HTTPException) ToJSON() map[string]any {
 	result := map[string]any{
 		"statusCode": e.StatusCode,
 		"message":    e.Message,
@@ -66,8 +66,8 @@ func (f ExceptionFilterFunc) Catch(err error, ctx *core.Context) error {
 // Common HTTP Exceptions (4xx Client Errors)
 
 // BadRequestException creates a 400 error
-func BadRequestException(message string) *HttpException {
-	return &HttpException{
+func BadRequestException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusBadRequest,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -75,8 +75,8 @@ func BadRequestException(message string) *HttpException {
 }
 
 // UnauthorizedException creates a 401 error
-func UnauthorizedException(message string) *HttpException {
-	return &HttpException{
+func UnauthorizedException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusUnauthorized,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -84,8 +84,8 @@ func UnauthorizedException(message string) *HttpException {
 }
 
 // PaymentRequiredException creates a 402 error
-func PaymentRequiredException(message string) *HttpException {
-	return &HttpException{
+func PaymentRequiredException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusPaymentRequired,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -93,8 +93,8 @@ func PaymentRequiredException(message string) *HttpException {
 }
 
 // ForbiddenException creates a 403 error
-func ForbiddenException(message string) *HttpException {
-	return &HttpException{
+func ForbiddenException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusForbidden,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -102,8 +102,8 @@ func ForbiddenException(message string) *HttpException {
 }
 
 // NotFoundException creates a 404 error
-func NotFoundException(message string) *HttpException {
-	return &HttpException{
+func NotFoundException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusNotFound,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -111,8 +111,8 @@ func NotFoundException(message string) *HttpException {
 }
 
 // MethodNotAllowedException creates a 405 error
-func MethodNotAllowedException(message string) *HttpException {
-	return &HttpException{
+func MethodNotAllowedException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusMethodNotAllowed,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -120,8 +120,8 @@ func MethodNotAllowedException(message string) *HttpException {
 }
 
 // NotAcceptableException creates a 406 error
-func NotAcceptableException(message string) *HttpException {
-	return &HttpException{
+func NotAcceptableException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusNotAcceptable,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -129,8 +129,8 @@ func NotAcceptableException(message string) *HttpException {
 }
 
 // ProxyAuthRequiredException creates a 407 error
-func ProxyAuthRequiredException(message string) *HttpException {
-	return &HttpException{
+func ProxyAuthRequiredException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusProxyAuthRequired,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -138,8 +138,8 @@ func ProxyAuthRequiredException(message string) *HttpException {
 }
 
 // RequestTimeoutException creates a 408 error
-func RequestTimeoutException(message string) *HttpException {
-	return &HttpException{
+func RequestTimeoutException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusRequestTimeout,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -147,8 +147,8 @@ func RequestTimeoutException(message string) *HttpException {
 }
 
 // ConflictException creates a 409 error
-func ConflictException(message string) *HttpException {
-	return &HttpException{
+func ConflictException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusConflict,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -156,8 +156,8 @@ func ConflictException(message string) *HttpException {
 }
 
 // GoneException creates a 410 error
-func GoneException(message string) *HttpException {
-	return &HttpException{
+func GoneException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusGone,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -165,8 +165,8 @@ func GoneException(message string) *HttpException {
 }
 
 // LengthRequiredException creates a 411 error
-func LengthRequiredException(message string) *HttpException {
-	return &HttpException{
+func LengthRequiredException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusLengthRequired,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -174,8 +174,8 @@ func LengthRequiredException(message string) *HttpException {
 }
 
 // PreconditionFailedException creates a 412 error
-func PreconditionFailedException(message string) *HttpException {
-	return &HttpException{
+func PreconditionFailedException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusPreconditionFailed,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -183,8 +183,8 @@ func PreconditionFailedException(message string) *HttpException {
 }
 
 // PayloadTooLargeException creates a 413 error
-func PayloadTooLargeException(message string) *HttpException {
-	return &HttpException{
+func PayloadTooLargeException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusRequestEntityTooLarge,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -192,8 +192,8 @@ func PayloadTooLargeException(message string) *HttpException {
 }
 
 // URITooLongException creates a 414 error
-func URITooLongException(message string) *HttpException {
-	return &HttpException{
+func URITooLongException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusRequestURITooLong,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -201,8 +201,8 @@ func URITooLongException(message string) *HttpException {
 }
 
 // UnsupportedMediaTypeException creates a 415 error
-func UnsupportedMediaTypeException(message string) *HttpException {
-	return &HttpException{
+func UnsupportedMediaTypeException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusUnsupportedMediaType,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -210,8 +210,8 @@ func UnsupportedMediaTypeException(message string) *HttpException {
 }
 
 // RangeNotSatisfiableException creates a 416 error
-func RangeNotSatisfiableException(message string) *HttpException {
-	return &HttpException{
+func RangeNotSatisfiableException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusRequestedRangeNotSatisfiable,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -219,8 +219,8 @@ func RangeNotSatisfiableException(message string) *HttpException {
 }
 
 // ExpectationFailedException creates a 417 error
-func ExpectationFailedException(message string) *HttpException {
-	return &HttpException{
+func ExpectationFailedException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusExpectationFailed,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -228,8 +228,8 @@ func ExpectationFailedException(message string) *HttpException {
 }
 
 // TeapotException creates a 418 error
-func TeapotException(message string) *HttpException {
-	return &HttpException{
+func TeapotException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusTeapot,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -237,8 +237,8 @@ func TeapotException(message string) *HttpException {
 }
 
 // MisdirectedRequestException creates a 421 error
-func MisdirectedRequestException(message string) *HttpException {
-	return &HttpException{
+func MisdirectedRequestException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusMisdirectedRequest,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -246,8 +246,8 @@ func MisdirectedRequestException(message string) *HttpException {
 }
 
 // UnprocessableEntityException creates a 422 error
-func UnprocessableEntityException(message string) *HttpException {
-	return &HttpException{
+func UnprocessableEntityException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusUnprocessableEntity,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -255,8 +255,8 @@ func UnprocessableEntityException(message string) *HttpException {
 }
 
 // LockedException creates a 423 error
-func LockedException(message string) *HttpException {
-	return &HttpException{
+func LockedException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusLocked,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -264,8 +264,8 @@ func LockedException(message string) *HttpException {
 }
 
 // FailedDependencyException creates a 424 error
-func FailedDependencyException(message string) *HttpException {
-	return &HttpException{
+func FailedDependencyException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusFailedDependency,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -273,8 +273,8 @@ func FailedDependencyException(message string) *HttpException {
 }
 
 // TooEarlyException creates a 425 error
-func TooEarlyException(message string) *HttpException {
-	return &HttpException{
+func TooEarlyException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusTooEarly,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -282,8 +282,8 @@ func TooEarlyException(message string) *HttpException {
 }
 
 // UpgradeRequiredException creates a 426 error
-func UpgradeRequiredException(message string) *HttpException {
-	return &HttpException{
+func UpgradeRequiredException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusUpgradeRequired,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -291,8 +291,8 @@ func UpgradeRequiredException(message string) *HttpException {
 }
 
 // PreconditionRequiredException creates a 428 error
-func PreconditionRequiredException(message string) *HttpException {
-	return &HttpException{
+func PreconditionRequiredException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusPreconditionRequired,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -300,8 +300,8 @@ func PreconditionRequiredException(message string) *HttpException {
 }
 
 // TooManyRequestsException creates a 429 error
-func TooManyRequestsException(message string) *HttpException {
-	return &HttpException{
+func TooManyRequestsException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusTooManyRequests,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -309,8 +309,8 @@ func TooManyRequestsException(message string) *HttpException {
 }
 
 // RequestHeaderFieldsTooLargeException creates a 431 error
-func RequestHeaderFieldsTooLargeException(message string) *HttpException {
-	return &HttpException{
+func RequestHeaderFieldsTooLargeException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusRequestHeaderFieldsTooLarge,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -318,8 +318,8 @@ func RequestHeaderFieldsTooLargeException(message string) *HttpException {
 }
 
 // UnavailableForLegalReasonsException creates a 451 error
-func UnavailableForLegalReasonsException(message string) *HttpException {
-	return &HttpException{
+func UnavailableForLegalReasonsException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusUnavailableForLegalReasons,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -329,8 +329,8 @@ func UnavailableForLegalReasonsException(message string) *HttpException {
 // Common HTTP Exceptions (5xx Server Errors)
 
 // InternalServerErrorException creates a 500 error
-func InternalServerErrorException(message string) *HttpException {
-	return &HttpException{
+func InternalServerErrorException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusInternalServerError,
 		Message:    message,
 		Details:    make(map[string]any),
@@ -338,17 +338,17 @@ func InternalServerErrorException(message string) *HttpException {
 }
 
 // ServiceUnavailableException creates a 503 error
-func ServiceUnavailableException(message string) *HttpException {
-	return &HttpException{
+func ServiceUnavailableException(message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: http.StatusServiceUnavailable,
 		Message:    message,
 		Details:    make(map[string]any),
 	}
 }
 
-// NewHttpException creates a custom HTTP exception
-func NewHttpException(statusCode int, message string) *HttpException {
-	return &HttpException{
+// NewHTTPException creates a custom HTTP exception
+func NewHTTPException(statusCode int, message string) *HTTPException {
+	return &HTTPException{
 		StatusCode: statusCode,
 		Message:    message,
 		Details:    make(map[string]any),

@@ -99,7 +99,7 @@ var _ Provider = (*ValueProvider)(nil)
 // NewValueProvider creates a provider from an existing value
 func NewValueProvider(value any, opts ...ProviderOption) *ValueProvider {
 	options := &ProviderOptions{
-		Scope: ScopeSINGLETON, // Values are always singleton
+		Scope: ScopeSINGLETON,
 	}
 	for _, opt := range opts {
 		opt(options)
@@ -111,7 +111,7 @@ func NewValueProvider(value any, opts ...ProviderOption) *ValueProvider {
 	}
 }
 
-func (p *ValueProvider) Provide(ctx context.Context, container *Container) (any, error) {
+func (p *ValueProvider) Provide(_ context.Context, _ *Container) (any, error) {
 	return p.value, nil
 }
 
@@ -242,7 +242,7 @@ func NewAsyncProvider(factory any, opts ...ProviderOption) (*AsyncProvider, erro
 	}, nil
 }
 
-func (p *AsyncProvider) Provide(ctx context.Context, container *Container) (any, error) {
+func (p *AsyncProvider) Provide(ctx context.Context, _ *Container) (any, error) {
 	fn := reflect.ValueOf(p.factory)
 
 	// Call async factory

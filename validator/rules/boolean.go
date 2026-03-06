@@ -8,11 +8,8 @@ import (
 func IsTrue() validator.Validator[bool] {
 	return func(value bool) *validator.FieldError {
 		if !value {
-			return validator.NewFieldError(
-				"",
-				"is_true",
-				"Value must be true",
-			)
+			return validator.
+				NewFieldError("", "is_true", "Value must be true")
 		}
 		return nil
 	}
@@ -22,11 +19,8 @@ func IsTrue() validator.Validator[bool] {
 func IsFalse() validator.Validator[bool] {
 	return func(value bool) *validator.FieldError {
 		if value {
-			return validator.NewFieldError(
-				"",
-				"is_false",
-				"Value must be false",
-			)
+			return validator.
+				NewFieldError("", "is_false", "Value must be false")
 		}
 		return nil
 	}
@@ -36,11 +30,8 @@ func IsFalse() validator.Validator[bool] {
 func MustAccept() validator.Validator[bool] {
 	return func(value bool) *validator.FieldError {
 		if !value {
-			return validator.NewFieldError(
-				"",
-				"must_accept",
-				"You must accept to continue",
-			)
+			return validator.
+				NewFieldError("", "must_accept", "You must accept to continue")
 		}
 		return nil
 	}
@@ -50,11 +41,8 @@ func MustAccept() validator.Validator[bool] {
 func MustDecline() validator.Validator[bool] {
 	return func(value bool) *validator.FieldError {
 		if value {
-			return validator.NewFieldError(
-				"",
-				"must_decline",
-				"You must decline to continue",
-			)
+			return validator.
+				NewFieldError("", "must_decline", "You must decline to continue")
 		}
 		return nil
 	}

@@ -36,11 +36,8 @@ func ValidStruct[T Validatable]() validator.Validator[T] {
 func ValidStructPtr[T any]() validator.Validator[*T] {
 	return func(value *T) *validator.FieldError {
 		if value == nil {
-			return validator.NewFieldError(
-				"",
-				"required",
-				"Value cannot be nil",
-			)
+			return validator.
+				NewFieldError("", "required", "Value cannot be nil")
 		}
 
 		// Check if value implements Validatable
@@ -77,11 +74,8 @@ func ValidStructAsync[T AsyncValidatable]() validator.ContextValidator[T] {
 func ValidStructPtrAsync[T AsyncValidatable]() validator.ContextValidator[*T] {
 	return func(ctx context.Context, value *T) *validator.FieldError {
 		if value == nil {
-			return validator.NewFieldError(
-				"",
-				"required",
-				"Value cannot be nil",
-			)
+			return validator.
+				NewFieldError("", "required", "Value cannot be nil")
 		}
 
 		result := (*value).ValidateAsync(ctx)
@@ -117,13 +111,9 @@ func StructHas[T any, F comparable](
 		var zero F
 
 		if fieldValue == zero {
-			err := validator.NewFieldError(
-				"",
-				"struct_has",
-				"Required field is missing",
-			)
-			err.WithParam("field", fieldName)
-			return err
+			return validator.
+				NewFieldError("", "struct_has", "Required field is missing").
+				WithParam("field", fieldName)
 		}
 
 		return nil

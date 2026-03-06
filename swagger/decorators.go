@@ -1,30 +1,30 @@
 package swagger
 
-// ApiOperation defines operation metadata
-type ApiOperation struct {
+// APIOperation defines operation metadata
+type APIOperation struct {
 	Summary     string
 	Description string
 	Tags        []string
 	OperationID string
 }
 
-// ApiResponse defines response metadata
-type ApiResponse struct {
+// APIResponse defines response metadata
+type APIResponse struct {
 	StatusCode  string
 	Description string
 	Type        any
 }
 
-// ApiProperty defines property metadata
-type ApiProperty struct {
+// APIProperty defines property metadata
+type APIProperty struct {
 	Description string
 	Example     any
 	Required    bool
 	Format      string
 }
 
-// ApiSecurity defines security requirements
-type ApiSecurity struct {
+// APISecurity defines security requirements
+type APISecurity struct {
 	Name   string
 	Scopes []string
 }

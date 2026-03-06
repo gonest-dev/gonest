@@ -51,7 +51,7 @@ func (a *MuxAdapter) WrapMiddleware(middleware core.MiddlewareFunc) any {
 			ctx := core.NewContext(w, r)
 			ctx.Set("adapter", "standard")
 
-			wrapped := middleware(func(c *core.Context) error {
+			wrapped := middleware(func(_ *core.Context) error {
 				next.ServeHTTP(w, r)
 				return nil
 			})
@@ -97,7 +97,7 @@ func (a *MuxAdapter) handleError(w http.ResponseWriter, err error) {
 	// Default error handling
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"error": err.Error(),
 	})
 }

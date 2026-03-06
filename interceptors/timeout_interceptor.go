@@ -19,7 +19,7 @@ func NewTimeoutInterceptor(timeout time.Duration) *TimeoutInterceptor {
 }
 
 // Intercept adds timeout to the request
-func (i *TimeoutInterceptor) Intercept(ctx *ExecutionContext, next func() error) error {
+func (i *TimeoutInterceptor) Intercept(_ *ExecutionContext, next func() error) error {
 	// Create context with timeout
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), i.timeout)
 	defer cancel()

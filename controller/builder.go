@@ -4,15 +4,15 @@ import (
 	"github.com/gonest-dev/gonest/core"
 )
 
-// ControllerBuilder helps build controllers with a fluent API
-type ControllerBuilder struct {
+// Builder helps build controllers with a fluent API
+type Builder struct {
 	routes  []*Route
-	options *ControllerOptions
+	options *Options
 }
 
 // NewController creates a new controller builder
-func NewController(opts ...*ControllerOptions) *ControllerBuilder {
-	options := &ControllerOptions{
+func NewController(opts ...*Options) *Builder {
+	options := &Options{
 		Prefix:      "",
 		Middlewares: make([]core.MiddlewareFunc, 0),
 		Metadata:    make(map[string]any),
@@ -22,7 +22,7 @@ func NewController(opts ...*ControllerOptions) *ControllerBuilder {
 		options = opts[0]
 	}
 
-	return &ControllerBuilder{
+	return &Builder{
 		routes:  make([]*Route, 0),
 		options: options,
 	}
@@ -30,47 +30,47 @@ func NewController(opts ...*ControllerOptions) *ControllerBuilder {
 
 // RouteBuilder helps build individual routes
 type RouteBuilder struct {
-	controller *ControllerBuilder
+	controller *Builder
 	route      *Route
 }
 
 // Get adds a GET route
-func (cb *ControllerBuilder) Get(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Get(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodGET, path, handler)
 }
 
 // Post adds a POST route
-func (cb *ControllerBuilder) Post(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Post(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodPOST, path, handler)
 }
 
 // Put adds a PUT route
-func (cb *ControllerBuilder) Put(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Put(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodPUT, path, handler)
 }
 
 // Patch adds a PATCH route
-func (cb *ControllerBuilder) Patch(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Patch(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodPATCH, path, handler)
 }
 
 // Delete adds a DELETE route
-func (cb *ControllerBuilder) Delete(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Delete(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodDELETE, path, handler)
 }
 
 // Options adds an OPTIONS route
-func (cb *ControllerBuilder) Options(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Options(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodOPTIONS, path, handler)
 }
 
 // Head adds a HEAD route
-func (cb *ControllerBuilder) Head(path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) Head(path string, handler HandlerFunc) *RouteBuilder {
 	return cb.addRoute(HTTPMethodHEAD, path, handler)
 }
 
 // addRoute is a helper to add routes
-func (cb *ControllerBuilder) addRoute(method HTTPMethod, path string, handler HandlerFunc) *RouteBuilder {
+func (cb *Builder) addRoute(method HTTPMethod, path string, handler HandlerFunc) *RouteBuilder {
 	// Prepend controller prefix to path
 	fullPath := cb.options.Prefix + path
 
@@ -147,18 +147,18 @@ func (rb *RouteBuilder) Meta(key string, value any) *RouteBuilder {
 }
 
 // Build returns the controller
-func (rb *RouteBuilder) Build() *ControllerBuilder {
+func (rb *RouteBuilder) Build() *Builder {
 	return rb.controller
 }
 
 // GetRoutes implements the Controller interface
-func (cb *ControllerBuilder) GetRoutes() []*Route {
+func (cb *Builder) GetRoutes() []*Route {
 	return cb.routes
 }
 
 // WithPrefix sets the controller prefix
-func WithPrefix(prefix string) *ControllerOptions {
-	return &ControllerOptions{
+func WithPrefix(prefix string) *Options {
+	return &Options{
 		Prefix:      prefix,
 		Middlewares: make([]core.MiddlewareFunc, 0),
 		Metadata:    make(map[string]any),
@@ -166,7 +166,7 @@ func WithPrefix(prefix string) *ControllerOptions {
 }
 
 // WithMiddleware adds middleware to controller options
-func (opts *ControllerOptions) WithMiddleware(middleware ...core.MiddlewareFunc) *ControllerOptions {
+func (opts *Options) WithMiddleware(middleware ...core.MiddlewareFunc) *Options {
 	opts.Middlewares = append(opts.Middlewares, middleware...)
 	return opts
 }

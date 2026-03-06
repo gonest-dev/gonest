@@ -78,11 +78,11 @@ const (
 	// ErrorCodeMAX - value above maximum
 	ErrorCodeMAX ErrorCode = "max"
 
-	// ErrorCodeMIN_LENGTH - string too short
-	ErrorCodeMIN_LENGTH ErrorCode = "min_length"
+	// ErrorCodeMINLENGTH - string too short
+	ErrorCodeMINLENGTH ErrorCode = "min_length"
 
-	// ErrorCodeMAX_LENGTH - string too long
-	ErrorCodeMAX_LENGTH ErrorCode = "max_length"
+	// ErrorCodeMAXLENGTH - string too long
+	ErrorCodeMAXLENGTH ErrorCode = "max_length"
 
 	// ErrorCodePATTERN - doesn't match pattern
 	ErrorCodePATTERN ErrorCode = "pattern"
@@ -93,8 +93,8 @@ const (
 	// ErrorCodeUUID - invalid UUID format
 	ErrorCodeUUID ErrorCode = "uuid"
 
-	// ErrorCodeONE_OF - value not in allowed list
-	ErrorCodeONE_OF ErrorCode = "one_of"
+	// ErrorCodeONEOF - value not in allowed list
+	ErrorCodeONEOF ErrorCode = "one_of"
 
 	// ErrorCodeCUSTOM - custom validation failed
 	ErrorCodeCUSTOM ErrorCode = "custom"

@@ -2,12 +2,12 @@ package swagger
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
+	"strings"
 )
 
-// SwaggerUIConfig configures Swagger UI
-type SwaggerUIConfig struct {
+// UIConfig configures Swagger UI
+type UIConfig struct {
 	Title     string
 	SpecURL   string
 	CustomCSS string
@@ -15,7 +15,7 @@ type SwaggerUIConfig struct {
 }
 
 // GenerateSwaggerUI generates Swagger UI HTML
-func GenerateSwaggerUI(config *SwaggerUIConfig) string {
+func GenerateSwaggerUI(config *UIConfig) string {
 	if config.Title == "" {
 		config.Title = "API Documentation"
 	}
@@ -65,9 +65,12 @@ func GenerateSwaggerUI(config *SwaggerUIConfig) string {
 	t := template.Must(template.New("swagger").Parse(tmpl))
 	var result string
 
-	// Execute template (simplified, would use proper buffer in production)
+	// Execute template
 	_ = t
-	result = fmt.Sprintf(tmpl, config.Title, config.CustomCSS, config.SpecURL, config.CustomJS)
+	result = strings.ReplaceAll(tmpl, "{{.Title}}", config.Title)
+	result = strings.ReplaceAll(result, "{{.CustomCSS}}", config.CustomCSS)
+	result = strings.ReplaceAll(result, "{{.SpecURL}}", config.SpecURL)
+	result = strings.ReplaceAll(result, "{{.CustomJS}}", config.CustomJS)
 
 	return result
 }

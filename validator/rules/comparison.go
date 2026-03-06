@@ -10,14 +10,10 @@ import (
 func EqualTo[T comparable](other T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if value != other {
-			err := validator.NewFieldError(
-				"",
-				"equal_to",
-				"Value must equal the expected value",
-			)
-			err.WithParam("expected", other)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", "equal_to", "Value must equal the expected value").
+				WithParam("expected", other).
+				WithParam("actual", value)
 		}
 		return nil
 	}
@@ -27,13 +23,9 @@ func EqualTo[T comparable](other T) validator.Validator[T] {
 func NotEqualTo[T comparable](other T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if value == other {
-			err := validator.NewFieldError(
-				"",
-				"not_equal_to",
-				"Value must not equal the rejected value",
-			)
-			err.WithParam("rejected", other)
-			return err
+			return validator.
+				NewFieldError("", "not_equal_to", "Value must not equal the rejected value").
+				WithParam("rejected", other)
 		}
 		return nil
 	}
@@ -43,14 +35,10 @@ func NotEqualTo[T comparable](other T) validator.Validator[T] {
 func GreaterThanOrEqual[T constraints.Ordered](other T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if value < other {
-			err := validator.NewFieldError(
-				"",
-				"greater_than_or_equal",
-				"Value must be greater than or equal to threshold",
-			)
-			err.WithParam("threshold", other)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", "greater_than_or_equal", "Value must be greater than or equal to threshold").
+				WithParam("threshold", other).
+				WithParam("actual", value)
 		}
 		return nil
 	}
@@ -60,14 +48,10 @@ func GreaterThanOrEqual[T constraints.Ordered](other T) validator.Validator[T] {
 func LessThanOrEqual[T constraints.Ordered](other T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if value > other {
-			err := validator.NewFieldError(
-				"",
-				"less_than_or_equal",
-				"Value must be less than or equal to threshold",
-			)
-			err.WithParam("threshold", other)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", "less_than_or_equal", "Value must be less than or equal to threshold").
+				WithParam("threshold", other).
+				WithParam("actual", value)
 		}
 		return nil
 	}
@@ -78,13 +62,9 @@ func SameAs[T comparable](getter func() T, fieldName string) validator.Validator
 	return func(value T) *validator.FieldError {
 		other := getter()
 		if value != other {
-			err := validator.NewFieldError(
-				"",
-				"same_as",
-				"Values must match",
-			)
-			err.WithParam("field", fieldName)
-			return err
+			return validator.
+				NewFieldError("", "same_as", "Values must match").
+				WithParam("field", fieldName)
 		}
 		return nil
 	}
@@ -95,13 +75,9 @@ func DifferentFrom[T comparable](others ...T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		for _, other := range others {
 			if value == other {
-				err := validator.NewFieldError(
-					"",
-					"different_from",
-					"Value must be different from specified values",
-				)
-				err.WithParam("forbidden", others)
-				return err
+				return validator.
+					NewFieldError("", "different_from", "Value must be different from specified values").
+					WithParam("forbidden", others)
 			}
 		}
 		return nil
@@ -113,13 +89,9 @@ func NotIn[T comparable](forbidden []T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		for _, item := range forbidden {
 			if value == item {
-				err := validator.NewFieldError(
-					"",
-					"not_in",
-					"Value must not be in the forbidden list",
-				)
-				err.WithParam("forbidden", forbidden)
-				return err
+				return validator.
+					NewFieldError("", "not_in", "Value must not be in the forbidden list").
+					WithParam("forbidden", forbidden)
 			}
 		}
 		return nil
@@ -135,14 +107,10 @@ func InRange[T constraints.Ordered](ranges ...[2]T) validator.Validator[T] {
 			}
 		}
 
-		err := validator.NewFieldError(
-			"",
-			"in_range",
-			"Value must be in one of the specified ranges",
-		)
-		err.WithParam("ranges", ranges)
-		err.WithParam("actual", value)
-		return err
+		return validator.
+			NewFieldError("", "in_range", "Value must be in one of the specified ranges").
+			WithParam("ranges", ranges).
+			WithParam("actual", value)
 	}
 }
 
@@ -151,14 +119,10 @@ func NotInRange[T constraints.Ordered](ranges ...[2]T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		for _, r := range ranges {
 			if value >= r[0] && value <= r[1] {
-				err := validator.NewFieldError(
-					"",
-					"not_in_range",
-					"Value must not be in the forbidden ranges",
-				)
-				err.WithParam("ranges", ranges)
-				err.WithParam("actual", value)
-				return err
+				return validator.
+					NewFieldError("", "not_in_range", "Value must not be in the forbidden ranges").
+					WithParam("ranges", ranges).
+					WithParam("actual", value)
 			}
 		}
 		return nil
@@ -173,10 +137,10 @@ func Compare[T any](
 ) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if !comparison(value, compareTo) {
-			err := validator.NewFieldError("", code, message)
-			err.WithParam("expected", compareTo)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", code, message).
+				WithParam("expected", compareTo).
+				WithParam("actual", value)
 		}
 		return nil
 	}

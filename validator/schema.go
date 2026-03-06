@@ -23,9 +23,7 @@ type SchemaType[T any] struct {
 
 // fieldValidator is an interface that can validate a field of type T
 type fieldValidator[T any] interface {
-	validate(*T) *FieldError
-	validateAsync(context.Context, *T) *FieldError
-	hasAsync() bool
+	Validate(context.Context, *T) *FieldError
 }
 
 // SchemaBuilder builds validation schemas in a type-safe way
@@ -59,14 +57,14 @@ func NewSchema[T any](instance *T) *SchemaBuilder[T] {
 
 // fieldValidatorImpl implements fieldValidator for a specific field type
 type fieldValidatorImpl[T any, F any] struct {
-	fieldName      string
-	displayName    string
-	fieldIndex     int
-	validators     []Validator[F]
-	asyncValidator ContextValidator[F]
+	displayName string
+	fieldIndex  int
+	validators  []Validator[F]
 }
 
-func (fv *fieldValidatorImpl[T, F]) validate(value *T) *FieldError {
+var _ fieldValidator[any] = (*fieldValidatorImpl[any, any])(nil)
+
+func (fv *fieldValidatorImpl[T, F]) Validate(_ context.Context, value *T) *FieldError {
 	v := reflect.ValueOf(value).Elem()
 	fieldValue := v.Field(fv.fieldIndex).Interface().(F)
 
@@ -80,30 +78,6 @@ func (fv *fieldValidatorImpl[T, F]) validate(value *T) *FieldError {
 	}
 
 	return nil
-}
-
-func (fv *fieldValidatorImpl[T, F]) validateAsync(ctx context.Context, value *T) *FieldError {
-	if err := fv.validate(value); err != nil {
-		return err
-	}
-
-	if fv.asyncValidator != nil {
-		v := reflect.ValueOf(value).Elem()
-		fieldValue := v.Field(fv.fieldIndex).Interface().(F)
-
-		if err := fv.asyncValidator(ctx, fieldValue); err != nil {
-			if err.field == "" {
-				err.field = fv.displayName
-			}
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (fv *fieldValidatorImpl[T, F]) hasAsync() bool {
-	return fv.asyncValidator != nil
 }
 
 // getFieldInfoFromPointer extracts field info from a field pointer
@@ -286,30 +260,11 @@ func (sb *SchemaBuilder[T]) Build() *SchemaType[T] {
 }
 
 // Validate validates a value against the schema
-func (s *SchemaType[T]) Validate(value *T) *ValidationResult {
+func (s *SchemaType[T]) Validate(ctx context.Context, value *T) *ValidationResult {
 	result := NewValidationResult()
 
 	for _, field := range s.fields {
-		if err := field.validate(value); err != nil {
-			result.AddError(err)
-		}
-	}
-
-	for _, validator := range s.crossValidators {
-		if err := validator(value); err != nil {
-			result.AddError(err)
-		}
-	}
-
-	return result
-}
-
-// ValidateAsync validates a value asynchronously
-func (s *SchemaType[T]) ValidateAsync(ctx context.Context, value *T) *ValidationResult {
-	result := NewValidationResult()
-
-	for _, field := range s.fields {
-		if err := field.validateAsync(ctx, value); err != nil {
+		if err := field.Validate(ctx, value); err != nil {
 			result.AddError(err)
 		}
 	}

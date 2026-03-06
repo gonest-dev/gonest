@@ -11,9 +11,11 @@ COVERPROFILE_ALL ?= coverage.out
 # Automatically discover modules
 MODULES := core validator controller pipes guards interceptors exceptions swagger di platform
 MODULE_PACKAGES := ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
+GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
 
 # Path to testing tools
 TOOLS_PKG := github.com/gonest-dev/gonest-tools
+LINT_TOOL := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
 # Bypass Go proxy for private/recently public tools
 export GOPRIVATE := github.com/gonest-dev/*
@@ -59,12 +61,9 @@ badge: coverage ## Generate coverage badge
 	$(GO) run $(TOOLS_PKG)/badge@latest -in $(COVERPROFILE_ALL) -out $(BADGE_DIR)/coverage.svg -label $(BADGE_LABEL)
 	@echo CI completed successfully!
 
-ci-test: ## Run act locally with SSL bypass and full image
-	@act push --env GOPROXY=direct --env GOSUMDB=off --env GIT_SSL_NO_VERIFY=true --no-cache-server -P ubuntu-latest=catthehacker/ubuntu:act-latest
-
 lint: ## Run linter
-	@echo Running linter...
-	golangci-lint run --timeout=5m
+	@echo "Running linter..."
+	@$(GO) run $(LINT_TOOL) run --timeout=5m $(MODULE_PACKAGES)
 
 build: ## Build all modules
 	@echo Building all modules...

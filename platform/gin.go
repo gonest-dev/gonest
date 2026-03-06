@@ -51,7 +51,7 @@ func (a *GinAdapter) WrapMiddleware(middleware core.MiddlewareFunc) gin.HandlerF
 		ctx.Set("adapter", "gin")
 		ctx.Set("gin_context", c)
 
-		wrapped := middleware(func(ctx *core.Context) error {
+		wrapped := middleware(func(_ *core.Context) error {
 			c.Next()
 			return nil
 		})

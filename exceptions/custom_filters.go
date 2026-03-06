@@ -12,7 +12,7 @@ func NewNotFoundExceptionFilter() *NotFoundExceptionFilter {
 }
 
 func (f *NotFoundExceptionFilter) Catch(err error, ctx *core.Context) error {
-	if httpErr, ok := err.(*HttpException); ok {
+	if httpErr, ok := err.(*HTTPException); ok {
 		if httpErr.StatusCode == 404 {
 			return ctx.JSON(404, map[string]any{
 				"statusCode": 404,
@@ -50,7 +50,7 @@ func NewUnauthorizedExceptionFilter() *UnauthorizedExceptionFilter {
 }
 
 func (f *UnauthorizedExceptionFilter) Catch(err error, ctx *core.Context) error {
-	if httpErr, ok := err.(*HttpException); ok {
+	if httpErr, ok := err.(*HTTPException); ok {
 		if httpErr.StatusCode == 401 {
 			return ctx.JSON(401, map[string]any{
 				"statusCode": 401,
@@ -71,7 +71,7 @@ func NewForbiddenExceptionFilter() *ForbiddenExceptionFilter {
 }
 
 func (f *ForbiddenExceptionFilter) Catch(err error, ctx *core.Context) error {
-	if httpErr, ok := err.(*HttpException); ok {
+	if httpErr, ok := err.(*HTTPException); ok {
 		if httpErr.StatusCode == 403 {
 			return ctx.JSON(403, map[string]any{
 				"statusCode": 403,

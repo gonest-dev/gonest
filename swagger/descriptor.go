@@ -44,7 +44,6 @@ type FieldDescriptor struct {
 // FieldDescriptorBuilder provides fluent API for field configuration
 type FieldDescriptorBuilder struct {
 	descriptor *FieldDescriptor
-	builder    *DescriptorBuilder[any]
 }
 
 // NewDescriptor creates a new descriptor builder
@@ -280,26 +279,26 @@ func (f *FieldDescriptorBuilder) Example(ex any) *FieldDescriptorBuilder {
 }
 
 // Minimum sets minimum value for numbers
-func (f *FieldDescriptorBuilder) Minimum(min float64) *FieldDescriptorBuilder {
-	f.descriptor.minimum = &min
+func (f *FieldDescriptorBuilder) Minimum(v float64) *FieldDescriptorBuilder {
+	f.descriptor.minimum = &v
 	return f
 }
 
 // Maximum sets maximum value for numbers
-func (f *FieldDescriptorBuilder) Maximum(max float64) *FieldDescriptorBuilder {
-	f.descriptor.maximum = &max
+func (f *FieldDescriptorBuilder) Maximum(v float64) *FieldDescriptorBuilder {
+	f.descriptor.maximum = &v
 	return f
 }
 
 // MinLength sets minimum length for strings
-func (f *FieldDescriptorBuilder) MinLength(min int) *FieldDescriptorBuilder {
-	f.descriptor.minLength = &min
+func (f *FieldDescriptorBuilder) MinLength(v int) *FieldDescriptorBuilder {
+	f.descriptor.minLength = &v
 	return f
 }
 
 // MaxLength sets maximum length for strings
-func (f *FieldDescriptorBuilder) MaxLength(max int) *FieldDescriptorBuilder {
-	f.descriptor.maxLength = &max
+func (f *FieldDescriptorBuilder) MaxLength(v int) *FieldDescriptorBuilder {
+	f.descriptor.maxLength = &v
 	return f
 }
 

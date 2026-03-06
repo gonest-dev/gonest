@@ -15,15 +15,13 @@ func AsyncCustom[T any](
 	return func(ctx context.Context, value T) *validator.FieldError {
 		valid, err := predicate(ctx, value)
 		if err != nil {
-			return validator.NewFieldError(
-				"",
-				"async_error",
-				fmt.Sprintf("Validation error: %v", err),
-			)
+			return validator.
+				NewFieldError("", "async_error", fmt.Sprintf("Validation error: %v", err))
 		}
 
 		if !valid {
-			return validator.NewFieldError("", code, message)
+			return validator.
+				NewFieldError("", code, message)
 		}
 
 		return nil
@@ -38,21 +36,14 @@ func AsyncUnique[T any](
 	return func(ctx context.Context, value T) *validator.FieldError {
 		exists, err := checker(ctx, value)
 		if err != nil {
-			return validator.NewFieldError(
-				"",
-				"async_error",
-				fmt.Sprintf("Failed to check uniqueness: %v", err),
-			)
+			return validator.
+				NewFieldError("", "async_error", fmt.Sprintf("Failed to check uniqueness: %v", err))
 		}
 
 		if exists {
-			err := validator.NewFieldError(
-				"",
-				"unique",
-				fmt.Sprintf("%s already exists", resourceName),
-			)
-			err.WithParam("resource", resourceName)
-			return err
+			return validator.
+				NewFieldError("", "unique", fmt.Sprintf("%s already exists", resourceName)).
+				WithParam("resource", resourceName)
 		}
 
 		return nil
@@ -67,21 +58,14 @@ func AsyncExists[T any](
 	return func(ctx context.Context, value T) *validator.FieldError {
 		exists, err := checker(ctx, value)
 		if err != nil {
-			return validator.NewFieldError(
-				"",
-				"async_error",
-				fmt.Sprintf("Failed to check existence: %v", err),
-			)
+			return validator.
+				NewFieldError("", "async_error", fmt.Sprintf("Failed to check existence: %v", err))
 		}
 
 		if !exists {
-			err := validator.NewFieldError(
-				"",
-				"exists",
-				fmt.Sprintf("%s not found", resourceName),
-			)
-			err.WithParam("resource", resourceName)
-			return err
+			return validator.
+				NewFieldError("", "exists", fmt.Sprintf("%s not found", resourceName)).
+				WithParam("resource", resourceName)
 		}
 
 		return nil
@@ -104,18 +88,15 @@ func AsyncCompare[T comparable](
 	return func(ctx context.Context, value T) *validator.FieldError {
 		compareWith, err := fetcher(ctx)
 		if err != nil {
-			return validator.NewFieldError(
-				"",
-				"async_error",
-				fmt.Sprintf("Failed to fetch comparison value: %v", err),
-			)
+			return validator.
+				NewFieldError("", "async_error", fmt.Sprintf("Failed to fetch comparison value: %v", err))
 		}
 
 		if !comparison(value, compareWith) {
-			err := validator.NewFieldError("", code, message)
-			err.WithParam("expected", compareWith)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", code, message).
+				WithParam("expected", compareWith).
+				WithParam("actual", value)
 		}
 
 		return nil

@@ -6,14 +6,14 @@ import (
 
 // ValidationException represents validation errors
 type ValidationException struct {
-	*HttpException
+	*HTTPException
 	ValidationResult *validator.ValidationResult
 }
 
 // NewValidationException creates a validation exception
 func NewValidationException(result *validator.ValidationResult) *ValidationException {
 	return &ValidationException{
-		HttpException: &HttpException{
+		HTTPException: &HTTPException{
 			StatusCode: 400,
 			Message:    "Validation failed",
 			Details:    result.ToJSON(),

@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"slices"
+
 	"github.com/gonest-dev/gonest/validator"
 )
 
@@ -9,11 +11,8 @@ func Required[T comparable]() validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		var zero T
 		if value == zero {
-			return validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeREQUIRED),
-				"This field is required",
-			)
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeREQUIRED), "This field is required")
 		}
 		return nil
 	}
@@ -23,11 +22,8 @@ func Required[T comparable]() validator.Validator[T] {
 func NotEmpty[T ~string | ~[]any]() validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if len(value) == 0 {
-			return validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeREQUIRED),
-				"This field cannot be empty",
-			)
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeREQUIRED), "This field cannot be empty")
 		}
 		return nil
 	}
@@ -35,7 +31,7 @@ func NotEmpty[T ~string | ~[]any]() validator.Validator[T] {
 
 // Optional always passes (useful for composition)
 func Optional[T any]() validator.Validator[T] {
-	return func(value T) *validator.FieldError {
+	return func(_ T) *validator.FieldError {
 		return nil
 	}
 }
@@ -44,11 +40,8 @@ func Optional[T any]() validator.Validator[T] {
 func Custom[T any](predicate func(T) bool, message string) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if !predicate(value) {
-			return validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeCUSTOM),
-				message,
-			)
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeCUSTOM), message)
 		}
 		return nil
 	}
@@ -58,7 +51,8 @@ func Custom[T any](predicate func(T) bool, message string) validator.Validator[T
 func Must[T any](condition func(T) bool, code, message string) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if !condition(value) {
-			return validator.NewFieldError("", code, message)
+			return validator.
+				NewFieldError("", code, message)
 		}
 		return nil
 	}
@@ -68,13 +62,9 @@ func Must[T any](condition func(T) bool, code, message string) validator.Validat
 func Equal[T comparable](expected T, message string) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if value != expected {
-			err := validator.NewFieldError(
-				"",
-				"equal",
-				message,
-			)
-			err.WithParam("expected", expected)
-			return err
+			return validator.
+				NewFieldError("", "equal", message).
+				WithParam("expected", expected)
 		}
 		return nil
 	}
@@ -84,13 +74,9 @@ func Equal[T comparable](expected T, message string) validator.Validator[T] {
 func NotEqual[T comparable](rejected T, message string) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if value == rejected {
-			err := validator.NewFieldError(
-				"",
-				"not_equal",
-				message,
-			)
-			err.WithParam("rejected", rejected)
-			return err
+			return validator.
+				NewFieldError("", "not_equal", message).
+				WithParam("rejected", rejected)
 		}
 		return nil
 	}
@@ -99,19 +85,13 @@ func NotEqual[T comparable](rejected T, message string) validator.Validator[T] {
 // OneOf validates that value is one of the allowed values
 func OneOf[T comparable](allowed []T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
-		for _, a := range allowed {
-			if value == a {
-				return nil
-			}
+		if slices.Contains(allowed, value) {
+			return nil
 		}
 
-		err := validator.NewFieldError(
-			"",
-			string(validator.ErrorCodeONE_OF),
-			"Value must be one of the allowed values",
-		)
-		err.WithParam("allowed", allowed)
-		return err
+		return validator.
+			NewFieldError("", string(validator.ErrorCodeONEOF), "Value must be one of the allowed values").
+			WithParam("allowed", allowed)
 	}
 }
 

@@ -1,38 +1,32 @@
 package rules
 
 import (
+	"slices"
+
 	"github.com/gonest-dev/gonest/validator"
 )
 
 // ArrayMinSize validates minimum array size
-func ArrayMinSize[T any](min int) validator.Validator[[]T] {
+func ArrayMinSize[T any](minSize int) validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
-		if len(value) < min {
-			err := validator.NewFieldError(
-				"",
-				"array_min_size",
-				"Array is too small",
-			)
-			err.WithParam("min", min)
-			err.WithParam("actual", len(value))
-			return err
+		if len(value) < minSize {
+			return validator.
+				NewFieldError("", "array_min_size", "Array is too small").
+				WithParam("min", minSize).
+				WithParam("actual", len(value))
 		}
 		return nil
 	}
 }
 
 // ArrayMaxSize validates maximum array size
-func ArrayMaxSize[T any](max int) validator.Validator[[]T] {
+func ArrayMaxSize[T any](maxSize int) validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
-		if len(value) > max {
-			err := validator.NewFieldError(
-				"",
-				"array_max_size",
-				"Array is too large",
-			)
-			err.WithParam("max", max)
-			err.WithParam("actual", len(value))
-			return err
+		if len(value) > maxSize {
+			return validator.
+				NewFieldError("", "array_max_size", "Array is too large").
+				WithParam("max", maxSize).
+				WithParam("actual", len(value))
 		}
 		return nil
 	}
@@ -42,14 +36,10 @@ func ArrayMaxSize[T any](max int) validator.Validator[[]T] {
 func ArraySize[T any](size int) validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
 		if len(value) != size {
-			err := validator.NewFieldError(
-				"",
-				"array_size",
-				"Array must have exact size",
-			)
-			err.WithParam("expected", size)
-			err.WithParam("actual", len(value))
-			return err
+			return validator.
+				NewFieldError("", "array_size", "Array must have exact size").
+				WithParam("expected", size).
+				WithParam("actual", len(value))
 		}
 		return nil
 	}
@@ -59,11 +49,8 @@ func ArraySize[T any](size int) validator.Validator[[]T] {
 func ArrayNotEmpty[T any]() validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
 		if len(value) == 0 {
-			return validator.NewFieldError(
-				"",
-				"array_not_empty",
-				"Array cannot be empty",
-			)
+			return validator.
+				NewFieldError("", "array_not_empty", "Array cannot be empty")
 		}
 		return nil
 	}
@@ -75,14 +62,10 @@ func ArrayUnique[T comparable]() validator.Validator[[]T] {
 		seen := make(map[T]bool)
 		for i, item := range value {
 			if seen[item] {
-				err := validator.NewFieldError(
-					"",
-					"array_unique",
-					"Array contains duplicate values",
-				)
-				err.WithParam("index", i)
-				err.WithParam("value", item)
-				return err
+				return validator.
+					NewFieldError("", "array_unique", "Array contains duplicate values").
+					WithParam("index", i).
+					WithParam("value", item)
 			}
 			seen[item] = true
 		}
@@ -93,19 +76,13 @@ func ArrayUnique[T comparable]() validator.Validator[[]T] {
 // ArrayContains validates that array contains a specific value
 func ArrayContains[T comparable](target T) validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
-		for _, item := range value {
-			if item == target {
-				return nil
-			}
+		if slices.Contains(value, target) {
+			return nil
 		}
 
-		err := validator.NewFieldError(
-			"",
-			"array_contains",
-			"Array must contain the specified value",
-		)
-		err.WithParam("target", target)
-		return err
+		return validator.
+			NewFieldError("", "array_contains", "Array must contain the specified value").
+			WithParam("target", target)
 	}
 }
 
@@ -114,14 +91,10 @@ func ArrayDoesNotContain[T comparable](forbidden T) validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
 		for i, item := range value {
 			if item == forbidden {
-				err := validator.NewFieldError(
-					"",
-					"array_does_not_contain",
-					"Array must not contain the specified value",
-				)
-				err.WithParam("forbidden", forbidden)
-				err.WithParam("index", i)
-				return err
+				return validator.
+					NewFieldError("", "array_does_not_contain", "Array must not contain the specified value").
+					WithParam("forbidden", forbidden).
+					WithParam("index", i)
 			}
 		}
 		return nil
@@ -133,14 +106,10 @@ func ArrayEvery[T any](predicate func(T) bool, message string) validator.Validat
 	return func(value []T) *validator.FieldError {
 		for i, item := range value {
 			if !predicate(item) {
-				err := validator.NewFieldError(
-					"",
-					"array_every",
-					message,
-				)
-				err.WithParam("index", i)
-				err.WithParam("value", item)
-				return err
+				return validator.
+					NewFieldError("", "array_every", message).
+					WithParam("index", i).
+					WithParam("value", item)
 			}
 		}
 		return nil
@@ -156,11 +125,8 @@ func ArraySome[T any](predicate func(T) bool, message string) validator.Validato
 			}
 		}
 
-		return validator.NewFieldError(
-			"",
-			"array_some",
-			message,
-		)
+		return validator.
+			NewFieldError("", "array_some", message)
 	}
 }
 
@@ -169,14 +135,10 @@ func ArrayNone[T any](predicate func(T) bool, message string) validator.Validato
 	return func(value []T) *validator.FieldError {
 		for i, item := range value {
 			if predicate(item) {
-				err := validator.NewFieldError(
-					"",
-					"array_none",
-					message,
-				)
-				err.WithParam("index", i)
-				err.WithParam("value", item)
-				return err
+				return validator.
+					NewFieldError("", "array_none", message).
+					WithParam("index", i).
+					WithParam("value", item)
 			}
 		}
 		return nil
@@ -188,8 +150,7 @@ func ArrayEach[T any](itemValidator validator.Validator[T]) validator.Validator[
 	return func(value []T) *validator.FieldError {
 		for i, item := range value {
 			if err := itemValidator(item); err != nil {
-				err.WithParam("index", i)
-				return err
+				return err.WithParam("index", i)
 			}
 		}
 		return nil

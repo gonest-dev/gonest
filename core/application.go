@@ -174,8 +174,8 @@ func (app *NestApplication) GetRouter() *Router {
 // Application option functions
 
 // WithPort sets the server port
-func WithPort(port int) ApplicationOption {
-	return func(app *NestApplication) {
+func WithPort(_ int) ApplicationOption {
+	return func(_ *NestApplication) {
 		// Port will be used in Listen() method
 	}
 }

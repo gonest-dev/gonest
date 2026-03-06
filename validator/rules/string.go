@@ -10,34 +10,26 @@ import (
 )
 
 // MinLength validates minimum string length
-func MinLength(min int) validator.Validator[string] {
+func MinLength(minLength int) validator.Validator[string] {
 	return func(value string) *validator.FieldError {
-		if len(value) < min {
-			err := validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeMIN_LENGTH),
-				"String is too short",
-			)
-			err.WithParam("min", min)
-			err.WithParam("actual", len(value))
-			return err
+		if len(value) < minLength {
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeMINLENGTH), "String is too short").
+				WithParam("min", minLength).
+				WithParam("actual", len(value))
 		}
 		return nil
 	}
 }
 
 // MaxLength validates maximum string length
-func MaxLength(max int) validator.Validator[string] {
+func MaxLength(maxLength int) validator.Validator[string] {
 	return func(value string) *validator.FieldError {
-		if len(value) > max {
-			err := validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeMAX_LENGTH),
-				"String is too long",
-			)
-			err.WithParam("max", max)
-			err.WithParam("actual", len(value))
-			return err
+		if len(value) > maxLength {
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeMAXLENGTH), "String is too long").
+				WithParam("max", maxLength).
+				WithParam("actual", len(value))
 		}
 		return nil
 	}
@@ -47,14 +39,10 @@ func MaxLength(max int) validator.Validator[string] {
 func Length(length int) validator.Validator[string] {
 	return func(value string) *validator.FieldError {
 		if len(value) != length {
-			err := validator.NewFieldError(
-				"",
-				"length",
-				"String must be exactly the specified length",
-			)
-			err.WithParam("expected", length)
-			err.WithParam("actual", len(value))
-			return err
+			return validator.
+				NewFieldError("", "length", "String must be exactly the specified length").
+				WithParam("expected", length).
+				WithParam("actual", len(value))
 		}
 		return nil
 	}
@@ -69,11 +57,8 @@ func Email() validator.Validator[string] {
 
 		_, err := mail.ParseAddress(value)
 		if err != nil {
-			return validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeEMAIL),
-				"Invalid email format",
-			)
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeEMAIL), "Invalid email format")
 		}
 		return nil
 	}
@@ -88,11 +73,8 @@ func URL() validator.Validator[string] {
 
 		_, err := url.ParseRequestURI(value)
 		if err != nil {
-			return validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeURL),
-				"Invalid URL format",
-			)
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeURL), "Invalid URL format")
 		}
 		return nil
 	}
@@ -108,13 +90,9 @@ func Pattern(pattern string) validator.Validator[string] {
 		}
 
 		if !re.MatchString(value) {
-			err := validator.NewFieldError(
-				"",
-				string(validator.ErrorCodePATTERN),
-				"Value doesn't match the required pattern",
-			)
-			err.WithParam("pattern", pattern)
-			return err
+			return validator.
+				NewFieldError("", string(validator.ErrorCodePATTERN), "Value doesn't match the required pattern").
+				WithParam("pattern", pattern)
 		}
 		return nil
 	}
@@ -130,11 +108,8 @@ func UUID() validator.Validator[string] {
 		}
 
 		if !uuidRegex.MatchString(strings.ToLower(value)) {
-			return validator.NewFieldError(
-				"",
-				string(validator.ErrorCodeUUID),
-				"Invalid UUID format",
-			)
+			return validator.
+				NewFieldError("", string(validator.ErrorCodeUUID), "Invalid UUID format")
 		}
 		return nil
 	}
@@ -150,11 +125,8 @@ func AlphaNumeric() validator.Validator[string] {
 		}
 
 		if !re.MatchString(value) {
-			return validator.NewFieldError(
-				"",
-				"alpha_numeric",
-				"Value must contain only letters and numbers",
-			)
+			return validator.
+				NewFieldError("", "alpha_numeric", "Value must contain only letters and numbers")
 		}
 		return nil
 	}
@@ -170,11 +142,8 @@ func Alpha() validator.Validator[string] {
 		}
 
 		if !re.MatchString(value) {
-			return validator.NewFieldError(
-				"",
-				"alpha",
-				"Value must contain only letters",
-			)
+			return validator.
+				NewFieldError("", "alpha", "Value must contain only letters")
 		}
 		return nil
 	}
@@ -190,11 +159,8 @@ func Numeric() validator.Validator[string] {
 		}
 
 		if !re.MatchString(value) {
-			return validator.NewFieldError(
-				"",
-				"numeric",
-				"Value must contain only numbers",
-			)
+			return validator.
+				NewFieldError("", "numeric", "Value must contain only numbers")
 		}
 		return nil
 	}
@@ -208,13 +174,9 @@ func Contains(substr string) validator.Validator[string] {
 		}
 
 		if !strings.Contains(value, substr) {
-			err := validator.NewFieldError(
-				"",
-				"contains",
-				"Value must contain the specified substring",
-			)
-			err.WithParam("substring", substr)
-			return err
+			return validator.
+				NewFieldError("", "contains", "Value must contain the specified substring").
+				WithParam("substring", substr)
 		}
 		return nil
 	}
@@ -228,13 +190,9 @@ func StartsWith(prefix string) validator.Validator[string] {
 		}
 
 		if !strings.HasPrefix(value, prefix) {
-			err := validator.NewFieldError(
-				"",
-				"starts_with",
-				"Value must start with the specified prefix",
-			)
-			err.WithParam("prefix", prefix)
-			return err
+			return validator.
+				NewFieldError("", "starts_with", "Value must start with the specified prefix").
+				WithParam("prefix", prefix)
 		}
 		return nil
 	}
@@ -248,13 +206,9 @@ func EndsWith(suffix string) validator.Validator[string] {
 		}
 
 		if !strings.HasSuffix(value, suffix) {
-			err := validator.NewFieldError(
-				"",
-				"ends_with",
-				"Value must end with the specified suffix",
-			)
-			err.WithParam("suffix", suffix)
-			return err
+			return validator.
+				NewFieldError("", "ends_with", "Value must end with the specified suffix").
+				WithParam("suffix", suffix)
 		}
 		return nil
 	}
@@ -268,11 +222,8 @@ func HasUpperCase() validator.Validator[string] {
 				return nil
 			}
 		}
-		return validator.NewFieldError(
-			"",
-			"has_uppercase",
-			"Value must contain at least one uppercase letter",
-		)
+		return validator.
+			NewFieldError("", "has_uppercase", "Value must contain at least one uppercase letter")
 	}
 }
 
@@ -284,11 +235,8 @@ func HasLowerCase() validator.Validator[string] {
 				return nil
 			}
 		}
-		return validator.NewFieldError(
-			"",
-			"has_lowercase",
-			"Value must contain at least one lowercase letter",
-		)
+		return validator.
+			NewFieldError("", "has_lowercase", "Value must contain at least one lowercase letter")
 	}
 }
 
@@ -300,11 +248,8 @@ func HasDigit() validator.Validator[string] {
 				return nil
 			}
 		}
-		return validator.NewFieldError(
-			"",
-			"has_digit",
-			"Value must contain at least one digit",
-		)
+		return validator.
+			NewFieldError("", "has_digit", "Value must contain at least one digit")
 	}
 }
 
@@ -318,13 +263,9 @@ func HasSpecialChar() validator.Validator[string] {
 				return nil
 			}
 		}
-		err := validator.NewFieldError(
-			"",
-			"has_special_char",
-			"Value must contain at least one special character",
-		)
-		err.WithParam("allowed", specialChars)
-		return err
+		return validator.
+			NewFieldError("", "has_special_char", "Value must contain at least one special character").
+			WithParam("allowed", specialChars)
 	}
 }
 
@@ -332,11 +273,8 @@ func HasSpecialChar() validator.Validator[string] {
 func StrongPassword() validator.Validator[string] {
 	return func(value string) *validator.FieldError {
 		if len(value) < 8 {
-			return validator.NewFieldError(
-				"",
-				"strong_password",
-				"Password must be at least 8 characters long",
-			)
+			return validator.
+				NewFieldError("", "strong_password", "Password must be at least 8 characters long")
 		}
 
 		hasUpper := false
@@ -361,32 +299,20 @@ func StrongPassword() validator.Validator[string] {
 		}
 
 		if !hasUpper {
-			return validator.NewFieldError(
-				"",
-				"strong_password",
-				"Password must contain at least one uppercase letter",
-			)
+			return validator.
+				NewFieldError("", "strong_password", "Password must contain at least one uppercase letter")
 		}
 		if !hasLower {
-			return validator.NewFieldError(
-				"",
-				"strong_password",
-				"Password must contain at least one lowercase letter",
-			)
+			return validator.
+				NewFieldError("", "strong_password", "Password must contain at least one lowercase letter")
 		}
 		if !hasDigit {
-			return validator.NewFieldError(
-				"",
-				"strong_password",
-				"Password must contain at least one digit",
-			)
+			return validator.
+				NewFieldError("", "strong_password", "Password must contain at least one digit")
 		}
 		if !hasSpecial {
-			return validator.NewFieldError(
-				"",
-				"strong_password",
-				"Password must contain at least one special character",
-			)
+			return validator.
+				NewFieldError("", "strong_password", "Password must contain at least one special character")
 		}
 
 		return nil

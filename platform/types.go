@@ -5,7 +5,7 @@ import (
 )
 
 // PlatformAdapter defines the interface for platform adapters
-type PlatformAdapter interface {
+type Adapter interface {
 	// Name returns the adapter name
 	Name() string
 
@@ -38,6 +38,6 @@ type Logger interface {
 // DefaultLogger provides basic logging
 type DefaultLogger struct{}
 
-func (l *DefaultLogger) Info(msg string, args ...any)  {}
-func (l *DefaultLogger) Error(msg string, args ...any) {}
-func (l *DefaultLogger) Debug(msg string, args ...any) {}
+func (l *DefaultLogger) Info(_ string, _ ...any)  {}
+func (l *DefaultLogger) Error(_ string, _ ...any) {}
+func (l *DefaultLogger) Debug(_ string, _ ...any) {}

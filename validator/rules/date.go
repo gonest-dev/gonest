@@ -10,14 +10,10 @@ import (
 func DateAfter(after time.Time) validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		if !value.After(after) {
-			err := validator.NewFieldError(
-				"",
-				"date_after",
-				"Date must be after the specified date",
-			)
-			err.WithParam("after", after)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", "date_after", "Date must be after the specified date").
+				WithParam("after", after).
+				WithParam("actual", value)
 		}
 		return nil
 	}
@@ -27,14 +23,10 @@ func DateAfter(after time.Time) validator.Validator[time.Time] {
 func DateBefore(before time.Time) validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		if !value.Before(before) {
-			err := validator.NewFieldError(
-				"",
-				"date_before",
-				"Date must be before the specified date",
-			)
-			err.WithParam("before", before)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", "date_before", "Date must be before the specified date").
+				WithParam("before", before).
+				WithParam("actual", value)
 		}
 		return nil
 	}
@@ -44,15 +36,11 @@ func DateBefore(before time.Time) validator.Validator[time.Time] {
 func DateBetween(start, end time.Time) validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		if value.Before(start) || value.After(end) {
-			err := validator.NewFieldError(
-				"",
-				"date_between",
-				"Date must be between the specified dates",
-			)
-			err.WithParam("start", start)
-			err.WithParam("end", end)
-			err.WithParam("actual", value)
-			return err
+			return validator.
+				NewFieldError("", "date_between", "Date must be between the specified dates").
+				WithParam("start", start).
+				WithParam("end", end).
+				WithParam("actual", value)
 		}
 		return nil
 	}
@@ -62,14 +50,10 @@ func DateBetween(start, end time.Time) validator.Validator[time.Time] {
 func DatePast() validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		if !value.Before(time.Now()) {
-			err := validator.NewFieldError(
-				"",
-				"date_past",
-				"Date must be in the past",
-			)
-			err.WithParam("actual", value)
-			err.WithParam("now", time.Now())
-			return err
+			return validator.
+				NewFieldError("", "date_past", "Date must be in the past").
+				WithParam("actual", value).
+				WithParam("now", time.Now())
 		}
 		return nil
 	}
@@ -79,14 +63,10 @@ func DatePast() validator.Validator[time.Time] {
 func DateFuture() validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		if !value.After(time.Now()) {
-			err := validator.NewFieldError(
-				"",
-				"date_future",
-				"Date must be in the future",
-			)
-			err.WithParam("actual", value)
-			err.WithParam("now", time.Now())
-			return err
+			return validator.
+				NewFieldError("", "date_future", "Date must be in the future").
+				WithParam("actual", value).
+				WithParam("now", time.Now())
 		}
 		return nil
 	}
@@ -100,14 +80,10 @@ func DateToday() validator.Validator[time.Time] {
 		tomorrow := today.AddDate(0, 0, 1)
 
 		if value.Before(today) || value.After(tomorrow) {
-			err := validator.NewFieldError(
-				"",
-				"date_today",
-				"Date must be today",
-			)
-			err.WithParam("actual", value)
-			err.WithParam("today", today)
-			return err
+			return validator.
+				NewFieldError("", "date_today", "Date must be today").
+				WithParam("actual", value).
+				WithParam("today", today)
 		}
 		return nil
 	}
@@ -125,15 +101,11 @@ func DateMinAge(minAge int) validator.Validator[time.Time] {
 		}
 
 		if age < minAge {
-			err := validator.NewFieldError(
-				"",
-				"date_min_age",
-				"Age is below minimum",
-			)
-			err.WithParam("min_age", minAge)
-			err.WithParam("actual_age", age)
-			err.WithParam("birthdate", value)
-			return err
+			return validator.
+				NewFieldError("", "date_min_age", "Age is below minimum").
+				WithParam("min_age", minAge).
+				WithParam("actual_age", age).
+				WithParam("birthdate", value)
 		}
 		return nil
 	}
@@ -150,15 +122,11 @@ func DateMaxAge(maxAge int) validator.Validator[time.Time] {
 		}
 
 		if age > maxAge {
-			err := validator.NewFieldError(
-				"",
-				"date_max_age",
-				"Age is above maximum",
-			)
-			err.WithParam("max_age", maxAge)
-			err.WithParam("actual_age", age)
-			err.WithParam("birthdate", value)
-			return err
+			return validator.
+				NewFieldError("", "date_max_age", "Age is above maximum").
+				WithParam("max_age", maxAge).
+				WithParam("actual_age", age).
+				WithParam("birthdate", value)
 		}
 		return nil
 	}
@@ -168,14 +136,10 @@ func DateMaxAge(maxAge int) validator.Validator[time.Time] {
 func DateWeekday(weekday time.Weekday) validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		if value.Weekday() != weekday {
-			err := validator.NewFieldError(
-				"",
-				"date_weekday",
-				"Date must be on the specified weekday",
-			)
-			err.WithParam("expected", weekday.String())
-			err.WithParam("actual", value.Weekday().String())
-			return err
+			return validator.
+				NewFieldError("", "date_weekday", "Date must be on the specified weekday").
+				WithParam("expected", weekday.String()).
+				WithParam("actual", value.Weekday().String())
 		}
 		return nil
 	}
@@ -186,13 +150,9 @@ func DateWeekend() validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		weekday := value.Weekday()
 		if weekday != time.Saturday && weekday != time.Sunday {
-			err := validator.NewFieldError(
-				"",
-				"date_weekend",
-				"Date must be on weekend",
-			)
-			err.WithParam("actual", weekday.String())
-			return err
+			return validator.
+				NewFieldError("", "date_weekend", "Date must be on weekend").
+				WithParam("actual", weekday.String())
 		}
 		return nil
 	}
@@ -203,13 +163,9 @@ func DateIsWeekday() validator.Validator[time.Time] {
 	return func(value time.Time) *validator.FieldError {
 		weekday := value.Weekday()
 		if weekday == time.Saturday || weekday == time.Sunday {
-			err := validator.NewFieldError(
-				"",
-				"date_weekday",
-				"Date must be on a weekday",
-			)
-			err.WithParam("actual", weekday.String())
-			return err
+			return validator.
+				NewFieldError("", "date_weekday", "Date must be on a weekday").
+				WithParam("actual", weekday.String())
 		}
 		return nil
 	}

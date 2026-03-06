@@ -10,7 +10,6 @@ import (
 type ScopeManager struct {
 	globalContainer   *Container
 	requestContainers sync.Map // map[requestID]*Container
-	mu                sync.RWMutex
 }
 
 // NewScopeManager creates a new scope manager

@@ -73,10 +73,7 @@ func (a *FiberAdapter) WrapMiddleware(middleware core.MiddlewareFunc) fiber.Hand
 		ctx.Set("adapter", "fiber")
 		ctx.Set("fiber_context", c)
 
-		wrapped := middleware(func(ctx *core.Context) error {
-			return c.Next()
-		})
-
+		wrapped := middleware(func(_ *core.Context) error { return c.Next() })
 		return wrapped(ctx)
 	}
 }

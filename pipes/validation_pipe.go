@@ -33,7 +33,7 @@ func NewValidationPipe(opts ...*ValidationPipeOptions) *ValidationPipe {
 }
 
 // Transform validates and transforms the value
-func (vp *ValidationPipe) Transform(value any, ctx *core.Context, targetType reflect.Type) (any, error) {
+func (vp *ValidationPipe) Transform(value any, _ *core.Context, targetType reflect.Type) (any, error) {
 	// If target type is provided, transform to that type
 	if targetType != nil {
 		transformed, err := vp.transformToType(value, targetType)

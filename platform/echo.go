@@ -57,10 +57,7 @@ func (a *EchoAdapter) WrapMiddleware(middleware core.MiddlewareFunc) echo.Middle
 			ctx.Set("adapter", "echo")
 			ctx.Set("echo_context", c)
 
-			wrapped := middleware(func(ctx *core.Context) error {
-				return next(c)
-			})
-
+			wrapped := middleware(func(_ *core.Context) error { return next(c) })
 			return wrapped(ctx)
 		}
 	}

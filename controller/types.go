@@ -60,8 +60,8 @@ type ParamConfig struct {
 	Validate  func(any) error
 }
 
-// ControllerOptions represents controller configuration
-type ControllerOptions struct {
+// Options represents controller configuration
+type Options struct {
 	Prefix      string
 	Middlewares []core.MiddlewareFunc
 	// Metadata for guards, interceptors, etc

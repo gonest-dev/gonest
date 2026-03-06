@@ -15,7 +15,7 @@ func NewParseIntPipe() *ParseIntPipe {
 	return &ParseIntPipe{}
 }
 
-func (p *ParseIntPipe) Transform(value any, ctx *core.Context) (int, error) {
+func (p *ParseIntPipe) Transform(value any, _ *core.Context) (int, error) {
 	str, ok := value.(string)
 	if !ok {
 		return 0, fmt.Errorf("expected string, got %T", value)
@@ -36,7 +36,7 @@ func NewParseFloatPipe() *ParseFloatPipe {
 	return &ParseFloatPipe{}
 }
 
-func (p *ParseFloatPipe) Transform(value any, ctx *core.Context) (float64, error) {
+func (p *ParseFloatPipe) Transform(value any, _ *core.Context) (float64, error) {
 	str, ok := value.(string)
 	if !ok {
 		return 0, fmt.Errorf("expected string, got %T", value)
@@ -57,7 +57,7 @@ func NewParseBoolPipe() *ParseBoolPipe {
 	return &ParseBoolPipe{}
 }
 
-func (p *ParseBoolPipe) Transform(value any, ctx *core.Context) (bool, error) {
+func (p *ParseBoolPipe) Transform(value any, _ *core.Context) (bool, error) {
 	str, ok := value.(string)
 	if !ok {
 		return false, fmt.Errorf("expected string, got %T", value)
@@ -78,7 +78,7 @@ func NewParseUUIDPipe() *ParseUUIDPipe {
 	return &ParseUUIDPipe{}
 }
 
-func (p *ParseUUIDPipe) Transform(value any, ctx *core.Context) (string, error) {
+func (p *ParseUUIDPipe) Transform(value any, _ *core.Context) (string, error) {
 	str, ok := value.(string)
 	if !ok {
 		return "", fmt.Errorf("expected string, got %T", value)
@@ -115,7 +115,7 @@ func NewParseEnumPipe(allowedValues ...string) *ParseEnumPipe {
 	}
 }
 
-func (p *ParseEnumPipe) Transform(value any, ctx *core.Context) (string, error) {
+func (p *ParseEnumPipe) Transform(value any, _ *core.Context) (string, error) {
 	str, ok := value.(string)
 	if !ok {
 		return "", fmt.Errorf("expected string, got %T", value)
@@ -146,7 +146,7 @@ func NewParseArrayPipe(separator ...string) *ParseArrayPipe {
 	}
 }
 
-func (p *ParseArrayPipe) Transform(value any, ctx *core.Context) ([]string, error) {
+func (p *ParseArrayPipe) Transform(value any, _ *core.Context) ([]string, error) {
 	str, ok := value.(string)
 	if !ok {
 		return nil, fmt.Errorf("expected string, got %T", value)
@@ -180,7 +180,7 @@ func NewDefaultValuePipe(defaultValue any) *DefaultValuePipe {
 	}
 }
 
-func (p *DefaultValuePipe) Transform(value any, ctx *core.Context) (any, error) {
+func (p *DefaultValuePipe) Transform(value any, _ *core.Context) (any, error) {
 	// Check if value is empty
 	if value == nil {
 		return p.defaultValue, nil

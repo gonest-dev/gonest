@@ -41,8 +41,8 @@ func NewGlobalExceptionFilter(opts ...*GlobalExceptionFilterOptions) *GlobalExce
 
 // Catch handles the exception
 func (f *GlobalExceptionFilter) Catch(err error, ctx *core.Context) error {
-	// Check if it's an HttpException
-	if httpErr, ok := err.(*HttpException); ok {
+	// Check if it's an HTTPException
+	if httpErr, ok := err.(*HTTPException); ok {
 		// Log the error
 		f.logger.Printf("[ERROR] %s %s: %s",
 			ctx.Get("method"), ctx.Get("path"), httpErr.Message)
