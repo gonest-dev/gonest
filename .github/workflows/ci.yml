@@ -42,14 +42,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-          cache: false # Desativamos aqui para não conflitar com o cache da action de lint
+          cache: false
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.64.5
-          # A action detecta o go.work e usa o cache automaticamente
-          args: --timeout=5m
+          version: latest
+          install-mode: goinstall
+          args: --timeout=5m ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
 
   build:
     runs-on: ubuntu-latest
