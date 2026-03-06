@@ -22,5 +22,3 @@ run:
   timeout: 10m
   tests: true
   allow-parallel-runners: true
-
-version: "2"
