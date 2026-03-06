@@ -79,6 +79,8 @@ jobs:
           - exceptions
           - swagger
           - adapters
+    env:
+      GOWORK: off
     steps:
       - name: Checkout
         uses: actions/checkout@v4
