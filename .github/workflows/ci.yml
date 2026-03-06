@@ -23,10 +23,7 @@ jobs:
 
 
       - name: Test & Coverage
-        run: |
-          go test -v -coverprofile=coverage.out ./...
-          # Aqui você usa a ferramenta local se já estiver no path ou go run
-          go run github.com/gonest-dev/gonest-tools/badge@latest -in coverage.out -out .public/coverage.svg
+        run: make ci
 
       - name: Commit badges
         if: github.ref == 'refs/heads/main'
@@ -52,8 +49,7 @@ jobs:
         with:
           version: latest
           install-mode: goinstall
-          # Com o go.work sanitizado, o linter enxerga tudo automaticamente
-          args: --timeout=5m ./...
+          args: --timeout=5m
 
   build:
     runs-on: ubuntu-latest
@@ -80,7 +76,6 @@ jobs:
 
 
       - name: Build ${{ matrix.module }}
-        # Detecta se o módulo está na raiz ou em subpasta e builda
         run: |
           TARGET_DIR=$(find . -name "${{ matrix.module }}" -type d -not -path '*/.*' | head -n 1)
           cd "$TARGET_DIR" && go build -v ./...
