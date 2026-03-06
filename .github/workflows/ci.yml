@@ -2,79 +2,57 @@ name: ci
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: write
+
+env:
+  GOPRIVATE: "github.com/gonest-dev/*"
 
 jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
           cache: true
-          cache-dependency-path: go.work.sum
+          cache-dependency-path: "**/go.sum"
 
-      - name: Sanitize Workspace
 
+      - name: Test & Coverage
         run: |
-          if [ -f go.work ]; then
-            sed -i '/\.\.\//d' go.work
-            echo "Workspace sanitizado:"
-            cat go.work
-          fi
-
-      - name: Test
-        run: make test
-
-      - name: Coverage
-        run: make coverage
-
-      - name: Generate badges
-        run: make badges
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.out
-          fail_ci_if_error: false
+          go test -v -coverprofile=coverage.out ./...
+          # Aqui você usa a ferramenta local se já estiver no path ou go run
+          go run github.com/gonest-dev/gonest-tools/badge@latest -in coverage.out -out .public/coverage.svg
 
       - name: Commit badges
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .public/*.svg
           git diff --cached --quiet && exit 0
-          git commit -m "chore: update coverage badges [skip ci]"
+          git commit -m "chore: update badges [skip ci]"
           git push
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
 
-      - name: Sanitize Workspace
-        run: sed -i '/\.\.\//d' go.work
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           install-mode: goinstall
+          # Com o go.work sanitizado, o linter enxerga tudo automaticamente
           args: --timeout=5m ./...
 
   build:
@@ -91,19 +69,18 @@ jobs:
             interceptors,
             exceptions,
             swagger,
-            adapters,
+            di,
+            platform,
           ]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
 
-      - name: Sanitize Workspace
-        run: sed -i '/\.\.\//d' go.work
 
       - name: Build ${{ matrix.module }}
-        run: cd ${{ matrix.module }} && go build -v ./...
+        # Detecta se o módulo está na raiz ou em subpasta e builda
+        run: |
+          TARGET_DIR=$(find . -name "${{ matrix.module }}" -type d -not -path '*/.*' | head -n 1)
+          cd "$TARGET_DIR" && go build -v ./...

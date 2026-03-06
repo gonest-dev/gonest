@@ -2,7 +2,7 @@
 
 # GoNest Framework
 
-<img src=".public/icon.svg" alt="GoNest Logo" width="200"/>
+<img src="icon.svg" alt="GoNest Logo" width="200"/>
 
 **A NestJS-inspired framework for Go with complete type-safety**
 

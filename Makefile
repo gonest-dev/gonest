@@ -9,15 +9,14 @@ BADGE_LABEL ?= coverage
 COVERPROFILE_ALL ?= coverage.out
 
 # Automatically discover modules
-MODULES := core validator controller pipes guards interceptors exceptions swagger adapters
-MODULE_PACKAGES := ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./adapters/...
+MODULES := core validator controller pipes guards interceptors exceptions swagger di platform
+MODULE_PACKAGES := ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
 
-# Detect OS for path separator
-ifeq ($(OS),Windows_NT)
-	TOOLS_DIR := ..\gonest-tools
-else
-	TOOLS_DIR := ../gonest-tools
-endif
+# Path to testing tools
+TOOLS_PKG := github.com/gonest-dev/gonest-tools
+
+# Bypass Go proxy for private/recently public tools
+export GOPRIVATE := github.com/gonest-dev/*
 
 .DEFAULT_GOAL := help
 
@@ -57,11 +56,11 @@ coverage: ## Generate coverage
 
 badge: coverage ## Generate coverage badge
 	@echo Generating coverage badge...
-	@if not exist $(BADGE_DIR) mkdir $(BADGE_DIR)
-	$(GO) run $(TOOLS_DIR)/badge -in $(COVERPROFILE_ALL) -out $(BADGE_DIR)/coverage.svg -label $(BADGE_LABEL)
-
-ci: coverage badge ## Run CI tasks
+	$(GO) run $(TOOLS_PKG)/badge@latest -in $(COVERPROFILE_ALL) -out $(BADGE_DIR)/coverage.svg -label $(BADGE_LABEL)
 	@echo CI completed successfully!
+
+ci-test: ## Run act locally with SSL bypass and full image
+	@act push --env GOPROXY=direct --env GOSUMDB=off --env GIT_SSL_NO_VERIFY=true --no-cache-server -P ubuntu-latest=catthehacker/ubuntu:act-latest
 
 lint: ## Run linter
 	@echo Running linter...
@@ -77,13 +76,14 @@ build: ## Build all modules
 	cd interceptors && $(GO) build -v ./... && cd ..
 	cd exceptions && $(GO) build -v ./... && cd ..
 	cd swagger && $(GO) build -v ./... && cd ..
-	cd adapters && $(GO) build -v ./... && cd ..
+	cd di && $(GO) build -v ./... && cd ..
+	cd platform && $(GO) build -v ./... && cd ..
 	@echo All modules built successfully!
 
 clean: ## Clean artifacts
 	@echo Cleaning...
 	$(GO) clean -testcache
-	$(GO) run $(TOOLS_DIR)/clean $(COVERPROFILE_ALL) "*.coverage.out" "$(BADGE_DIR)/*.svg"
+	$(GO) run $(TOOLS_PKG)/clean@latest $(COVERPROFILE_ALL) "*.coverage.out" "$(BADGE_DIR)/*.svg"
 	@echo Cleaned!
 
 format: ## Format code
@@ -100,30 +100,31 @@ mod-tidy: ## Tidy all modules
 	cd interceptors && $(GO) mod tidy && cd ..
 	cd exceptions && $(GO) mod tidy && cd ..
 	cd swagger && $(GO) mod tidy && cd ..
-	cd adapters && $(GO) mod tidy && cd ..
+	cd di && $(GO) mod tidy && cd ..
+	cd platform && $(GO) mod tidy && cd ..
 	@echo All modules tidied!
 
 # Tag management
 tag-create: ## Create tags locally
-	$(GO) run $(TOOLS_DIR)/tag --create "$(filter-out $@,$(MAKECMDGOALS))"
+	$(GO) run $(TOOLS_PKG)/tag@latest --create "$(filter-out $@,$(MAKECMDGOALS))"
 
 tag-push: ## Push tags to remote
-	$(GO) run $(TOOLS_DIR)/tag --push "$(filter-out $@,$(MAKECMDGOALS))"
+	$(GO) run $(TOOLS_PKG)/tag@latest --push "$(filter-out $@,$(MAKECMDGOALS))"
 
 tag-delete: ## Delete tags
-	$(GO) run $(TOOLS_DIR)/tag --delete "$(filter-out $@,$(MAKECMDGOALS))"
+	$(GO) run $(TOOLS_PKG)/tag@latest --delete "$(filter-out $@,$(MAKECMDGOALS))"
 
 tag: ## Create and push tags
-	$(GO) run $(TOOLS_DIR)/tag --create --push "$(filter-out $@,$(MAKECMDGOALS))"
+	$(GO) run $(TOOLS_PKG)/tag@latest --create --push "$(filter-out $@,$(MAKECMDGOALS))"
 
 tag-minor: ## Bump patch version
-	$(GO) run $(TOOLS_DIR)/tag --bump patch
+	$(GO) run $(TOOLS_PKG)/tag@latest --bump patch
 
 tag-major: ## Bump minor version
-	$(GO) run $(TOOLS_DIR)/tag --bump minor
+	$(GO) run $(TOOLS_PKG)/tag@latest --bump minor
 
 tag-purge: ## Purge old tags
-	$(GO) run $(TOOLS_DIR)/tag --purge "$(filter-out $@,$(MAKECMDGOALS))"
+	$(GO) run $(TOOLS_PKG)/tag@latest --purge "$(filter-out $@,$(MAKECMDGOALS))"
 
 # Prevent make from treating arguments as targets
 %:
