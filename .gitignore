@@ -23,9 +23,6 @@ coverage.txt
 .DS_Store
 Thumbs.db
 
-# Go workspace
-go.work.sum
-
 # Keep badge directory
 !.public/
 !.public/.gitkeep
