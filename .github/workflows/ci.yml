@@ -12,7 +12,7 @@ jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
     env:
-      [cite_start]GOWORK: off # Desabilita o workspace para ignorar caminhos locais inexistentes no CI
+      GOWORK: off
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,7 +74,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        module: [core, validator, controller, pipes, guards, interceptors, exceptions, swagger, adapters]
+        module:
+          [
+            core,
+            validator,
+            controller,
+            pipes,
+            guards,
+            interceptors,
+            exceptions,
+            swagger,
+            adapters,
+          ]
     env:
       GOWORK: off
     steps:
