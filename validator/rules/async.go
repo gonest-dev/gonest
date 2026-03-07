@@ -11,7 +11,8 @@ import (
 // AsyncCustom creates an async custom validator
 func AsyncCustom[T any](
 	predicate func(context.Context, T) (bool, error),
-	code, message string,
+	code string,
+	message string,
 ) validator.ContextValidator[T] {
 	return func(ctx context.Context, value T) *validator.FieldError {
 		valid, err := predicate(ctx, value)
@@ -84,7 +85,8 @@ func AsyncValidateWith[T any](
 func AsyncCompare[T comparable](
 	fetcher func(context.Context) (T, error),
 	comparison func(T, T) bool,
-	code, message string,
+	code string,
+	message string,
 ) validator.ContextValidator[T] {
 	return func(ctx context.Context, value T) *validator.FieldError {
 		compareWith, err := fetcher(ctx)

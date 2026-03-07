@@ -120,10 +120,8 @@ func ArrayEvery[T any](predicate func(T) bool, message string) validator.Validat
 // ArraySome validates that at least one element passes the predicate
 func ArraySome[T any](predicate func(T) bool, message string) validator.Validator[[]T] {
 	return func(value []T) *validator.FieldError {
-		for _, item := range value {
-			if predicate(item) {
-				return nil
-			}
+		if slices.ContainsFunc(value, predicate) {
+			return nil
 		}
 
 		return validator.

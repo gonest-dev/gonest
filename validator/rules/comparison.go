@@ -2,6 +2,8 @@
 package rules
 
 import (
+	"slices"
+
 	"golang.org/x/exp/constraints"
 
 	"github.com/gonest-dev/gonest/validator"
@@ -74,12 +76,10 @@ func SameAs[T comparable](getter func() T, fieldName string) validator.Validator
 // DifferentFrom validates that value is different from others
 func DifferentFrom[T comparable](others ...T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
-		for _, other := range others {
-			if value == other {
-				return validator.
-					NewFieldError("", "different_from", "Value must be different from specified values").
-					WithParam("forbidden", others)
-			}
+		if slices.Contains(others, value) {
+			return validator.
+				NewFieldError("", "different_from", "Value must be different from specified values").
+				WithParam("forbidden", others)
 		}
 		return nil
 	}
@@ -88,12 +88,10 @@ func DifferentFrom[T comparable](others ...T) validator.Validator[T] {
 // NotIn validates that value is not in a list
 func NotIn[T comparable](forbidden []T) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
-		for _, item := range forbidden {
-			if value == item {
-				return validator.
-					NewFieldError("", "not_in", "Value must not be in the forbidden list").
-					WithParam("forbidden", forbidden)
-			}
+		if slices.Contains(forbidden, value) {
+			return validator.
+				NewFieldError("", "not_in", "Value must not be in the forbidden list").
+				WithParam("forbidden", forbidden)
 		}
 		return nil
 	}
@@ -134,7 +132,8 @@ func NotInRange[T constraints.Ordered](ranges ...[2]T) validator.Validator[T] {
 func Compare[T any](
 	compareTo T,
 	comparison func(value, other T) bool,
-	code, message string,
+	code string,
+	message string,
 ) validator.Validator[T] {
 	return func(value T) *validator.FieldError {
 		if !comparison(value, compareTo) {
