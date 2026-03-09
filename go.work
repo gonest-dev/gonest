@@ -1,4 +1,4 @@
-go 1.25.0
+go 1.26.1
 
 use (
 	./core/common
@@ -11,6 +11,7 @@ use (
 	./core/platform
 	./modules/config
 	./modules/tester
+	./packages/dev
 	./packages/env
 	./packages/swagger
 	./packages/validator
