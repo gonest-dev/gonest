@@ -26,3 +26,6 @@ Thumbs.db
 # Keep badge directory
 !.public/
 !.public/.gitkeep
+
+
+__debug_bin.exe
