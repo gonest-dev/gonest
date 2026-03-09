@@ -8,7 +8,7 @@ import (
 	"github.com/gonest-dev/gonest/core/common"
 )
 
-// GinAdapter implements PlatformAdapter for Gin framework
+// GinAdapter implements Adapter for Gin framework
 type GinAdapter struct {
 	config *AdapterConfig
 	engine *gin.Engine
@@ -122,6 +122,7 @@ func (a *GinAdapter) GetEngine() *gin.Engine {
 }
 
 // Compile-time check
-var _ PlatformAdapter = (*GinAdapter)(nil)
+var _ Adapter = (*GinAdapter)(nil)
+
 
 

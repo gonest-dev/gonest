@@ -80,8 +80,8 @@ type MiddlewareFunc func(HandlerFunc) HandlerFunc
 // ApplicationOption configures the NestApplication
 type ApplicationOption func(*NestApplication)
 
-// PlatformAdapter abstracts different HTTP frameworks
-type PlatformAdapter interface {
+// Adapter abstracts different HTTP frameworks
+type Adapter interface {
 	// Name returns the platform name (e.g., "gin", "fiber", "echo")
 	Name() string
 
@@ -99,5 +99,3 @@ type PlatformAdapter interface {
 func getProviderType(provider any) reflect.Type {
 	return reflect.TypeOf(provider)
 }
-
-

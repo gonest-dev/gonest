@@ -10,7 +10,7 @@ import (
 	"github.com/gonest-dev/gonest/core/common"
 )
 
-// MuxAdapter implements PlatformAdapter for standard net/http
+// MuxAdapter implements Adapter for standard net/http
 type MuxAdapter struct {
 	config      *AdapterConfig
 	mux         *http.ServeMux
@@ -117,7 +117,7 @@ func (a *MuxAdapter) Use(middleware common.MiddlewareFunc) {
 }
 
 // matchWithParams tries to match a path with parameter placeholders
-func (a *MuxAdapter) matchWithParams(routes map[string]common.HandlerFunc, path string, r *http.Request) common.HandlerFunc {
+func (a *MuxAdapter) matchWithParams(routes map[string]common.HandlerFunc, path string, _ *http.Request) common.HandlerFunc {
 	pathSegments := strings.Split(strings.Trim(path, "/"), "/")
 
 	for routePath, handler := range routes {
@@ -171,6 +171,5 @@ func (a *MuxAdapter) handleError(w http.ResponseWriter, err error) {
 }
 
 // Compile-time check
-var _ PlatformAdapter = (*MuxAdapter)(nil)
-
+var _ Adapter = (*MuxAdapter)(nil)
 

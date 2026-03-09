@@ -8,14 +8,13 @@ BADGE_LABEL ?= coverage
 
 COVERPROFILE_ALL ?= coverage.out
 
-# Automatically discover modules
-MODULES := core validator controller pipes guards interceptors exceptions swagger di platform
-MODULE_PACKAGES := ./core/... ./validator/... ./controller/... ./pipes/... ./guards/... ./interceptors/... ./exceptions/... ./swagger/... ./di/... ./platform/...
-GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
+# Automatically discover modules using the discovery tool
+MODULE_PACKAGES := $(shell go run github.com/gonest-dev/gonest-tools/modules --packages)
+MODULE_DIRS     := $(shell go run github.com/gonest-dev/gonest-tools/modules --dirs)
+GOPATH_BIN := $(shell go env GOPATH)/bin
 
-# Path to testing tools
 TOOLS_PKG := github.com/gonest-dev/gonest-tools
-LINT_TOOL := github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.1
+LINT_TOOL := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.5
 
 # Bypass Go proxy for private/recently public tools
 export GOPRIVATE := github.com/gonest-dev/*
@@ -67,16 +66,10 @@ lint: ## Run linter
 
 build: ## Build all modules
 	@echo Building all modules...
-	cd core && $(GO) build -v ./... && cd ..
-	cd validator && $(GO) build -v ./... && cd ..
-	cd controller && $(GO) build -v ./... && cd ..
-	cd pipes && $(GO) build -v ./... && cd ..
-	cd guards && $(GO) build -v ./... && cd ..
-	cd interceptors && $(GO) build -v ./... && cd ..
-	cd exceptions && $(GO) build -v ./... && cd ..
-	cd swagger && $(GO) build -v ./... && cd ..
-	cd di && $(GO) build -v ./... && cd ..
-	cd platform && $(GO) build -v ./... && cd ..
+	@for dir in $(MODULE_DIRS); do \
+		echo "Building $$dir..."; \
+		cd $$dir && $(GO) build -v ./... && cd - > /dev/null; \
+	done
 	@echo All modules built successfully!
 
 clean: ## Clean artifacts
@@ -91,16 +84,10 @@ format: ## Format code
 
 mod-tidy: ## Tidy all modules
 	@echo Tidying modules...
-	cd core && $(GO) mod tidy && cd ..
-	cd validator && $(GO) mod tidy && cd ..
-	cd controller && $(GO) mod tidy && cd ..
-	cd pipes && $(GO) mod tidy && cd ..
-	cd guards && $(GO) mod tidy && cd ..
-	cd interceptors && $(GO) mod tidy && cd ..
-	cd exceptions && $(GO) mod tidy && cd ..
-	cd swagger && $(GO) mod tidy && cd ..
-	cd di && $(GO) mod tidy && cd ..
-	cd platform && $(GO) mod tidy && cd ..
+	@for dir in $(MODULE_DIRS); do \
+		echo "Tidying $$dir..."; \
+		cd $$dir && $(GO) mod tidy && cd - > /dev/null; \
+	done
 	@echo All modules tidied!
 
 # Tag management

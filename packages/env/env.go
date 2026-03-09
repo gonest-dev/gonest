@@ -55,7 +55,7 @@ func Get[T any](key string, optionalDefault ...T) T {
 // Populate fills a struct with environment variables based on 'env' and 'default' tags.
 func Populate(target any) error {
 	v := reflect.ValueOf(target)
-	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
+	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("env: target must be a pointer to a struct")
 	}
 
@@ -118,5 +118,3 @@ func expandValue(raw string) string {
 		return v
 	})
 }
-
-

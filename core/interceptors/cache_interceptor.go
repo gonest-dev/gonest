@@ -60,7 +60,7 @@ func NewInMemoryCacheStorage() *InMemoryCacheStorage {
 }
 
 // Get retrieves a value from in-memory cache
-func (s *InMemoryCacheStorage) Get(ctx context.Context, key string) (any, bool, error) {
+func (s *InMemoryCacheStorage) Get(_ context.Context, key string) (any, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -78,7 +78,7 @@ func (s *InMemoryCacheStorage) Get(ctx context.Context, key string) (any, bool, 
 }
 
 // Set stores a value in in-memory cache
-func (s *InMemoryCacheStorage) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
+func (s *InMemoryCacheStorage) Set(_ context.Context, key string, value any, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -91,7 +91,7 @@ func (s *InMemoryCacheStorage) Set(ctx context.Context, key string, value any, t
 }
 
 // Delete removes a value from in-memory cache
-func (s *InMemoryCacheStorage) Delete(ctx context.Context, key string) error {
+func (s *InMemoryCacheStorage) Delete(_ context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -100,7 +100,7 @@ func (s *InMemoryCacheStorage) Delete(ctx context.Context, key string) error {
 }
 
 // Clear removes all entries from in-memory cache
-func (s *InMemoryCacheStorage) Clear(ctx context.Context) error {
+func (s *InMemoryCacheStorage) Clear(_ context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -109,7 +109,7 @@ func (s *InMemoryCacheStorage) Clear(ctx context.Context) error {
 }
 
 // Has checks if key exists in in-memory cache
-func (s *InMemoryCacheStorage) Has(ctx context.Context, key string) (bool, error) {
+func (s *InMemoryCacheStorage) Has(_ context.Context, key string) (bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -157,23 +157,23 @@ func NewNoOpCacheStorage() *NoOpCacheStorage {
 	return &NoOpCacheStorage{}
 }
 
-func (s *NoOpCacheStorage) Get(ctx context.Context, key string) (any, bool, error) {
+func (s *NoOpCacheStorage) Get(_ context.Context, _ string) (any, bool, error) {
 	return nil, false, nil
 }
 
-func (s *NoOpCacheStorage) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
+func (s *NoOpCacheStorage) Set(_ context.Context, _ string, _ any, _ time.Duration) error {
 	return nil
 }
 
-func (s *NoOpCacheStorage) Delete(ctx context.Context, key string) error {
+func (s *NoOpCacheStorage) Delete(_ context.Context, _ string) error {
 	return nil
 }
 
-func (s *NoOpCacheStorage) Clear(ctx context.Context) error {
+func (s *NoOpCacheStorage) Clear(_ context.Context) error {
 	return nil
 }
 
-func (s *NoOpCacheStorage) Has(ctx context.Context, key string) (bool, error) {
+func (s *NoOpCacheStorage) Has(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 
@@ -453,5 +453,3 @@ func CacheKeyFromUser() func(*ExecutionContext) string {
 		return fmt.Sprintf("%s:%s", method, path)
 	}
 }
-
-

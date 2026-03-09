@@ -9,7 +9,7 @@ import (
 	"github.com/gonest-dev/gonest/core/common"
 )
 
-// ChiAdapter implements PlatformAdapter for Chi router
+// ChiAdapter implements Adapter for Chi router
 type ChiAdapter struct {
 	config *AdapterConfig
 	router *chi.Mux
@@ -128,6 +128,7 @@ func (a *ChiAdapter) GetRouter() *chi.Mux {
 }
 
 // Compile-time check
-var _ PlatformAdapter = (*ChiAdapter)(nil)
+var _ Adapter = (*ChiAdapter)(nil)
+
 
 

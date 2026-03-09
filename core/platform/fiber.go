@@ -10,7 +10,7 @@ import (
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
-// FiberAdapter implements PlatformAdapter for Fiber framework
+// FiberAdapter implements Adapter for Fiber framework
 type FiberAdapter struct {
 	config *AdapterConfig
 	app    *fiber.App
@@ -123,6 +123,7 @@ func (a *FiberAdapter) GetApp() *fiber.App {
 }
 
 // Compile-time check
-var _ PlatformAdapter = (*FiberAdapter)(nil)
+var _ Adapter = (*FiberAdapter)(nil)
+
 
 

@@ -25,10 +25,16 @@ func CreateModule(module common.Module) *ModuleBuilder {
 // OverrideProvider starts the override process for a provider
 func (b *ModuleBuilder) OverrideProvider(token any) *OverrideBuilder {
 	t := reflect.TypeOf(token)
-	if t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct {
-		// Keep as is
+	if t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct {
+		return &OverrideBuilder{
+			builder: b,
+			token:   t,
+		}
 	} else if t.Kind() == reflect.Interface {
-		// Keep as is
+		return &OverrideBuilder{
+			builder: b,
+			token:   t,
+		}
 	}
 
 	return &OverrideBuilder{
@@ -69,7 +75,7 @@ func (m *Module) Get(token any) (any, error) {
 }
 
 // CreateNestApplication creates a full NestApplication from the testing module
-func (m *Module) CreateNestApplication(opts ...common.ApplicationOption) *common.NestApplication {
+func (m *Module) CreateNestApplication(_ ...common.ApplicationOption) *common.NestApplication {
 	// The application is already created during Compile, we just return it or
 	// allow further configuration if needed.
 	return m.app
@@ -88,7 +94,7 @@ func (o *OverrideBuilder) UseValue(val any) *ModuleBuilder {
 }
 
 // UseClass overrides the provider with a new class instance
-func (o *OverrideBuilder) UseClass(class any) *ModuleBuilder {
+func (o *OverrideBuilder) UseClass(_ any) *ModuleBuilder {
 	// Note: di.RegisterType logic would be needed here if we want full autowire
 	// For now, simpler value or factory might be more common in tests.
 	return o.builder

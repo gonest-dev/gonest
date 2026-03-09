@@ -1,6 +1,7 @@
 go 1.26.1
 
 use (
+	..\gonest-tools\modules
 	./core/common
 	./core/controller
 	./core/di

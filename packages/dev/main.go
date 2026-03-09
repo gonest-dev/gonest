@@ -49,7 +49,8 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		log.Fatalf("Failed to walk: %v", err)
+		fmt.Printf("Error walking filesystem: %v\n", err)
+		return
 	}
 
 	fmt.Println("👀 Watching for changes...")
@@ -105,9 +106,9 @@ func restart(mainFile string, appArgs []string) {
 		// Send SIGTERM for graceful shutdown
 		err := cmd.Process.Signal(os.Interrupt)
 		if err != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
-		cmd.Wait() // Wait for it to actually stop
+		_ = cmd.Wait() // Wait for it to actually stop
 	}
 
 	// 2. Build

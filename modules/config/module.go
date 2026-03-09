@@ -8,21 +8,21 @@ import (
 	"github.com/gonest-dev/gonest/packages/env"
 )
 
-// ConfigModule is the GoNest module for configuration.
-type ConfigModule struct {
+// Module is the entry point for the configuration module
+type Module struct {
 	options *Options
 }
 
-// Options defines configuration for ConfigModule.
+// Options defines configuration for Module.
 type Options struct {
 	EnvFiles []string
 	Schema   any // Should be *validator.SchemaType[T]
 }
 
 // Configure implements the common.Module interface.
-func (m *ConfigModule) Configure(builder *common.ModuleBuilder) {
+func (m *Module) Configure(builder *common.ModuleBuilder) {
 	// Initialize ConfigService with options
-	svc := NewConfigService()
+	svc := NewService()
 
 	// Load environment variables
 	if len(m.options.EnvFiles) > 0 {
@@ -39,7 +39,7 @@ func (m *ConfigModule) Configure(builder *common.ModuleBuilder) {
 		schemaType := schemaVal.Type()
 
 		// Verify it's a pointer to SchemaType
-		if schemaType.Kind() == reflect.Ptr && strings.Contains(schemaType.Elem().Name(), "SchemaType") {
+		if schemaType.Kind() == reflect.Pointer && strings.Contains(schemaType.Elem().Name(), "SchemaType") {
 			// Create a new instance of the configuration struct
 			// SchemaType[T] has a Validate(ctx, *T) method
 			// We can use reflection to call it
@@ -66,16 +66,16 @@ func (m *ConfigModule) Configure(builder *common.ModuleBuilder) {
 		}
 	}
 
-	builder.Providers(func() *ConfigService { return svc }).
+	builder.Providers(func() *Service { return svc }).
 		Exports(svc)
 }
 
-// ForRoot initializes the ConfigModule with options.
-func ForRoot(opts *Options) *ConfigModule {
+// ForRoot initializes the module with options.
+func ForRoot(opts *Options) common.Module {
 	if opts == nil {
 		opts = &Options{}
 	}
-	return &ConfigModule{options: opts}
+	return &Module{options: opts}
 }
 
 // WithEnvFiles sets the .env files to load.
@@ -89,5 +89,3 @@ func WithValidation(schema any) *Options {
 }
 
 // Add more option helpers if needed
-
-

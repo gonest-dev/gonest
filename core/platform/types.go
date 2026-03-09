@@ -7,9 +7,8 @@ import (
 	"github.com/gonest-dev/gonest/core/common"
 )
 
-// PlatformAdapter defines the interface for platform adapters
-// This is implemented by each framework adapter (Gin, Fiber, Echo, etc)
-type PlatformAdapter interface {
+// Adapter defines the interface for platform-specific (e.g. Fiber, Gin) implementations
+type Adapter interface {
 	// Name returns the platform name
 	Name() string
 
@@ -42,5 +41,3 @@ type DefaultLogger struct{}
 func (l *DefaultLogger) Info(_ string, _ ...any)  {}
 func (l *DefaultLogger) Error(_ string, _ ...any) {}
 func (l *DefaultLogger) Debug(_ string, _ ...any) {}
-
-

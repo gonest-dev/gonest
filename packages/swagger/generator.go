@@ -9,7 +9,7 @@ import (
 )
 
 // GenerateFromApplication generates OpenAPI document from NestApplication
-func GenerateFromApplication(app *common.NestApplication, opts ...DocumentOption) *OpenAPIDocument {
+func GenerateFromApplication(_ *common.NestApplication, opts ...DocumentOption) *OpenAPIDocument {
 	builder := NewDocumentBuilder()
 
 	// Apply options
@@ -224,5 +224,3 @@ func WithLicense(name, url string) DocumentOption {
 		b.SetLicense(name, url)
 	}
 }
-
-

@@ -25,7 +25,7 @@ func (f NestFactory) Create(rootModule Module, opts ...ApplicationOption) *NestA
 		lifecycle:       NewLifecycleManager(),
 		container:       di.NewContainer(),
 		injector:        nil, // Will be created after container setup
-		platformAdapter: nil, // Will be set via option or default
+		Adapter: nil, // Will be set via option or default
 		shutdownTimeout: 10 * time.Second,
 	}
 
@@ -57,7 +57,7 @@ type NestApplication struct {
 	lifecycle       *LifecycleManager
 	container       *di.Container
 	injector        *di.Injector
-	platformAdapter PlatformAdapter
+	Adapter Adapter
 	shutdownTimeout time.Duration
 	rootModule      *ModuleRef
 	server          *http.Server
@@ -249,13 +249,13 @@ func (app *NestApplication) registerModulesRecursive(moduleRef *ModuleRef) {
 }
 
 // UsePlatform sets the platform adapter
-func (app *NestApplication) UsePlatform(adapter PlatformAdapter) {
-	app.platformAdapter = adapter
+func (app *NestApplication) UsePlatform(adapter Adapter) {
+	app.Adapter = adapter
 }
 
 // Listen starts the HTTP server using the platform adapter
 func (app *NestApplication) Listen(addr string) error {
-	if app.platformAdapter == nil {
+	if app.Adapter == nil {
 		return fmt.Errorf("no platform adapter set. Use app.UsePlatform() or provide a platform in options")
 	}
 
@@ -264,7 +264,7 @@ func (app *NestApplication) Listen(addr string) error {
 	for _, moduleRef := range modules {
 		for _, ctrlRef := range moduleRef.GetControllers() {
 			for _, route := range ctrlRef.routes {
-				_ = app.platformAdapter.RegisterRoute(route)
+				_ = app.Adapter.RegisterRoute(route)
 			}
 		}
 	}
@@ -272,7 +272,7 @@ func (app *NestApplication) Listen(addr string) error {
 	// Start platform server
 	app.server = &http.Server{
 		Addr:    addr,
-		Handler: app.platformAdapter.Handler(),
+		Handler: app.Adapter.Handler(),
 	}
 
 	// Setup graceful shutdown
@@ -281,7 +281,7 @@ func (app *NestApplication) Listen(addr string) error {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("🚀 Application is running on http://%s (platform: %s)", addr, app.platformAdapter.Name())
+		log.Printf("🚀 Application is running on http://%s (platform: %s)", addr, app.Adapter.Name())
 		if app.isDevMode {
 			log.Printf("🛠️  Development mode enabled (fast shutdown active)")
 		}
@@ -347,9 +347,9 @@ func (app *NestApplication) GetMetadata() *MetadataStorage {
 // Application option functions
 
 // WithPlatform sets the platform adapter
-func WithPlatform(adapter PlatformAdapter) ApplicationOption {
+func WithPlatform(adapter Adapter) ApplicationOption {
 	return func(app *NestApplication) {
-		app.platformAdapter = adapter
+		app.Adapter = adapter
 	}
 }
 
@@ -379,5 +379,4 @@ func WithWriteTimeout(timeout time.Duration) ApplicationOption {
 		app.server.WriteTimeout = timeout
 	}
 }
-
 

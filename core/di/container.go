@@ -95,14 +95,14 @@ func (c *Container) RegisterType(instance any, opts ...ProviderOption) error {
 		// Create a function that returns the pointer type
 		// Uses reflect.MakeFunc to have the correct return type
 		fnType := reflect.FuncOf(nil, []reflect.Type{t}, false)
-		constructorFn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
+		constructorFn := reflect.MakeFunc(fnType, func(_ []reflect.Value) []reflect.Value {
 			return []reflect.Value{reflect.New(elemType)}
 		})
 		constructor = constructorFn.Interface()
 	} else {
 		// Value type
 		fnType := reflect.FuncOf(nil, []reflect.Type{t}, false)
-		constructorFn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
+		constructorFn := reflect.MakeFunc(fnType, func(_ []reflect.Value) []reflect.Value {
 			return []reflect.Value{reflect.New(t).Elem()}
 		})
 		constructor = constructorFn.Interface()
@@ -321,5 +321,3 @@ func (c *Container) Clear() {
 
 	c.ClearRequestScope()
 }
-
-

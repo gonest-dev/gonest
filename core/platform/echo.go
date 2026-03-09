@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// EchoAdapter implements PlatformAdapter for Echo framework
+// EchoAdapter implements Adapter for Echo framework
 type EchoAdapter struct {
 	config *AdapterConfig
 	echo   *echo.Echo
@@ -106,6 +106,7 @@ func (a *EchoAdapter) GetEcho() *echo.Echo {
 }
 
 // Compile-time check
-var _ PlatformAdapter = (*EchoAdapter)(nil)
+var _ Adapter = (*EchoAdapter)(nil)
+
 
 

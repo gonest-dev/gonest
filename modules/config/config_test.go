@@ -19,7 +19,7 @@ func TestConfigModule(t *testing.T) {
 	// Initialize module
 	_ = config.ForRoot(&config.Options{EnvFiles: []string{".env.config.test"}})
 
-	service := config.NewConfigService()
+	service := config.NewService()
 
 	// Test Get (string by default)
 	if v := service.Get("APP_NAME"); v != "GoNestApp" {
@@ -31,5 +31,3 @@ func TestConfigModule(t *testing.T) {
 		t.Errorf("expected 3000, got %d", v)
 	}
 }
-
-
