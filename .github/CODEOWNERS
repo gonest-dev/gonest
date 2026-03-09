@@ -7,24 +7,26 @@
 * @gonest-dev/core-team
 
 # Framework modules
-/gonest/core/          @gonest-dev/core-team
-/gonest/validator/     @gonest-dev/core-team
-/gonest/controller/    @gonest-dev/core-team
-/gonest/pipes/         @gonest-dev/core-team
-/gonest/guards/        @gonest-dev/core-team
-/gonest/interceptors/  @gonest-dev/core-team
-/gonest/exceptions/    @gonest-dev/core-team
-/gonest/swagger/       @gonest-dev/core-team
-/gonest/adapters/      @gonest-dev/core-team
+/gonest/core/common/        @gonest-dev/core-team
+/gonest/core/validator/     @gonest-dev/core-team
+/gonest/core/controller/    @gonest-dev/core-team
+/gonest/core/pipes/         @gonest-dev/core-team
+/gonest/core/guards/        @gonest-dev/core-team
+/gonest/core/interceptors/  @gonest-dev/core-team
+/gonest/core/exceptions/    @gonest-dev/core-team
+/gonest/core/platform/      @gonest-dev/core-team
+/gonest/packages/env/       @gonest-dev/core-team
+/gonest/packages/swagger/   @gonest-dev/core-team
+/gonest/packages/validator/ @gonest-dev/core-team
 
 # Tools
-/gonest-tools/         @gonest-dev/core-team
+/gonest-tools/              @gonest-dev/core-team
 
 # Documentation
-/gonest-docs/          @gonest-dev/docs-team
+/gonest-docs/               @gonest-dev/docs-team
 
 # Examples
-/gonest-examples/      @gonest-dev/core-team
+/gonest-examples/           @gonest-dev/core-team
 
 # CI/CD
-/.github/              @gonest-dev/core-team
+/.github/                   @gonest-dev/core-team
