@@ -27,18 +27,18 @@ go get github.com/gonest-dev/gonest
 package main
 
 import (
-    "github.com/gonest-dev/gonest/core"
-    "github.com/gonest-dev/gonest/controller"
+    "github.com/gonest-dev/gonest/core/common"
+    "github.com/gonest-dev/gonest/core/controller"
 )
 
 func main() {
-    app := core.NewApplication()
+    app := common.NewApplication()
 
     ctrl := controller.NewController(
         controller.WithPrefix("/"),
     )
 
-    ctrl.Get("/", func(ctx *core.Context) error {
+    ctrl.Get("/", func(ctx *common.Context) error {
         return ctx.JSON(200, map[string]any{
             "message": "Hello, GoNest!",
         })

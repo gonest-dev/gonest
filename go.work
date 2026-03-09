@@ -1,16 +1,17 @@
-go 1.25
-
-toolchain go1.25.0
+go 1.25.0
 
 use (
-	./controller
-	./core
-	./di
-	./exceptions
-	./guards
-	./interceptors
-	./pipes
-	./platform
-	./swagger
-	./validator
+	./core/common
+	./core/controller
+	./core/di
+	./core/exceptions
+	./core/guards
+	./core/interceptors
+	./core/pipes
+	./core/platform
+	./modules/config
+	./modules/tester
+	./packages/env
+	./packages/swagger
+	./packages/validator
 )
