@@ -80,10 +80,13 @@ func validateExports(m *Module) error {
 	return nil
 }
 
-// moduleName returns a debug-friendly identifier for a module. Modules
-// have no explicit name field (Stage 1 scope), so this falls back to a
-// generic label.
+// moduleName returns a debug-friendly identifier for a module: the name set
+// via Module.Name, if any, or a pointer-address fallback otherwise (also
+// used when Name("") was called with an empty string).
 func moduleName(m *Module) string {
+	if m.name != "" {
+		return m.name
+	}
 	return fmt.Sprintf("%p", m)
 }
 

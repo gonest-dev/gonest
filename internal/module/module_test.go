@@ -1,6 +1,7 @@
 package module
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -271,6 +272,44 @@ func TestAssemble_AutoWiresOwnerModuleOnProviders(t *testing.T) {
 
 	if p.ownerModule != m {
 		t.Fatalf("assemble did not auto-wire OwnerModule on provider: got %v, want %v", p.ownerModule, m)
+	}
+}
+
+func TestModule_Name_MakesModuleNameReturnGivenName(t *testing.T) {
+	m := New(func(m *Module) {})
+	m.Name("Foo")
+
+	if got := ModuleName(m); got != "Foo" {
+		t.Fatalf("ModuleName(m) = %q, want %q", got, "Foo")
+	}
+}
+
+func TestModule_Name_NeverCalled_FallsBackToPointerAddress(t *testing.T) {
+	m := New(func(m *Module) {})
+
+	want := fmt.Sprintf("%p", m)
+	if got := ModuleName(m); got != want {
+		t.Fatalf("ModuleName(m) = %q, want fallback %q", got, want)
+	}
+}
+
+func TestModule_Name_EmptyString_FallsBackToPointerAddress(t *testing.T) {
+	m := New(func(m *Module) {})
+	m.Name("")
+
+	want := fmt.Sprintf("%p", m)
+	if got := ModuleName(m); got != want {
+		t.Fatalf("ModuleName(m) = %q, want fallback %q", got, want)
+	}
+}
+
+func TestModule_Name_CalledTwice_LastCallWins(t *testing.T) {
+	m := New(func(m *Module) {})
+	m.Name("First")
+	m.Name("Second")
+
+	if got := ModuleName(m); got != "Second" {
+		t.Fatalf("ModuleName(m) = %q, want %q", got, "Second")
 	}
 }
 

@@ -58,6 +58,7 @@ type Owner interface {
 type Module struct {
 	fn func(*Module)
 
+	name        string
 	imports     []*Module
 	providers   []ProviderRef
 	controllers []ControllerRef
@@ -69,6 +70,16 @@ type Module struct {
 // passed to it -- no resolution logic runs here.
 func New(fn func(*Module)) *Module {
 	return &Module{fn: fn}
+}
+
+// Name sets a human-readable identifier for this module, used in place of
+// the pointer-address fallback in error messages produced by Assemble and
+// internal/resolver. Calling Name more than once overwrites the previous
+// value -- the last call wins. Calling Name("") is equivalent to never
+// calling Name: error messages still fall back to the pointer address.
+func (m *Module) Name(name string) *Module {
+	m.name = name
+	return m
 }
 
 // Imports registers modules this module depends on.
