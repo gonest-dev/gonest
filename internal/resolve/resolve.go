@@ -1,0 +1,74 @@
+// Package resolve implements MustResolve[T], the generic entry point used
+// inside a Provider's or Controller's deferred builder fn to declare a
+// dependency on another provider's type. During Stage 2 builder execution
+// (a future task) it will perform the real module-scoped search; for now it
+// allocates a placeholder via reflect and records the call as a pending
+// edge (owner -> target type) for a future task (T7) to consult.
+package resolve
+
+import (
+	"fmt"
+	"reflect"
+	"sync"
+
+	"github.com/gonest-dev/gonest/internal/module"
+)
+
+// pendingEdge records that owner requested resolution of targetType via
+// MustResolve. A future task (T7) will walk this bookkeeping to perform the
+// real module-scoped search and wire dependency edges into the DI graph.
+type pendingEdge struct {
+	owner      module.Owner
+	targetType reflect.Type
+}
+
+var (
+	pendingEdgesMu sync.Mutex
+	pendingEdges   []pendingEdge
+)
+
+// resetPendingEdges clears all recorded pending edges. Test-only helper
+// (used by _test.go files in this package to isolate test cases from each
+// other's bookkeeping).
+func resetPendingEdges() {
+	pendingEdgesMu.Lock()
+	defer pendingEdgesMu.Unlock()
+	pendingEdges = nil
+}
+
+// pendingEdgesFor returns the pending edges recorded for owner, in
+// registration order. Test-only helper.
+func pendingEdgesFor(owner module.Owner) []pendingEdge {
+	pendingEdgesMu.Lock()
+	defer pendingEdgesMu.Unlock()
+
+	var out []pendingEdge
+	for _, e := range pendingEdges {
+		if e.owner == owner {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// MustResolve declares a dependency on type T (which must be a pointer
+// type, e.g. *Foo) from owner's builder fn. It allocates and returns a
+// placeholder value via reflect, and records a pending edge (owner -> T)
+// for a future task to consult when performing real module-scoped
+// resolution. It panics if T is not a pointer type.
+func MustResolve[T any](owner module.Owner) T {
+	var zero T
+	t := reflect.TypeOf(&zero).Elem()
+
+	if t.Kind() != reflect.Pointer {
+		panic(fmt.Sprintf("gonest: MustResolve[T] requires T to be a pointer type, got %s", t.String()))
+	}
+
+	placeholder := reflect.New(t.Elem())
+
+	pendingEdgesMu.Lock()
+	pendingEdges = append(pendingEdges, pendingEdge{owner: owner, targetType: t})
+	pendingEdgesMu.Unlock()
+
+	return placeholder.Interface().(T)
+}
