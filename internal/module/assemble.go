@@ -1,0 +1,66 @@
+package module
+
+import "fmt"
+
+// assemble performs Stage 1 (Structural Assembly): it walks the Imports
+// graph starting at root via BFS, executing each module's fn exactly once
+// even when the import graph contains diamonds (multiple modules importing
+// the same shared module). After every module's fn has run, it validates
+// that each module's Exports is a subset of its own Providers.
+//
+// It returns the list of visited modules (root first) or an error if any
+// module exports a provider it did not declare.
+func assemble(root *Module) ([]*Module, error) {
+	visited := make(map[*Module]bool)
+	order := make([]*Module, 0)
+	queue := []*Module{root}
+
+	for len(queue) > 0 {
+		m := queue[0]
+		queue = queue[1:]
+
+		if visited[m] {
+			continue
+		}
+		visited[m] = true
+		order = append(order, m)
+
+		if m.fn != nil {
+			m.fn(m)
+		}
+
+		queue = append(queue, m.imports...)
+	}
+
+	for _, m := range order {
+		if err := validateExports(m); err != nil {
+			return nil, err
+		}
+	}
+
+	return order, nil
+}
+
+// validateExports ensures every provider in m.Exports was also registered
+// via m.Providers on the same module.
+func validateExports(m *Module) error {
+	declared := make(map[providerRef]bool, len(m.providers))
+	for _, p := range m.providers {
+		declared[p] = true
+	}
+
+	for _, p := range m.exports {
+		if !declared[p] {
+			return fmt.Errorf("module %s exports provider %v it does not declare", moduleName(m), p)
+		}
+	}
+
+	return nil
+}
+
+// moduleName returns a debug-friendly identifier for a module. Modules
+// have no explicit name field (Stage 1 scope), so this falls back to a
+// generic label.
+func moduleName(m *Module) string {
+	return fmt.Sprintf("%p", m)
+}
