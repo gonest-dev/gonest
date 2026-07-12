@@ -4,10 +4,14 @@
 // modules, providers, and controllers.
 package module
 
+import "reflect"
+
 // ProviderRef is a minimal marker interface satisfied by the real
 // *provider.Provider type (owned by internal/provider). Module never needs
 // to know the concrete provider type — it only tracks registered
-// participants for Stage 1's structural bookkeeping.
+// participants for Stage 1's structural bookkeeping, exposes the type it
+// resolves (ResolvedType), and accepts ownership wiring (SetOwnerModule)
+// during Stage 1 assembly.
 //
 // Exported (not just structurally implementable) because Go ties
 // unexported interface methods to the declaring package: a method named
@@ -17,12 +21,24 @@ package module
 // itself — is what makes cross-package satisfaction possible.
 type ProviderRef interface {
 	IsProvider()
+	// ResolvedType returns the reflect.Type this provider resolves (its
+	// Constructor's first return value's type), used by internal/resolver
+	// to match a MustResolve[T] target type against registered providers.
+	ResolvedType() reflect.Type
+	// SetOwnerModule associates this provider with the module that owns
+	// it. Called by assemble during Stage 1 so OwnerModule() reflects
+	// reality without any manual wiring by callers.
+	SetOwnerModule(m *Module)
 }
 
-// ControllerRef is the Controller equivalent of ProviderRef. Same
+// ControllerRef is the Controller equivalent of ProviderRef, minus
+// ResolvedType (a Controller does not itself resolve a type). Same
 // cross-package rationale.
 type ControllerRef interface {
 	IsController()
+	// SetOwnerModule associates this controller with the module that owns
+	// it. Called by assemble during Stage 1.
+	SetOwnerModule(m *Module)
 }
 
 // Owner is the contract implemented by Provider and Controller to report
@@ -76,4 +92,29 @@ func (m *Module) Controllers(cs ...ControllerRef) {
 // end of Stage 1 assembly.
 func (m *Module) Exports(ps ...ProviderRef) {
 	m.exports = append(m.exports, ps...)
+}
+
+// OwnProviders returns a copy of the providers registered on this module
+// via Providers. Read-only: mutating the returned slice does not affect
+// this Module's internal state. Used by internal/resolver to search this
+// module's own providers before falling back to imports.
+func (m *Module) OwnProviders() []ProviderRef {
+	return append([]ProviderRef(nil), m.providers...)
+}
+
+// ImportedModules returns a copy of the modules registered on this module
+// via Imports. Read-only: mutating the returned slice does not affect this
+// Module's internal state. Used by internal/resolver to walk imports when
+// a type is not found among this module's own providers.
+func (m *Module) ImportedModules() []*Module {
+	return append([]*Module(nil), m.imports...)
+}
+
+// ExportedProviders returns a copy of the providers registered on this
+// module via Exports. Read-only: mutating the returned slice does not
+// affect this Module's internal state. Used by internal/resolver to
+// determine which of an imported module's own providers are visible to
+// importers.
+func (m *Module) ExportedProviders() []ProviderRef {
+	return append([]ProviderRef(nil), m.exports...)
 }

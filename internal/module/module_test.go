@@ -1,20 +1,39 @@
 package module
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // fakeProvider is a minimal stand-in for the real *provider.Provider type.
 // It only needs to satisfy ProviderRef.
 type fakeProvider struct {
-	name string
+	name        string
+	resolved    reflect.Type
+	ownerModule *Module
 }
 
 func (*fakeProvider) IsProvider() {}
 
+func (p *fakeProvider) ResolvedType() reflect.Type {
+	return p.resolved
+}
+
+func (p *fakeProvider) SetOwnerModule(m *Module) {
+	p.ownerModule = m
+}
+
 // fakeController is a minimal stand-in for the real *controller.Controller
 // type. It only needs to satisfy ControllerRef.
-type fakeController struct{}
+type fakeController struct {
+	ownerModule *Module
+}
 
 func (*fakeController) IsController() {}
+
+func (c *fakeController) SetOwnerModule(m *Module) {
+	c.ownerModule = m
+}
 
 func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
 	executed := false
@@ -123,5 +142,114 @@ func TestModule_Controllers_RegistersControllers(t *testing.T) {
 
 	if _, err := assemble(m); err != nil {
 		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+}
+
+type dummyType struct{}
+
+func TestModule_OwnProviders_ReturnsRegisteredProviders(t *testing.T) {
+	p := &fakeProvider{name: "X"}
+	m := New(func(m *Module) {
+		m.Providers(p)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnProviders()
+	if len(got) != 1 || got[0] != ProviderRef(p) {
+		t.Fatalf("OwnProviders() = %v, want [p]", got)
+	}
+}
+
+func TestModule_Imports_ReturnsImportedModules(t *testing.T) {
+	child := New(func(m *Module) {})
+	root := New(func(m *Module) {
+		m.Imports(child)
+	})
+
+	if _, err := assemble(root); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := root.ImportedModules()
+	if len(got) != 1 || got[0] != child {
+		t.Fatalf("ImportedModules() = %v, want [child]", got)
+	}
+}
+
+func TestModule_Exports_ReturnsExportedProviders(t *testing.T) {
+	p := &fakeProvider{name: "X"}
+	m := New(func(m *Module) {
+		m.Providers(p)
+		m.Exports(p)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.ExportedProviders()
+	if len(got) != 1 || got[0] != ProviderRef(p) {
+		t.Fatalf("ExportedProviders() = %v, want [p]", got)
+	}
+}
+
+func TestModule_OwnProviders_ReturnsCopyNotInternalSlice(t *testing.T) {
+	p := &fakeProvider{name: "X"}
+	m := New(func(m *Module) {
+		m.Providers(p)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnProviders()
+	got[0] = &fakeProvider{name: "mutated"}
+
+	got2 := m.OwnProviders()
+	if got2[0] != ProviderRef(p) {
+		t.Fatalf("OwnProviders() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+}
+
+func TestProviderRef_ResolvedType_ExposesUnderlyingType(t *testing.T) {
+	p := &fakeProvider{name: "X", resolved: reflect.TypeOf(&dummyType{})}
+
+	var ref ProviderRef = p
+	if ref.ResolvedType() != reflect.TypeOf(&dummyType{}) {
+		t.Fatalf("ResolvedType() = %v, want %v", ref.ResolvedType(), reflect.TypeOf(&dummyType{}))
+	}
+}
+
+func TestAssemble_AutoWiresOwnerModuleOnProviders(t *testing.T) {
+	p := &fakeProvider{name: "X"}
+	m := New(func(m *Module) {
+		m.Providers(p)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	if p.ownerModule != m {
+		t.Fatalf("assemble did not auto-wire OwnerModule on provider: got %v, want %v", p.ownerModule, m)
+	}
+}
+
+func TestAssemble_AutoWiresOwnerModuleOnControllers(t *testing.T) {
+	c := &fakeController{}
+	m := New(func(m *Module) {
+		m.Controllers(c)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	if c.ownerModule != m {
+		t.Fatalf("assemble did not auto-wire OwnerModule on controller: got %v, want %v", c.ownerModule, m)
 	}
 }

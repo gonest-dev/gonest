@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/module"
@@ -165,4 +166,32 @@ func TestProvider_SatisfiesModuleProviderRef(t *testing.T) {
 	// concern and already covered by internal/module's test suite.
 	p := New(func(p *Provider) {})
 	var _ module.ProviderRef = p
+}
+
+func TestResolvedType_ReturnsConstructorReturnType_FuncReturningT(t *testing.T) {
+	p := New(func(p *Provider) {
+		p.Constructor(func() *fakeService {
+			return &fakeService{}
+		})
+	})
+	runFn(p)
+
+	want := reflect.TypeOf(&fakeService{})
+	if got := p.ResolvedType(); got != want {
+		t.Fatalf("ResolvedType() = %v, want %v", got, want)
+	}
+}
+
+func TestResolvedType_ReturnsConstructorReturnType_FuncReturningTAndError(t *testing.T) {
+	p := New(func(p *Provider) {
+		p.Constructor(func() (*fakeService, error) {
+			return &fakeService{}, nil
+		})
+	})
+	runFn(p)
+
+	want := reflect.TypeOf(&fakeService{})
+	if got := p.ResolvedType(); got != want {
+		t.Fatalf("ResolvedType() = %v, want %v", got, want)
+	}
 }

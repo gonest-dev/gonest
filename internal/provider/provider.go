@@ -65,6 +65,17 @@ func (p *Provider) OwnerModule() *module.Module {
 	return p.ownerModule
 }
 
+// ResolvedType returns the reflect.Type this provider resolves: the first
+// return value's type of the stored Constructor (e.g. *Foo for both
+// func() *Foo and func() (*Foo, error)). It implements module.ProviderRef.
+// Returns nil if Constructor has not been called yet.
+func (p *Provider) ResolvedType() reflect.Type {
+	if !p.constructor.IsValid() {
+		return nil
+	}
+	return p.constructor.Type().Out(0)
+}
+
 // Scope sets the lifetime of this provider's instance. If never called,
 // the default is scope.Singleton.
 func (p *Provider) Scope(s scope.Scope) {
