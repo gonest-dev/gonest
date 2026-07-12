@@ -207,6 +207,21 @@ func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
 // more Controllers, or several Providers), each holding its own
 // placeholder returned from its own MustResolve call -- all of them must be
 // copied into, not just the first.
+//
+// resolve.PendingEdges() only ever contains edges from the module tree
+// NewApp is currently bootstrapping: NewApp calls resolve.Reset() at the
+// start of every call (see resolve.Reset's doc comment), so by the time
+// Stage 3 runs there is no other tree's leftover state left to
+// contaminate from. The Find(...) == node re-check below is therefore NOT
+// a cross-tree contamination guard -- it is still load-bearing WITHIN a
+// single tree: two different owners can request the same TargetType and
+// legitimately resolve to two DIFFERENT providers (own-module providers
+// take priority over imports, and diamond imports can shadow a type
+// differently depending on the requesting module -- see
+// TestFind_OwnModuleHasPriorityOverImports and
+// TestFind_DiamondImport_DirectImporterResolvesSharedProvider in
+// resolver_test.go), so edge.TargetType matching node.ResolvedType() alone
+// is not sufficient to know this edge belongs to node.
 func placeholdersFor(node module.ProviderRef) []reflect.Value {
 	var out []reflect.Value
 

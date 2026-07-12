@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/resolve"
 	"github.com/gonest-dev/gonest/internal/resolver"
 )
 
@@ -43,7 +44,17 @@ type App struct {
 // It returns once the whole graph is resolved, or an error from Stage 1
 // (structural/export validation), cycle detection, or Stage 3 (a
 // Constructor's returned error or recovered panic).
+//
+// NewApp calls resolve.Reset() at the very start, before Stage 2, to clear
+// internal/resolve's process-global pending-edge bookkeeping left over from
+// any previous NewApp call -- see resolve.Reset's doc comment for the "one
+// bootstrap at a time per process" contract this establishes. Calling
+// NewApp concurrently from multiple goroutines in the same process is not
+// supported; NewApp is meant to run once, synchronously, at process
+// startup.
 func NewApp(root *Module) (*App, error) {
+	resolve.Reset()
+
 	modules, err := root.Assemble()
 	if err != nil {
 		return nil, err

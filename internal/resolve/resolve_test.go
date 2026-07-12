@@ -177,6 +177,22 @@ func TestPendingEdge_RetainsPlaceholderUsableForCopyInPlace(t *testing.T) {
 	}
 }
 
+func TestReset_ClearsAllPendingEdges(t *testing.T) {
+	resetPendingEdges()
+	owner := newOwner()
+
+	MustResolve[*fakeService](owner)
+	if got := len(PendingEdges()); got == 0 {
+		t.Fatalf("PendingEdges() len = 0 before Reset(), want > 0 (setup didn't record an edge)")
+	}
+
+	Reset()
+
+	if got := len(PendingEdges()); got != 0 {
+		t.Fatalf("PendingEdges() len = %d after Reset(), want 0", got)
+	}
+}
+
 func TestMustResolve_MultipleCallsDoNotCollide(t *testing.T) {
 	resetPendingEdges()
 	ownerA := newOwner()

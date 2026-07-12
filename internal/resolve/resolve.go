@@ -48,13 +48,34 @@ func PendingEdges() []PendingEdge {
 	return append([]PendingEdge(nil), pendingEdges...)
 }
 
-// resetPendingEdges clears all recorded pending edges. Test-only helper
-// (used by _test.go files in this package to isolate test cases from each
-// other's bookkeeping).
-func resetPendingEdges() {
+// Reset clears all recorded pending edges. Exported so root NewApp/MustNewApp
+// can call it at the very start of every bootstrap, before Stage 2
+// (declareAll) runs -- pendingEdges is process-global state, so without this
+// reset it would accumulate every MustResolve call ever made across every
+// NewApp call in the process lifetime (unbounded memory growth, and stale
+// edges from a previous bootstrap leaking into the next one's cycle
+// detection / placeholder resolution).
+//
+// Calling Reset() establishes a "one bootstrap at a time per process"
+// contract: NewApp is meant to run once, synchronously, at process startup
+// (see design.md) -- it is not safe to call NewApp concurrently from
+// multiple goroutines in the same process, since a second call's Reset()
+// (or its Stage 2 MustResolve calls) would race with and corrupt a
+// concurrently in-flight first call's pending-edge bookkeeping. Sequential
+// calls (e.g. one NewApp finishing fully before another starts, as in a test
+// suite) are safe -- see TestReset_ClearsAllPendingEdges and
+// TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges.
+func Reset() {
 	pendingEdgesMu.Lock()
 	defer pendingEdgesMu.Unlock()
 	pendingEdges = nil
+}
+
+// resetPendingEdges is Reset, kept under its original unexported name for
+// this package's own tests (predates Reset's export -- avoids a mechanical
+// rename churn across every _test.go call site in this file).
+func resetPendingEdges() {
+	Reset()
 }
 
 // pendingEdgesFor returns the pending edges recorded for owner, in

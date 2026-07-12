@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/gonest-dev/gonest/internal/resolve"
 )
 
 // UserProperties/UserEntity/UserService/UserProvider/UserModule/AppModule
@@ -153,6 +155,76 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "circular dependency") {
 		t.Fatalf("NewApp() error = %q, want it to mention 'circular dependency'", err.Error())
+	}
+}
+
+// TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges proves that
+// calling NewApp twice in the same process, with two completely unrelated
+// module trees, does not let the first call's MustResolve bookkeeping leak
+// into the second call's cycle detection or placeholder resolution.
+// internal/resolve's pendingEdges slice is process-global; without resetting
+// it at the start of each NewApp call, the second call's Stage 3 would
+// observe stale pending edges from the first call forever (unbounded growth
+// across a long-running process, and a correctness risk for
+// placeholdersFor's unscoped resolve.PendingEdges() read).
+func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) {
+	type firstTreeService struct{ Value string }
+	firstProvider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *firstTreeService {
+			return &firstTreeService{Value: "first"}
+		})
+	})
+	firstRoot := NewModule(func(module *Module) {
+		module.Providers(firstProvider)
+	})
+
+	firstApp, err := NewApp(firstRoot)
+	if err != nil {
+		t.Fatalf("first NewApp() error = %v", err)
+	}
+	if firstApp == nil {
+		t.Fatalf("first NewApp() returned nil *App")
+	}
+
+	// After the first call resolves, no pending edges should remain in
+	// internal/resolve's global bookkeeping -- NewApp must reset the log at
+	// the start of ITS OWN call, not leave the previous call's edges parked
+	// forever.
+	if got := len(resolve.PendingEdges()); got != 0 {
+		t.Fatalf("resolve.PendingEdges() len = %d after first NewApp() returned, want 0 -- pending edges must not accumulate across NewApp calls", got)
+	}
+
+	type secondTreeService struct{ Value string }
+	var resolved *secondTreeService
+	secondProvider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *secondTreeService {
+			return &secondTreeService{Value: "second"}
+		})
+	})
+	var consumer *Provider
+	consumer = NewProvider(func(provider *Provider) {
+		resolved = MustResolve[*secondTreeService](consumer)
+		provider.Constructor(func() *consumerMarker {
+			return &consumerMarker{}
+		})
+	})
+	secondRoot := NewModule(func(module *Module) {
+		module.Providers(secondProvider, consumer)
+	})
+
+	secondApp, err := NewApp(secondRoot)
+	if err != nil {
+		t.Fatalf("second NewApp() error = %v, want nil -- must not be affected by the first call's leftover state", err)
+	}
+	if secondApp == nil {
+		t.Fatalf("second NewApp() returned nil *App")
+	}
+
+	if resolved == nil {
+		t.Fatalf("second tree's MustResolve[*secondTreeService] placeholder is nil after second NewApp() returned")
+	}
+	if resolved.Value != "second" {
+		t.Fatalf("resolved.Value = %q, want %q -- second call's placeholder must be filled from the SECOND tree's provider, not confused with the first tree's leftover pending edges", resolved.Value, "second")
 	}
 }
 
