@@ -15,10 +15,10 @@ import (
 // net/http or any real request lifecycle -- it is a standalone,
 // context.Context-keyed cache, deliberately NOT wired into
 // internal/resolver's Stage 3 (Resolve, in stage3.go) or into
-// internal/resolve's pending-edge bookkeeping. A future Pipeline feature is
+// internal/inject's pending-edge bookkeeping. A future Pipeline feature is
 // expected to (a) call WithRequestID once per inbound HTTP request to tag
 // that request's ctx, and (b) consult a RequestScope's Get/Set from within
-// MustResolve-style resolution when a target provider's scope.Scope is
+// MustInject-style resolution when a target provider's scope.Scope is
 // scope.Request -- neither of those integration points exists yet, and
 // building them now would require inventing a "resolve on demand mid
 // request" flow that is out of this task's scope (see spec.md's P3 story
@@ -72,11 +72,11 @@ func requestIDFrom(ctx context.Context) (id any, ok bool) {
 
 // requestScope is RequestScope's only implementation: a mutex-guarded,
 // two-level map (request ID -> key -> instance). Mutex-guarded map is the
-// same defensive style internal/resolve.pendingEdges (see
-// internal/resolve/resolve.go) and internal/resolver's other package-level
+// same defensive style internal/inject.pendingEdges (see
+// internal/inject/inject.go) and internal/resolver's other package-level
 // state use elsewhere in this codebase, kept here for consistency even
 // though this is an independent, non-shared mechanism (each NewRequestScope
-// call returns its own instance -- unlike internal/resolve's
+// call returns its own instance -- unlike internal/inject's
 // process-global pendingEdges, there is no package-level var here, so no
 // Reset()-style bootstrap contract is needed).
 type requestScope struct {

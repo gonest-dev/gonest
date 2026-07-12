@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolve"
 	"github.com/gonest-dev/gonest/internal/scope"
 )
 
@@ -40,7 +40,7 @@ var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 // module tree (the return value of the root Module's Assemble, i.e. Stage
 // 1 output, after Stage 2 has run every Provider/Controller's Declare), it
 // resolves every registered scope.Singleton provider concurrently via
-// errgroup, respecting the dependency graph recorded by MustResolve calls
+// errgroup, respecting the dependency graph recorded by MustInject calls
 // during Stage 2.
 //
 // Every provider registered in any of modules is resolved, not only ones
@@ -49,7 +49,7 @@ var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 // nodes themselves, see BuildGraph) still need their target Providers
 // resolved even though nothing in the Provider graph depends on them.
 // BuildGraph's edges are used purely to determine start-after-dependency
-// ordering for providers that DO have recorded MustResolve edges between
+// ordering for providers that DO have recorded MustInject edges between
 // them; providers with no such edges start immediately.
 //
 // ctx is passed to errgroup.WithContext, so a Constructor returning an
@@ -171,8 +171,8 @@ func isTransient(node module.ProviderRef) bool {
 }
 
 // scopedGraph builds the dependency graph for exactly nodes, filtering out
-// any pending edge whose owner is not itself one of nodes. internal/resolve
-// tracks pending edges in process-global state (every MustResolve call ever
+// any pending edge whose owner is not itself one of nodes. internal/inject
+// tracks pending edges in process-global state (every MustInject call ever
 // made, across every module tree ever assembled in this process) -- without
 // this filter, BuildGraph's raw output would let an unrelated, previously
 // assembled (but never resolved) module tree's pending edges leak into this
@@ -226,7 +226,7 @@ func allProviders(modules []*module.Module) []module.ProviderRef {
 // invokeAndCopy invokes node's Constructor exactly once (handling all 4
 // accepted signatures), recovering any panic and converting it to an
 // error, then copies the resolved instance in place into every placeholder
-// any pending MustResolve edge allocated for this exact provider. This is
+// any pending MustInject edge allocated for this exact provider. This is
 // the Singleton path: one Constructor call, result shared across every
 // edge targeting node.
 func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
@@ -246,7 +246,7 @@ func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
 // (the Transient path: one independent Constructor call per pending edge
 // targeting node), copying the result ONLY into edge's own placeholder --
 // never shared with any other edge targeting the same node.
-func invokeAndCopyEdge(ctx context.Context, node module.ProviderRef, edge resolve.PendingEdge) error {
+func invokeAndCopyEdge(ctx context.Context, node module.ProviderRef, edge inject.PendingEdge) error {
 	real, err := callConstructor(ctx, node)
 	if err != nil {
 		return err
@@ -295,16 +295,16 @@ func callConstructor(ctx context.Context, node module.ProviderRef) (real reflect
 }
 
 // placeholdersFor returns every placeholder reflect.Value that a recorded
-// MustResolve pending edge allocated for a call that resolves to node
+// MustInject pending edge allocated for a call that resolves to node
 // (i.e. Find(edge.Owner.OwnerModule(), edge.TargetType) == node). A single
 // provider can be depended upon by multiple owners (a Provider and one or
 // more Controllers, or several Providers), each holding its own
-// placeholder returned from its own MustResolve call -- all of them must be
+// placeholder returned from its own MustInject call -- all of them must be
 // copied into, not just the first.
 //
-// resolve.PendingEdges() only ever contains edges from the module tree
-// NewApp is currently bootstrapping: NewApp calls resolve.Reset() at the
-// start of every call (see resolve.Reset's doc comment), so by the time
+// inject.PendingEdges() only ever contains edges from the module tree
+// NewApp is currently bootstrapping: NewApp calls inject.Reset() at the
+// start of every call (see inject.Reset's doc comment), so by the time
 // Stage 3 runs there is no other tree's leftover state left to
 // contaminate from. The Find(...) == node re-check below is therefore NOT
 // a cross-tree contamination guard -- it is still load-bearing WITHIN a
@@ -337,10 +337,10 @@ func placeholdersFor(node module.ProviderRef) []reflect.Value {
 // See placeholdersFor's doc comment for why the Find(...) == node re-check
 // is load-bearing within a single tree, not just a cross-tree contamination
 // guard.
-func edgesFor(node module.ProviderRef) []resolve.PendingEdge {
-	var out []resolve.PendingEdge
+func edgesFor(node module.ProviderRef) []inject.PendingEdge {
+	var out []inject.PendingEdge
 
-	for _, edge := range resolve.PendingEdges() {
+	for _, edge := range inject.PendingEdges() {
 		ownerModule := edge.Owner.OwnerModule()
 		if ownerModule == nil {
 			continue

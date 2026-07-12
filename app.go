@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolve"
 	"github.com/gonest-dev/gonest/internal/resolver"
 )
 
@@ -33,27 +33,27 @@ type App struct {
 //     OwnerModule on every registered provider/controller, validates
 //     Exports.
 //  2. Builder Execution: runs Declare on every provider and controller
-//     across the assembled module tree, so MustResolve calls inside their
+//     across the assembled module tree, so MustInject calls inside their
 //     builder fn run against a fully-known module tree and record pending
 //     edges.
 //  3. Cycle detection, then Parallel Resolution: resolves every registered
 //     Provider concurrently (respecting dependency edges recorded in Stage
 //     2), copying each resolved instance in place into every placeholder
-//     MustResolve returned for it.
+//     MustInject returned for it.
 //
 // It returns once the whole graph is resolved, or an error from Stage 1
 // (structural/export validation), cycle detection, or Stage 3 (a
 // Constructor's returned error or recovered panic).
 //
-// NewApp calls resolve.Reset() at the very start, before Stage 2, to clear
-// internal/resolve's process-global pending-edge bookkeeping left over from
-// any previous NewApp call -- see resolve.Reset's doc comment for the "one
+// NewApp calls inject.Reset() at the very start, before Stage 2, to clear
+// internal/inject's process-global pending-edge bookkeeping left over from
+// any previous NewApp call -- see inject.Reset's doc comment for the "one
 // bootstrap at a time per process" contract this establishes. Calling
 // NewApp concurrently from multiple goroutines in the same process is not
 // supported; NewApp is meant to run once, synchronously, at process
 // startup.
 func NewApp(root *Module) (*App, error) {
-	resolve.Reset()
+	inject.Reset()
 
 	modules, err := root.Assemble()
 	if err != nil {
@@ -94,7 +94,7 @@ type declarable interface {
 
 // declareAll runs Declare (Stage 2 builder execution) on every provider and
 // controller registered across modules, exactly once each. Order does not
-// matter: MustResolve calls made during Declare only ever look up an
+// matter: MustInject calls made during Declare only ever look up an
 // already-assembled module tree (Stage 1 has already fully run by the time
 // this is called from NewApp), never another provider/controller's
 // Declare-time state.

@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/controller"
+	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolve"
 )
 
-// resetForGraphTest clears resolve's pending edges before a test builds
+// resetForGraphTest clears inject's pending edges before a test builds
 // fresh bookkeeping, so tests don't see edges recorded by other tests
 // running earlier in the same process.
 func resetForGraphTest(t *testing.T) {
 	t.Helper()
-	// internal/resolve does not export a reset -- use MustResolve's own
+	// internal/inject does not export a reset -- use MustInject's own
 	// package-level test helper indirectly by draining via PendingEdges
 	// is not possible (no exported clear). Instead, each test uses fresh,
 	// unique target types so pre-existing edges from other tests never
@@ -24,7 +24,7 @@ func resetForGraphTest(t *testing.T) {
 
 // aProvider/bProvider/cProvider are minimal fakeProvider-backed nodes with
 // distinct resolved types, used to build a small dependency graph via
-// MustResolve calls recorded as pending edges.
+// MustInject calls recorded as pending edges.
 type graphAService struct{}
 type graphBService struct{}
 type graphCService struct{}
@@ -40,9 +40,9 @@ func TestBuildGraph_SingleDependencyEdge(t *testing.T) {
 	})
 	m.Assemble()
 
-	// Simulate Stage 2: A's builder fn calls MustResolve[*graphBService],
+	// Simulate Stage 2: A's builder fn calls MustInject[*graphBService],
 	// recording a pending edge {owner: a, targetType: *graphBService}.
-	resolve.MustResolve[*graphBService](a)
+	inject.MustInject[*graphBService](a)
 
 	graph := BuildGraph()
 
@@ -66,10 +66,10 @@ func TestBuildGraph_ExcludesControllerOwnedEdges(t *testing.T) {
 	ctrl := controller.New(func(c *controller.Controller) {})
 	ctrl.SetOwnerModule(m)
 
-	// A Controller's MustResolve call must NOT become a graph node/edge --
+	// A Controller's MustInject call must NOT become a graph node/edge --
 	// controllers are never a dependency-graph key (design.md: "Controller
 	// não entra no grafo de resolução").
-	resolve.MustResolve[*controllerOnlyService](ctrl)
+	inject.MustInject[*controllerOnlyService](ctrl)
 
 	graph := BuildGraph()
 
@@ -81,7 +81,7 @@ func TestBuildGraph_ExcludesControllerOwnedEdges(t *testing.T) {
 	// dependency TARGET here, never a dependency SOURCE, since nothing
 	// depends on it).
 	if deps, ok := graph[module.ProviderRef(p)]; ok && len(deps) != 0 {
-		t.Fatalf("graph[p] = %v, want empty (p has no MustResolve calls of its own; only ctrl, a non-ProviderRef, resolved it)", deps)
+		t.Fatalf("graph[p] = %v, want empty (p has no MustInject calls of its own; only ctrl, a non-ProviderRef, resolved it)", deps)
 	}
 }
 
@@ -99,6 +99,6 @@ func TestBuildGraph_NodeWithNoDependenciesHasEmptyList(t *testing.T) {
 	graph := BuildGraph()
 
 	if deps, ok := graph[module.ProviderRef(p)]; ok && len(deps) != 0 {
-		t.Fatalf("graph[p] = %v, want empty or absent (p declared no MustResolve calls)", deps)
+		t.Fatalf("graph[p] = %v, want empty or absent (p declared no MustInject calls)", deps)
 	}
 }

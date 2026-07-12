@@ -10,7 +10,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/provider"
-	"github.com/gonest-dev/gonest/internal/resolve"
+	"github.com/gonest-dev/gonest/internal/inject"
 )
 
 // --- fixtures -------------------------------------------------------------
@@ -104,7 +104,7 @@ func TestResolve_DependentProvider_WaitsForDependencyDone(t *testing.T) {
 
 	var dependent *provider.Provider
 	dependent = provider.New(func(p *provider.Provider) {
-		dep := resolve.MustResolve[*stage3AService](dependent)
+		dep := inject.MustInject[*stage3AService](dependent)
 		p.Constructor(func() *stage3DependentService {
 			dependentSawDepFinished.Store(depFinished.Load())
 			return &stage3DependentService{Dep: dep}
@@ -251,7 +251,7 @@ func TestResolve_ConstructorPanic_IsRecoveredAsError(t *testing.T) {
 // --- copy-in-place -------------------------------------------------------
 
 // TestResolve_CopyInPlace_PlaceholderReflectsRealData proves the placeholder
-// MustResolve returned earlier is mutated in place once Resolve completes.
+// MustInject returned earlier is mutated in place once Resolve completes.
 func TestResolve_CopyInPlace_PlaceholderReflectsRealData(t *testing.T) {
 	a := provider.New(func(p *provider.Provider) {
 		p.Constructor(func() *stage3AService {
@@ -262,7 +262,7 @@ func TestResolve_CopyInPlace_PlaceholderReflectsRealData(t *testing.T) {
 	var placeholder *stage3AService
 	var dependent *provider.Provider
 	dependent = provider.New(func(p *provider.Provider) {
-		placeholder = resolve.MustResolve[*stage3AService](dependent)
+		placeholder = inject.MustInject[*stage3AService](dependent)
 		p.Constructor(func() *stage3DependentService {
 			return &stage3DependentService{}
 		})
@@ -292,10 +292,10 @@ func TestResolve_CopyInPlace_PlaceholderReflectsRealData(t *testing.T) {
 // TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges proves
 // Resolve scopes graph-building to the module tree it was given: pending
 // edges recorded by a completely unrelated, previously-resolved module tree
-// (e.g. from an earlier NewApp call, or MustResolve calls in another
+// (e.g. from an earlier NewApp call, or MustInject calls in another
 // package-level var elsewhere in the process) must not leak into this
 // Resolve call's cycle detection or dependency graph. Without scoping,
-// internal/resolve's process-global pending-edge bookkeeping would make two
+// internal/inject's process-global pending-edge bookkeeping would make two
 // independent NewApp calls in the same process interfere with each other.
 func TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges(t *testing.T) {
 	type unrelatedX struct{}
@@ -303,11 +303,11 @@ func TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges(t *testing.T) 
 
 	var unrelatedA, unrelatedB *provider.Provider
 	unrelatedA = provider.New(func(p *provider.Provider) {
-		resolve.MustResolve[*unrelatedY](unrelatedA)
+		inject.MustInject[*unrelatedY](unrelatedA)
 		p.Constructor(func() *unrelatedX { return &unrelatedX{} })
 	})
 	unrelatedB = provider.New(func(p *provider.Provider) {
-		resolve.MustResolve[*unrelatedX](unrelatedB)
+		inject.MustInject[*unrelatedX](unrelatedB)
 		p.Constructor(func() *unrelatedY { return &unrelatedY{} })
 	})
 	unrelatedModule := module.New(func(m *module.Module) {
@@ -319,7 +319,7 @@ func TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges(t *testing.T) 
 	unrelatedA.Declare()
 	unrelatedB.Declare()
 	// Deliberately NOT resolved -- these pending edges (A <-> B, a genuine
-	// cycle) sit in internal/resolve's global bookkeeping, unrelated to the
+	// cycle) sit in internal/inject's global bookkeeping, unrelated to the
 	// module tree resolved below.
 
 	type contaminationCheckService struct{}
@@ -343,7 +343,7 @@ func TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges(t *testing.T) 
 }
 
 // TestResolve_ResolvesProvidersWithNoPendingEdgesToo proves Stage 3 resolves
-// EVERY registered provider, not only ones reachable via a MustResolve
+// EVERY registered provider, not only ones reachable via a MustInject
 // chain -- a provider nobody depends on (never a pending-edge target) must
 // still have its Constructor invoked if it's registered in an assembled
 // module.

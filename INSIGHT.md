@@ -50,7 +50,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   controller.Path("/user")
 
   // resolvendo dependências (placeholder resolvido de verdade no bootstrap do NewApp)
-  userService := gonest.MustResolve[*UserService](controller)
+  userService := gonest.MustInject[*UserService](controller)
 
   // rotas do controller
   controller.Route(gonest.HttpQuery, "/", func (route *gonest.Route) {
@@ -178,7 +178,7 @@ var RequestIdMiddleware = gonest.NewMiddleware(func (middleware *gonest.Middlewa
 // decide se request pode prosseguir. retorna bool; false = 403 Forbidden automático.
 // pra mensagem custom, panica com Exception própria em vez de retornar false.
 var AuthGuard = gonest.NewGuard(func (guard *gonest.Guard) {
-  authService := gonest.MustResolve[*AuthService](guard)
+  authService := gonest.MustInject[*AuthService](guard)
 
   guard.Handler(func(ctx *gonest.Context) bool {
     token := ctx.Header("Authorization")
@@ -193,7 +193,7 @@ var AuthGuard = gonest.NewGuard(func (guard *gonest.Guard) {
 // envolve a execução do handler (antes/depois), tipo AOP. pode medir tempo,
 // mutar resposta, fazer cache etc. roda depois dos guards, antes/depois do handler.
 var TimingInterceptor = gonest.NewInterceptor(func (interceptor *gonest.Interceptor) {
-  logger := gonest.MustResolve[*LoggerService](interceptor)
+  logger := gonest.MustInject[*LoggerService](interceptor)
 
   interceptor.Handler(func(ctx *gonest.Context, next gonest.Next) {
     start := time.Now()
@@ -235,7 +235,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   controller.Interceptors(TimingInterceptor)
   controller.Filters(FooExampleFilter)
 
-  userService := gonest.MustResolve[*UserService](controller)
+  userService := gonest.MustInject[*UserService](controller)
 
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
@@ -268,7 +268,7 @@ Em Go não tem Promise, mas o mesmo modelo mental existe via goroutine + `errgro
 - Providers que dependem de outro **esperam** (`group.Wait()`) o dependido terminar antes
   de rodar seu próprio `Constructor`.
 - Cada resolução final faz o placeholder+copy-in-place (`*placeholder = *real`) no ponteiro
-  que já foi devolvido antecipadamente por `MustResolve` na fase de declaração.
+  que já foi devolvido antecipadamente por `MustInject` na fase de declaração.
 - Se qualquer branch falhar (`Constructor` retorna `error` ou panica), `errgroup` cancela
   o resto via `context.Context` e `NewApp` retorna erro sem subir o servidor.
 
@@ -296,7 +296,7 @@ bootstrap.ts com Zod+Swagger 3.1). Diferença chave pro gonest: `NewApp` já res
 árvore INTEIRA (em paralelo, via errgroup, seção acima) antes de retornar — não existe
 `app.resolve()` assíncrono depois do `create()` feito igual Nest, então nada de
 `Promise.all([app.resolve(Logger), app.resolve(Config)])`: quando `NewApp` volta, tudo já
-tá pronto e `MustResolve` só pega o ponteiro já populado.
+tá pronto e `MustInject` só pega o ponteiro já populado.
 
 ```go
 package main
@@ -314,15 +314,15 @@ func main() {
 }
 
 func bootstrap() error {
-  app := gonest.MustApp[gonest.FiberApp](AppModule, gonest.AppOptions{
+  app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{
     BufferLogs: true,
     LogLevels:  []gonest.LogLevel{gonest.LogLevelError, gonest.LogLevelWarn},
   })
   defer app.Close()
 
-  // grafo já resolvido pelo NewApp acima — MustResolve aqui é leitura direta, sem espera.
-  config := gonest.MustResolve[*AppConfig](app)
-  logger := gonest.MustResolve[*AppLogger](app)
+  // grafo já resolvido pelo NewApp acima — MustInject aqui é leitura direta, sem espera.
+  config := gonest.MustInject[*AppConfig](app)
+  logger := gonest.MustInject[*AppLogger](app)
 
   app.SetGlobalPrefix(config.Prefix)
   app.UseLogger(logger)
@@ -389,7 +389,7 @@ type UserEntity struct {
 // cada método é uma combinação type+format do OpenAPI 3.1 (achatado, sem tipo pai
 // tipo Number().Integer() — direto Integer(), Float(), Double(), Email(), Uuid() etc).
 // Required/Nullable/Description/Examples ficam na base, comuns a qualquer branch.
-// mesma declaração alimenta: schema OpenAPI (oas) + validação runtime (MustJsonBody/MustResolve).
+// mesma declaração alimenta: schema OpenAPI (oas) + validação runtime (MustJsonBody/MustInject).
 var _ = gonest.NewMetadata[UserEntity](func (t *UserEntity, m *gonest.Metadata) {
   m.Description("Entidade de usuário")
   m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
@@ -544,7 +544,7 @@ func TestUserService_Get_NotFound(t *testing.T) {
   tester := gonest.MustNewTestApp(UserModule, nil) // sem overrides
   defer tester.Close()
 
-  service := gonest.MustResolve[*UserService](tester)
+  service := gonest.MustInject[*UserService](tester)
 
   defer func() {
     exc, ok := recover().(*gonest.NotFoundException)
@@ -575,8 +575,7 @@ type UserCreatedEvent struct {
 
 // listener: função livre MustOn (método não pode ser genérico), registrado num Listener builder.
 var UserCreatedListener = gonest.NewListener(func (listener *gonest.Listener) {
-  logger := gonest.MustResolve[*LoggerService](listener)
-
+  logger := gonest.MustInject[*LoggerService](listener)
   gonest.MustOn[UserCreatedEvent](listener, func(ctx context.Context, event UserCreatedEvent) {
     logger.Log("user created", event.UserID)
   })
@@ -619,19 +618,10 @@ import (
 )
 
 var CleanupScheduler = gonest.NewScheduler(func (scheduler *gonest.Scheduler) {
-  userService := gonest.MustResolve[*UserService](scheduler)
-
-  scheduler.Cron("cleanup-expired-users", "0 0 * * *", func (ctx context.Context) {
-    userService.PurgeExpired(ctx)
-  })
-
-  scheduler.Interval("healthcheck-ping", time.Minute, func (ctx context.Context) {
-    userService.Ping(ctx)
-  })
-
-  scheduler.Timeout("warmup-cache", 5*time.Second, func (ctx context.Context) {
-    userService.WarmupCache(ctx)
-  })
+  userService := gonest.MustInject[*UserService](scheduler)
+  scheduler.Cron("cleanup-expired-users", "0 0 * * *", func (ctx context.Context) { userService.PurgeExpired(ctx) })
+  scheduler.Interval("healthcheck-ping", time.Minute, func (ctx context.Context) { userService.Ping(ctx) })
+  scheduler.Timeout("warmup-cache", 5*time.Second, func (ctx context.Context) { userService.WarmupCache(ctx) })
 })
 
 var AppModule = gonest.NewModule(func (module *gonest.Module) {
@@ -655,15 +645,9 @@ import (
 )
 
 var AppHealth = gonest.NewHealthCheck(func (health *gonest.HealthCheck) {
-  db := gonest.MustResolve[*Db](health)
-  redis := gonest.MustResolve[*Redis](health)
-
-  health.Check("database", func (ctx context.Context) error {
-    return db.Ping(ctx)
-  })
-  health.Check("redis", func (ctx context.Context) error {
-    return redis.Ping(ctx)
-  })
+  db, redis := gonest.MustInject[*Db](health), gonest.MustInject[*Redis](health)
+  health.Check("database", func (ctx context.Context) error { return db.Ping(ctx) })
+  health.Check("redis", func (ctx context.Context) error { return redis.Ping(ctx) })
 })
 
 var AppModule = gonest.NewModule(func (module *gonest.Module) {
@@ -671,7 +655,7 @@ var AppModule = gonest.NewModule(func (module *gonest.Module) {
 })
 
 func main() {
-  app := gonest.MustApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
+  app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
   defer app.Close()
 
   // monta GET /health automaticamente a partir dos HealthChecks registrados no módulo.

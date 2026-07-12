@@ -1,10 +1,10 @@
-// Package resolve implements MustResolve[T], the generic entry point used
+// Package inject implements MustInject[T], the generic entry point used
 // inside a Provider's or Controller's deferred builder fn to declare a
 // dependency on another provider's type. During Stage 2 builder execution
 // (a future task) it will perform the real module-scoped search; for now it
 // allocates a placeholder via reflect and records the call as a pending
 // edge (owner -> target type) for a future task (T7) to consult.
-package resolve
+package inject
 
 import (
 	"fmt"
@@ -15,11 +15,11 @@ import (
 )
 
 // PendingEdge records that Owner requested resolution of TargetType via
-// MustResolve. internal/resolver walks this bookkeeping (via PendingEdges)
+// MustInject. internal/resolver walks this bookkeeping (via PendingEdges)
 // to perform the real module-scoped search and wire dependency edges into
 // the DI graph, including cycle detection.
 //
-// Placeholder retains the exact reflect.Value MustResolve allocated and
+// Placeholder retains the exact reflect.Value MustInject allocated and
 // returned to the caller (T in reflect.New(t.Elem()) form, i.e. the pointer
 // itself, not "the struct it points to"). Stage 3 resolution needs this to
 // copy the real resolved instance into the placeholder in place
@@ -51,7 +51,7 @@ func PendingEdges() []PendingEdge {
 // Reset clears all recorded pending edges. Exported so root NewApp/MustNewApp
 // can call it at the very start of every bootstrap, before Stage 2
 // (declareAll) runs -- pendingEdges is process-global state, so without this
-// reset it would accumulate every MustResolve call ever made across every
+// reset it would accumulate every MustInject call ever made across every
 // NewApp call in the process lifetime (unbounded memory growth, and stale
 // edges from a previous bootstrap leaking into the next one's cycle
 // detection / placeholder resolution).
@@ -60,7 +60,7 @@ func PendingEdges() []PendingEdge {
 // contract: NewApp is meant to run once, synchronously, at process startup
 // (see design.md) -- it is not safe to call NewApp concurrently from
 // multiple goroutines in the same process, since a second call's Reset()
-// (or its Stage 2 MustResolve calls) would race with and corrupt a
+// (or its Stage 2 MustInject calls) would race with and corrupt a
 // concurrently in-flight first call's pending-edge bookkeeping. Sequential
 // calls (e.g. one NewApp finishing fully before another starts, as in a test
 // suite) are safe -- see TestReset_ClearsAllPendingEdges and
@@ -93,16 +93,16 @@ func pendingEdgesFor(owner module.Owner) []PendingEdge {
 	return out
 }
 
-// MustResolve declares a dependency on type T (which must be a pointer
+// MustInject declares a dependency on type T (which must be a pointer
 // type, e.g. *Foo) from owner's builder fn. It allocates and returns a
 // placeholder value via reflect, and records a pending edge (owner -> T)
 // for a future task to consult when performing real module-scoped
 // resolution. It panics if T is not a pointer type.
-func MustResolve[T any](owner module.Owner) T {
+func MustInject[T any](owner module.Owner) T {
 	t := reflect.TypeFor[T]()
 
 	if t.Kind() != reflect.Pointer {
-		panic(fmt.Sprintf("gonest: MustResolve[T] requires T to be a pointer type, got %s", t.String()))
+		panic(fmt.Sprintf("gonest: MustInject[T] requires T to be a pointer type, got %s", t.String()))
 	}
 
 	placeholder := reflect.New(t.Elem())

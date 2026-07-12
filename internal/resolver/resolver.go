@@ -1,5 +1,5 @@
 // Package resolver implements the DI Resolver's search step: given a
-// *module.Module (the module a MustResolve caller belongs to) and a target
+// *module.Module (the module a MustInject caller belongs to) and a target
 // reflect.Type, it finds the module.ProviderRef that resolves that type,
 // searching the owner module's own providers first and then its imported
 // modules' exported providers.

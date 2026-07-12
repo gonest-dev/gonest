@@ -3,7 +3,7 @@ package gonest
 import "github.com/gonest-dev/gonest/internal/controller"
 
 // Controller represents a declarative unit that consumes providers via
-// MustResolve. It does not participate in the provider resolution graph --
+// MustInject. It does not participate in the provider resolution graph --
 // it only consumes placeholders it requests.
 type Controller = controller.Controller
 

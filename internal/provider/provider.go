@@ -47,7 +47,7 @@ func New(fn func(*Provider)) *Provider {
 // any call after the first (including when fn is nil), so callers that walk
 // the assembled module tree (Stage 2 of bootstrap) can call Declare on every
 // registered provider without needing to track which ones they already
-// visited. This is what makes MustResolve calls inside fn actually happen
+// visited. This is what makes MustInject calls inside fn actually happen
 // and get recorded as pending edges -- before Declare runs, fn has never
 // executed (see New's doc comment).
 func (p *Provider) Declare() {

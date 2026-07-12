@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/resolve"
+	"github.com/gonest-dev/gonest/internal/inject"
 )
 
 // UserProperties/UserEntity/UserService/UserProvider/UserModule/AppModule
@@ -13,7 +13,7 @@ import (
 // test -- stripped of anything HTTP/Controller-related (no Fiber, no
 // routes), keeping just the DI shape: a UserService struct + UserProvider
 // (a Provider with a Constructor), wired into a Module, resolved via NewApp
-// + MustResolve[*UserService].
+// + MustInject[*UserService].
 
 type UserEntity struct {
 	ID   int64
@@ -53,7 +53,7 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 
 	var userService *UserService
 	consumer := NewProvider(func(provider *Provider) {
-		userService = MustResolve[*UserService](provider)
+		userService = MustInject[*UserService](provider)
 		provider.Constructor(func() *consumerMarker {
 			return &consumerMarker{}
 		})
@@ -69,7 +69,7 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 	}
 
 	if userService == nil {
-		t.Fatalf("MustResolve[*UserService] placeholder is nil after NewApp returned")
+		t.Fatalf("MustInject[*UserService] placeholder is nil after NewApp returned")
 	}
 
 	// Prove it's genuinely usable, not a zero-value placeholder: the
@@ -137,11 +137,11 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 
 	var pa, pb *Provider
 	pa = NewProvider(func(provider *Provider) {
-		MustResolve[*cycleB](pa)
+		MustInject[*cycleB](pa)
 		provider.Constructor(func() *cycleA { return &cycleA{} })
 	})
 	pb = NewProvider(func(provider *Provider) {
-		MustResolve[*cycleA](pb)
+		MustInject[*cycleA](pb)
 		provider.Constructor(func() *cycleB { return &cycleB{} })
 	})
 
@@ -160,13 +160,13 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 
 // TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges proves that
 // calling NewApp twice in the same process, with two completely unrelated
-// module trees, does not let the first call's MustResolve bookkeeping leak
+// module trees, does not let the first call's MustInject bookkeeping leak
 // into the second call's cycle detection or placeholder resolution.
-// internal/resolve's pendingEdges slice is process-global; without resetting
+// internal/inject's pendingEdges slice is process-global; without resetting
 // it at the start of each NewApp call, the second call's Stage 3 would
 // observe stale pending edges from the first call forever (unbounded growth
 // across a long-running process, and a correctness risk for
-// placeholdersFor's unscoped resolve.PendingEdges() read).
+// placeholdersFor's unscoped inject.PendingEdges() read).
 func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) {
 	type firstTreeService struct{ Value string }
 	firstProvider := NewProvider(func(provider *Provider) {
@@ -187,11 +187,11 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 	}
 
 	// After the first call resolves, no pending edges should remain in
-	// internal/resolve's global bookkeeping -- NewApp must reset the log at
+	// internal/inject's global bookkeeping -- NewApp must reset the log at
 	// the start of ITS OWN call, not leave the previous call's edges parked
 	// forever.
-	if got := len(resolve.PendingEdges()); got != 0 {
-		t.Fatalf("resolve.PendingEdges() len = %d after first NewApp() returned, want 0 -- pending edges must not accumulate across NewApp calls", got)
+	if got := len(inject.PendingEdges()); got != 0 {
+		t.Fatalf("inject.PendingEdges() len = %d after first NewApp() returned, want 0 -- pending edges must not accumulate across NewApp calls", got)
 	}
 
 	type secondTreeService struct{ Value string }
@@ -203,7 +203,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 	})
 	var consumer *Provider
 	consumer = NewProvider(func(provider *Provider) {
-		resolved = MustResolve[*secondTreeService](consumer)
+		resolved = MustInject[*secondTreeService](consumer)
 		provider.Constructor(func() *consumerMarker {
 			return &consumerMarker{}
 		})
@@ -221,7 +221,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 	}
 
 	if resolved == nil {
-		t.Fatalf("second tree's MustResolve[*secondTreeService] placeholder is nil after second NewApp() returned")
+		t.Fatalf("second tree's MustInject[*secondTreeService] placeholder is nil after second NewApp() returned")
 	}
 	if resolved.Value != "second" {
 		t.Fatalf("resolved.Value = %q, want %q -- second call's placeholder must be filled from the SECOND tree's provider, not confused with the first tree's leftover pending edges", resolved.Value, "second")

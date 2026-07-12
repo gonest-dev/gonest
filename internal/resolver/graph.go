@@ -1,14 +1,14 @@
 package resolver
 
 import (
+	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolve"
 )
 
-// BuildGraph combines the pending edges recorded by internal/resolve (every
-// MustResolve[T] call made so far, across all owners) with Find (this
+// BuildGraph combines the pending edges recorded by internal/inject (every
+// MustInject[T] call made so far, across all owners) with Find (this
 // package's module-scoped search) to produce the provider dependency graph:
-// each key is a Provider that itself called MustResolve during its own
+// each key is a Provider that itself called MustInject during its own
 // builder fn, mapped to the list of providers it depends on.
 //
 // Pending edges whose owner is not itself a module.ProviderRef (e.g. a
@@ -19,7 +19,7 @@ import (
 func BuildGraph() map[module.ProviderRef][]module.ProviderRef {
 	graph := make(map[module.ProviderRef][]module.ProviderRef)
 
-	for _, edge := range resolve.PendingEdges() {
+	for _, edge := range inject.PendingEdges() {
 		ownerRef, ok := edge.Owner.(module.ProviderRef)
 		if !ok {
 			continue

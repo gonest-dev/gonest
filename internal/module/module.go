@@ -23,7 +23,7 @@ type ProviderRef interface {
 	IsProvider()
 	// ResolvedType returns the reflect.Type this provider resolves (its
 	// Constructor's first return value's type), used by internal/resolver
-	// to match a MustResolve[T] target type against registered providers.
+	// to match a MustInject[T] target type against registered providers.
 	ResolvedType() reflect.Type
 	// SetOwnerModule associates this provider with the module that owns
 	// it. Called by assemble during Stage 1 so OwnerModule() reflects
@@ -42,7 +42,7 @@ type ControllerRef interface {
 }
 
 // Owner is the contract implemented by Provider and Controller to report
-// which Module they belong to. Used later by MustResolve to determine
+// which Module they belong to. Used later by MustInject to determine
 // resolution scope (own module -> imported exports).
 type Owner interface {
 	OwnerModule() *Module
