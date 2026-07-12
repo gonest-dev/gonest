@@ -14,18 +14,29 @@ import (
 	"github.com/gonest-dev/gonest/internal/module"
 )
 
-// pendingEdge records that owner requested resolution of targetType via
-// MustResolve. A future task (T7) will walk this bookkeeping to perform the
-// real module-scoped search and wire dependency edges into the DI graph.
-type pendingEdge struct {
-	owner      module.Owner
-	targetType reflect.Type
+// PendingEdge records that Owner requested resolution of TargetType via
+// MustResolve. internal/resolver walks this bookkeeping (via PendingEdges)
+// to perform the real module-scoped search and wire dependency edges into
+// the DI graph, including cycle detection.
+type PendingEdge struct {
+	Owner      module.Owner
+	TargetType reflect.Type
 }
 
 var (
 	pendingEdgesMu sync.Mutex
-	pendingEdges   []pendingEdge
+	pendingEdges   []PendingEdge
 )
+
+// PendingEdges returns a copy of all pending edges recorded so far, in
+// registration order. Read-only: mutating the returned slice does not
+// affect this package's internal state. Used by internal/resolver to build
+// the provider dependency graph (combined with resolver.Find).
+func PendingEdges() []PendingEdge {
+	pendingEdgesMu.Lock()
+	defer pendingEdgesMu.Unlock()
+	return append([]PendingEdge(nil), pendingEdges...)
+}
 
 // resetPendingEdges clears all recorded pending edges. Test-only helper
 // (used by _test.go files in this package to isolate test cases from each
@@ -38,13 +49,13 @@ func resetPendingEdges() {
 
 // pendingEdgesFor returns the pending edges recorded for owner, in
 // registration order. Test-only helper.
-func pendingEdgesFor(owner module.Owner) []pendingEdge {
+func pendingEdgesFor(owner module.Owner) []PendingEdge {
 	pendingEdgesMu.Lock()
 	defer pendingEdgesMu.Unlock()
 
-	var out []pendingEdge
+	var out []PendingEdge
 	for _, e := range pendingEdges {
-		if e.owner == owner {
+		if e.Owner == owner {
 			out = append(out, e)
 		}
 	}
@@ -67,7 +78,7 @@ func MustResolve[T any](owner module.Owner) T {
 	placeholder := reflect.New(t.Elem())
 
 	pendingEdgesMu.Lock()
-	pendingEdges = append(pendingEdges, pendingEdge{owner: owner, targetType: t})
+	pendingEdges = append(pendingEdges, PendingEdge{Owner: owner, TargetType: t})
 	pendingEdgesMu.Unlock()
 
 	return placeholder.Interface().(T)

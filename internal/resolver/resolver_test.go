@@ -25,6 +25,13 @@ func (p *fakeProvider) SetOwnerModule(m *module.Module) {
 	p.ownerModule = m
 }
 
+// OwnerModule implements module.Owner, so *fakeProvider can itself be used
+// as the owner argument to resolve.MustResolve when tests need a
+// Provider-owned dependency edge (graph_test.go, cycle detection setup).
+func (p *fakeProvider) OwnerModule() *module.Module {
+	return p.ownerModule
+}
+
 type fooService struct{}
 type barService struct{}
 type bazService struct{}

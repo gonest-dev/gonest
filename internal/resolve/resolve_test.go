@@ -120,8 +120,34 @@ func TestMustResolve_RegistersExactlyOnePendingEdge(t *testing.T) {
 		t.Fatalf("pending edges for owner = %d, want 1", len(edges))
 	}
 	wantType := "*resolve.fakeService"
-	if got := edges[0].targetType.String(); got != wantType {
+	if got := edges[0].TargetType.String(); got != wantType {
 		t.Fatalf("pending edge targetType = %q, want %q", got, wantType)
+	}
+}
+
+func TestPendingEdges_ReturnsCopyNotAliasingInternalState(t *testing.T) {
+	resetPendingEdges()
+	owner := newOwner()
+
+	MustResolve[*fakeService](owner)
+
+	got := PendingEdges()
+	if len(got) != 1 {
+		t.Fatalf("PendingEdges() len = %d, want 1", len(got))
+	}
+	if got[0].Owner != owner {
+		t.Fatalf("PendingEdges()[0].Owner = %v, want %v", got[0].Owner, owner)
+	}
+	wantType := "*resolve.fakeService"
+	if gotType := got[0].TargetType.String(); gotType != wantType {
+		t.Fatalf("PendingEdges()[0].TargetType = %q, want %q", gotType, wantType)
+	}
+
+	// Mutating the returned slice must not affect internal bookkeeping.
+	got[0].Owner = nil
+	again := PendingEdges()
+	if again[0].Owner != owner {
+		t.Fatalf("PendingEdges() second call Owner = %v, want %v (mutation of first result leaked into internal state)", again[0].Owner, owner)
 	}
 }
 
