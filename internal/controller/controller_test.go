@@ -47,20 +47,14 @@ func TestOwnerModule_NilBeforeAssociation(t *testing.T) {
 	}
 }
 
-// NOTE on module.Module.Controllers(cs ...controllerRef): Go's spec ties
-// unexported interface methods to the package they are declared in --
-// an unexported method identifier is only equal across packages if it is
-// declared in the SAME package as the interface. internal/module's
-// controllerRef ("isController()") therefore can only ever be satisfied by
-// types defined inside package module itself; *controller.Controller from
-// this package cannot implement it, no matter its method set, because
-// package controller declares a distinct (name-identical but
-// package-scoped) isController identifier. Verified empirically: adding
-// `m.Controllers(c)` here (c being a *Controller from this package) fails
-// to compile with "does not implement module.controllerRef (unexported
-// method isController)". This is a cross-package structural-typing
-// limitation in internal/module's current API, not something fixable from
-// internal/controller -- see task report for details. *Controller still
-// implements an isController() method locally (see controller.go) per the
-// spec's stated contract, so it is ready the moment module.Module's API
-// is adjusted (e.g. an exported adapter, or controllerRef moved/exported).
+// TestController_SatisfiesModuleControllerRef confirms the cross-package
+// blocker flagged during T5 (unexported controllerRef.isController couldn't
+// be satisfied outside package module) is resolved now that internal/module
+// exports ControllerRef/IsController.
+func TestController_SatisfiesModuleControllerRef(t *testing.T) {
+	// Compile-time proof: this line alone is the test. If *Controller
+	// stopped satisfying module.ControllerRef, this file would fail to
+	// build.
+	c := New(func(c *Controller) {})
+	var _ module.ControllerRef = c
+}

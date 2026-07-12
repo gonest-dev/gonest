@@ -30,10 +30,12 @@ func New(fn func(*Controller)) *Controller {
 	return &Controller{fn: fn}
 }
 
-// isController is the unexported marker method that lets *Controller
-// structurally satisfy module.controllerRef (internal/module) without
-// either package importing a shared interface type.
-func (c *Controller) isController() {}
+// IsController is the marker method that satisfies module.ControllerRef, so
+// *Controller can be passed to (*module.Module).Controllers. Exported: Go
+// ties unexported interface methods to the declaring package, so an
+// unexported marker here could never satisfy module's interface across
+// packages.
+func (c *Controller) IsController() {}
 
 // SetOwnerModule associates this controller with the module that owns it.
 // It is called by module assembly once ownership is known (structural

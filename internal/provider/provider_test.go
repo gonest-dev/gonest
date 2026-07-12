@@ -154,21 +154,15 @@ func TestOwnerModule_PopulatedAfterSetOwnerModule(t *testing.T) {
 	}
 }
 
-// NOTE (blocker, not weakened): a cross-package integration test calling
-// (*module.Module).Providers(p) with p *Provider from this package does
-// NOT compile. Go's spec disallows satisfying an interface with an
-// unexported method (providerRef.isProvider) from any package other than
-// the one that declares the interface -- confirmed with an isolated
-// two-package repro (pkga.Ref / pkgb.Thing) that fails identically:
-// "*pkgb.Thing does not implement pkga.Ref (unexported method isRef)".
-// module_test.go's own fakeProvider only works because it lives in
-// package module itself (same package as providerRef), not because of
-// the method name matching alone.
-//
-// *Provider does implement an isProvider() method, satisfying the letter
-// of the task's structural requirement, and passing *Provider to any
-// exported API in package module works fine. But module.Module.Providers
-// specifically cannot accept it as-is -- this needs to be resolved by
-// widening internal/module's contract (e.g. an exported adapter type or
-// exported interface), which is out of scope for T4 (internal/module is
-// off-limits for this task). Flagged in the task report.
+// TestProvider_SatisfiesModuleProviderRef confirms the cross-package
+// blocker flagged during T4 (unexported providerRef.isProvider couldn't be
+// satisfied outside package module) is resolved now that internal/module
+// exports ProviderRef/IsProvider.
+func TestProvider_SatisfiesModuleProviderRef(t *testing.T) {
+	// Compile-time proof: this line alone is the test. If *Provider stopped
+	// satisfying module.ProviderRef, this file would fail to build. Stage 1
+	// assembly behavior itself (fn deferral, registration) is module's own
+	// concern and already covered by internal/module's test suite.
+	p := New(func(p *Provider) {})
+	var _ module.ProviderRef = p
+}

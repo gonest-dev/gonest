@@ -2,19 +2,19 @@ package module
 
 import "testing"
 
-// fakeProvider is a minimal stand-in for the real *provider.Provider type
-// (owned by a later task). It only needs to satisfy providerRef.
+// fakeProvider is a minimal stand-in for the real *provider.Provider type.
+// It only needs to satisfy ProviderRef.
 type fakeProvider struct {
 	name string
 }
 
-func (*fakeProvider) isProvider() {}
+func (*fakeProvider) IsProvider() {}
 
 // fakeController is a minimal stand-in for the real *controller.Controller
-// type (owned by a later task). It only needs to satisfy controllerRef.
+// type. It only needs to satisfy ControllerRef.
 type fakeController struct{}
 
-func (*fakeController) isController() {}
+func (*fakeController) IsController() {}
 
 func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
 	executed := false

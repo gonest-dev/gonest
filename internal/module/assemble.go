@@ -44,7 +44,7 @@ func assemble(root *Module) ([]*Module, error) {
 // validateExports ensures every provider in m.Exports was also registered
 // via m.Providers on the same module.
 func validateExports(m *Module) error {
-	declared := make(map[providerRef]bool, len(m.providers))
+	declared := make(map[ProviderRef]bool, len(m.providers))
 	for _, p := range m.providers {
 		declared[p] = true
 	}

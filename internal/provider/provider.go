@@ -42,11 +42,12 @@ func New(fn func(*Provider)) *Provider {
 	return &Provider{fn: fn, scope: scope.Singleton}
 }
 
-// isProvider is a marker method that structurally satisfies module's
-// unexported providerRef interface, so *Provider can be passed to
-// (*module.Module).Providers without module needing to import this
-// package.
-func (p *Provider) isProvider() {}
+// IsProvider is a marker method that satisfies module.ProviderRef, so
+// *Provider can be passed to (*module.Module).Providers without module
+// needing to import this package. Exported: Go ties unexported interface
+// methods to the declaring package, so an unexported marker here could
+// never satisfy module's interface across packages.
+func (p *Provider) IsProvider() {}
 
 // SetOwnerModule associates this provider with the module that owns it.
 // It is called by module assembly once ownership is known (structural

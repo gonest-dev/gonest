@@ -4,19 +4,25 @@
 // modules, providers, and controllers.
 package module
 
-// providerRef is a minimal marker interface satisfied by the real
-// *provider.Provider type (owned by a later task, in internal/provider).
-// Module never needs to know the concrete provider type — it only tracks
-// registered participants for Stage 1's structural bookkeeping.
-type providerRef interface {
-	isProvider()
+// ProviderRef is a minimal marker interface satisfied by the real
+// *provider.Provider type (owned by internal/provider). Module never needs
+// to know the concrete provider type — it only tracks registered
+// participants for Stage 1's structural bookkeeping.
+//
+// Exported (not just structurally implementable) because Go ties
+// unexported interface methods to the declaring package: a method named
+// isProvider() defined on *provider.Provider in a different package can
+// never satisfy an unexported isProvider() declared here, even with an
+// identical signature. Exporting the interface — not the marker method
+// itself — is what makes cross-package satisfaction possible.
+type ProviderRef interface {
+	IsProvider()
 }
 
-// controllerRef is a minimal marker interface satisfied by the real
-// *controller.Controller type (owned by a later task, in
-// internal/controller). Same rationale as providerRef.
-type controllerRef interface {
-	isController()
+// ControllerRef is the Controller equivalent of ProviderRef. Same
+// cross-package rationale.
+type ControllerRef interface {
+	IsController()
 }
 
 // Owner is the contract implemented by Provider and Controller to report
@@ -37,9 +43,9 @@ type Module struct {
 	fn func(*Module)
 
 	imports     []*Module
-	providers   []providerRef
-	controllers []controllerRef
-	exports     []providerRef
+	providers   []ProviderRef
+	controllers []ControllerRef
+	exports     []ProviderRef
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -55,12 +61,12 @@ func (m *Module) Imports(mods ...*Module) {
 }
 
 // Providers registers providers owned by this module.
-func (m *Module) Providers(ps ...providerRef) {
+func (m *Module) Providers(ps ...ProviderRef) {
 	m.providers = append(m.providers, ps...)
 }
 
 // Controllers registers controllers owned by this module.
-func (m *Module) Controllers(cs ...controllerRef) {
+func (m *Module) Controllers(cs ...ControllerRef) {
 	m.controllers = append(m.controllers, cs...)
 }
 
@@ -68,6 +74,6 @@ func (m *Module) Controllers(cs ...controllerRef) {
 // visible to importing modules. Every exported provider must have also
 // been registered via Providers on this same module -- validated at the
 // end of Stage 1 assembly.
-func (m *Module) Exports(ps ...providerRef) {
+func (m *Module) Exports(ps ...ProviderRef) {
 	m.exports = append(m.exports, ps...)
 }
