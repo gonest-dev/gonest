@@ -2,35 +2,22 @@ package gonest
 
 import "testing"
 
-func TestScopeSingleton_String(t *testing.T) {
-	got := ScopeSingleton.String()
-	want := "Singleton"
-	if got != want {
-		t.Fatalf("ScopeSingleton.String() = %q, want %q", got, want)
+// Behavior of Scope itself is covered in internal/scope. This only smoke-tests
+// that the root-level re-export (type alias + const aliases) actually points
+// at the same values.
+func TestScope(t *testing.T) {
+	testCases := []struct {
+		scope Scope
+		want  string
+	}{
+		{scope: ScopeSingleton, want: "Singleton"},
+		{scope: ScopeTransient, want: "Transient"},
+		{scope: ScopeRequest, want: "Request"},
 	}
-}
 
-func TestScopeTransient_String(t *testing.T) {
-	got := ScopeTransient.String()
-	want := "Transient"
-	if got != want {
-		t.Fatalf("ScopeTransient.String() = %q, want %q", got, want)
-	}
-}
-
-func TestScopeRequest_String(t *testing.T) {
-	got := ScopeRequest.String()
-	want := "Request"
-	if got != want {
-		t.Fatalf("ScopeRequest.String() = %q, want %q", got, want)
-	}
-}
-
-func TestScope_String_Unknown(t *testing.T) {
-	unknown := Scope(999)
-	got := unknown.String()
-	want := "Unknown"
-	if got != want {
-		t.Fatalf("Scope(999).String() = %q, want %q", got, want)
+	for _, tt := range testCases {
+		if got := tt.scope.String(); got != tt.want {
+			t.Fatalf("Scope(%v).String() = %q, want %q", tt.scope, got, tt.want)
+		}
 	}
 }
