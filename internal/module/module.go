@@ -102,6 +102,14 @@ func (m *Module) OwnProviders() []ProviderRef {
 	return append([]ProviderRef(nil), m.providers...)
 }
 
+// OwnControllers returns a copy of the controllers registered on this
+// module via Controllers. Read-only: mutating the returned slice does not
+// affect this Module's internal state. Used by Stage 2 (running Declare on
+// every registered controller) and by a future task's route registration.
+func (m *Module) OwnControllers() []ControllerRef {
+	return append([]ControllerRef(nil), m.controllers...)
+}
+
 // ImportedModules returns a copy of the modules registered on this module
 // via Imports. Read-only: mutating the returned slice does not affect this
 // Module's internal state. Used by internal/resolver to walk imports when

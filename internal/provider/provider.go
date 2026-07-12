@@ -33,6 +33,7 @@ type Provider struct {
 	constructor reflect.Value
 
 	ownerModule *module.Module
+	declared    bool
 }
 
 // New creates a Provider that defers fn until Stage 2 builder execution
@@ -40,6 +41,23 @@ type Provider struct {
 // to it -- no resolution logic runs here.
 func New(fn func(*Provider)) *Provider {
 	return &Provider{fn: fn, scope: scope.Singleton}
+}
+
+// Declare runs this provider's deferred fn exactly once. It is a no-op on
+// any call after the first (including when fn is nil), so callers that walk
+// the assembled module tree (Stage 2 of bootstrap) can call Declare on every
+// registered provider without needing to track which ones they already
+// visited. This is what makes MustResolve calls inside fn actually happen
+// and get recorded as pending edges -- before Declare runs, fn has never
+// executed (see New's doc comment).
+func (p *Provider) Declare() {
+	if p.declared {
+		return
+	}
+	p.declared = true
+	if p.fn != nil {
+		p.fn(p)
+	}
 }
 
 // IsProvider is a marker method that satisfies module.ProviderRef, so
@@ -80,6 +98,24 @@ func (p *Provider) ResolvedType() reflect.Type {
 // the default is scope.Singleton.
 func (p *Provider) Scope(s scope.Scope) {
 	p.scope = s
+}
+
+// ResolvedScope returns the scope this provider was configured with (or
+// scope.Singleton if Scope was never called). Named ResolvedScope, not
+// Scope, because Scope is already the setter -- Go does not allow method
+// overloading. Used by internal/resolver's Stage 3 engine to decide
+// per-scope resolution strategy (only scope.Singleton is handled by T9;
+// Transient/Request are later tasks).
+func (p *Provider) ResolvedScope() scope.Scope {
+	return p.scope
+}
+
+// ConstructorFunc returns the reflect.Value of the Constructor stored via
+// Constructor(fn any), ready to be invoked directly (fn.Call(...)) by
+// internal/resolver's Stage 3 engine. Returns an invalid (zero)
+// reflect.Value if Constructor has not been called yet.
+func (p *Provider) ConstructorFunc() reflect.Value {
+	return p.constructor
 }
 
 // Constructor registers the builder function used to produce this

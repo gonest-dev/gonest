@@ -20,7 +20,8 @@ import "github.com/gonest-dev/gonest/internal/module"
 type Controller struct {
 	fn func(*Controller)
 
-	owner *module.Module
+	owner    *module.Module
+	declared bool
 }
 
 // New creates a Controller that defers fn until bootstrap runs it. fn is
@@ -28,6 +29,21 @@ type Controller struct {
 // dependencies -- neither is implemented yet at this shell stage.
 func New(fn func(*Controller)) *Controller {
 	return &Controller{fn: fn}
+}
+
+// Declare runs this controller's deferred fn exactly once. It is a no-op on
+// any call after the first (including when fn is nil), mirroring
+// Provider.Declare -- callers that walk the assembled module tree (Stage 2
+// of bootstrap) can call Declare on every registered controller without
+// tracking which ones they already visited.
+func (c *Controller) Declare() {
+	if c.declared {
+		return
+	}
+	c.declared = true
+	if c.fn != nil {
+		c.fn(c)
+	}
 }
 
 // IsController is the marker method that satisfies module.ControllerRef, so

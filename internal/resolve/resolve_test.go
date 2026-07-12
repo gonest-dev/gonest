@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -148,6 +149,31 @@ func TestPendingEdges_ReturnsCopyNotAliasingInternalState(t *testing.T) {
 	again := PendingEdges()
 	if again[0].Owner != owner {
 		t.Fatalf("PendingEdges() second call Owner = %v, want %v (mutation of first result leaked into internal state)", again[0].Owner, owner)
+	}
+}
+
+func TestPendingEdge_RetainsPlaceholderUsableForCopyInPlace(t *testing.T) {
+	resetPendingEdges()
+	owner := newOwner()
+
+	got := MustResolve[*fakeService](owner)
+
+	edges := pendingEdgesFor(owner)
+	if len(edges) != 1 {
+		t.Fatalf("pending edges for owner = %d, want 1", len(edges))
+	}
+	if !edges[0].Placeholder.IsValid() {
+		t.Fatalf("PendingEdge.Placeholder is zero reflect.Value, want the allocated placeholder")
+	}
+
+	// Simulate Stage 3's copy-in-place: write through the retained
+	// reflect.Value and confirm it's the SAME underlying allocation the
+	// caller already holds a pointer to (got), not a separate copy.
+	real := &fakeService{Name: "resolved"}
+	edges[0].Placeholder.Elem().Set(reflect.ValueOf(real).Elem())
+
+	if got.Name != "resolved" {
+		t.Fatalf("got.Name = %q after copy-in-place via retained Placeholder, want %q -- Placeholder does not alias the value MustResolve returned", got.Name, "resolved")
 	}
 }
 

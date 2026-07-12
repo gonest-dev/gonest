@@ -182,6 +182,82 @@ func TestResolvedType_ReturnsConstructorReturnType_FuncReturningT(t *testing.T) 
 	}
 }
 
+func TestDeclare_ExecutesFn(t *testing.T) {
+	executed := false
+	p := New(func(p *Provider) {
+		executed = true
+	})
+
+	p.Declare()
+
+	if !executed {
+		t.Fatalf("Declare() did not execute fn")
+	}
+}
+
+func TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls(t *testing.T) {
+	count := 0
+	p := New(func(p *Provider) {
+		count++
+	})
+
+	p.Declare()
+	p.Declare()
+	p.Declare()
+
+	if count != 1 {
+		t.Fatalf("fn executed %d times across 3 Declare() calls, want exactly 1", count)
+	}
+}
+
+func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
+	p := &Provider{}
+
+	p.Declare()
+}
+
+func TestConstructorFunc_ReturnsInvocableReflectValue(t *testing.T) {
+	p := New(func(p *Provider) {
+		p.Constructor(func() *fakeService {
+			return &fakeService{}
+		})
+	})
+	runFn(p)
+
+	fn := p.ConstructorFunc()
+	if !fn.IsValid() {
+		t.Fatalf("ConstructorFunc() returned invalid reflect.Value")
+	}
+
+	out := fn.Call(nil)
+	if len(out) != 1 {
+		t.Fatalf("ConstructorFunc().Call(nil) returned %d values, want 1", len(out))
+	}
+	if _, ok := out[0].Interface().(*fakeService); !ok {
+		t.Fatalf("ConstructorFunc().Call(nil)[0] = %v, want *fakeService", out[0].Interface())
+	}
+}
+
+func TestResolvedScope_ReturnsSingletonByDefault(t *testing.T) {
+	p := New(func(p *Provider) {})
+	runFn(p)
+
+	if got := p.ResolvedScope(); got != scope.Singleton {
+		t.Fatalf("ResolvedScope() = %v, want %v", got, scope.Singleton)
+	}
+}
+
+func TestResolvedScope_ReturnsExplicitScope(t *testing.T) {
+	p := New(func(p *Provider) {
+		p.Scope(scope.Transient)
+	})
+	runFn(p)
+
+	if got := p.ResolvedScope(); got != scope.Transient {
+		t.Fatalf("ResolvedScope() = %v, want %v", got, scope.Transient)
+	}
+}
+
 func TestResolvedType_ReturnsConstructorReturnType_FuncReturningTAndError(t *testing.T) {
 	p := New(func(p *Provider) {
 		p.Constructor(func() (*fakeService, error) {

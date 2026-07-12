@@ -47,6 +47,40 @@ func TestOwnerModule_NilBeforeAssociation(t *testing.T) {
 	}
 }
 
+func TestDeclare_ExecutesFn(t *testing.T) {
+	executed := false
+	c := New(func(c *Controller) {
+		executed = true
+	})
+
+	c.Declare()
+
+	if !executed {
+		t.Fatalf("Declare() did not execute fn")
+	}
+}
+
+func TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls(t *testing.T) {
+	count := 0
+	c := New(func(c *Controller) {
+		count++
+	})
+
+	c.Declare()
+	c.Declare()
+	c.Declare()
+
+	if count != 1 {
+		t.Fatalf("fn executed %d times across 3 Declare() calls, want exactly 1", count)
+	}
+}
+
+func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
+	c := &Controller{}
+
+	c.Declare()
+}
+
 // TestController_SatisfiesModuleControllerRef confirms the cross-package
 // blocker flagged during T5 (unexported controllerRef.isController couldn't
 // be satisfied outside package module) is resolved now that internal/module

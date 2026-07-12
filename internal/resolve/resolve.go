@@ -18,9 +18,19 @@ import (
 // MustResolve. internal/resolver walks this bookkeeping (via PendingEdges)
 // to perform the real module-scoped search and wire dependency edges into
 // the DI graph, including cycle detection.
+//
+// Placeholder retains the exact reflect.Value MustResolve allocated and
+// returned to the caller (T in reflect.New(t.Elem()) form, i.e. the pointer
+// itself, not "the struct it points to"). Stage 3 resolution needs this to
+// copy the real resolved instance into the placeholder in place
+// (*placeholder = *real via reflect) once the target provider's Constructor
+// has run -- without retaining the placeholder here, that copy-in-place
+// would have no way back from "a pending edge exists" to "here is the exact
+// pointer callers are already holding a reference to".
 type PendingEdge struct {
-	Owner      module.Owner
-	TargetType reflect.Type
+	Owner       module.Owner
+	TargetType  reflect.Type
+	Placeholder reflect.Value
 }
 
 var (
@@ -68,8 +78,7 @@ func pendingEdgesFor(owner module.Owner) []PendingEdge {
 // for a future task to consult when performing real module-scoped
 // resolution. It panics if T is not a pointer type.
 func MustResolve[T any](owner module.Owner) T {
-	var zero T
-	t := reflect.TypeOf(&zero).Elem()
+	t := reflect.TypeFor[T]()
 
 	if t.Kind() != reflect.Pointer {
 		panic(fmt.Sprintf("gonest: MustResolve[T] requires T to be a pointer type, got %s", t.String()))
@@ -78,7 +87,7 @@ func MustResolve[T any](owner module.Owner) T {
 	placeholder := reflect.New(t.Elem())
 
 	pendingEdgesMu.Lock()
-	pendingEdges = append(pendingEdges, PendingEdge{Owner: owner, TargetType: t})
+	pendingEdges = append(pendingEdges, PendingEdge{Owner: owner, TargetType: t, Placeholder: placeholder})
 	pendingEdgesMu.Unlock()
 
 	return placeholder.Interface().(T)

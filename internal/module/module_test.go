@@ -163,6 +163,41 @@ func TestModule_OwnProviders_ReturnsRegisteredProviders(t *testing.T) {
 	}
 }
 
+func TestModule_OwnControllers_ReturnsRegisteredControllers(t *testing.T) {
+	c := &fakeController{}
+	m := New(func(m *Module) {
+		m.Controllers(c)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnControllers()
+	if len(got) != 1 || got[0] != ControllerRef(c) {
+		t.Fatalf("OwnControllers() = %v, want [c]", got)
+	}
+}
+
+func TestModule_OwnControllers_ReturnsCopyNotInternalSlice(t *testing.T) {
+	c := &fakeController{}
+	m := New(func(m *Module) {
+		m.Controllers(c)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnControllers()
+	got[0] = &fakeController{}
+
+	got2 := m.OwnControllers()
+	if got2[0] != ControllerRef(c) {
+		t.Fatalf("OwnControllers() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+}
+
 func TestModule_Imports_ReturnsImportedModules(t *testing.T) {
 	child := New(func(m *Module) {})
 	root := New(func(m *Module) {
