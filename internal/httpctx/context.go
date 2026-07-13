@@ -1,14 +1,20 @@
 // Package httpctx provides Context, the single per-request access point
-// exposed to route Handlers. Context delegates to a minimal responder
+// exposed to route Handlers. Context delegates to a minimal Responder
 // interface so the real Fiber-backed implementation can be wired in later
 // (see design.md's "FiberApp" component) without changing Context's public
 // API or these tests.
 package httpctx
 
-// responder is the minimal surface Context needs to serve its request/response
+// Responder is the minimal surface Context needs to serve its request/response
 // methods. A fake implementation is used in tests; a Fiber-backed
 // implementation is added in a later task.
-type responder interface {
+//
+// Exported (not just "responder") so packages other than httpctx -- namely
+// internal/route's tests -- can build a *Context around their own fake
+// without needing a Fiber-backed one to exist yet (see L-004 in STATE.md:
+// Go ties interface satisfaction/visibility to whether the interface itself
+// is exported, not just its methods).
+type Responder interface {
 	JSON(v any) error
 	SetStatus(code int)
 	GetHeader(name string) string
@@ -18,12 +24,40 @@ type responder interface {
 
 // Context encapsulates the HTTP request/response for a single route Handler.
 type Context struct {
-	res responder
+	res   Responder
+	route any
 }
 
-// newContext builds a Context around the given responder.
-func newContext(res responder) *Context {
+// New builds a Context around the given Responder. Exported so other
+// packages (namely internal/route, which needs to attach a *Route to a
+// Context for MustParam[T] to consult -- see WithRoute/Route below) can
+// construct a *Context in their own tests without a real Fiber-backed
+// Responder existing yet.
+func New(res Responder) *Context {
 	return &Context{res: res}
+}
+
+// WithRoute attaches an opaque reference to the *route.Route that owns this
+// Context to the Context, and returns ctx for chaining. It is stored as
+// `any` (not *route.Route) deliberately: internal/route already imports
+// internal/httpctx (Route.Handler takes a *Context, Route.Param takes a
+// *pipe.Pipe whose Handler also takes a *Context) -- if httpctx imported
+// route back to give WithRoute/Route a concrete type, that would be an
+// import cycle. Storing `any` here keeps httpctx's boundary exactly as
+// narrow as T2 established ("no Fiber", not "no Route"): httpctx never
+// inspects or calls anything on the stored value, it is purely a carrier.
+// The root param.go wrapper (which imports both httpctx and route) is the
+// only place that type-asserts this back to *route.Route.
+func (ctx *Context) WithRoute(route any) *Context {
+	ctx.route = route
+	return ctx
+}
+
+// Route returns the opaque reference previously attached via WithRoute, or
+// nil if none was attached (e.g. a Context built directly in a test that
+// doesn't exercise MustParam's custom-Pipe path).
+func (ctx *Context) Route() any {
+	return ctx.route
 }
 
 // Json writes value as the JSON response body.

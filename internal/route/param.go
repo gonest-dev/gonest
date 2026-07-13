@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+
+	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/pipe"
 )
 
 // defaultCoerce converts raw (a route param's raw string value, e.g. from
@@ -58,4 +61,62 @@ func defaultCoerce[T any](raw string) (T, error) {
 	default:
 		return zero, fmt.Errorf("gonest: unsupported param type %s for value %q", reflect.TypeOf(zero), raw)
 	}
+}
+
+// MustParam is the real implementation behind the public root
+// gonest.MustParam[T] wrapper (Go cannot re-export a generic function via
+// var, see AD-004 -- same reasoning as inject.MustInject/gonest.MustInject).
+//
+// It resolves ctx's currently-attached *Route (via ctx.Route(), an `any`
+// that MustParam type-asserts back to *Route -- see httpctx.Context's
+// WithRoute/Route doc comment for why the link is untyped at the httpctx
+// layer) and:
+//
+//  1. If a Route is attached and its declared path does NOT have a ":name"
+//     segment for name (Route.HasParam), panics with the
+//     "no param named" message -- this is the existence check that resolves
+//     T4's documented ambiguity (ctx.Param returning "" cannot alone
+//     distinguish "absent" from "present but empty" for T=string).
+//  2. If a Route is attached and has a custom Pipe registered for name
+//     (Route.PipeFor), calls that Pipe's Handler with (ctx, raw) and
+//     returns its result. Any panic from the Pipe's Handler itself
+//     propagates unchanged (expected pass-through, not caught here).
+//  3. Otherwise (no Route attached, or no custom Pipe for name), falls back
+//     to defaultCoerce[T]. A conversion failure panics with the
+//     "could not be converted" message.
+func MustParam[T any](ctx *httpctx.Context, name string) T {
+	raw := ctx.Param(name)
+
+	r, hasRoute := ctx.Route().(*Route)
+	if hasRoute && !r.HasParam(name) {
+		panic(fmt.Sprintf("gonest: no param named %q on this route", name))
+	}
+
+	if hasRoute {
+		if p, ok := r.PipeFor(name); ok {
+			return callPipeHandler[T](p, ctx, raw, name)
+		}
+	}
+
+	v, err := defaultCoerce[T](raw)
+	if err != nil {
+		var zero T
+		panic(fmt.Sprintf("gonest: param %q could not be converted to %s: %v", name, reflect.TypeOf(zero), err))
+	}
+	return v
+}
+
+// callPipeHandler invokes p's stored Handler (func(ctx *httpctx.Context, raw
+// string) T) via reflect and returns its typed result. Panics from the
+// Handler itself propagate unchanged -- reflect.Value.Call does not recover
+// panics, so this is naturally pass-through.
+func callPipeHandler[T any](p *pipe.Pipe, ctx *httpctx.Context, raw, name string) T {
+	fn := p.HandlerFunc()
+	out := fn.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(raw)})
+	result, ok := out[0].Interface().(T)
+	if !ok {
+		var zero T
+		panic(fmt.Sprintf("gonest: param %q could not be converted to %s: custom Pipe returned %s", name, reflect.TypeOf(zero), out[0].Type()))
+	}
+	return result
 }

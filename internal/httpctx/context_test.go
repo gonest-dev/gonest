@@ -2,7 +2,7 @@ package httpctx
 
 import "testing"
 
-// fakeResponder is a test-only implementation of responder, standing in for
+// fakeResponder is a test-only implementation of Responder, standing in for
 // the real Fiber-backed implementation that arrives in a later task (T7).
 type fakeResponder struct {
 	jsonValue  any
@@ -42,7 +42,7 @@ func (f *fakeResponder) GetParam(name string) string {
 
 func TestContext_Json_DelegatesToResponder(t *testing.T) {
 	fake := newFakeResponder()
-	ctx := newContext(fake)
+	ctx := New(fake)
 
 	type payload struct{ Name string }
 	value := payload{Name: "gonest"}
@@ -58,7 +58,7 @@ func TestContext_Json_DelegatesToResponder(t *testing.T) {
 
 func TestContext_Status_IsChainableAndSetsCode(t *testing.T) {
 	fake := newFakeResponder()
-	ctx := newContext(fake)
+	ctx := New(fake)
 
 	returned := ctx.Status(201)
 
@@ -72,7 +72,7 @@ func TestContext_Status_IsChainableAndSetsCode(t *testing.T) {
 
 func TestContext_Status_Json_Chained(t *testing.T) {
 	fake := newFakeResponder()
-	ctx := newContext(fake)
+	ctx := New(fake)
 
 	if err := ctx.Status(200).Json(map[string]string{"ok": "true"}); err != nil {
 		t.Fatalf("chained Status().Json() returned error: %v", err)
@@ -89,7 +89,7 @@ func TestContext_Status_Json_Chained(t *testing.T) {
 func TestContext_Header_ReadsFromResponder(t *testing.T) {
 	fake := newFakeResponder()
 	fake.headers["X-Test"] = "abc"
-	ctx := newContext(fake)
+	ctx := New(fake)
 
 	if got := ctx.Header("X-Test"); got != "abc" {
 		t.Fatalf("expected Header() to return %q, got %q", "abc", got)
@@ -98,7 +98,7 @@ func TestContext_Header_ReadsFromResponder(t *testing.T) {
 
 func TestContext_SetHeader_WritesToResponder(t *testing.T) {
 	fake := newFakeResponder()
-	ctx := newContext(fake)
+	ctx := New(fake)
 
 	ctx.SetHeader("X-Custom", "value")
 
@@ -110,9 +110,44 @@ func TestContext_SetHeader_WritesToResponder(t *testing.T) {
 func TestContext_Param_ReadsFromResponder(t *testing.T) {
 	fake := newFakeResponder()
 	fake.params["id"] = "42"
-	ctx := newContext(fake)
+	ctx := New(fake)
 
 	if got := ctx.Param("id"); got != "42" {
 		t.Fatalf("expected Param() to return %q, got %q", "42", got)
+	}
+}
+
+// TestContext_Route_NilByDefault proves a Context built without WithRoute
+// has no attached route reference -- the zero value case exercised by any
+// existing/future test that builds a Context directly and never needs
+// MustParam's custom-Pipe lookup.
+func TestContext_Route_NilByDefault(t *testing.T) {
+	ctx := New(newFakeResponder())
+
+	if got := ctx.Route(); got != nil {
+		t.Fatalf("expected Route() to be nil by default, got %v", got)
+	}
+}
+
+// TestContext_WithRoute_IsChainableAndStoresRoute proves WithRoute attaches
+// an opaque reference and returns ctx for chaining, and Route() returns
+// exactly what was attached (round-trip, no transformation).
+func TestContext_WithRoute_IsChainableAndStoresRoute(t *testing.T) {
+	ctx := New(newFakeResponder())
+
+	type fakeRoute struct{ name string }
+	r := &fakeRoute{name: "user-route"}
+
+	returned := ctx.WithRoute(r)
+
+	if returned != ctx {
+		t.Fatalf("expected WithRoute() to return the same *Context for chaining")
+	}
+	got, ok := ctx.Route().(*fakeRoute)
+	if !ok {
+		t.Fatalf("expected Route() to return the attached *fakeRoute, got %T", ctx.Route())
+	}
+	if got != r {
+		t.Fatalf("expected Route() to return the exact attached pointer")
 	}
 }
