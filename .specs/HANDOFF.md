@@ -1,21 +1,22 @@
 # Handoff
 
 **Date:** 2026-07-13
-**Feature:** Interceptor (Milestone 3) — ✅ COMPLETE (T1-T4)
-**Task:** Nenhuma em progresso. Próxima: especificar "Pipe" (pipeline-stage, 4ª feature de Milestone 3, ver ROADMAP.md).
+**Feature:** Pipe (Milestone 3) — ✅ COMPLETE (housekeeping + 2 bug fixes reais, não feature nova)
+**Task:** Nenhuma em progresso. Próxima: especificar "Filter" (5ª e última feature-tipo de Milestone 3 antes de "Pipeline Ordering", ver ROADMAP.md).
 
 ## Completed ✓
 
-- **Milestones 1-2 COMPLETE** — DI graph, módulos, controllers/rotas, adapter Fiber real, bootstrap+listen, contrato de exceção `{name,message,details}` com recovery real. Ver STATE.md pra histórico completo.
+- **Milestones 1-2 COMPLETE** — DI graph, módulos, controllers/rotas, adapter Fiber real, bootstrap+listen, contrato de exceção `{name,message,details}` com recovery real.
 - **Milestone 3 em progresso:**
   - Feature "Middleware" (T1-T5) — COMPLETE.
   - Feature "Guard" (T1-T4) — COMPLETE. AD-008 registrada.
-  - Feature "Interceptor" (T1-T4) — COMPLETE
-    - T1 (`internal/interceptor`: `Next` PRÓPRIO, `Interceptor`/`New`/`Handler`, execução imediata) — DONE, evaluator PASS, commit `81b32ba`
-    - T2 (`Controller.Interceptors` real, era stub; `OwnInterceptors()`) — DONE, evaluator PASS, commit `2345f95`
-    - T3 (composição em Stage 2.5: Interceptor envolve `routeHandler` puro, Guard envolve o RESULTADO — Guard mais externo) — DONE, evaluator PASS, commits `2f7fbc4`+`d74ec71` (segundo commit = correção de bug real de ordem, ver L-011 em STATE.md)
-    - T4 (re-exports raiz: `Interceptor`/`NewInterceptor`) — DONE, evaluator PASS, commit `f357df0`
-  - **L-011 registrada (STATE.md):** erro real no MEU design.md — descrevi Interceptor envolvendo `gatedHandler` (Guard+Handler já compostos), produzindo ordem errada (Interceptor-before rodando antes do Guard decidir). Corrigido: Interceptor envolve o Handler puro, Guard envolve isso. Ordem final correta: Middleware → Guard → Interceptor → Handler, batendo com ROADMAP.md. Dev sub-agent que implementou T3 originalmente seguiu o design errado corretamente (não era escopo dele reordenar sozinho) e reportou a divergência como SPEC_DEVIATION — foi isso que permitiu pegar o erro rápido.
+  - Feature "Interceptor" (T1-T4) — COMPLETE. L-011 registrada (erro de ordem Guard/Interceptor no design, corrigido).
+  - **"Pipe" (Milestone 3) — COMPLETE.** Descoberta: `internal/pipe` já existia desde T3 de "Controller & Route Registration" — só faltava re-export raiz. Ao adicionar, achei e corrigi 2 bugs reais de integração nunca antes testados end-to-end:
+    - `b305e70` — `Route.Param` não chamava `Pipe.Declare()`, Handler do Pipe customizado nunca era registrado em produção
+    - `2d3e0c3` — `ctx.WithRoute()` nunca era chamado em `internal/app`'s `registerRoutes`, `MustParam` sempre caía no `defaultCoerce` genérico, ignorando qualquer Pipe customizado
+    - `a153ba8` — `pipe.go`/`pipe_test.go` na raiz, incluindo o teste que expôs os 2 bugs acima
+    - Verificação independente (evaluator): PASS, confirmou ambas correções + checou criticamente se os testes provam mesmo a correção (sim — subteste "caminho inválido → 400 estruturado" é a prova inequívoca, já que só o Pipe customizado produz Exception estruturada)
+  - **L-012 registrada (STATE.md):** padrão a vigiar — testes que só validam peça isolada (chamando `Declare()`/`WithRoute()` manualmente) nunca pegam bug de fiação entre peças; só teste que sobe app inteira + dispara request HTTP real prova conexão de verdade. Testes raiz não são redundantes com testes de `internal/*` por causa disso.
 
 ## In Progress
 
@@ -23,19 +24,20 @@
 
 ## Pending
 
-- Especificar **Pipe** (pipeline-stage, distinto do `Pipe` de coerção de param já existente — `NewPipe`, transforma/valida param antes do handler, panic `BadRequestException` se inválido, ver ROADMAP.md Milestone 3). Mesmo padrão AD-008 provavelmente aplica (sem MustInject).
-- Depois: `Filter` (`NewFilter`, `Catch(exceptionType, handler)` — último stub de `Controller` ainda no placeholder), depois "Pipeline Ordering" (valida ordem combinada Middleware → Guard → Interceptor → Pipe → Handler com TODOS os 5 estágios existindo)
-- **Atenção especial pra "Pipeline Ordering":** dado L-011, ao especificar essa feature validar explicitamente a ordem de execução resultante de qualquer composição proposta contra ROADMAP.md ANTES de despachar pra developer — não só a ordem "de quem chama quem no código", mas a ordem real observável em runtime.
+- Especificar **Filter** (`NewFilter`, `Catch(exceptionType, handler)`, registro por controller/módulo/global — último stub de `Controller` ainda no placeholder `Middleware struct{}`, ver ROADMAP.md Milestone 3)
+- Depois: "Pipeline Ordering" (valida ordem combinada Middleware → Guard → Interceptor → Pipe → Handler com TODOS os 5 estágios existindo — **atenção especial dado L-011**: traçar ordem de execução real antes de despachar)
+- Ao especificar Filter, considerar se precisa de composição em Stage 2.5 (`internal/app`) igual Middleware/Guard/Interceptor, ou se plugga em cima do recover wrapper já existente (`internal/fiberapp`) de forma diferente — Filter intercepta EXCEPTIONS específicas, não decora o request/response como os outros, pode ter formato de integração distinto
 
 ## Blockers
 
-- Nenhum ativo. B-001 (`-race`/CC=clang) resolvido de vez, ver STATE.md.
+- Nenhum ativo. B-001 (`-race`/CC=clang) resolvido de vez.
 
 ## Débitos leves registrados (não bloqueiam nada)
 
 - L-008: `httpctx.Context.route any` + type assertion deveria ser interface tipada (`paramHost`).
 - L-010: `Context.Header()`/`SetHeader()` são stores diferentes (request/response).
-- L-011: cuidado ao desenhar composição de pipeline — traçar ordem de EXECUÇÃO resultante, não só ordem sintática de wrapping, contra ROADMAP.md antes de despachar.
+- L-011: cuidado ao desenhar composição de pipeline — traçar ordem de EXECUÇÃO resultante, não só ordem sintática de wrapping.
+- L-012: tipos com `New(fn)` deferido precisam de chamada real de `Declare()` em produção, não só em teste; testes raiz end-to-end são o único lugar que pega bugs de fiação entre peças.
 - `gonest.FiberApp`/`gonest.Context`/`gonest.Route`/`gonest.HttpGet` não existem como aliases raiz — gaps pré-existentes.
 - `HttpStatus` enum completo não existe ainda.
 - `gofmt` em 2 arquivos pré-existentes (`internal/resolver/stage3_test.go`, `transient_test.go`) — cosmético.
@@ -43,6 +45,6 @@
 ## Context
 
 - Branch: `master`
-- Todo trabalho desta sessão commitado (código via sub-agents, docs `.specs/*` via orquestrador, sempre com pathspec explícito). `.vscode/` untracked (não gerado por mim, deixado como está).
-- Fluxo de trabalho: AD-001 (planner→developer→evaluator, 2 sub-agents por task), AD-004 (1 pacote por tipo em `internal/`, reexport fino na raiz), AD-008 (pipeline-stage types sem MustInject, execução imediata), L-007 (`git commit -- <arquivos>` sempre com pathspec), L-011 (traçar ordem de execução real de composições de pipeline antes de despachar, não só sintaxe)
-- Pra retomar: ler STATE.md inteiro primeiro (tem todo histórico de decisões/lições), depois ROADMAP.md Milestone 3 pra especificar "Pipe" (Specify phase, feature nova) — provável reaproveitamento quase mecânico do padrão de Middleware/Guard/Interceptor.
+- Todo trabalho desta sessão commitado (código via sub-agents + correções diretas do orquestrador quando achados durante housekeeping, sempre verificadas por evaluator independente depois; docs `.specs/*` via orquestrador, sempre com pathspec explícito). `.vscode/` untracked (não gerado por mim, deixado como está).
+- Fluxo de trabalho: AD-001 (planner→developer→evaluator), AD-004 (1 pacote por tipo em `internal/`, reexport fino na raiz — root files são a ÚNICA porta pública já que Go bloqueia import externo de `internal/*`, arquivo `package gonest` fisicamente TEM que estar na raiz do módulo), AD-008 (pipeline-stage types sem MustInject), L-007 (`git commit -- <arquivos>` sempre com pathspec), L-011/L-012 (cuidados de composição de pipeline e de fiação Declare/WithRoute)
+- Pra retomar: ler STATE.md inteiro primeiro, depois ROADMAP.md Milestone 3 pra especificar "Filter" (Specify phase, feature nova).

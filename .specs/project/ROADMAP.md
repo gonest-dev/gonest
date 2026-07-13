@@ -70,8 +70,9 @@
 - `NewInterceptor`, `Handler(ctx, next)` (`internal/interceptor`, re-exportado na raiz) — mesmo padrão AD-008 (sem MustInject, execução imediata), tipo `Next` próprio (não reusa `middleware.Next`)
 - `Controller.Interceptors()` (real, era stub) — envolve o Handler puro com before/after; Guard fica MAIS EXTERNO que Interceptor na composição (ordem Middleware → Guard → Interceptor → Handler, corrigida durante revisão — ver L-011 em STATE.md)
 
-**Pipe** - PLANNED
-- `NewPipe`, transforma/valida param antes do handler, panic `BadRequestException` se inválido
+**Pipe** - COMPLETE
+- `NewPipe`, transforma/valida param antes do handler, panic `BadRequestException` se inválido — implementação já existia desde "Controller & Route Registration" T3 (`internal/pipe`), só faltava re-export raiz
+- Corrigidos 2 bugs reais de integração achados ao adicionar o primeiro teste end-to-end via dispatch real: `Route.Param` não chamava `Pipe.Declare()`, e `ctx.WithRoute()` nunca era chamado em produção — Pipe customizado nunca funcionava fora de teste isolado. Ver L-012 em STATE.md.
 
 **Filter** - PLANNED
 - `NewFilter`, `Catch(exceptionType, handler)`, registro por controller/módulo/global
