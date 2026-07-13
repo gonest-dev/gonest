@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/fiberapp"
@@ -846,5 +848,230 @@ func TestNewApp_NonZeroAppOptions_StoredOnApp(t *testing.T) {
 	}
 	if len(app.opts.LogLevels) != 2 || app.opts.LogLevels[0] != LogLevelWarn || app.opts.LogLevels[1] != LogLevelError {
 		t.Fatalf("app.opts.LogLevels = %+v, want [Warn Error]", app.opts.LogLevels)
+	}
+}
+
+// listenSpyAdapter is a minimal HttpAdapter spy used only by
+// MustListen's own tests (T4) -- it records the addr/onListen it was called
+// with, blocks on a channel the test closes to release it (proving
+// MustListen's underlying Listen call genuinely blocks rather than
+// returning immediately), and can be configured to return an error instead,
+// to prove MustListen's panic-on-error behavior without needing a real port
+// bind.
+type listenSpyAdapter struct {
+	mu          sync.Mutex
+	addr        string
+	onListen    func()
+	onListenRan int
+
+	// unblock, when non-nil, is waited on before Listen returns -- letting a
+	// test control exactly when the blocking call finishes.
+	unblock chan struct{}
+	// err, when non-nil, is returned by Listen instead of blocking.
+	err error
+}
+
+func (f *listenSpyAdapter) Init() {}
+
+func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error {
+	return nil
+}
+
+func (f *listenSpyAdapter) Listen(addr string, onListen func()) error {
+	f.mu.Lock()
+	f.addr = addr
+	f.onListen = onListen
+	f.mu.Unlock()
+
+	if f.err != nil {
+		return f.err
+	}
+
+	if onListen != nil {
+		onListen()
+		f.mu.Lock()
+		f.onListenRan++
+		f.mu.Unlock()
+	}
+
+	if f.unblock != nil {
+		<-f.unblock
+	}
+	return nil
+}
+
+// TestMustListen_FiresOnListenOnceAndBlocks proves App.MustListen calls
+// through to the adapter's Listen with a real OnListen wrapped into a plain
+// func(), that the callback fires exactly once, and that MustListen itself
+// blocks (does not return) until the underlying Listen call does.
+func TestMustListen_FiresOnListenOnceAndBlocks(t *testing.T) {
+	spy := &listenSpyAdapter{unblock: make(chan struct{})}
+	a := &App{adapter: spy}
+
+	var calls int
+	fired := make(chan struct{})
+	onListen := OnListen(func() {
+		calls++
+		close(fired)
+	})
+
+	returned := make(chan struct{})
+	go func() {
+		a.MustListen(":0", onListen)
+		close(returned)
+	}()
+
+	select {
+	case <-fired:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	// MustListen must still be blocked -- Listen has not been released yet.
+	select {
+	case <-returned:
+		t.Fatalf("MustListen() returned before the underlying adapter.Listen call did")
+	default:
+	}
+
+	close(spy.unblock)
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("MustListen() did not return after adapter.Listen was released")
+	}
+
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("onListen called %d times, want exactly 1", calls)
+	}
+	if spy.addr != ":0" {
+		t.Fatalf("adapter.Listen addr = %q, want %q", spy.addr, ":0")
+	}
+}
+
+// TestMustListen_NilOnListen_BlocksWithoutPanicOrCall proves passing a nil
+// OnListen to MustListen is safe: the adapter's Listen still gets called (a
+// nil onListen func passed straight through), MustListen blocks until
+// Listen returns, and nothing panics.
+func TestMustListen_NilOnListen_BlocksWithoutPanicOrCall(t *testing.T) {
+	spy := &listenSpyAdapter{unblock: make(chan struct{})}
+	a := &App{adapter: spy}
+
+	returned := make(chan struct{})
+	go func() {
+		a.MustListen(":0", nil)
+		close(returned)
+	}()
+
+	// Give MustListen a moment to reach the blocking Listen call, then prove
+	// it has NOT returned yet.
+	select {
+	case <-returned:
+		t.Fatalf("MustListen() returned before the underlying adapter.Listen call did")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(spy.unblock)
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("MustListen() did not return after adapter.Listen was released")
+	}
+
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	if spy.onListen != nil {
+		t.Fatalf("adapter.Listen received a non-nil onListen, want nil to have been passed straight through")
+	}
+	if spy.onListenRan != 0 {
+		t.Fatalf("onListenRan = %d, want 0 -- nil onListen must never be called", spy.onListenRan)
+	}
+}
+
+// TestMustListen_ListenError_PanicsWithAddrAndError proves MustListen
+// panics, with a message containing both addr and the underlying error's
+// text, when adapter.Listen returns an error -- the "Must"-prefixed
+// panic-on-error convention shared with MustNewApp/MustInject/MustParam.
+func TestMustListen_ListenError_PanicsWithAddrAndError(t *testing.T) {
+	wantErr := errors.New("address already in use")
+	spy := &listenSpyAdapter{err: wantErr}
+	a := &App{adapter: spy}
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("MustListen() did not panic when adapter.Listen returned an error")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("panic value = %v (%T), want a string", r, r)
+		}
+		if !strings.Contains(msg, ":9999") {
+			t.Fatalf("panic message = %q, want it to contain the addr %q", msg, ":9999")
+		}
+		if !strings.Contains(msg, wantErr.Error()) {
+			t.Fatalf("panic message = %q, want it to contain the underlying error %q", msg, wantErr.Error())
+		}
+	}()
+
+	a.MustListen(":9999", nil)
+}
+
+// TestMustListen_RealFiberApp_IntegrationSmoke proves the whole chain works
+// end-to-end through App.MustListen with a real fiberapp.FiberApp: it binds
+// a real (OS-chosen) port, MustListen's wrapped OnListen fires exactly once,
+// and a real HTTP request against the bound addr succeeds. Kept deliberately
+// minimal -- a full DI+routing dial-the-whole-stack proof belongs to T6, not
+// here.
+func TestMustListen_RealFiberApp_IntegrationSmoke(t *testing.T) {
+	root := module.New(func(m *module.Module) {})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	const addr = "127.0.0.1:34579"
+
+	fired := make(chan struct{})
+	var once sync.Once
+	onListen := OnListen(func() {
+		once.Do(func() { close(fired) })
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		app.MustListen(addr, onListen)
+	}()
+
+	select {
+	case <-fired:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	resp, err := http.Get("http://" + addr + "/")
+	if err != nil {
+		t.Fatalf("http.Get error = %v", err)
+	}
+	resp.Body.Close()
+
+	select {
+	case <-done:
+		t.Fatalf("MustListen() returned unexpectedly before shutdown")
+	default:
 	}
 }

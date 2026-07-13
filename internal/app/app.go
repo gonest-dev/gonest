@@ -48,6 +48,25 @@ func (a *App) Adapter() HttpAdapter {
 	return a.adapter
 }
 
+// MustListen starts the app serving on addr via the underlying adapter's
+// Listen, blocking until it stops. onListen, if non-nil, is wrapped into a
+// plain func() and passed through to adapter.Listen -- a nil onListen is
+// passed straight through as nil, relying on HttpAdapter.Listen's own
+// documented nil-safety rather than gonest wrapping it in a no-op closure.
+// Panics, using the same "Must"-prefixed panic-on-error convention as
+// MustNewApp/MustInject/MustParam, if adapter.Listen returns an error (e.g.
+// the addr is already in use) -- the panic message contains both addr and
+// the underlying error.
+func (a *App) MustListen(addr string, onListen OnListen) {
+	var onListenFunc func()
+	if onListen != nil {
+		onListenFunc = func() { onListen() }
+	}
+	if err := a.adapter.Listen(addr, onListenFunc); err != nil {
+		panic(fmt.Sprintf("gonest: failed to listen on %q: %v", addr, err))
+	}
+}
+
 // HttpAdapter is the minimal contract an HTTP adapter must satisfy for
 // NewApp[T] to use it as T. Mirrors design.md's "FiberApp (adapter)"
 // component's stated contract exactly: RegisterRoute wires one gonest Route
