@@ -12,11 +12,11 @@ Dev NestJS espera `@Injectable()` + constructor injection resolvendo automaticam
 
 ## Out of Scope
 
-| Feature | Reason |
-| --- | --- |
-| Module/Controller/Route registration | Feature separada (Milestone 1: "Module Composition", "Controller & Route Registration") |
+| Feature                                                           | Reason                                                                                          |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Module/Controller/Route registration                              | Feature separada (Milestone 1: "Module Composition", "Controller & Route Registration")         |
 | Interceptor/Guard/Middleware consumindo provider de Request scope | Depende do Request Pipeline (Milestone 3) — aqui só o mecanismo de scope, não o wiring com HTTP |
-| Multi-adapter HTTP | Fora de escopo do v1 inteiro (ver PROJECT.md) |
+| Multi-adapter HTTP                                                | Fora de escopo do v1 inteiro (ver PROJECT.md)                                                   |
 
 ---
 
@@ -34,7 +34,7 @@ Dev NestJS espera `@Injectable()` + constructor injection resolvendo automaticam
 2. WHEN dois providers (A, B) não têm dependência entre si THEN `NewApp` SHALL resolver ambos em paralelo (goroutines distintas via `errgroup`)
 3. WHEN provider A depende de provider B (`Constructor(func(b *B) *A {...})`) THEN `NewApp` SHALL esperar B terminar antes de rodar o `Constructor` de A
 4. WHEN `Constructor` aceita `context.Context` THEN `NewApp` SHALL injetar um `ctx` com timeout de bootstrap configurado, suportando cancelamento
-5. WHEN `Constructor` retorna `error` não-nil OU panica THEN `NewApp` SHALL cancelar as demais goroutines (via `context.Context`) e `NewApp`/`MustApp` SHALL retornar/panicar com esse erro, sem subir o servidor
+5. WHEN `Constructor` retorna `error` não-nil OU panica THEN `NewApp` SHALL cancelar as demais goroutines (via `context.Context`) e `NewApp`/`MustNewApp` SHALL retornar/panicar com esse erro, sem subir o servidor
 6. WHEN `MustResolve[T]` é chamado em fase de declaração (dentro do builder de outro Provider/Controller) THEN SHALL devolver um ponteiro placeholder que é populado (`*placeholder = *real`) quando a resolução real terminar, e esse mesmo ponteiro SHALL estar totalmente populado no momento em que `NewApp` retorna
 
 **Independent Test**: declarar 3 providers (2 independentes + 1 dependente de um deles), medir que bootstrap não serializa os 2 independentes; `MustResolve` de cada um devolve a mesma instância em chamadas repetidas.
@@ -85,18 +85,18 @@ Dev NestJS espera `@Injectable()` + constructor injection resolvendo automaticam
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --- | --- | --- | --- |
-| DI-01 | P1: Singleton Provider Resolution | Design | Pending |
-| DI-02 | P1: Resolução paralela via errgroup | Design | Pending |
-| DI-03 | P1: Constructor com context.Context (timeout bootstrap) | Design | Pending |
-| DI-04 | P1: Falha em Constructor cancela demais goroutines | Design | Pending |
-| DI-05 | P1: Placeholder + copy-in-place no MustResolve | Design | Pending |
-| DI-06 | P2: Transient scope | Design | Pending |
-| DI-07 | P3: Request scope (mecanismo isolado, sem pipeline) | Design | Pending |
-| DI-08 | Edge: detecção de ciclo | Design | Pending |
-| DI-09 | Edge: MustResolve de tipo não registrado → panic | Design | Pending |
-| DI-10 | Edge: resolução escopada por módulo + Export | Design | Pending |
+| Requirement ID | Story                                                   | Phase  | Status  |
+| -------------- | ------------------------------------------------------- | ------ | ------- |
+| DI-01          | P1: Singleton Provider Resolution                       | Design | Pending |
+| DI-02          | P1: Resolução paralela via errgroup                     | Design | Pending |
+| DI-03          | P1: Constructor com context.Context (timeout bootstrap) | Design | Pending |
+| DI-04          | P1: Falha em Constructor cancela demais goroutines      | Design | Pending |
+| DI-05          | P1: Placeholder + copy-in-place no MustResolve          | Design | Pending |
+| DI-06          | P2: Transient scope                                     | Design | Pending |
+| DI-07          | P3: Request scope (mecanismo isolado, sem pipeline)     | Design | Pending |
+| DI-08          | Edge: detecção de ciclo                                 | Design | Pending |
+| DI-09          | Edge: MustResolve de tipo não registrado → panic        | Design | Pending |
+| DI-10          | Edge: resolução escopada por módulo + Export            | Design | Pending |
 
 **Coverage:** 10 total, 0 mapped to tasks, 10 unmapped ⚠️ (aguardando fase Design/Tasks)
 

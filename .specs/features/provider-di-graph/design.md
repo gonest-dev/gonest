@@ -35,64 +35,68 @@ Projeto greenfield (sem código Go ainda) — não há componente existente pra 
 
 ### Integration Points
 
-| Sistema | Como integra |
-| --- | --- |
-| `golang.org/x/sync/errgroup` | Stage 3 inteiro — cada goroutine de resolução é `group.Go(...)`; falha em qualquer uma cancela `context.Context` compartilhado |
-| `context.Context` | Passado opcionalmente pro `Constructor` (timeout de bootstrap); mesmo `ctx` usado pelo `errgroup.WithContext` |
-| `reflect` | Só em 2 pontos: (a) alocar placeholder de `T` (`MustResolve`) e (b) copy-in-place no fim da resolução — nunca pra inferir tipo de campo struct (isso já foi descartado no design do metadata builder, ver STATE.md L-001) |
+| Sistema                      | Como integra                                                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `golang.org/x/sync/errgroup` | Stage 3 inteiro — cada goroutine de resolução é `group.Go(...)`; falha em qualquer uma cancela `context.Context` compartilhado                                                                                            |
+| `context.Context`            | Passado opcionalmente pro `Constructor` (timeout de bootstrap); mesmo `ctx` usado pelo `errgroup.WithContext`                                                                                                             |
+| `reflect`                    | Só em 2 pontos: (a) alocar placeholder de `T` (`MustResolve`) e (b) copy-in-place no fim da resolução — nunca pra inferir tipo de campo struct (isso já foi descartado no design do metadata builder, ver STATE.md L-001) |
 
 ---
 
 ## Components
 
+**Layout de pacotes (revisado 2026-07-12, ver STATE.md AD-004):** cada tipo do grafo de DI vive no seu próprio pacote sob `internal/`, com um shim de re-export fino na raiz (`package gonest`). Isso resolve 2 problemas do design original (pacote único `gonest`): (a) colisão de compilação entre sub-agents concorrentes escrevendo tipos no mesmo pacote (ver STATE.md L-003), e (b) privacidade real — com tudo em `internal/scope`, `internal/module`, `internal/provider`, `internal/controller`, `internal/resolve`, campos não-exportados ficam de fato inacessíveis entre pacotes irmãos (só o que cada pacote exporta explicitamente é visível pros outros `internal/*`, que por sua vez só a raiz consegue importar — dupla barreira, não só a convenção de lowercase-privado de um pacote único). Import direction é sempre unidirecional: `provider`/`controller` podem importar `module` (pra implementar o contrato de ownership); `resolve` importa `module`+`provider`+`controller`; nenhum `internal/*` importa a raiz `gonest` de volta (evita ciclo).
+
 ### Module (container por módulo)
 
-- **Purpose**: guarda providers/controllers próprios de um módulo, seus imports e o que exporta; unidade de escopo pro `MustResolve`.
-- **Location**: `module.go`
+- **Purpose**: guarda providers/controllers próprios de um módulo, seus imports e o que exporta; unidade de escopo pro `MustResolve`. Define o contrato `Owner` (antigo `ownerModule` de T2, agora com tipo de retorno concreto `*Module` em vez de `any`).
+- **Location**: `internal/module/module.go` (implementação) + `module.go` na raiz (re-export: `type Module = module.Module`, `var NewModule = module.New`)
 - **Interfaces**:
-  - `NewModule(fn func(*Module)) *Module` — não executa `fn` na chamada
+  - `module.New(fn func(*Module)) *Module` — não executa `fn` na chamada
   - `(m *Module) Imports(mods ...*Module)`
   - `(m *Module) Providers(ps ...*Provider)`
   - `(m *Module) Controllers(cs ...*Controller)`
   - `(m *Module) Exports(ps ...*Provider)` — `ps` deve ser subconjunto do que `m` declarou em `Providers` (senão panic no Stage 1, erro de config)
+  - `type Owner interface { OwnerModule() *Module }` — contrato exportado (dentro de `internal/module`, então só alcançável por outros pacotes `internal/*`, nunca por consumidor externo da lib) implementado por `Provider`/`Controller`
 - **Dependencies**: nenhuma (é a raiz da árvore declarativa)
 - **Reuses**: —
 
 ### Provider (declaração + instância)
 
-- **Purpose**: representa 1 tipo resolvível; guarda `Scope`, `Constructor` e, após Stage 3, a instância real.
-- **Location**: `provider.go`
+- **Purpose**: representa 1 tipo resolvível; guarda `Scope`, `Constructor` e, após Stage 3, a instância real. Implementa `module.Owner`.
+- **Location**: `internal/provider/provider.go` + `provider.go` na raiz (re-export)
 - **Interfaces**:
-  - `NewProvider(fn func(*Provider)) *Provider`
-  - `(p *Provider) Scope(s Scope)` — `ScopeSingleton | ScopeTransient | ScopeRequest`
+  - `provider.New(fn func(*Provider)) *Provider`
+  - `(p *Provider) Scope(s scope.Scope)` — `Singleton | Transient | Request`
   - `(p *Provider) Constructor(fn any)` — aceita `func() T`, `func() (T, error)`, `func(ctx context.Context) T`, `func(ctx context.Context) (T, error)` (variantes via reflect na hora de invocar)
-- **Dependencies**: outros `Provider`s resolvidos via `MustResolve` dentro do próprio `fn` (Stage 2)
+  - `(p *Provider) OwnerModule() *module.Module` — implementa `module.Owner`
+- **Dependencies**: `internal/scope` (tipo `Scope`), `internal/module` (tipo `*Module` + contrato `Owner`); outros `Provider`s resolvidos via `MustResolve` dentro do próprio `fn` (Stage 2)
 - **Reuses**: mecanismo de placeholder do `MustResolve` (compartilhado com Controller)
 
 ### Controller (consumidor, não entra no grafo de resolução)
 
-- **Purpose**: consome Providers via `MustResolve`; não é resolvido em si, só popula placeholders que usa.
-- **Location**: `controller.go`
-- **Interfaces**: (fora do escopo desta feature — ver "Controller & Route Registration"; aqui só interessa que ele participa do mesmo mecanismo de `MustResolve`)
-- **Dependencies**: Providers do próprio módulo + imports exportados
+- **Purpose**: consome Providers via `MustResolve`; não é resolvido em si, só popula placeholders que usa. Implementa `module.Owner`.
+- **Location**: `internal/controller/controller.go` + `controller.go` na raiz (re-export)
+- **Interfaces**: (fora do escopo desta feature — ver "Controller & Route Registration"; aqui só interessa que ele participa do mesmo mecanismo de `MustResolve` e implementa `module.Owner`)
+- **Dependencies**: `internal/module` (contrato `Owner`); Providers do próprio módulo + imports exportados
 - **Reuses**: `MustResolve` / placeholder
 
 ### DI Resolver (motor interno, não-exportado)
 
-- **Purpose**: implementa os 3 estágios — não é API pública, é o mecanismo que roda dentro de `NewApp`/`MustApp`.
-- **Location**: `internal/resolver.go`
+- **Purpose**: implementa os 3 estágios — não é API pública, é o mecanismo que roda dentro de `NewApp`/`MustNewApp`.
+- **Location**: `internal/resolver/resolver.go`
 - **Interfaces**:
-  - `resolve(root *Module, opts AppOptions) (*resolvedGraph, error)` — chamado por `NewApp`
-- **Dependencies**: `errgroup`, `context`, `reflect`
+  - `resolver.Resolve(root *module.Module, opts AppOptions) (*ResolvedGraph, error)` — chamado por `NewApp`
+- **Dependencies**: `internal/module`, `internal/provider`, `internal/controller`, `errgroup`, `context`, `reflect`
 - **Reuses**: —
 
 ### MustResolve[T] (genérico público)
 
 - **Purpose**: ponto único de acesso a dependência, usado dentro de `Provider.Constructor`'s builder fn e `Controller`'s builder fn.
-- **Location**: `resolve.go`
+- **Location**: `internal/resolve/resolve.go` (mecanismo real) + `resolve.go` na raiz (wrapper genérico público — Go não permite re-exportar função genérica via `var`, então é uma função real que chama a interna: `func MustResolve[T any](owner module.Owner) T { return resolve.MustResolve[T](owner) }`)
 - **Interfaces**:
-  - `MustResolve[T any](owner interface{ ownerModule() *Module }) T`
-- **Dependencies**: precisa que `T` seja tipo ponteiro (`*Struct`) — não há como o Go checar isso em compile-time com um type param só; validado via `reflect.TypeOf` em runtime, panic claro se `T` não for ponteiro (ver Tech Decisions)
+  - `MustResolve[T any](owner module.Owner) T`
+- **Dependencies**: `internal/module` (tipo `Owner`/`*Module`); precisa que `T` seja tipo ponteiro (`*Struct`) — não há como o Go checar isso em compile-time com um type param só; validado via `reflect.TypeOf` em runtime, panic claro se `T` não for ponteiro (ver Tech Decisions)
 - **Reuses**: nada — é o ponto de entrada que aciona o registro de aresta + alocação de placeholder
 
 ---
@@ -121,27 +125,27 @@ type providerNode struct {
 
 ## Error Handling Strategy
 
-| Cenário | Tratamento | Impacto pro dev |
-| --- | --- | --- |
-| Ciclo entre providers (A→B→A) | DFS de cores no Stage 2 (antes do errgroup rodar) detecta e monta a cadeia do ciclo | `NewApp` retorna erro `"circular dependency: A -> B -> A"`, nada de deadlock |
-| `MustResolve[T]` de tipo não registrado em lugar nenhum | Stage 2 falha a busca (módulo + imports exportados vazios) | panic imediato: `"gonest: no provider registered for type *X"` |
-| `MustResolve[T]` de tipo que existe mas não é exportado pro módulo que pede | Stage 2 distingue esse caso do anterior (tipo existe na árvore, só não alcançável) | panic: `"gonest: type *X exists in module Y but is not exported"` |
-| `Constructor` retorna `error` | goroutine desse node seta `err`, fecha `done`, cancela `context.Context` do `errgroup` | `NewApp`/`MustApp` retorna/panica com esse erro; demais goroutines em andamento são canceladas via ctx |
-| `Constructor` panica | `recover()` na goroutine do `errgroup.Go`, convertido em `error` e tratado igual ao caso acima | mesmo comportamento — nunca derruba o processo direto |
-| `T` passado pra `MustResolve[T]` não é ponteiro | checagem via `reflect.TypeOf` logo na entrada da função, antes de qualquer busca | panic imediato: `"gonest: MustResolve[T] requires T to be a pointer type, got X"` |
-| Módulo tenta `Exports` provider que não declarou em `Providers` | validado no fim do Stage 1 pra esse módulo | `NewApp` retorna erro: `"module X exports provider *Y it does not declare"` |
+| Cenário                                                                     | Tratamento                                                                                     | Impacto pro dev                                                                                           |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Ciclo entre providers (A→B→A)                                               | DFS de cores no Stage 2 (antes do errgroup rodar) detecta e monta a cadeia do ciclo            | `NewApp` retorna erro `"circular dependency: A -> B -> A"`, nada de deadlock                              |
+| `MustResolve[T]` de tipo não registrado em lugar nenhum                     | Stage 2 falha a busca (módulo + imports exportados vazios)                                     | panic imediato: `"gonest: no provider registered for type *X"`                                            |
+| `MustResolve[T]` de tipo que existe mas não é exportado pro módulo que pede | Stage 2 distingue esse caso do anterior (tipo existe na árvore, só não alcançável)             | panic: `"gonest: type *X exists in module Y but is not exported"`                                         |
+| `Constructor` retorna `error`                                               | goroutine desse node seta `err`, fecha `done`, cancela `context.Context` do `errgroup`         | `NewApp`/`MustNewApp` retorna/panica com esse erro; demais goroutines em andamento são canceladas via ctx |
+| `Constructor` panica                                                        | `recover()` na goroutine do `errgroup.Go`, convertido em `error` e tratado igual ao caso acima | mesmo comportamento — nunca derruba o processo direto                                                     |
+| `T` passado pra `MustResolve[T]` não é ponteiro                             | checagem via `reflect.TypeOf` logo na entrada da função, antes de qualquer busca               | panic imediato: `"gonest: MustResolve[T] requires T to be a pointer type, got X"`                         |
+| Módulo tenta `Exports` provider que não declarou em `Providers`             | validado no fim do Stage 1 pra esse módulo                                                     | `NewApp` retorna erro: `"module X exports provider *Y it does not declare"`                               |
 
 ---
 
 ## Tech Decisions (only non-obvious ones)
 
-| Decisão | Escolha | Racional |
-| --- | --- | --- |
-| Quando builder `fn` executa | Adiado pro bootstrap (Stage 1/2), nunca na chamada de `NewModule/NewProvider/NewController` | É o único jeito de `MustResolve` saber o módulo dono — na chamada direta (package init) essa info não existe ainda |
-| Como alocar placeholder pra `T` genérico sendo já um tipo ponteiro | `reflect.New(reflect.TypeOf((*T)(nil)).Elem().Elem())` + cast via `reflect.Value.Interface().(T)` | Go generics não permite `new()` derivar o tipo apontado a partir de um type param que já é `*Struct`; único jeito é reflect nesse ponto específico (não em todo o resolver) |
-| Granularidade do paralelismo no Stage 3 | Por nó (channel `done` por provider), não por camada topológica | Mais fiel ao `Promise.all` do Nest — um provider começa assim que SUAS deps terminam, não espera a "geração" inteira. Custo de implementação é baixo (1 channel por node) |
-| Escopo de resolução (`MustResolve`) | Próprio módulo → imports exportados, nunca a partir da raiz | Decisão do usuário em context.md — replica encapsulamento real de módulo do Nest, não container global |
-| Controller não entra no grafo de ciclo/paralelismo | Correto — Controller só consome, nunca é dependência de ninguém | Simplifica DFS de ciclo (só entre Providers) sem perder cobertura, já que Controller nunca aparece do lado "dependido" de uma aresta |
+| Decisão                                                            | Escolha                                                                                           | Racional                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quando builder `fn` executa                                        | Adiado pro bootstrap (Stage 1/2), nunca na chamada de `NewModule/NewProvider/NewController`       | É o único jeito de `MustResolve` saber o módulo dono — na chamada direta (package init) essa info não existe ainda                                                          |
+| Como alocar placeholder pra `T` genérico sendo já um tipo ponteiro | ~~`reflect.New(reflect.TypeOf((*T)(nil)).Elem().Elem())`~~ **corrigido em T6** (evaluator verificou empiricamente que a fórmula original inverte o `Kind()` — trata `*S` válido como se fosse struct e causa panic não-recuperável de `reflect: Elem of invalid type` no caso `T=S` que devia gerar o panic limpo do framework): usar `var zero T; t := reflect.TypeOf(&zero).Elem()` (dá o `reflect.Type` do próprio `T` em qualquer caso) → checar `t.Kind() == reflect.Pointer`, alocar via `reflect.New(t.Elem())`, cast via `.Interface().(T)` | Go generics não permite `new()` derivar o tipo apontado a partir de um type param que já é `*Struct`; único jeito é reflect nesse ponto específico (não em todo o resolver) |
+| Granularidade do paralelismo no Stage 3                            | Por nó (channel `done` por provider), não por camada topológica                                   | Mais fiel ao `Promise.all` do Nest — um provider começa assim que SUAS deps terminam, não espera a "geração" inteira. Custo de implementação é baixo (1 channel por node)   |
+| Escopo de resolução (`MustResolve`)                                | Próprio módulo → imports exportados, nunca a partir da raiz                                       | Decisão do usuário em context.md — replica encapsulamento real de módulo do Nest, não container global                                                                      |
+| Controller não entra no grafo de ciclo/paralelismo                 | Correto — Controller só consome, nunca é dependência de ninguém                                   | Simplifica DFS de ciclo (só entre Providers) sem perder cobertura, já que Controller nunca aparece do lado "dependido" de uma aresta                                        |
 
 ---
 

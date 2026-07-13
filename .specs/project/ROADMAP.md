@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** Core DI & Module System
-**Status:** Planning
+**Status:** In Progress
 
 ---
 
@@ -12,12 +12,12 @@
 
 ### Features
 
-**Provider & DI Graph** - PLANNED
+**Provider & DI Graph** - COMPLETE
 - `NewProvider`, `Scope` (Singleton), `Constructor`
 - `MustResolve[T]` com placeholder + copy-in-place
 - Resolução paralela via `errgroup` para providers sem dependência entre si; espera (`group.Wait()`) para dependentes
 
-**Module Composition** - PLANNED
+**Module Composition** - COMPLETE
 - `NewModule`, `Imports`, `Providers`, `Controllers`
 - Ordem topológica do import graph
 
@@ -26,7 +26,7 @@
 - `HttpCode`, `Context.Json`, `MustParam[T]`
 
 **App Bootstrap & Listen** - PLANNED
-- `NewApp`/`MustApp`, `AppOptions{BufferLogs, LogLevels}`
+- `NewApp`/`MustNewApp`, `AppOptions{BufferLogs, LogLevels}`
 - `MustListen`, `OnListen` (callback roda no bind, antes do bloqueio)
 
 ---
