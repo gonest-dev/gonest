@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Sessão pausada (ver `.specs/HANDOFF.md`). Milestone 1 — "Provider & DI Graph" e "Module Composition" COMPLETE. Feature "Controller & Route Registration": T1-T6 done + migração AD-004 (`app.go`→`internal/app`), todos evaluator PASS, commit `4e99255`. Próxima: T7 (`internal/fiberapp` — adapter Fiber real).
+**Current Work:** Milestone 1 — "Provider & DI Graph" e "Module Composition" COMPLETE. Feature "Controller & Route Registration": T1-T7 done + migração AD-004, todos evaluator PASS, commit `53cd63f`. Próxima: T8 (`NewApp[T]` genérico + Stage 2.5).
 
 ---
 

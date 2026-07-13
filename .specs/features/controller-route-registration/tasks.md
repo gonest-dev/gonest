@@ -189,7 +189,7 @@ T5 → T6 → T7 → T8 → T9
 
 ---
 
-### T7: `internal/fiberapp` — adapter real
+### T7: `internal/fiberapp` — adapter real ✅ DONE (evaluator: PASS, commit `53cd63f`)
 
 **What**: `FiberApp` — único pacote (além de `internal/httpctx`) que importa Fiber de verdade. Implementa o contrato mínimo (`RegisterRoute(method HttpMethod, path string, h func(*httpctx.Context)) error`, `Listen(addr string) error`). O wrapper registrado no Fiber roda o `Handler` do gonest dentro de `recover()` próprio — panic vira `c.Status(500).SendString(...)`, nunca usa o error-return nativo do Fiber nem o middleware `recover` dele (ver design.md Tech Decisions).
 **Where**: `internal/fiberapp/fiberapp.go`, `internal/fiberapp/fiberapp_test.go`
@@ -202,12 +202,12 @@ T5 → T6 → T7 → T8 → T9
 - Skill: NONE
 
 **Done when**:
-- [ ] `RegisterRoute` registra rota real no `fiber.App` interno
-- [ ] Request real via `app.Test(req)` (helper do próprio Fiber, sem subir porta) bate na rota e roda o `Handler` do gonest
-- [ ] `Handler` que panica com algo não-Exception → resposta 500, teste confirma via `app.Test` que o status é 500 e o processo de teste não morre
-- [ ] `ctx.Json(value)`/`ctx.Status(code)` chegam corretos na resposta HTTP real (`app.Test`)
-- [ ] Gate check passa (comando abaixo)
-- [ ] Test count: 5+ (registro simples, dispatch real via app.Test, panic→500, Json correto, Status correto)
+- [x] `RegisterRoute` registra rota real no `fiber.App` interno
+- [x] Request real via `app.Test(req)` (helper do próprio Fiber, sem subir porta) bate na rota e roda o `Handler` do gonest
+- [x] `Handler` que panica com algo não-Exception → resposta 500, teste confirma via `app.Test` que o status é 500 e o processo de teste não morre
+- [x] `ctx.Json(value)`/`ctx.Status(code)` chegam corretos na resposta HTTP real (`app.Test`)
+- [x] Gate check passa (comando abaixo)
+- [x] Test count: 5+ (registro simples, dispatch real via app.Test, panic→500, Json correto, Status correto)
 
 **Tests**: integration (usa `app.Test`, real dispatch Fiber — ver TESTING.md atualizado)
 **Gate**: full
