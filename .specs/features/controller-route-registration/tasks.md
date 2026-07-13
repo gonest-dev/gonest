@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/controller-route-registration/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T9, todos evaluator PASS)
 
 ---
 
@@ -242,7 +242,7 @@ T5 → T6 → T7 → T8 → T9
 
 ---
 
-### T9: Exemplo end-to-end — `UserController` do INSIGHT.md
+### T9: Exemplo end-to-end — `UserController` do INSIGHT.md ✅ DONE (evaluator: PASS, commit `c5b77ee`)
 
 **What**: adapta o `UserController`/`UserService` do INSIGHT.md (exemplo mais simples) num teste real — 5 rotas (List/Get/Create/Update/Delete), sem `MustInject` complexo (service simples em memória, como já foi feito em T9 da feature DI Graph pro exemplo `UserProvider`). Prova a feature inteira funcionando junto via `app.Test(req)`.
 **Where**: `internal/app/app_test.go` (pós-migração AD-004) — testes de integração podem ficar aqui já que não expõem nada privado extra
@@ -255,10 +255,10 @@ T5 → T6 → T7 → T8 → T9
 - Skill: NONE
 
 **Done when**:
-- [ ] As 5 rotas do `UserController` respondem corretamente via `app.Test` (status + body JSON)
-- [ ] `MustParam[int64](ctx, "user_id")` funciona nas rotas `Get`/`Update`/`Delete`
-- [ ] Gate check passa (comando abaixo)
-- [ ] Test count: 5+ (1 por rota, no mínimo)
+- [x] As 5 rotas do `UserController` respondem corretamente via `app.Test` (status + body JSON)
+- [x] `MustParam[int64](ctx, "user_id")` funciona nas rotas `Get`/`Update`/`Delete`
+- [x] Gate check passa (comando abaixo)
+- [x] Test count: 5+ (1 por rota, no mínimo)
 
 **Tests**: integration
 **Gate**: full

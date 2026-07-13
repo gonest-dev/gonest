@@ -1,8 +1,8 @@
 # Handoff
 
 **Date:** 2026-07-13
-**Feature:** Controller & Route Registration (Milestone 1)
-**Task:** T8 done — próxima: T9 (exemplo end-to-end `UserController`, última task da feature)
+**Feature:** Controller & Route Registration (Milestone 1) — ✅ COMPLETE (T1-T9)
+**Task:** Feature encerrada. Milestone 1 só falta "App Bootstrap & Listen" (`AppOptions`, `MustListen`, `OnListen`) — próxima feature a especificar.
 
 ## Completed ✓
 
@@ -18,7 +18,8 @@
   - T6 (`Controller` estendido: Path/Route/OwnRoutes + stubs Use/Guards/Interceptors/Filters) — DONE, evaluator PASS, commit `4e99255`
   - T7 (`internal/fiberapp` — adapter Fiber v3 real, recover próprio) — DONE, evaluator PASS, commit `53cd63f`
   - T8 (`NewApp[T]` genérico + Stage 2.5: coleta/registro de rota + detecção de colisão) — DONE, evaluator PASS, commit `129d2da` (ver AD-007 em STATE.md: idiom de 2 type param pra resolver T por valor + método pointer-receiver)
-- Total: 42+ testes nos pacotes tocados por T8, todos os pacotes verdes, `-race` limpo (12 pacotes)
+  - T9 (exemplo end-to-end `UserController`, 5 rotas via `app.Test` real) — DONE, evaluator PASS, commit `c5b77ee`. Achou e corrigiu bug real (L-009 em STATE.md): `fiber.Ctx.Params()` devolve view zero-copy sobre buffer reusado, precisava `strings.Clone`
+- Feature "Controller & Route Registration" **COMPLETE** (T1-T9). Total: todos os pacotes verdes, `-race` limpo (12 pacotes)
 
 ## In Progress
 
@@ -26,7 +27,7 @@
 
 ## Pending
 
-- **T9**: Exemplo end-to-end `UserController` do INSIGHT.md via `app.Test` — próxima task, depende de T8 (feito), última da feature
+- Especificar próxima feature: **App Bootstrap & Listen** (última de Milestone 1) — `AppOptions{BufferLogs, LogLevels}`, `MustListen`, `OnListen` (ver ROADMAP.md)
 - **T8**: `NewApp[T]` genérico + Stage 2.5 (coleta/registro de rota + detecção de colisão) — `Where` já aponta pra `internal/app` (migração já rodou)
 - **T9**: Exemplo end-to-end `UserController` do INSIGHT.md via `app.Test`
 
@@ -44,4 +45,4 @@
 - Branch: `master`
 - Uncommitted: `.specs/*` (docs de spec/design/tasks/STATE/ROADMAP editados ao longo da sessão, nunca commitados — só código Go foi commitado via sub-agents). `.vscode/` untracked (não gerado por mim).
 - Fluxo de trabalho: AD-001 (planner→developer→evaluator, 2 sub-agents por task), AD-004 (1 pacote por tipo em `internal/`, reexport fino na raiz), L-007 (`git commit -- <arquivos>` em dispatches paralelos)
-- Pra retomar: ler STATE.md inteiro primeiro (tem todo histórico de decisões/lições), depois `.specs/features/controller-route-registration/tasks.md` pra pegar T9 de onde parou.
+- Pra retomar: ler STATE.md inteiro primeiro (tem todo histórico de decisões/lições), depois ROADMAP.md pra especificar "App Bootstrap & Listen" (Specify phase, feature nova).

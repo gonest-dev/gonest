@@ -21,9 +21,10 @@
 - `NewModule`, `Imports`, `Providers`, `Controllers`
 - Ordem topológica do import graph
 
-**Controller & Route Registration** - PLANNED
+**Controller & Route Registration** - COMPLETE
 - `NewController`, `Path`, `Route`, `Handler`
 - `HttpCode`, `Context.Json`, `MustParam[T]`
+- Adapter Fiber v3 real (`internal/fiberapp`), `NewApp[T HttpAdapter]` genérico + Stage 2.5 (registro/colisão de rota)
 
 **App Bootstrap & Listen** - PLANNED
 - `NewApp`/`MustNewApp`, `AppOptions{BufferLogs, LogLevels}`

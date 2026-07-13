@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestone 1 — "Provider & DI Graph" e "Module Composition" COMPLETE. Feature "Controller & Route Registration": T1-T8 done + migração AD-004, todos evaluator PASS, commit `129d2da`. Próxima: T9 (exemplo end-to-end `UserController`, última task da feature).
+**Current Work:** Milestone 1 COMPLETE — "Provider & DI Graph", "Module Composition" e "Controller & Route Registration" (T1-T9, commit `c5b77ee`) todas DONE, evaluator PASS em toda task. Próxima: definir próxima feature do Milestone 2 (ver ROADMAP.md).
 
 ---
 
@@ -88,6 +88,15 @@
 **Problem:** `scopedGraph` (T9) só filtrava 1 dos 2 pontos que liam esse estado global (`BuildGraph`→cycle detection); `placeholdersFor` fazia uma segunda leitura não-escopada, segura só por invariante de identidade de ponteiro não testada.
 **Solution:** `resolve.Reset()` exportado, chamado como primeira linha de `NewApp` (antes de Stage 1) — cada bootstrap começa com o log de edges limpo. Contrato documentado explicitamente: "um bootstrap por vez por processo" (chamadas concorrentes de `NewApp` corrompem estado umas das outras). Teste de regressão prova que a fuga era real (RED genuíno antes do fix: 3 edges vazando).
 **Prevents:** ao adicionar qualquer estado global/package-level `var` em `internal/*`, perguntar de imediato "isso precisa ser resetado no início de cada `NewApp`?" — não esperar o próximo task achar o vazamento.
+
+## Lessons Learned (cont. 8)
+
+### L-009: Fiber v3 `Ctx.Params()` devolve view zero-copy sobre buffer reusado — precisa `strings.Clone` (2026-07-13)
+
+**Context:** T9 (exemplo end-to-end `UserController`) escreveu `UserService.Create(name)` guardando `name` (vindo de `ctx.Param`→`fiberResponder.GetParam`→`fiber.Ctx.Params()`) num campo de struct persistido além da vida da request. Testes ficaram flaky, valor corrompido (`"1da"` em vez de `"Ada"`).
+**Problem:** `fiber.Ctx.Params()` (fasthttp por baixo) devolve string sobre um buffer reusado entre requests — doc do Fiber diz explicitamente "Returned value is only valid within the handler... Make copies to use the value outside the Handler". `fiberResponder.GetParam` (`internal/fiberapp/fiberapp.go`, criado em T7) repassava o valor cru, sem copiar — qualquer handler que persiste o valor (mesmo indiretamente, via struct guardado em serviço singleton) corre risco de ver o valor de uma request seguinte sobrescrever o buffer.
+**Solution:** `GetParam` agora faz `strings.Clone(r.c.Params(name))`. Evaluator do T9 reproduziu o bug de propósito (reverteu o fix, rodou o teste novo 30x, 19 falhas com o padrão exato de corrupção previsto) antes de confirmar o fix — não foi só aceitar a alegação do dev sub-agent.
+**Prevents:** qualquer novo código em `internal/fiberapp` (ou adapter HTTP futuro) que leia string de `fiber.Ctx` (`Params`, possivelmente `Query`/outros getters zero-copy do fasthttp) e a repasse pra fora do escopo da request precisa copiar explicitamente — não assumir que string do Fiber/fasthttp é segura pra reter.
 
 ## Lessons Learned (cont. 7)
 
