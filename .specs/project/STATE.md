@@ -1,11 +1,18 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestone 1 — "Provider & DI Graph" e "Module Composition" COMPLETE. Feature "Controller & Route Registration": T1-T7 done + migração AD-004, todos evaluator PASS, commit `53cd63f`. Próxima: T8 (`NewApp[T]` genérico + Stage 2.5).
+**Current Work:** Milestone 1 — "Provider & DI Graph" e "Module Composition" COMPLETE. Feature "Controller & Route Registration": T1-T8 done + migração AD-004, todos evaluator PASS, commit `129d2da`. Próxima: T9 (exemplo end-to-end `UserController`, última task da feature).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-007: `NewApp[T]` genérico usa idiom de 2 type param pra suportar valor + método pointer-receiver (2026-07-13)
+
+**Decision:** `NewApp[T any, PT httpAdapterPtr[T]](root *module.Module)` com `type httpAdapterPtr[T any] interface { *T; HttpAdapter }` (constraint), construção via `PT(new(T))`. Go infere `PT` a partir de `T`, então call site continua com 1 type arg só: `gonest.NewApp[gonest.FiberApp](AppModule)` — exatamente como já documentado no INSIGHT.md (T por valor, não ponteiro).
+**Reason:** `INSIGHT.md` já fixava o call site como `NewApp[gonest.FiberApp](...)` (T por valor) antes de T8 rodar — mas `FiberApp` só satisfaz `HttpAdapter` via método de ponteiro (`*FiberApp`), então `T HttpAdapter` sozinho não compila (`FiberApp` valor não implementa a interface, só `*FiberApp` implementa). O idiom de 2 type param (T + PT constrained a `*T` satisfazendo a interface) é o jeito padrão em Go de resolver "quero só nomear o tipo base, mas a interface só é satisfeita pelo ponteiro".
+**Trade-off:** `FiberApp` (e qualquer adapter futuro) precisa de um hook de init idempotente separado do zero-value construction (`Init()`, chamado 1x pelo `NewApp[T]` genérico logo após `PT(new(T))`) — zero-value de struct com campo `*fiber.App` não-inicializado precisa desse passo extra pra não nil-panicar. `fiberapp.New()` (API pública já existente de T7) passou a delegar pra `Init()` internamente, sem quebrar os testes originais de T7.
+**Impact:** qualquer adapter HTTP futuro que implemente `HttpAdapter` (não só Fiber) precisa seguir o mesmo padrão: métodos pointer-receiver + `Init()` idempotente que aloca estado real, chamável em cima de um zero-value.
 
 ### AD-004: 1 pacote Go por tipo sob internal/, root só reexporta (2026-07-12)
 

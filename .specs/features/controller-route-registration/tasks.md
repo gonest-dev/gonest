@@ -216,7 +216,7 @@ T5 → T6 → T7 → T8 → T9
 
 ---
 
-### T8: `NewApp[T]` genérico + Stage 2.5 (coleta e registro de rota + detecção de colisão)
+### T8: `NewApp[T]` genérico + Stage 2.5 (coleta e registro de rota + detecção de colisão) ✅ DONE (evaluator: PASS, commit `129d2da`)
 
 **What**: `NewApp`/`MustNewApp` viram genéricos de verdade (`NewApp[T HttpAdapter](root *Module) (*App, error)`). Depois de Stage 2 (`Declare()` em todos providers/controllers, já existente), passo novo: percorre a árvore de módulos já assembleada (reusa a lista que `Assemble()` devolve), pra cada `Module.OwnControllers()` monta prefixo (`Controller.Path()+Route.path`) e detecta colisão (mesmo método+path) ANTES de registrar no adapter — colisão retorna erro, sem colisão registra cada rota via `adapter.RegisterRoute(...)`.
 **Where**: `internal/app/app.go` (pós-migração AD-004, ver STATE.md) + `app.go` na raiz (re-export) — **migração já executada** (commit `4d2d7c9`, antes de T8 rodar), T8 só estende o arquivo que já existe em `internal/app`
@@ -229,11 +229,11 @@ T5 → T6 → T7 → T8 → T9
 - Skill: NONE
 
 **Done when**:
-- [ ] `NewApp[gonest.FiberApp](AppModule)` compila e resolve — grafo DI + rotas registradas no mesmo bootstrap
-- [ ] Rota duplicada (mesmo método+path considerando prefixo) → erro `"duplicate route: GET /user/:id"`, servidor não sobe
-- [ ] App sem nenhum Controller → bootstrap funciona normal (edge case do spec.md)
-- [ ] Gate check passa (comando abaixo)
-- [ ] Test count: 4+ (bootstrap com rotas ok, colisão detectada, app sem controller, edge de prefixo vazio)
+- [x] `NewApp[gonest.FiberApp](AppModule)` compila e resolve — grafo DI + rotas registradas no mesmo bootstrap
+- [x] Rota duplicada (mesmo método+path considerando prefixo) → erro `"duplicate route: GET /user/:id"`, servidor não sobe
+- [x] App sem nenhum Controller → bootstrap funciona normal (edge case do spec.md)
+- [x] Gate check passa (comando abaixo)
+- [x] Test count: 4+ (bootstrap com rotas ok, colisão detectada, app sem controller, edge de prefixo vazio)
 
 **Tests**: unit (a parte de colisão/coleta é lógica pura; dispatch real já coberto em T7's integration)
 **Gate**: full

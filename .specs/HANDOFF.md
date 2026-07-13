@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-13
 **Feature:** Controller & Route Registration (Milestone 1)
-**Task:** T7 done — próxima: T8 (`NewApp[T]` genérico + Stage 2.5)
+**Task:** T8 done — próxima: T9 (exemplo end-to-end `UserController`, última task da feature)
 
 ## Completed ✓
 
@@ -17,7 +17,8 @@
   - Migração consistência AD-004 (`app.go`→`internal/app`, `param.go` já compliant) — DONE, evaluator PASS, commit `4d2d7c9`
   - T6 (`Controller` estendido: Path/Route/OwnRoutes + stubs Use/Guards/Interceptors/Filters) — DONE, evaluator PASS, commit `4e99255`
   - T7 (`internal/fiberapp` — adapter Fiber v3 real, recover próprio) — DONE, evaluator PASS, commit `53cd63f`
-- Total: todos os pacotes verdes, `-race` limpo (12 pacotes)
+  - T8 (`NewApp[T]` genérico + Stage 2.5: coleta/registro de rota + detecção de colisão) — DONE, evaluator PASS, commit `129d2da` (ver AD-007 em STATE.md: idiom de 2 type param pra resolver T por valor + método pointer-receiver)
+- Total: 42+ testes nos pacotes tocados por T8, todos os pacotes verdes, `-race` limpo (12 pacotes)
 
 ## In Progress
 
@@ -25,7 +26,7 @@
 
 ## Pending
 
-- **T8**: `NewApp[T]` genérico + Stage 2.5 (coleta/registro de rota + detecção de colisão) — próxima task, depende de T7 (feito)
+- **T9**: Exemplo end-to-end `UserController` do INSIGHT.md via `app.Test` — próxima task, depende de T8 (feito), última da feature
 - **T8**: `NewApp[T]` genérico + Stage 2.5 (coleta/registro de rota + detecção de colisão) — `Where` já aponta pra `internal/app` (migração já rodou)
 - **T9**: Exemplo end-to-end `UserController` do INSIGHT.md via `app.Test`
 
@@ -43,4 +44,4 @@
 - Branch: `master`
 - Uncommitted: `.specs/*` (docs de spec/design/tasks/STATE/ROADMAP editados ao longo da sessão, nunca commitados — só código Go foi commitado via sub-agents). `.vscode/` untracked (não gerado por mim).
 - Fluxo de trabalho: AD-001 (planner→developer→evaluator, 2 sub-agents por task), AD-004 (1 pacote por tipo em `internal/`, reexport fino na raiz), L-007 (`git commit -- <arquivos>` em dispatches paralelos)
-- Pra retomar: ler STATE.md inteiro primeiro (tem todo histórico de decisões/lições), depois `.specs/features/controller-route-registration/tasks.md` pra pegar T8 de onde parou.
+- Pra retomar: ler STATE.md inteiro primeiro (tem todo histórico de decisões/lições), depois `.specs/features/controller-route-registration/tasks.md` pra pegar T9 de onde parou.
