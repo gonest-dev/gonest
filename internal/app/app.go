@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gonest-dev/gonest/internal/exception"
+	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -228,19 +230,21 @@ func newAdapter[T any, PT httpAdapterPtr[T]]() PT {
 
 // routableController is a locally-declared interface used to type-assert
 // module.ControllerRef values down to the methods Stage 2.5 needs
-// (PathPrefix, OwnRoutes, OwnMiddleware) but that module.ControllerRef
-// itself does not expose -- same pattern as this file's own declarable
-// interface just below, and for the same reason: PathPrefix/OwnRoutes/
-// OwnMiddleware are route-collection/composition concerns, not something
-// module.Module needs to know about a registered controller. Already
-// implemented by *controller.Controller (see
+// (PathPrefix, OwnRoutes, OwnMiddleware, OwnGuards) but that
+// module.ControllerRef itself does not expose -- same pattern as this
+// file's own declarable interface just below, and for the same reason:
+// PathPrefix/OwnRoutes/OwnMiddleware/OwnGuards are route-collection/
+// composition concerns, not something module.Module needs to know about a
+// registered controller. Already implemented by *controller.Controller (see
 // internal/controller/controller.go) -- OwnMiddleware was added there by
-// T2 of the "Middleware" feature, no controller-side change was needed
-// here beyond widening this interface.
+// T2 of the "Middleware" feature, OwnGuards by T2 of the "Guard" feature,
+// no controller-side change was needed here beyond widening this
+// interface.
 type routableController interface {
 	PathPrefix() string
 	OwnRoutes() []*route.Route
 	OwnMiddleware() []*middleware.Middleware
+	OwnGuards() []*guard.Guard
 }
 
 // registerRoutes implements Stage 2.5: walk every module's OwnControllers,
@@ -281,6 +285,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 			}
 			prefix := rc.PathPrefix()
 			controllerMiddleware := rc.OwnMiddleware()
+			controllerGuards := rc.OwnGuards()
 			for _, r := range rc.OwnRoutes() {
 				fullPath := prefix + r.Path()
 				key := r.Method().String() + " " + fullPath
@@ -288,7 +293,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 					return fmt.Errorf("duplicate route: %s", key)
 				}
 				seen[key] = true
-				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, r.HandlerFunc())
+				gated := gatedHandler(controllerGuards, r.HandlerFunc())
+				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, gated)
 				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: composedHandler})
 			}
 		}
@@ -301,6 +307,31 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	}
 
 	return nil
+}
+
+// gatedHandler builds the new innermost layer Stage 2.5 feeds into the
+// EXISTING middleware-composition loop (composeHandler, unchanged): it
+// evaluates controllerGuards in order BEFORE calling routeHandler. Any guard
+// whose HandlerFunc() returns false stops the chain by panicking
+// exception.NewForbiddenException(nil) -- caught by the same recover
+// wrapper any other panic (Handler or middleware) already is, per
+// design.md's Error Handling Strategy table. A guard's own handler panicking
+// with a custom exception.Exception propagates unchanged (no recover here)
+// so that panic is formatted with ITS OWN status/body downstream. Guards run
+// in registration order and short-circuit on the first false -- later
+// guards never run once an earlier one fails. When controllerGuards is
+// empty, the loop runs zero iterations and routeHandler runs immediately --
+// behaviorally identical to calling routeHandler directly (zero regression
+// for controllers that never call Guards).
+func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
+	return func(ctx *httpctx.Context) {
+		for _, g := range controllerGuards {
+			if !g.HandlerFunc()(ctx) {
+				panic(exception.NewForbiddenException(nil))
+			}
+		}
+		routeHandler(ctx)
+	}
 }
 
 // composeHandler builds the final handler for one route: global middleware

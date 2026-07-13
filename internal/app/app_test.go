@@ -14,6 +14,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/fiberapp"
+	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -1684,5 +1685,320 @@ func TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper(t *testing.T) {
 	}
 	if handlerRan {
 		t.Fatalf("route Handler ran after a panicking middleware, want the panic to short-circuit the chain")
+	}
+}
+
+// --- T3 of "Guard": Stage 2.5 gatedHandler in internal/app ---
+
+// TestNewApp_SingleGuardReturnsTrue_RouteHandlerRuns proves a single guard
+// whose handler returns true lets the request through: the route Handler's
+// own response comes back on a real app.Test dispatch.
+func TestNewApp_SingleGuardReturnsTrue_RouteHandlerRuns(t *testing.T) {
+	allow := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool { return true })
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Guards(allow)
+		c.Route(route.HttpGet, "/allowed", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/allowed", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if !handlerRan {
+		t.Fatalf("route Handler did not run, want it to run when the guard returns true")
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["ok"] != "true" {
+		t.Fatalf("body = %+v, want {ok:true} -- the route Handler's own response must come through", body)
+	}
+}
+
+// TestNewApp_SingleGuardReturnsFalse_Produces403AndSkipsHandler proves a
+// guard returning false produces a 403 Forbidden with the exact structured
+// body a *exception.ForbiddenException formats to, and that the route
+// Handler never runs.
+func TestNewApp_SingleGuardReturnsFalse_Produces403AndSkipsHandler(t *testing.T) {
+	deny := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool { return false })
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Guards(deny)
+		c.Route(route.HttpGet, "/denied", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/denied", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it to be skipped when the guard returns false")
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["name"] != "ForbiddenException" {
+		t.Fatalf("body[name] = %v, want %q", body["name"], "ForbiddenException")
+	}
+	if body["message"] != "" {
+		t.Fatalf("body[message] = %v, want empty string", body["message"])
+	}
+	if body["details"] != nil {
+		t.Fatalf("body[details] = %v, want nil", body["details"])
+	}
+}
+
+// TestNewApp_GuardPanicsWithCustomException_ProducesThatExceptionsStatus
+// proves a guard whose handler panics with a custom exception.Exception
+// (rather than merely returning false) propagates that specific exception
+// through unmodified -- caught by the same recover wrapper, formatted with
+// THAT exception's own status/body (401, not 403) -- and the route Handler
+// never runs.
+func TestNewApp_GuardPanicsWithCustomException_ProducesThatExceptionsStatus(t *testing.T) {
+	unauthorized := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			panic(exception.NewUnauthorizedException(nil))
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Guards(unauthorized)
+		c.Route(route.HttpGet, "/needs-auth", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/needs-auth", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", resp.StatusCode)
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it to be skipped when a guard panics")
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["name"] != "UnauthorizedException" {
+		t.Fatalf("body[name] = %v, want %q", body["name"], "UnauthorizedException")
+	}
+}
+
+// TestNewApp_MultipleGuards_ShortCircuitsOnFirstFalse proves that with 2+
+// guards registered in order, a false from the FIRST guard prevents the
+// SECOND guard's own handler function from ever running -- observed via a
+// side-effect flag on the second guard that must stay untouched.
+func TestNewApp_MultipleGuards_ShortCircuitsOnFirstFalse(t *testing.T) {
+	var secondGuardRan bool
+	first := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool { return false })
+	})
+	second := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			secondGuardRan = true
+			return true
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Guards(first, second)
+		c.Route(route.HttpGet, "/multi", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/multi", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if secondGuardRan {
+		t.Fatalf("second guard's handler ran, want short-circuit after the first guard returned false")
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it to be skipped")
+	}
+}
+
+// TestNewApp_MiddlewareThenGuardThenHandler_OrderedSequence proves a
+// controller with BOTH Use() (middleware) AND Guards() registered runs:
+// middleware first, then the guard, then the Handler -- via an explicit
+// ordered-sequence assertion, reusing the shared []string order-recorder
+// technique this file's own "Middleware" T4 tests established.
+func TestNewApp_MiddlewareThenGuardThenHandler_OrderedSequence(t *testing.T) {
+	var order []string
+	mw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "middleware")
+			next(ctx)
+		})
+	})
+	g := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			order = append(order, "guard")
+			return true
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(mw)
+		c.Guards(g)
+		c.Route(route.HttpGet, "/sequence", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				order = append(order, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/sequence", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	want := []string{"middleware", "guard", "handler"}
+	if len(order) != len(want) {
+		t.Fatalf("execution order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("execution order = %v, want %v -- middleware must run before the guard, and the guard before the Handler", order, want)
+		}
+	}
+}
+
+// TestNewApp_ZeroGuards_NonRegressionReference proves an existing
+// pre-feature test (T9's UserController end-to-end example, defined earlier
+// in this file and left completely UNMODIFIED by this task) still passes
+// unmodified after adding gatedHandler -- a controller with zero Guards()
+// calls must behave exactly as before this feature.
+func TestNewApp_ZeroGuards_NonRegressionReference(t *testing.T) {
+	t.Run("UserControllerEndToEnd_NonRegressionReference", func(t *testing.T) {
+		TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t)
+	})
+}
+
+// TestNewApp_GuardPanicsWithNonException_StillGeneric500 proves a guard
+// panicking with a value that does NOT satisfy exception.Exception (e.g. a
+// plain error) still produces the same generic 500 fallback any other panic
+// already gets -- non-regression of "Panic Recovery & Default Handler"'s
+// existing behavior, proof the gatedHandler composition didn't break it.
+func TestNewApp_GuardPanicsWithNonException_StillGeneric500(t *testing.T) {
+	buggy := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			panic(errors.New("bug"))
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Guards(buggy)
+		c.Route(route.HttpGet, "/buggy-guard", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/buggy-guard", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it to be skipped when the guard panics")
 	}
 }
