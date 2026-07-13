@@ -44,7 +44,7 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 
 ---
 
-### T2: `NewApp`/`MustNewApp` accept `AppOptions` (breaking signature change)
+### T2: `NewApp`/`MustNewApp` accept `AppOptions` (breaking signature change) ✅ DONE (evaluator: PASS, commit `e080552`)
 
 **What**: `NewApp[T, PT](root *module.Module, opts AppOptions) (*App, error)` and `MustNewApp[T, PT](root *module.Module, opts AppOptions) *App` — `opts` becomes a required 2nd positional param (ground truth: INSIGHT.md's call sites always pass it, even as `AppOptions{}`). `App` struct gains an `opts AppOptions` field, stored, not otherwise read yet. **Migration**: every existing T8/T9 call site in `internal/app/app_test.go` (and root `app.go`'s wrapper, done in T5) that calls `NewApp[...](root)`/`MustNewApp[...](root)` needs `AppOptions{}` added as the 2nd arg — mechanical, do not skip any.
 **Where**: `internal/app/app.go` (existing `App` struct + `NewApp`/`MustNewApp`, extended), `internal/app/app_test.go` (existing call sites updated)
@@ -57,11 +57,11 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 - Skill: NONE
 
 **Done when**:
-- [ ] `NewApp[T, PT](root, AppOptions{})` bootstraps identically to how `NewApp[T, PT](root)` did before this task (same DI graph resolved, same routes registered) — zero behavior regression
-- [ ] `NewApp[T, PT](root, AppOptions{BufferLogs: true, LogLevels: [...]})` also bootstraps successfully, `opts` field on `*App` reflects what was passed (add an unexported-but-testable path, or a same-package test, to confirm storage — no public getter required yet since nothing public reads it)
-- [ ] Every pre-existing test in `internal/app/app_test.go` that calls `NewApp`/`MustNewApp` is updated to pass `AppOptions{}` (or a non-zero value where the test is specifically about opts) and still passes
-- [ ] Gate check passes
-- [ ] Test count: 12+ (all pre-existing `internal/app` tests still passing post-migration, plus 2+ new: bootstrap with zero-value opts, bootstrap with non-zero opts)
+- [x] `NewApp[T, PT](root, AppOptions{})` bootstraps identically to how `NewApp[T, PT](root)` did before this task (same DI graph resolved, same routes registered) — zero behavior regression
+- [x] `NewApp[T, PT](root, AppOptions{BufferLogs: true, LogLevels: [...]})` also bootstraps successfully, `opts` field on `*App` reflects what was passed (add an unexported-but-testable path, or a same-package test, to confirm storage — no public getter required yet since nothing public reads it)
+- [x] Every pre-existing test in `internal/app/app_test.go` that calls `NewApp`/`MustNewApp` is updated to pass `AppOptions{}` (or a non-zero value where the test is specifically about opts) and still passes
+- [x] Gate check passes
+- [x] Test count: 12+ (all pre-existing `internal/app` tests still passing post-migration, plus 2+ new: bootstrap with zero-value opts, bootstrap with non-zero opts)
 
 **Tests**: unit
 **Gate**: full (touches every existing `internal/app` test via the signature migration)
