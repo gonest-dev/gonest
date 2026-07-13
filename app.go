@@ -3,7 +3,9 @@ package gonest
 import "github.com/gonest-dev/gonest/internal/app"
 
 // App is the minimal handle returned once NewApp has finished bootstrapping
-// the whole dependency graph.
+// the whole dependency graph. Because this is a true Go type alias (not a
+// defined type), every method on app.App -- including MustListen -- is
+// automatically visible on gonest.App with zero extra wrapper code.
 type App = app.App
 
 // HttpAdapter is the constraint NewApp[T]/MustNewApp[T] require of their
@@ -11,13 +13,9 @@ type App = app.App
 // comment for the full contract (RegisterRoute, Listen, Init).
 type HttpAdapter = app.HttpAdapter
 
-// AppOptions is a minimal, temporary re-export of internal/app.AppOptions --
-// just enough to keep this file's NewApp/MustNewApp wrappers compiling
-// against internal/app's now-required opts parameter (T2 of the "App
-// Bootstrap & Listen" feature). This is NOT the full re-export surface --
-// OnListen/LogLevel aliases and any other public API additions belong to a
-// later task in this feature (see design.md's "App (extended)" component);
-// this alias only exists so `go build ./...`/`go test ./...` stay green.
+// AppOptions is Nest-parity bootstrap config for NewApp/MustNewApp
+// (BufferLogs, LogLevels). See internal/app.AppOptions's doc comment for the
+// full contract. LogLevel/OnListen's own aliases live in options.go.
 type AppOptions = app.AppOptions
 
 // NewApp bootstraps root through all 3 DI stages (Structural Assembly,
@@ -35,10 +33,7 @@ type AppOptions = app.AppOptions
 // internal/app.NewApp's doc comment for the full bootstrap contract.
 //
 // opts is threaded straight through to internal/app.NewApp -- this wrapper
-// does not interpret it. A later task in this feature is responsible for
-// this file's complete public API surface (this signature update is only
-// here to keep the root package compiling against internal/app's breaking
-// change).
+// does not interpret it.
 func NewApp[T any, PT interface {
 	*T
 	HttpAdapter
