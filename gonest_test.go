@@ -1,0 +1,929 @@
+package gonest
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/gonest-dev/gonest/internal/fiberapp"
+	"github.com/gonest-dev/gonest/internal/httpctx"
+	interceptorpkg "github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/pipe"
+	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/google/uuid"
+)
+
+// ---------------------------------------------------------------------------
+// App / bootstrap
+// ---------------------------------------------------------------------------
+
+// TestNewApp_RootAlias_InsightCallShape proves the exact INSIGHT.md call
+// shape gonest.NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
+// compiles and works through the root gonest package. gonest.FiberApp does
+// not exist as a root alias yet (a pre-existing gap from an earlier
+// feature) -- fiberapp.FiberApp is used directly here via import instead.
+func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
+	root := NewModule(func(m *Module) {})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() returned nil *App")
+	}
+}
+
+// TestMustNewApp_RootAlias_InsightCallShape proves
+// gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{...})
+// compiles and works through the root gonest package.
+func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
+	root := NewModule(func(m *Module) {})
+
+	app := MustNewApp[fiberapp.FiberApp](root, AppOptions{
+		BufferLogs: true,
+		LogLevels:  []LogLevel{LogLevelWarn, LogLevelError},
+	})
+	if app == nil {
+		t.Fatalf("MustNewApp() returned nil *App")
+	}
+}
+
+// TestApp_MustListen_PromotedThroughRootAlias proves App.MustListen (added
+// on internal/app.App) is automatically visible on the root gonest.App
+// alias with zero extra wrapper code, and that both
+// app.MustListen(addr, gonest.OnListen(fn)) and
+// app.MustListen(addr, nil) compile and work through the root alias.
+func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
+	root := NewModule(func(m *Module) {})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	const addr = "127.0.0.1:34589"
+
+	fired := make(chan struct{})
+	var once sync.Once
+	onListen := OnListen(func() {
+		once.Do(func() { close(fired) })
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		app.MustListen(addr, onListen)
+	}()
+
+	select {
+	case <-fired:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	resp, err := http.Get("http://" + addr + "/")
+	if err != nil {
+		t.Fatalf("http.Get error = %v", err)
+	}
+	resp.Body.Close()
+
+	select {
+	case <-done:
+		t.Fatalf("MustListen() returned unexpectedly before shutdown")
+	default:
+	}
+}
+
+// TestApp_MustListen_NilOnListen_ThroughRootAlias proves
+// app.MustListen(addr, nil) compiles and works through the root alias.
+func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
+	root := NewModule(func(m *Module) {})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	const addr = "127.0.0.1:34590"
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		app.MustListen(addr, nil)
+	}()
+
+	// Give MustListen a moment to bind, then confirm it's serving without
+	// having panicked -- a nil OnListen must be safe end-to-end.
+	var resp *http.Response
+	var err2 error
+	for i := 0; i < 50; i++ {
+		resp, err2 = http.Get("http://" + addr + "/")
+		if err2 == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if err2 != nil {
+		t.Fatalf("http.Get error = %v", err2)
+	}
+	resp.Body.Close()
+
+	select {
+	case <-done:
+		t.Fatalf("MustListen() returned unexpectedly before shutdown")
+	default:
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Route params
+// ---------------------------------------------------------------------------
+
+// paramFakeResponder is a minimal test-only httpctx.Responder for exercising
+// MustParam[T] end to end (Context -> Route -> Pipe/defaultCoerce).
+type paramFakeResponder struct {
+	params map[string]string
+}
+
+func newParamFakeResponder() *paramFakeResponder {
+	return &paramFakeResponder{params: map[string]string{}}
+}
+
+func (f *paramFakeResponder) JSON(v any) error                  { return nil }
+func (f *paramFakeResponder) SetStatus(code int)                {}
+func (f *paramFakeResponder) GetHeader(name string) string      { return "" }
+func (f *paramFakeResponder) SetHeaderValue(name, value string) {}
+func (f *paramFakeResponder) GetParam(name string) string       { return f.params[name] }
+
+// TestMustParam_WithoutCustomPipe_UsesDefaultCoerce proves that when a
+// Route has no custom Pipe registered for a param name, MustParam[T] falls
+// back to the default reflect+strconv coercion.
+func TestMustParam_WithoutCustomPipe_UsesDefaultCoerce(t *testing.T) {
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+
+	res := newParamFakeResponder()
+	res.params["id"] = "42"
+	ctx := httpctx.New(res).WithRoute(r)
+
+	got := MustParam[int](ctx, "id")
+	if got != 42 {
+		t.Fatalf("MustParam[int](ctx, \"id\") = %d, want %d", got, 42)
+	}
+}
+
+// TestMustParam_WithCustomPipe_UsesCustomPipeInsteadOfDefault proves that
+// when the current Route has a custom Pipe registered for a param name (via
+// Route.Param), MustParam[T] runs that Pipe's Handler instead of
+// defaultCoerce.
+func TestMustParam_WithCustomPipe_UsesCustomPipeInsteadOfDefault(t *testing.T) {
+	p := pipe.New(func(p *pipe.Pipe) {
+		p.Handler(func(ctx *httpctx.Context, raw string) int {
+			// Deliberately does NOT match defaultCoerce's behavior (would
+			// return 42 for raw "42") -- proves the custom Pipe ran, not
+			// the default coercion.
+			return 999
+		})
+	})
+	p.Declare()
+
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {
+		r.Param("id", p)
+	})
+
+	res := newParamFakeResponder()
+	res.params["id"] = "42"
+	ctx := httpctx.New(res).WithRoute(r)
+
+	got := MustParam[int](ctx, "id")
+	if got != 999 {
+		t.Fatalf("MustParam[int](ctx, \"id\") = %d, want %d (from custom Pipe)", got, 999)
+	}
+}
+
+// TestMustParam_PanicsWhenParamNotDeclaredOnRoute proves MustParam[T] panics
+// with the distinct "no param named" message when the current Route's
+// declared path doesn't have a ":name" segment for the requested name.
+func TestMustParam_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) {
+	r := route.New(route.HttpGet, "/users", func(r *route.Route) {})
+
+	res := newParamFakeResponder()
+	ctx := httpctx.New(res).WithRoute(r)
+
+	defer func() {
+		rec := recover()
+		if rec == nil {
+			t.Fatal("expected MustParam to panic for a param not declared on the route, got no panic")
+		}
+		msg, ok := rec.(string)
+		if !ok {
+			t.Fatalf("expected panic value to be a string, got %T: %v", rec, rec)
+		}
+		want := `gonest: no param named "id" on this route`
+		if msg != want {
+			t.Fatalf("panic message = %q, want %q", msg, want)
+		}
+	}()
+
+	MustParam[int](ctx, "id")
+}
+
+// TestMustParam_PanicsOnConversionFailure_DefaultCoerce proves MustParam[T]
+// panics with the distinct "could not be converted" message when the raw
+// value exists but fails to convert to T via defaultCoerce.
+func TestMustParam_PanicsOnConversionFailure_DefaultCoerce(t *testing.T) {
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+
+	res := newParamFakeResponder()
+	res.params["id"] = "not-a-number"
+	ctx := httpctx.New(res).WithRoute(r)
+
+	defer func() {
+		rec := recover()
+		if rec == nil {
+			t.Fatal("expected MustParam to panic on conversion failure, got no panic")
+		}
+		msg, ok := rec.(string)
+		if !ok {
+			t.Fatalf("expected panic value to be a string, got %T: %v", rec, rec)
+		}
+		if !stringsContains(msg, `gonest: param "id" could not be converted to int`) {
+			t.Fatalf("panic message = %q, want prefix %q", msg, `gonest: param "id" could not be converted to int`)
+		}
+	}()
+
+	MustParam[int](ctx, "id")
+}
+
+// TestMustParam_PanicsWhenCustomPipeHandlerPanics proves that if the custom
+// Pipe's Handler itself panics, MustParam lets that panic propagate as-is
+// (pass-through, not caught/rewrapped).
+func TestMustParam_PanicsWhenCustomPipeHandlerPanics(t *testing.T) {
+	p := pipe.New(func(p *pipe.Pipe) {
+		p.Handler(func(ctx *httpctx.Context, raw string) int {
+			panic("custom pipe exploded")
+		})
+	})
+	p.Declare()
+
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {
+		r.Param("id", p)
+	})
+
+	res := newParamFakeResponder()
+	res.params["id"] = "42"
+	ctx := httpctx.New(res).WithRoute(r)
+
+	defer func() {
+		rec := recover()
+		if rec == nil {
+			t.Fatal("expected the custom Pipe's panic to propagate, got no panic")
+		}
+		msg, ok := rec.(string)
+		if !ok || msg != "custom pipe exploded" {
+			t.Fatalf("expected panic value %q to pass through unchanged, got %v", "custom pipe exploded", rec)
+		}
+	}()
+
+	MustParam[int](ctx, "id")
+}
+
+// TestMustParam_WithoutAttachedRoute_UsesDefaultCoerce proves MustParam[T]
+// works even when Context has no attached Route (Route() returns nil) --
+// falls back straight to defaultCoerce.
+func TestMustParam_WithoutAttachedRoute_UsesDefaultCoerce(t *testing.T) {
+	res := newParamFakeResponder()
+	res.params["id"] = "7"
+	ctx := httpctx.New(res)
+
+	got := MustParam[int](ctx, "id")
+	if got != 7 {
+		t.Fatalf("MustParam[int](ctx, \"id\") = %d, want %d", got, 7)
+	}
+}
+
+func stringsContains(s, substr string) bool {
+	return len(s) >= len(substr) && (func() bool {
+		for i := 0; i+len(substr) <= len(s); i++ {
+			if s[i:i+len(substr)] == substr {
+				return true
+			}
+		}
+		return false
+	})()
+}
+
+// TestNewPipe_RootAlias_TypeCheck proves NewPipe/Pipe resolve and
+// type-check at the root gonest package: NewPipe builds a *Pipe, Handler
+// accepts a valid func(ctx, raw string) T signature (validated via
+// reflect), and route.Route.Param genuinely declares it (running the
+// deferred fn) without the caller needing to call Declare manually.
+func TestNewPipe_RootAlias_TypeCheck(t *testing.T) {
+	p := NewPipe(func(p *Pipe) {
+		p.Handler(func(ctx *httpctx.Context, raw string) int {
+			return 0
+		})
+	})
+	if p == nil {
+		t.Fatal("NewPipe() returned nil *Pipe")
+	}
+
+	r := route.New(route.HttpGet, "/x/:n", func(r *route.Route) {
+		r.Param("n", p)
+	})
+
+	got, ok := r.PipeFor("n")
+	if !ok {
+		t.Fatal("expected PipeFor(\"n\") to report ok=true")
+	}
+	if !got.HandlerFunc().IsValid() {
+		t.Fatal("expected Route.Param to have declared the Pipe (HandlerFunc() valid) without a manual Declare() call")
+	}
+}
+
+// ParseIntPipe reproduces INSIGHT.md's own ParseIntPipe example verbatim
+// through the root gonest package's Pipe/NewPipe aliases: parses raw into
+// an int64, panicking a BadRequestException with the invalid raw value as
+// Details on failure.
+var ParseIntPipe = NewPipe(func(pipe *Pipe) {
+	pipe.Handler(func(ctx *httpctx.Context, raw string) int64 {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			panic(NewBadRequestException(map[string]any{"raw": raw}))
+		}
+		return value
+	})
+})
+
+// TestParseIntPipe_RootAlias_InsightCallShape proves INSIGHT.md's
+// ParseIntPipe example compiles and works end-to-end through the root
+// gonest package's Pipe/NewPipe aliases, attached via
+// route.Param("id", ParseIntPipe) through the root Controller/Module/
+// NewApp aliases, dispatched via REAL app.Test requests covering both the
+// valid-int and invalid-int paths (proving MustParam[T] genuinely reaches
+// the custom Pipe's Handler through the whole real HTTP dispatch chain,
+// not just at construction time).
+func TestParseIntPipe_RootAlias_InsightCallShape(t *testing.T) {
+	var gotID int64
+	handlerRan := false
+
+	controller := NewController(func(c *Controller) {
+		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
+			r.Param("id", ParseIntPipe)
+			r.Handler(func(ctx *httpctx.Context) {
+				gotID = MustParam[int64](ctx, "id")
+				handlerRan = true
+				ctx.Json(map[string]int64{"id": gotID})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	t.Run("valid int -> 200, MustParam decodes via ParseIntPipe", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/items/42", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+		if !handlerRan {
+			t.Fatal("route Handler did not run")
+		}
+		if gotID != 42 {
+			t.Fatalf("gotID = %d, want 42", gotID)
+		}
+	})
+
+	t.Run("invalid int -> 400 BadRequestException, Handler does not run", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/items/not-a-number", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+		}
+		if handlerRan {
+			t.Fatal("route Handler ran, want it NOT to run when the param fails to parse")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Exceptions
+// ---------------------------------------------------------------------------
+
+// FooExampleError reproduces INSIGHT.md's dev-defined-exception example
+// verbatim, adapted per SPEC_DEVIATION: INSIGHT.md uses
+// gonest.HttpStatusBadRequest, a named HttpStatus constant that was
+// explicitly scoped OUT of the "HttpException Core" feature, so this test
+// uses the equivalent net/http.StatusBadRequest int literal instead.
+type FooExampleError struct {
+	HttpException
+}
+
+// NewFooExampleError mirrors INSIGHT.md's constructor shape exactly, using
+// the root-aliased HttpException/NewHttpException.
+func NewFooExampleError(details any) *FooExampleError {
+	return &FooExampleError{
+		HttpException: NewHttpException(http.StatusBadRequest, "FooExampleError", "lorem ipsum dolor met", details),
+	}
+}
+
+// TestFooExampleError_RootAlias_InsightCallShape proves INSIGHT.md's
+// dev-defined-exception example compiles and works end-to-end through the
+// root gonest package's Exception/HttpException/NewHttpException aliases.
+func TestFooExampleError_RootAlias_InsightCallShape(t *testing.T) {
+	err := NewFooExampleError(map[string]any{"field": "bar"})
+
+	if err.Status() != http.StatusBadRequest {
+		t.Fatalf("Status() = %d, want %d", err.Status(), http.StatusBadRequest)
+	}
+	if err.Name() != "FooExampleError" {
+		t.Fatalf("Name() = %q, want %q", err.Name(), "FooExampleError")
+	}
+	if err.Message() != "lorem ipsum dolor met" {
+		t.Fatalf("Message() = %q, want %q", err.Message(), "lorem ipsum dolor met")
+	}
+
+	var _ Exception = err
+}
+
+// TestNewNotFoundException_RootAlias_PanicRecoverRoundTrip proves a
+// root-aliased built-in exception constructor (NewNotFoundException) can be
+// panicked with and recovered via a type assertion back to
+// *NotFoundException through the root gonest package.
+func TestNewNotFoundException_RootAlias_PanicRecoverRoundTrip(t *testing.T) {
+	defer func() {
+		r := recover()
+		exc, ok := r.(*NotFoundException)
+		if !ok {
+			t.Fatalf("recover() type assertion to *NotFoundException failed, got %T", r)
+		}
+		if exc.Status() != http.StatusNotFound {
+			t.Fatalf("Status() = %d, want %d", exc.Status(), http.StatusNotFound)
+		}
+	}()
+
+	panic(NewNotFoundException(map[string]any{"userId": "abc123"}))
+}
+
+// TestHttpException_RootAlias_SatisfiesException proves the root-aliased
+// HttpException/Exception types keep their structural-satisfaction
+// relationship: a type embedding gonest.HttpException satisfies
+// gonest.Exception without ever naming it.
+func TestHttpException_RootAlias_SatisfiesException(t *testing.T) {
+	var exc Exception = NewFooExampleError(nil)
+
+	if exc.Details() != nil {
+		t.Fatalf("Details() = %v, want nil", exc.Details())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Middleware
+// ---------------------------------------------------------------------------
+
+// TestNewMiddleware_RootAlias_TypeCheck proves NewMiddleware/Middleware/Next
+// all resolve and type-check at the root gonest package: NewMiddleware
+// builds a *Middleware, Handler accepts a func(ctx, next Next), and the
+// resulting HandlerFunc genuinely reaches ctx/next through to the handler
+// body.
+func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
+	var gotCtx *httpctx.Context
+	nextCalled := false
+
+	m := NewMiddleware(func(m *Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next Next) {
+			gotCtx = ctx
+			next(ctx)
+		})
+	})
+	if m == nil {
+		t.Fatal("NewMiddleware() returned nil *Middleware")
+	}
+
+	fn := m.HandlerFunc()
+	if fn == nil {
+		t.Fatal("HandlerFunc() returned nil after Handler was called")
+	}
+
+	ctx := httpctx.New(nil)
+	fn(ctx, func(ctx *httpctx.Context) {
+		nextCalled = true
+	})
+
+	if gotCtx != ctx {
+		t.Fatal("ctx passed to the stored handler did not reach the handler body unchanged")
+	}
+	if !nextCalled {
+		t.Fatal("next passed to the stored handler was not called/did not reach the handler body")
+	}
+}
+
+// RequestIdMiddleware reproduces INSIGHT.md's Middleware example verbatim,
+// through the root-aliased NewMiddleware/Middleware/Next. It generates a
+// UUID and sets it as the X-Request-Id response header before calling
+// next(ctx).
+var RequestIdMiddleware = NewMiddleware(func(middleware *Middleware) {
+	middleware.Handler(func(ctx *httpctx.Context, next Next) {
+		requestId, _ := uuid.NewV7()
+		ctx.SetHeader("X-Request-Id", requestId.String())
+		next(ctx)
+	})
+})
+
+// TestRequestIdMiddleware_RootAlias_InsightCallShape proves INSIGHT.md's
+// RequestIdMiddleware example compiles and works end-to-end through the root
+// gonest package's Middleware/Next/NewMiddleware aliases, attached via
+// controller.Use(RequestIdMiddleware) through the root Controller/Module
+// aliases, and dispatched via a REAL app.Test request -- confirming the
+// X-Request-Id header genuinely lands in the real HTTP response.
+func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
+	controller := NewController(func(c *Controller) {
+		c.Use(RequestIdMiddleware)
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	requestId := resp.Header.Get("X-Request-Id")
+	if requestId == "" {
+		t.Fatal("X-Request-Id response header is empty, want a generated UUID")
+	}
+	if _, err := uuid.Parse(requestId); err != nil {
+		t.Fatalf("X-Request-Id header = %q is not a valid UUID: %v", requestId, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Guard
+// ---------------------------------------------------------------------------
+
+// TestNewGuard_RootAlias_TypeCheck proves NewGuard/Guard resolve and
+// type-check at the root gonest package: NewGuard builds a *Guard, Handler
+// accepts a func(ctx) bool, and the resulting HandlerFunc genuinely reaches
+// ctx through to the handler body and returns its own decision.
+func TestNewGuard_RootAlias_TypeCheck(t *testing.T) {
+	var gotCtx *httpctx.Context
+
+	g := NewGuard(func(g *Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			gotCtx = ctx
+			return true
+		})
+	})
+	if g == nil {
+		t.Fatal("NewGuard() returned nil *Guard")
+	}
+
+	fn := g.HandlerFunc()
+	if fn == nil {
+		t.Fatal("HandlerFunc() returned nil after Handler was called")
+	}
+
+	ctx := httpctx.New(nil)
+	result := fn(ctx)
+
+	if gotCtx != ctx {
+		t.Fatal("ctx passed to the stored handler did not reach the handler body unchanged")
+	}
+	if !result {
+		t.Fatal("HandlerFunc() result did not reach back out as the handler's own decision")
+	}
+}
+
+// authService is a stand-in for INSIGHT.md's AuthGuard example's
+// AuthService, adapted per AD-008: no MustInject support (Guard.New(fn)
+// runs fn immediately, before any module-tree/DI context exists). Instead
+// of injecting it, AuthGuard below closes over an already-constructed
+// instance directly, same as any other plain Go closure would.
+type authService struct{}
+
+// Validate reports whether token is considered valid. In this stand-in,
+// any non-empty token other than the literal "invalid-token" is valid --
+// enough to prove both the false->403 path and the true->Handler-runs path.
+func (a *authService) Validate(token string) bool {
+	return token != "invalid-token"
+}
+
+var stubAuthService = &authService{}
+
+// AuthGuard reproduces INSIGHT.md's AuthGuard example, adapted per AD-008
+// (no MustInject): rather than gonest.MustInject[*AuthService](guard), it
+// closes over the package-level stubAuthService directly. The rest of the
+// example is faithful: missing Authorization header panics a custom
+// gonest.NewUnauthorizedException(nil) (proving the custom-exception-on-
+// invalid path), otherwise it returns authService.Validate(token) as a
+// plain bool (proving the false->automatic 403 path and the true->Handler-
+// runs path).
+var AuthGuard = NewGuard(func(guard *Guard) {
+	guard.Handler(func(ctx *httpctx.Context) bool {
+		token := ctx.Header("Authorization")
+		if token == "" {
+			panic(NewUnauthorizedException(nil))
+		}
+		return stubAuthService.Validate(token)
+	})
+})
+
+// TestAuthGuard_RootAlias_InsightCallShape proves INSIGHT.md's AuthGuard
+// example (adapted per AD-008, see AuthGuard's own doc comment) compiles
+// and works end-to-end through the root gonest package's Guard/NewGuard
+// aliases, attached via controller.Guards(AuthGuard) through the root
+// Controller/Module/NewApp aliases, and dispatched via REAL app.Test
+// requests covering all 3 cases.
+func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
+	handlerRan := false
+
+	controller := NewController(func(c *Controller) {
+		c.Guards(AuthGuard)
+		c.Route(route.HttpGet, "/secure", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	t.Run("no Authorization header -> 401 UnauthorizedException", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+		}
+		if handlerRan {
+			t.Fatal("route Handler ran, want it NOT to run when Authorization header is missing")
+		}
+	})
+
+	t.Run("invalid token -> 403 ForbiddenException", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+		req.Header.Set("Authorization", "invalid-token")
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+		}
+		if handlerRan {
+			t.Fatal("route Handler ran, want it NOT to run when token is invalid")
+		}
+	})
+
+	t.Run("valid token -> 200, Handler runs", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+		req.Header.Set("Authorization", "valid-token")
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+		if !handlerRan {
+			t.Fatal("route Handler did not run, want it to run when token is valid")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Interceptor
+// ---------------------------------------------------------------------------
+
+// TestNewInterceptor_RootAlias_TypeCheck proves NewInterceptor/Interceptor
+// resolve and type-check at the root gonest package: NewInterceptor builds
+// a *Interceptor, Handler accepts a func(ctx, next interceptor.Next), and
+// the resulting HandlerFunc genuinely reaches ctx/next through to the
+// handler body. interceptor.Next itself has no root alias yet (only
+// Interceptor/NewInterceptor are in the "Interceptor" feature's scope --
+// design.md's Tech Decisions explain why interceptor.Next is deliberately
+// its own type, not reused from middleware.Next), so internal/interceptor
+// is imported directly here for the Next parameter type.
+func TestNewInterceptor_RootAlias_TypeCheck(t *testing.T) {
+	var gotCtx *httpctx.Context
+	nextCalled := false
+
+	i := NewInterceptor(func(i *Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptorpkg.Next) {
+			gotCtx = ctx
+			next(ctx)
+		})
+	})
+	if i == nil {
+		t.Fatal("NewInterceptor() returned nil *Interceptor")
+	}
+
+	fn := i.HandlerFunc()
+	if fn == nil {
+		t.Fatal("HandlerFunc() returned nil after Handler was called")
+	}
+
+	ctx := httpctx.New(nil)
+	fn(ctx, func(ctx *httpctx.Context) {
+		nextCalled = true
+	})
+
+	if gotCtx != ctx {
+		t.Fatal("ctx passed to the stored handler did not reach the handler body unchanged")
+	}
+	if !nextCalled {
+		t.Fatal("next passed to the stored handler was not called/did not reach the handler body")
+	}
+}
+
+// timingLog is a stand-in for INSIGHT.md's TimingInterceptor example's
+// LoggerService, adapted per AD-008: no MustInject support
+// (Interceptor.New(fn) runs fn immediately, before any module/DI context
+// exists). Instead of injecting a logger, TimingInterceptor below closes
+// over an already-constructed package-level slice directly, and records
+// each logged entry so the test can assert on before/after ordering.
+var timingLog []string
+
+// TimingInterceptor reproduces INSIGHT.md's TimingInterceptor example,
+// adapted per AD-008 (no MustInject): rather than
+// gonest.MustInject[*LoggerService](interceptor), it closes over the
+// package-level timingLog directly. The rest of the example is faithful:
+// start := time.Now(), next(ctx) runs the rest of the chain/Handler, then
+// it logs something time-related -- proving the log call happens AFTER
+// next(ctx) returns via observable ordering (timingLog's contents), not by
+// measuring real elapsed time precisely.
+var TimingInterceptor = NewInterceptor(func(interceptor *Interceptor) {
+	interceptor.Handler(func(ctx *httpctx.Context, next interceptorpkg.Next) {
+		start := time.Now()
+		timingLog = append(timingLog, "before")
+		next(ctx)
+		timingLog = append(timingLog, "request took "+time.Since(start).String())
+	})
+})
+
+// TestTimingInterceptor_RootAlias_InsightCallShape proves INSIGHT.md's
+// TimingInterceptor example (adapted per AD-008, see TimingInterceptor's
+// own doc comment) compiles and works end-to-end through the root gonest
+// package's Interceptor/Next/NewInterceptor aliases, attached via
+// controller.Interceptors(TimingInterceptor) through the root
+// Controller/Module/NewApp aliases, and dispatched via a REAL app.Test
+// request -- confirming both the before-Handler and after-Handler logic
+// ran, in the right order.
+func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
+	timingLog = nil
+	handlerRan := false
+
+	controller := NewController(func(c *Controller) {
+		c.Interceptors(TimingInterceptor)
+		c.Route(route.HttpGet, "/timed", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				timingLog = append(timingLog, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/timed", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if !handlerRan {
+		t.Fatal("route Handler did not run, want it to run")
+	}
+
+	if len(timingLog) != 3 {
+		t.Fatalf("timingLog = %v, want 3 entries (before, handler, after)", timingLog)
+	}
+	if timingLog[0] != "before" {
+		t.Fatalf("timingLog[0] = %q, want %q (before-Handler logic must run before next(ctx))", timingLog[0], "before")
+	}
+	if timingLog[1] != "handler" {
+		t.Fatalf("timingLog[1] = %q, want %q (route Handler must run inside next(ctx))", timingLog[1], "handler")
+	}
+	if timingLog[2] == "before" || timingLog[2] == "handler" {
+		t.Fatalf("timingLog[2] = %q, want an after-Handler log entry (must run after next(ctx) returns)", timingLog[2])
+	}
+}
