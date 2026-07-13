@@ -27,7 +27,7 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 
 ## Task Breakdown
 
-### T1: `internal/middleware` — `Next`/`Middleware`/`New`/`Handler`
+### T1: `internal/middleware` — `Next`/`Middleware`/`New`/`Handler` ✅ DONE (evaluator: PASS-WITH-NOTE, commit `804f440` — nota: self-report do dev alegou 5 testes, real são 4, satisfaz o mínimo de 4+ mesmo assim)
 
 **What**: new package. `type Next func(ctx *httpctx.Context)`, `type Middleware struct { handler func(ctx *httpctx.Context, next Next) }`, `func New(fn func(*Middleware)) *Middleware` (runs `fn` IMMEDIATELY, not deferred — see design.md's Tech Decisions), `func (m *Middleware) Handler(h func(ctx *httpctx.Context, next Next))`, `func (m *Middleware) HandlerFunc() func(ctx *httpctx.Context, next Next)`.
 **Where**: `internal/middleware/middleware.go`, `internal/middleware/middleware_test.go`
@@ -40,12 +40,12 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 - Skill: NONE
 
 **Done when**:
-- [ ] `New(fn)` runs `fn` immediately (test proves it, e.g. a side-effect inside `fn` is observable right after `New` returns, before any `Declare`-like call — there is none to call)
-- [ ] `Handler(h)` stores `h`, `HandlerFunc()` returns exactly that stored function (identity-callable — call it in a test, confirm `ctx`/`next` both reach the handler body correctly)
-- [ ] `HandlerFunc()` returns `nil` if `Handler` was never called (mirrors `Pipe.HandlerFunc()`'s zero-value contract — confirm via test)
-- [ ] A `Next` value can be constructed directly from a plain `func(ctx *httpctx.Context)` (proves the type-identity claim in design.md — a route Handler's own shape is directly assignable to `Next` with zero adapter code)
-- [ ] Gate check passes
-- [ ] Test count: 4+ (immediate execution, Handler/HandlerFunc round-trip, nil zero-value, Next type-identity)
+- [x] `New(fn)` runs `fn` immediately (test proves it, e.g. a side-effect inside `fn` is observable right after `New` returns, before any `Declare`-like call — there is none to call)
+- [x] `Handler(h)` stores `h`, `HandlerFunc()` returns exactly that stored function (identity-callable — call it in a test, confirm `ctx`/`next` both reach the handler body correctly)
+- [x] `HandlerFunc()` returns `nil` if `Handler` was never called (mirrors `Pipe.HandlerFunc()`'s zero-value contract — confirm via test)
+- [x] A `Next` value can be constructed directly from a plain `func(ctx *httpctx.Context)` (proves the type-identity claim in design.md — a route Handler's own shape is directly assignable to `Next` with zero adapter code)
+- [x] Gate check passes
+- [x] Test count: 4+ (immediate execution, Handler/HandlerFunc round-trip, nil zero-value, Next type-identity)
 
 **Tests**: unit
 **Gate**: quick
