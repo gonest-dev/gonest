@@ -18,7 +18,7 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 
 ## Task Breakdown
 
-### T1: `internal/interceptor` — `Next`/`Interceptor`/`New`/`Handler`
+### T1: `internal/interceptor` — `Next`/`Interceptor`/`New`/`Handler` ✅ DONE (evaluator: PASS, commit `81b32ba`)
 
 **What**: pacote novo. `type Next func(ctx *httpctx.Context)` (tipo PRÓPRIO, não reusa `middleware.Next` — ver design.md's Tech Decisions), `type Interceptor struct { handler func(ctx *httpctx.Context, next Next) }` (campo não-exportado), `func New(fn func(*Interceptor)) *Interceptor` (roda `fn` IMEDIATAMENTE, mesmo padrão de `middleware.New`/`guard.New`, AD-008), `func (i *Interceptor) Handler(h func(ctx *httpctx.Context, next Next))`, `func (i *Interceptor) HandlerFunc() func(ctx *httpctx.Context, next Next)` (`nil` se `Handler` nunca foi chamado).
 **Where**: `internal/interceptor/interceptor.go`, `internal/interceptor/interceptor_test.go`
@@ -31,12 +31,12 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 - Skill: NONE
 
 **Done when**:
-- [ ] `New(fn)` roda `fn` imediatamente (teste prova via efeito colateral observável)
-- [ ] `Handler(h)` armazena `h`, `HandlerFunc()` devolve exatamente essa função — chamar em teste com `ctx`/`next` fake, confirmar que ambos chegam corretamente no corpo do handler
-- [ ] `HandlerFunc()` devolve `nil` se `Handler` nunca foi chamado
-- [ ] Um `func(ctx *httpctx.Context)` puro é atribuível direto a `Next` sem conversão (prova de identidade de tipo, mesma prova que `internal/middleware`'s T1 já fez pro próprio `Next`)
-- [ ] Gate check passa
-- [ ] Test count: 4+ (execução imediata, round-trip Handler/HandlerFunc, nil zero-value, identidade de tipo de Next)
+- [x] `New(fn)` roda `fn` imediatamente (teste prova via efeito colateral observável)
+- [x] `Handler(h)` armazena `h`, `HandlerFunc()` devolve exatamente essa função — chamar em teste com `ctx`/`next` fake, confirmar que ambos chegam corretamente no corpo do handler
+- [x] `HandlerFunc()` devolve `nil` se `Handler` nunca foi chamado
+- [x] Um `func(ctx *httpctx.Context)` puro é atribuível direto a `Next` sem conversão (prova de identidade de tipo, mesma prova que `internal/middleware`'s T1 já fez pro próprio `Next`)
+- [x] Gate check passa
+- [x] Test count: 4+ (execução imediata, round-trip Handler/HandlerFunc, nil zero-value, identidade de tipo de Next)
 
 **Tests**: unit
 **Gate**: quick
