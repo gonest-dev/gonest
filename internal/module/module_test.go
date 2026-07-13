@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/gonest-dev/gonest/internal/middleware"
 )
 
 // fakeProvider is a minimal stand-in for the real *provider.Provider type.
@@ -310,6 +312,42 @@ func TestModule_Name_CalledTwice_LastCallWins(t *testing.T) {
 
 	if got := ModuleName(m); got != "Second" {
 		t.Fatalf("ModuleName(m) = %q, want %q", got, "Second")
+	}
+}
+
+func TestModule_Use_StoresMiddlewareInRegistrationOrder(t *testing.T) {
+	first := middleware.New(func(m *middleware.Middleware) {})
+	second := middleware.New(func(m *middleware.Middleware) {})
+	m := New(func(m *Module) {
+		m.Use(first, second)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnMiddleware()
+	if len(got) != 2 || got[0] != first || got[1] != second {
+		t.Fatalf("OwnMiddleware() = %v, want [first, second]", got)
+	}
+}
+
+func TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
+	mw := middleware.New(func(m *middleware.Middleware) {})
+	m := New(func(m *Module) {
+		m.Use(mw)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnMiddleware()
+	got[0] = middleware.New(func(m *middleware.Middleware) {})
+
+	got2 := m.OwnMiddleware()
+	if got2[0] != mw {
+		t.Fatalf("OwnMiddleware() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
 

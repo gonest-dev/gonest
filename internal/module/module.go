@@ -4,7 +4,11 @@
 // modules, providers, and controllers.
 package module
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/gonest-dev/gonest/internal/middleware"
+)
 
 // ProviderRef is a minimal marker interface satisfied by the real
 // *provider.Provider type (owned by internal/provider). Module never needs
@@ -63,6 +67,7 @@ type Module struct {
 	providers   []ProviderRef
 	controllers []ControllerRef
 	exports     []ProviderRef
+	middleware  []*middleware.Middleware
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -105,6 +110,19 @@ func (m *Module) Exports(ps ...ProviderRef) {
 	m.exports = append(m.exports, ps...)
 }
 
+// Use registers middleware owned by this module. Go cannot restrict this
+// method to "the root module only" at the type level -- any *Module can
+// call Use. Per this feature's design.md Tech Decisions, this is
+// intentional: Use is merely the storage primitive (mirroring how
+// Providers/Controllers store their own registrations); whether a given
+// module's middleware is actually CONSULTED during dispatch -- today only
+// the root module's is, imported modules' Use registrations are not
+// cascaded -- is decided later, by the code that reads OwnMiddleware (a
+// later task), not by this method.
+func (m *Module) Use(items ...*middleware.Middleware) {
+	m.middleware = append(m.middleware, items...)
+}
+
 // OwnProviders returns a copy of the providers registered on this module
 // via Providers. Read-only: mutating the returned slice does not affect
 // this Module's internal state. Used by internal/resolver to search this
@@ -119,6 +137,14 @@ func (m *Module) OwnProviders() []ProviderRef {
 // every registered controller) and by a future task's route registration.
 func (m *Module) OwnControllers() []ControllerRef {
 	return append([]ControllerRef(nil), m.controllers...)
+}
+
+// OwnMiddleware returns a copy of the middleware registered on this module
+// via Use. Read-only: mutating the returned slice does not affect this
+// Module's internal state. Used by a later task to determine which
+// middleware wrap the root module's dispatch chain.
+func (m *Module) OwnMiddleware() []*middleware.Middleware {
+	return append([]*middleware.Middleware(nil), m.middleware...)
 }
 
 // ImportedModules returns a copy of the modules registered on this module
