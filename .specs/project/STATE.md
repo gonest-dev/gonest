@@ -1,11 +1,18 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 3 iniciado: feature "Middleware" (T1-T5, commit `1d70b8c`) DONE, evaluator PASS em toda task — `internal/middleware` novo pacote, `Controller.Use` (real, era stub) + `Module.Use` (novo, global só-root) compõem chain em Stage 2.5 (`internal/app`), global sempre outermost. Próxima: "Guard" (2ª feature de Milestone 3, ver ROADMAP.md).
+**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 3 em progresso: "Middleware" e "Guard" DONE. Feature "Guard" (T1-T4, commit `97ba40c`) — `internal/guard` novo pacote (execução imediata, sem MustInject por decisão explícita do usuário — Guard pode ter múltiplos "donos" via `Controller.Guards`, sem owner único claro tipo Provider), `Controller.Guards` real (era stub) + `gatedHandler` em Stage 2.5 encaixado como innermost do wrap de Middleware já existente (ordem: Middleware → Guard → Handler). Próxima: "Interceptor" (3ª feature de Milestone 3, ver ROADMAP.md).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-008: Pipeline-stage types (Middleware/Guard/futuro Interceptor/Filter) não suportam MustInject em v1 (2026-07-13)
+
+**Decision:** `Middleware`/`Guard` (e provavelmente `Interceptor`/`Filter` quando construídos) rodam `New(fn)` IMEDIATAMENTE (mesmo padrão de `route.New`), sem suporte a `MustInject` dentro do builder — diferente de `Provider`/`Controller`/`Module`, que deferem `fn` até `Declare()` especificamente pra permitir `MustInject` resolver contra árvore de módulo já montada.
+**Reason:** decisão explícita do usuário nesta sessão, perguntada via AskUserQuestion antes de especificar "Guard". `Provider` tem exatamente 1 módulo dono (imposto pelo grafo de DI via `Module.Providers`). Um `*Guard`/`*Middleware` pode ser anexado a MÚLTIPLOS controllers em módulos DIFERENTES (`controller.Guards(sameGuardVar)` reusável) — não existe "dono" único claro pra resolver `MustInject` contra sem inventar semântica ambígua nova (primeiro anexo vence? cascata por módulo? nenhuma dessas tem exemplo real no INSIGHT.md ou ROADMAP.md que justifique a complexidade agora).
+**Trade-off:** exemplos do INSIGHT.md que usam `MustInject` dentro do builder de Guard/Interceptor (`AuthGuard`, `TimingInterceptor`) precisam ser adaptados nos testes — capturar a dependência de outro jeito (valor já construído fechado via closure), não via injeção de verdade. Se uma necessidade real de DI dentro de pipeline-stage aparecer no futuro, essa decisão precisa ser revisitada com um modelo de ownership novo (não é bloqueio permanente, só não resolvido ainda).
+**Impact:** toda feature futura de Milestone 3 (`Interceptor`, `Filter`) deve seguir o mesmo padrão até decisão em contrário — `New(fn)` roda `fn` imediato, sem MustInject, mesma razão.
 
 ### AD-007: `NewApp[T]` genérico usa idiom de 2 type param pra suportar valor + método pointer-receiver (2026-07-13)
 

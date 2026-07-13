@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/guard/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T4, todos evaluator PASS)
 
 ---
 
@@ -100,7 +100,7 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 
 ---
 
-### T4: Root re-exports
+### T4: Root re-exports ✅ DONE (evaluator: PASS, commit `97ba40c` — nota menor: teste raiz confere status code mas não conteúdo do body pro nome da exception; comportamento já coberto a fundo em T3, não bloqueante)
 
 **What**: root `gonest` package gets `Guard` (type alias) and `NewGuard` (`var NewGuard = guard.New` — plain alias, `New` is not generic, same idiom as `NewMiddleware`/`NewHttpException`).
 **Where**: new file at repo root, `guard.go`, root-level test file
@@ -113,10 +113,10 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.NewGuard(fn)`, `gonest.Guard` resolve and work at root
-- [ ] INSIGHT.md's `AuthGuard` example (adapted per spec.md's Out of Scope: no `MustInject`, some other way to reach an `AuthService`-equivalent check — e.g. closing over an already-constructed value) reproduced through root aliases, attached via `controller.Guards(...)` through root `Controller`/`Module`/`NewApp` aliases, dispatched via real `app.Test`: missing/invalid check → exception response, valid check → route Handler runs
-- [ ] Gate check passes
-- [ ] Test count: 2+ (root-level smoke test for `NewGuard`/`Guard` resolving, the adapted `AuthGuard` reproduction end-to-end through root aliases)
+- [x] `gonest.NewGuard(fn)`, `gonest.Guard` resolve and work at root
+- [x] INSIGHT.md's `AuthGuard` example (adapted per spec.md's Out of Scope: no `MustInject`, some other way to reach an `AuthService`-equivalent check — e.g. closing over an already-constructed value) reproduced through root aliases, attached via `controller.Guards(...)` through root `Controller`/`Module`/`NewApp` aliases, dispatched via real `app.Test`: missing/invalid check → exception response, valid check → route Handler runs
+- [x] Gate check passes
+- [x] Test count: 2+ (root-level smoke test for `NewGuard`/`Guard` resolving, the adapted `AuthGuard` reproduction end-to-end through root aliases)
 
 **Tests**: unit (integration-style dispatch, root-package convention — see `middleware_test.go` at repo root for precedent)
 **Gate**: quick
