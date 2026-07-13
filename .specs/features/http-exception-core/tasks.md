@@ -18,7 +18,7 @@ Sequential: T2 depends on `HttpException`/`NewHttpException` from T1 (same packa
 
 ## Task Breakdown
 
-### T1: `Exception` interface + `HttpException` core type
+### T1: `Exception` interface + `HttpException` core type ✅ DONE (evaluator: PASS, commit `9e096a6`)
 
 **What**: `internal/exception/exception.go` (new file, new package) — `Exception` interface (`Status() int; Name() string; Message() string; Details() any`), `HttpException` struct (unexported fields: `status int; name, message string; details any`), `NewHttpException(status int, name, message string, details any) HttpException` (returns a VALUE, see design.md's Tech Decisions), and the 4 accessor methods (value receiver).
 **Where**: `internal/exception/exception.go`, `internal/exception/exception_test.go`
@@ -31,12 +31,12 @@ Sequential: T2 depends on `HttpException`/`NewHttpException` from T1 (same packa
 - Skill: NONE
 
 **Done when**:
-- [ ] `NewHttpException(status, name, message, details)`'s 4 accessors return exactly what was passed
-- [ ] `details == nil` is accepted, `Details()` returns `nil` (not a panic, not a synthesized value)
-- [ ] A locally-defined test type embedding `HttpException` by value (mirroring INSIGHT.md's `FooExampleError` pattern) satisfies `Exception` via promoted methods — proven by a type assertion in a test, not just "it compiles"
-- [ ] A non-exception panic value (e.g. `errors.New("x")`, a bare `int`) does NOT satisfy `Exception` — proven by a failed type assertion in a test
-- [ ] Gate check passes
-- [ ] Test count: 6+ (4 accessors, nil details, embedding satisfies Exception, non-exception does not satisfy Exception — may combine some into table-driven tests)
+- [x] `NewHttpException(status, name, message, details)`'s 4 accessors return exactly what was passed
+- [x] `details == nil` is accepted, `Details()` returns `nil` (not a panic, not a synthesized value)
+- [x] A locally-defined test type embedding `HttpException` by value (mirroring INSIGHT.md's `FooExampleError` pattern) satisfies `Exception` via promoted methods — proven by a type assertion in a test, not just "it compiles"
+- [x] A non-exception panic value (e.g. `errors.New("x")`, a bare `int`) does NOT satisfy `Exception` — proven by a failed type assertion in a test
+- [x] Gate check passes
+- [x] Test count: 6+ (4 accessors, nil details, embedding satisfies Exception, non-exception does not satisfy Exception — may combine some into table-driven tests)
 
 **Tests**: unit
 **Gate**: quick
