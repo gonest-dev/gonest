@@ -9,6 +9,7 @@ package controller
 
 import (
 	"github.com/gonest-dev/gonest/internal/guard"
+	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -33,7 +34,7 @@ type Controller struct {
 
 	middleware   []*middleware.Middleware
 	guards       []*guard.Guard
-	interceptors []Middleware
+	interceptors []*interceptor.Interceptor
 	filters      []Middleware
 }
 
@@ -153,10 +154,23 @@ func (c *Controller) OwnGuards() []*guard.Guard {
 	return append([]*guard.Guard(nil), c.guards...)
 }
 
-// Interceptors registers items as interceptors for this controller. Stub
-// only -- nothing reads the stored values yet.
-func (c *Controller) Interceptors(items ...Middleware) {
+// Interceptors registers items as interceptors for this controller, using
+// the real *interceptor.Interceptor type (internal/interceptor, feature
+// "Interceptor" T1). Interceptors was never called by any shipped code path
+// with the placeholder Middleware stub, so it is safe to change its
+// signature directly rather than deprecate-and-migrate (same class of
+// change as Use's/Guards' earlier migrations to their respective real
+// types).
+func (c *Controller) Interceptors(items ...*interceptor.Interceptor) {
 	c.interceptors = append(c.interceptors, items...)
+}
+
+// OwnInterceptors returns a copy of the interceptors registered on this
+// controller via Interceptors. Read-only: mutating the returned slice does
+// not affect this Controller's internal state (same defensive-copy pattern
+// as OwnGuards).
+func (c *Controller) OwnInterceptors() []*interceptor.Interceptor {
+	return append([]*interceptor.Interceptor(nil), c.interceptors...)
 }
 
 // Filters registers items as exception filters for this controller. Stub

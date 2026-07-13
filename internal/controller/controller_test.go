@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -150,7 +151,7 @@ func TestPipelineStubs_DoNotAffectObservableState(t *testing.T) {
 		c.Path("/things")
 		c.Use(middleware.New(nil))
 		c.Guards(guard.New(nil))
-		c.Interceptors(Middleware{})
+		c.Interceptors(interceptor.New(nil))
 		c.Filters(Middleware{})
 		c.Route(route.HttpGet, "/", nil)
 	})
@@ -263,5 +264,53 @@ func TestOwnGuards_ReturnsCopyNotInternalSlice(t *testing.T) {
 	got2 := c.OwnGuards()
 	if got2[0] != g1 {
 		t.Fatalf("OwnGuards() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+}
+
+func TestInterceptors_StoresInterceptorsInRegistrationOrder(t *testing.T) {
+	var order []string
+
+	i1 := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			order = append(order, "i1")
+			next(ctx)
+		})
+	})
+	i2 := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			order = append(order, "i2")
+			next(ctx)
+		})
+	})
+
+	c := New(func(c *Controller) {
+		c.Interceptors(i1, i2)
+	})
+	c.Declare()
+
+	got := c.OwnInterceptors()
+	if len(got) != 2 {
+		t.Fatalf("OwnInterceptors() returned %d items, want 2", len(got))
+	}
+	if got[0] != i1 || got[1] != i2 {
+		t.Fatalf("OwnInterceptors() = %v, want [i1, i2] in registration order", got)
+	}
+}
+
+func TestOwnInterceptors_ReturnsCopyNotInternalSlice(t *testing.T) {
+	i1 := interceptor.New(nil)
+	i2 := interceptor.New(nil)
+
+	c := New(func(c *Controller) {
+		c.Interceptors(i1)
+	})
+	c.Declare()
+
+	got := c.OwnInterceptors()
+	got[0] = i2
+
+	got2 := c.OwnInterceptors()
+	if got2[0] != i1 {
+		t.Fatalf("OwnInterceptors() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
