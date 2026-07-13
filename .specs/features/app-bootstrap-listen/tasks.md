@@ -18,7 +18,7 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 
 ## Task Breakdown
 
-### T1: `AppOptions`/`LogLevel`/`OnListen` types
+### T1: `AppOptions`/`LogLevel`/`OnListen` types ✅ DONE (evaluator: PASS, commit `691c653`)
 
 **What**: `internal/app/options.go` (new file) — `AppOptions{BufferLogs bool; LogLevels []LogLevel}`, `LogLevel int` enum (`LogLevelError`/`LogLevelWarn`/`LogLevelLog`/`LogLevelDebug`/`LogLevelVerbose`) with `String()` (same debug-friendly pattern as `HttpMethod.String()`), `OnListen func()`.
 **Where**: `internal/app/options.go`, `internal/app/options_test.go`
@@ -31,11 +31,11 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 - Skill: NONE
 
 **Done when**:
-- [ ] `AppOptions{}` zero value compiles and is a valid struct
-- [ ] All 5 `LogLevel` values + `String()` return distinct, readable strings
-- [ ] `OnListen` is a defined `func()` type (not a bare `func()` inline everywhere), nil-able
-- [ ] Gate check passes
-- [ ] Test count: 6+ (1 per LogLevel String() value + zero-value AppOptions + OnListen nil-safety)
+- [x] `AppOptions{}` zero value compiles and is a valid struct
+- [x] All 5 `LogLevel` values + `String()` return distinct, readable strings
+- [x] `OnListen` is a defined `func()` type (not a bare `func()` inline everywhere), nil-able
+- [x] Gate check passes
+- [x] Test count: 6+ (1 per LogLevel String() value + zero-value AppOptions + OnListen nil-safety)
 
 **Tests**: unit
 **Gate**: quick
