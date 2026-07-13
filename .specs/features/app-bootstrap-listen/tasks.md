@@ -70,7 +70,7 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 
 ---
 
-### T3: `HttpAdapter.Listen` gains `onListen` hook + Fiber wiring
+### T3: `HttpAdapter.Listen` gains `onListen` hook + Fiber wiring ✅ DONE (evaluator: PASS, commit `997e238`)
 
 **What**: `HttpAdapter.Listen(addr string, onListen func()) error` (was `Listen(addr string) error` in T8 — never called by any shipped code path yet, safe to change directly per design.md's Tech Decisions). `*fiberapp.FiberApp.Listen` implements it: registers `onListen` via Fiber v3's `f.app.Hooks().OnListen(...)` (only if `onListen != nil`) BEFORE calling the blocking `f.app.Listen(addr)`. **Before implementing**: re-verify Fiber v3's exact `Hooks().OnListen` callback signature (Knowledge Verification Chain — check vendored source under the Go module cache, or Context7 `gofiber/fiber` v3 docs; design.md flags this as unverified this session).
 **Where**: `internal/app/app.go` (`HttpAdapter` interface signature), `internal/fiberapp/fiberapp.go` (`Listen` implementation), `internal/fiberapp/fiberapp_test.go`
@@ -83,11 +83,11 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 - Skill: NONE
 
 **Done when**:
-- [ ] `HttpAdapter` interface's `Listen` signature updated repo-wide (compiles)
-- [ ] `FiberApp.Listen(addr, onListen)` with non-nil `onListen` fires the callback exactly once, before the call blocks for good — test proves ordering (e.g. callback appends to a slice/sets a flag BEFORE a concurrent goroutine can observe the block having "returned", using a channel/waitgroup to prove happens-before, not a timing-based sleep)
-- [ ] `FiberApp.Listen(addr, nil)` does not panic, blocks normally, no hook registered
-- [ ] Gate check passes
-- [ ] Test count: 3+ (callback fires once, ordering proven, nil-onListen safe)
+- [x] `HttpAdapter` interface's `Listen` signature updated repo-wide (compiles)
+- [x] `FiberApp.Listen(addr, onListen)` with non-nil `onListen` fires the callback exactly once, before the call blocks for good — test proves ordering (e.g. callback appends to a slice/sets a flag BEFORE a concurrent goroutine can observe the block having "returned", using a channel/waitgroup to prove happens-before, not a timing-based sleep)
+- [x] `FiberApp.Listen(addr, nil)` does not panic, blocks normally, no hook registered
+- [x] Gate check passes
+- [x] Test count: 3+ (callback fires once, ordering proven, nil-onListen safe)
 
 **Tests**: integration (real Fiber `Listen`/bind — needs a real ephemeral port, e.g. `:0` or a freed test port; do NOT leave a listener running past the test, close/shutdown cleanly)
 **Gate**: full
