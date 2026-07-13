@@ -44,7 +44,7 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 
 ---
 
-### T2: `Controller.Guards` real type + `OwnGuards`
+### T2: `Controller.Guards` real type + `OwnGuards` ✅ DONE (evaluator: PASS, commit `4f29ed8`)
 
 **What**: `internal/controller/controller.go`'s existing `Guards(items ...Middleware)` stub changes to `Guards(items ...*guard.Guard)` (real type from T1), storing into a field whose type changes from `[]Middleware` to `[]*guard.Guard`. Add `OwnGuards() []*guard.Guard` accessor (defensive copy, mirrors `OwnMiddleware`/`OwnRoutes`). Do NOT touch `Interceptors`/`Filters` — those keep the placeholder `Middleware struct{}` stub unchanged (still out of scope).
 **Where**: `internal/controller/controller.go` (existing, extend), `internal/controller/controller_test.go` (existing — migrate any pre-existing test that called `Guards` with the OLD placeholder type, e.g. check `TestPipelineStubs_DoNotAffectObservableState` — it likely still calls `Guards(Middleware{})`, needs updating to `guard.New(nil)`)
@@ -57,11 +57,11 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 - Skill: NONE
 
 **Done when**:
-- [ ] `Controller.Guards(g1, g2, ...)` stores real `*guard.Guard` values in registration order
-- [ ] `OwnGuards()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (same proof style as `TestOwnMiddleware_ReturnsCopyNotInternalSlice`)
-- [ ] `TestPipelineStubs_DoNotAffectObservableState` (or equivalent pre-existing test using the old `Guards` stub) migrated to real `*guard.Guard` values, still passes, and its assertions correctly reflect that `Interceptors`/`Filters` are STILL no-op while `Guards` (like `Use` before it) now genuinely stores something
-- [ ] Gate check passes
-- [ ] Test count: 3+ (Guards stores in order, OwnGuards defensive copy, pre-existing test migrated and still green)
+- [x] `Controller.Guards(g1, g2, ...)` stores real `*guard.Guard` values in registration order
+- [x] `OwnGuards()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (same proof style as `TestOwnMiddleware_ReturnsCopyNotInternalSlice`)
+- [x] `TestPipelineStubs_DoNotAffectObservableState` (or equivalent pre-existing test using the old `Guards` stub) migrated to real `*guard.Guard` values, still passes, and its assertions correctly reflect that `Interceptors`/`Filters` are STILL no-op while `Guards` (like `Use` before it) now genuinely stores something
+- [x] Gate check passes
+- [x] Test count: 3+ (Guards stores in order, OwnGuards defensive copy, pre-existing test migrated and still green)
 
 **Tests**: unit
 **Gate**: quick
