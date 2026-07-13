@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestone 1 COMPLETE — "Provider & DI Graph", "Module Composition" e "Controller & Route Registration" (T1-T9, commit `c5b77ee`) todas DONE, evaluator PASS em toda task. Próxima: definir próxima feature do Milestone 2 (ver ROADMAP.md).
+**Current Work:** Milestone 1 **COMPLETE** — "Provider & DI Graph", "Module Composition", "Controller & Route Registration" e "App Bootstrap & Listen" (T1-T6, commit `667a328`) todas DONE, evaluator PASS em toda task. Primeiro `go run` funcional provado via teste e2e real (`net/http.Client` contra porta bindada de verdade). Próxima: especificar primeira feature de Milestone 2 (Exceptions & Response Contract — `HttpException Core`, ver ROADMAP.md).
 
 ---
 
@@ -169,6 +169,7 @@ _Nenhuma ainda._
 
 - [ ] Abstração multi-adapter HTTP (net/http, Echo, Gin) — Captured during: definição de escopo v1
 - [ ] Emitter/Scheduler/Terminus — Captured during: definição de escopo v1 (ver Future Considerations no ROADMAP.md)
+- [ ] `gonest.FiberApp` como alias raiz de `internal/fiberapp.FiberApp` — Captured during: T5 de "App Bootstrap & Listen" (2026-07-13). Gap pré-existente (nenhuma feature anterior adicionou esse re-export) — INSIGHT.md usa `gonest.FiberApp` no call-site literal (`gonest.NewApp[gonest.FiberApp](...)`), mas hoje só `fiberapp.FiberApp` existe. Não bloqueou nada (testes usam o import direto), mas API pública fica incompleta até alguém adicionar `type FiberApp = fiberapp.FiberApp` num arquivo apropriado na raiz. Baixo custo, baixa prioridade — pegar quando mexer na raiz de novo por outro motivo, ou antes de considerar a API "pronta pra uso externo".
 - [ ] Renomear `MustResolve`→`MustInject` (e nomes públicos relacionados: `internal/resolve`→`internal/inject`) — Captured during: T8 evaluator. Motivo: evitar colisão de vocabulário com "Resolver" do GraphQL, caso o projeto suporte GraphQL no futuro. Nest já usa `@Injectable`/`@Inject`, `MustInject` fica mais alinhado. Usuário decidiu fazer o rename só depois de fechar a feature "Provider & DI Graph" inteira (T9-T11), não agora. `internal/resolver` (motor de grafo/DFS) NÃO precisa renomear — é implementação interna, não API pública.
 
 ---

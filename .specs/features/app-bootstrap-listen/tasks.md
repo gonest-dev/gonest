@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/app-bootstrap-listen/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T6, todos evaluator PASS)
 
 ---
 
@@ -149,7 +149,7 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 
 ---
 
-### T6: Real end-to-end — actual `net/http` client against a real bound port
+### T6: Real end-to-end — actual `net/http` client against a real bound port ✅ DONE (evaluator: PASS, commit `667a328`)
 
 **What**: extend `internal/app/app_test.go` (or a new `app_e2e_test.go` in the same package) with a test that: bootstraps a real app (reuse T9's `UserController`/`AppModule` example), starts `MustListen` in a goroutine against an ephemeral port (`:0` — capture the actual bound port via the adapter or `OnListen`'s callback timing, since `:0` means "OS picks a free port"), confirms `OnListen`'s callback fires (proving BOOT-03 end-to-end, not just at the Fiber-adapter-unit level from T3), then dispatches a REAL `net/http.Client` request (not `app.Test`) against the bound address and confirms a correct response. Shuts down cleanly at test end (no leaked listener/goroutine across test runs — check how to stop a Fiber v3 app cleanly, likely `app.Shutdown()` or similar on the underlying `*fiber.App`, reachable via `FiberApp`'s existing `FiberApp()` accessor from T7).
 **Where**: `internal/app/app_test.go` (or new file in same package)
@@ -162,11 +162,11 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 - Skill: NONE
 
 **Done when**:
-- [ ] Real `net/http.Client` request against the actually-bound port gets a correct status + body (reuse one of T9's 5 routes, e.g. `GET /user/:user_id` or List)
-- [ ] `OnListen` callback observably fires before the test proceeds to dial (proven via channel/waitgroup synchronization, not a sleep)
-- [ ] No leaked listener/goroutine after the test completes (clean shutdown, verified by the test not hanging and, ideally, a second bind to the same ephemeral-then-freed port succeeding in a follow-up assertion or by explicit `t.Cleanup`)
-- [ ] Gate check passes
-- [ ] Test count: 1+ (this is inherently a single cohesive end-to-end scenario; may include 2-3 sub-assertions in one test function, consistent with how T9 structured its 5-route test)
+- [x] Real `net/http.Client` request against the actually-bound port gets a correct status + body (reuse one of T9's 5 routes, e.g. `GET /user/:user_id` or List)
+- [x] `OnListen` callback observably fires before the test proceeds to dial (proven via channel/waitgroup synchronization, not a sleep)
+- [x] No leaked listener/goroutine after the test completes (clean shutdown, verified by the test not hanging and, ideally, a second bind to the same ephemeral-then-freed port succeeding in a follow-up assertion or by explicit `t.Cleanup`)
+- [x] Gate check passes
+- [x] Test count: 1+ (this is inherently a single cohesive end-to-end scenario; may include 2-3 sub-assertions in one test function, consistent with how T9 structured its 5-route test)
 
 **Tests**: integration
 **Gate**: full

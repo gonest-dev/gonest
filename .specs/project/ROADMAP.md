@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Core DI & Module System
-**Status:** In Progress
+**Current Milestone:** Exceptions & Response Contract (Milestone 2)
+**Status:** Milestone 1 COMPLETE — starting Milestone 2
 
 ---
 
@@ -26,9 +26,10 @@
 - `HttpCode`, `Context.Json`, `MustParam[T]`
 - Adapter Fiber v3 real (`internal/fiberapp`), `NewApp[T HttpAdapter]` genérico + Stage 2.5 (registro/colisão de rota)
 
-**App Bootstrap & Listen** - PLANNED
-- `NewApp`/`MustNewApp`, `AppOptions{BufferLogs, LogLevels}`
-- `MustListen`, `OnListen` (callback roda no bind, antes do bloqueio)
+**App Bootstrap & Listen** - COMPLETE
+- `NewApp`/`MustNewApp` com `AppOptions{BufferLogs, LogLevels}` (config capturada, inerte — sem Logger real ainda)
+- `MustListen`/`OnListen` real via `HttpAdapter.Listen` + Fiber `Hooks().OnListen` (callback roda no bind, antes do bloqueio)
+- Milestone 1 **COMPLETE** — primeiro `go run` funcional provado via teste e2e com `net/http.Client` real
 
 ---
 
