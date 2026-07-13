@@ -45,7 +45,7 @@ Sequential: T2 depends on `HttpException`/`NewHttpException` from T1 (same packa
 
 ---
 
-### T2: 5 built-in exceptions
+### T2: 5 built-in exceptions ✅ DONE (evaluator: PASS, commit `619ea7c`)
 
 **What**: `internal/exception/builtin.go` (new file) — `NotFoundException`/`BadRequestException`/`ConflictException`/`UnauthorizedException`/`ForbiddenException`, each `struct { HttpException }` with a `New*Exception(details any) *T` constructor (returns a POINTER, see design.md's Tech Decisions) that fixes `status` (via `net/http` stdlib constants: `http.StatusNotFound`/`StatusBadRequest`/`StatusConflict`/`StatusUnauthorized`/`StatusForbidden`) and `name` (the exception's own Go type name as a string, e.g. `"NotFoundException"`).
 **Where**: `internal/exception/builtin.go`, `internal/exception/builtin_test.go`
@@ -58,12 +58,12 @@ Sequential: T2 depends on `HttpException`/`NewHttpException` from T1 (same packa
 - Skill: NONE
 
 **Done when**:
-- [ ] All 5 constructors return the correct fixed status code (404/400/409/401/403) and name string matching the type name exactly
-- [ ] `New*Exception(nil)` works for all 5 (mirrors INSIGHT.md's `NewUnauthorizedException(nil)`)
-- [ ] `panic(New*Exception(...))` + `recover().(*T)` round-trips correctly for all 5 (mirrors INSIGHT.md's own test pattern: `exc, ok := recover().(*gonest.NotFoundException)`)
-- [ ] Each of the 5 satisfies `Exception` (table-driven, reusing T1's assertion pattern)
-- [ ] Gate check passes
-- [ ] Test count: 10+ (2 per exception: constructor correctness + panic/recover round-trip — may combine into table-driven tests covering all 5)
+- [x] All 5 constructors return the correct fixed status code (404/400/409/401/403) and name string matching the type name exactly
+- [x] `New*Exception(nil)` works for all 5 (mirrors INSIGHT.md's `NewUnauthorizedException(nil)`)
+- [x] `panic(New*Exception(...))` + `recover().(*T)` round-trips correctly for all 5 (mirrors INSIGHT.md's own test pattern: `exc, ok := recover().(*gonest.NotFoundException)`)
+- [x] Each of the 5 satisfies `Exception` (table-driven, reusing T1's assertion pattern)
+- [x] Gate check passes
+- [x] Test count: 10+ (2 per exception: constructor correctness + panic/recover round-trip — may combine into table-driven tests covering all 5)
 
 **Tests**: unit
 **Gate**: quick
