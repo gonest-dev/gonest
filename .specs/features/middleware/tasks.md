@@ -105,7 +105,7 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 
 ---
 
-### T4: Stage 2.5 composition in `internal/app`
+### T4: Stage 2.5 composition in `internal/app` ✅ DONE (evaluator: PASS, commit `d349fa1` — SPEC_DEVIATION confirmado genuíno: `Header()`/`SetHeader()` são stores diferentes, request vs response, ver relato do dev)
 
 **What**: `internal/app/app.go`'s `registerRoutes` (Stage 2.5, T8) currently registers each route's bare `HandlerFunc()` with the adapter. Extend it to compose a middleware chain per route: `root.OwnMiddleware()` (global, ALWAYS consulted regardless of which module a controller belongs to — this is where "root module only" actually takes effect, per design.md) prepended to that route's OWN controller's `OwnMiddleware()` (via the existing `routableController` local interface, extended to require `OwnMiddleware() []*middleware.Middleware` — already satisfied by `*controller.Controller` post-T2), composed outward so global middleware ends up OUTERMOST (runs first). Register the COMPOSED `func(ctx *httpctx.Context)` with `adapter.RegisterRoute`, not the bare route Handler.
 **Where**: `internal/app/app.go` (existing `registerRoutes`, extended), `internal/app/app_test.go` (existing — add tests)
@@ -118,16 +118,16 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 - Skill: NONE
 
 **Done when**:
-- [ ] A route with a SINGLE controller-level middleware runs it before the route Handler, via a real `app.Test` dispatch (not a unit-level check of the composition function alone)
-- [ ] A middleware calling `next(ctx)` continues the chain; a middleware NOT calling `next(ctx)` short-circuits (route Handler never runs) — both proven via real dispatch
-- [ ] Multiple controller-level middleware run in registration order (test with 2+, each appending a distinguishable marker to a response header, confirm exact order in the final header value)
-- [ ] A middleware mutating `ctx` before calling `next` is visible to a LATER middleware and the route Handler (same `*httpctx.Context` instance, not a copy) — proven via the same marker-header technique
-- [ ] Root-module `Use()` middleware runs for EVERY route in the app, including a controller that itself has ZERO `Use()` calls — proven via 2 controllers, only one with its own middleware, both hit by requests, both show the global marker
-- [ ] Global middleware runs BEFORE controller-level middleware — proven via marker-header ORDER, not just presence (reuse the same technique, assert the substring ordering within the header value)
-- [ ] An app with ZERO `Use()` calls anywhere behaves EXACTLY as it did before this feature (zero regression) — confirm an existing pre-feature test (e.g. T9's `UserController` end-to-end example, or T8's route-registration tests) still passes unmodified
-- [ ] A panicking middleware is caught by the SAME existing recover wrapper (`internal/fiberapp`) and produces the correct Exception/generic-500 response, exactly like a panicking route Handler already does — proven via real dispatch, panicking with a built-in `exception.Exception` from inside a middleware
-- [ ] Gate check passes
-- [ ] Test count: 8+ (single mw runs before handler, next continues, missing next short-circuits, order among 2+ controller mw, ctx mutation visible downstream, global-applies-to-controller-without-own-mw, global-before-local ordering, zero-regression for no-Use apps, middleware panic uses existing recovery)
+- [x] A route with a SINGLE controller-level middleware runs it before the route Handler, via a real `app.Test` dispatch (not a unit-level check of the composition function alone)
+- [x] A middleware calling `next(ctx)` continues the chain; a middleware NOT calling `next(ctx)` short-circuits (route Handler never runs) — both proven via real dispatch
+- [x] Multiple controller-level middleware run in registration order (test with 2+, each appending a distinguishable marker — implemented via real `net/http.Response` header inspection instead of the originally-suggested read-then-append technique, see SPEC_DEVIATION note above)
+- [x] A middleware mutating `ctx` before calling `next` is visible to a LATER middleware and the route Handler (same `*httpctx.Context` instance, not a copy) — proven via `ctx.WithRoute`/`ctx.Route()` repurposed as an any-carrier (isolated from any test using `MustParam`'s Pipe-via-Route lookup, confirmed by evaluator)
+- [x] Root-module `Use()` middleware runs for EVERY route in the app, including a controller that itself has ZERO `Use()` calls — proven via 2 controllers, only one with its own middleware, both hit by requests, both show the global marker
+- [x] Global middleware runs BEFORE controller-level middleware — proven via explicit ordered-slice assertion
+- [x] An app with ZERO `Use()` calls anywhere behaves EXACTLY as it did before this feature (zero regression) — T9's `UserController` end-to-end test confirmed unmodified and still passing
+- [x] A panicking middleware is caught by the SAME existing recover wrapper (`internal/fiberapp`) and produces the correct Exception/generic-500 response, exactly like a panicking route Handler already does — proven via real dispatch, panicking with a built-in `exception.Exception` from inside a middleware
+- [x] Gate check passes
+- [x] Test count: 8+ (single mw runs before handler, next continues, missing next short-circuits, order among 2+ controller mw, ctx mutation visible downstream, global-applies-to-controller-without-own-mw, global-before-local ordering, zero-regression for no-Use apps, middleware panic uses existing recovery)
 
 **Tests**: integration (real Fiber dispatch via `app.Test`, per TESTING.md's established pattern for anything touching the actual request/response cycle)
 **Gate**: full
