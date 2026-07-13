@@ -96,7 +96,7 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 
 ---
 
-### T4: `App.MustListen`
+### T4: `App.MustListen` ✅ DONE (evaluator: PASS, commit `28778a9`)
 
 **What**: `func (a *App) MustListen(addr string, onListen OnListen)` — calls `a.adapter.Listen(addr, onListenFunc)` where `onListenFunc` is `nil` if `onListen == nil`, else the wrapped `func()`. Panics (clear message, includes `addr`) if `Listen` returns an error.
 **Where**: `internal/app/app.go` (extended), `internal/app/app_test.go`
@@ -109,11 +109,11 @@ T1 (AppOptions/LogLevel/OnListen types) → T2 (NewApp/MustNewApp + opts) → T3
 - Skill: NONE
 
 **Done when**:
-- [ ] `app.MustListen(addr, gonest.OnListen(fn))` calls `fn` exactly once and blocks (test runs it in a goroutine, waits on a channel the callback closes, then confirms a real request against `addr` succeeds)
-- [ ] `app.MustListen(addr, nil)` blocks without panicking or calling anything
-- [ ] `app.MustListen` with an adapter that returns an error from `Listen` (fake/spy `HttpAdapter` in test, not necessarily real Fiber) panics with a message containing the addr and the underlying error
-- [ ] Gate check passes
-- [ ] Test count: 3+ (fires callback + blocks, nil-safe, panics on Listen error)
+- [x] `app.MustListen(addr, gonest.OnListen(fn))` calls `fn` exactly once and blocks (test runs it in a goroutine, waits on a channel the callback closes, then confirms a real request against `addr` succeeds)
+- [x] `app.MustListen(addr, nil)` blocks without panicking or calling anything
+- [x] `app.MustListen` with an adapter that returns an error from `Listen` (fake/spy `HttpAdapter` in test, not necessarily real Fiber) panics with a message containing the addr and the underlying error
+- [x] Gate check passes
+- [x] Test count: 3+ (fires callback + blocks, nil-safe, panics on Listen error)
 
 **Tests**: unit (fake `HttpAdapter` spy for the panic/ordering proof) + integration (1 test using the real `fiberapp.FiberApp` to prove the whole chain, may overlap with T6 — keep this one minimal, T6 owns the full `net/http`-client-dial proof)
 **Gate**: full
