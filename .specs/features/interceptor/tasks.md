@@ -45,7 +45,7 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 
 ---
 
-### T2: `Controller.Interceptors` real type + `OwnInterceptors`
+### T2: `Controller.Interceptors` real type + `OwnInterceptors` ✅ DONE (evaluator: PASS, commit `2345f95`)
 
 **What**: `internal/controller/controller.go`'s `Interceptors(items ...Middleware)` (stub desde T6, tipo placeholder `Middleware struct{}`) muda pro tipo real `*interceptor.Interceptor` (T1). Campo `guards`... digo, `interceptors []Middleware` → `[]*interceptor.Interceptor`. `func (c *Controller) Interceptors(items ...*interceptor.Interceptor)`. Novo accessor: `func (c *Controller) OwnInterceptors() []*interceptor.Interceptor` (cópia defensiva, espelha `OwnGuards`). NÃO tocar `Filters` nem o tipo placeholder `Middleware struct{}` (continuam intocados — `Filters` fica sendo o ÚNICO stub restante depois desta feature).
 **Where**: `internal/controller/controller.go` (existente, estende), `internal/controller/controller_test.go` (existente — migrar `TestPipelineStubs_DoNotAffectObservableState` pra usar `interceptor.New(nil)` real no `Interceptors(...)`, mantendo `Filters(...)` com o stub antigo)
@@ -58,11 +58,11 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 - Skill: NONE
 
 **Done when**:
-- [ ] `Controller.Interceptors(i1, i2, ...)` armazena valores reais `*interceptor.Interceptor` em ordem de registro
-- [ ] `OwnInterceptors()` devolve cópia defensiva — teste prova que mutar o slice devolvido não afeta estado interno
-- [ ] `TestPipelineStubs_DoNotAffectObservableState` migrado: `Interceptors(...)` usa valores reais, `Filters(...)` continua com o stub antigo, asserções refletem corretamente que `Interceptors` (como `Use`/`Guards` antes) agora armazena de verdade enquanto `Filters` continua no-op
-- [ ] Gate check passa
-- [ ] Test count: 3+ (Interceptors armazena em ordem, OwnInterceptors cópia defensiva, teste pré-existente migrado e ainda verde)
+- [x] `Controller.Interceptors(i1, i2, ...)` armazena valores reais `*interceptor.Interceptor` em ordem de registro
+- [x] `OwnInterceptors()` devolve cópia defensiva — teste prova que mutar o slice devolvido não afeta estado interno
+- [x] `TestPipelineStubs_DoNotAffectObservableState` migrado: `Interceptors(...)` usa valores reais, `Filters(...)` continua com o stub antigo, asserções refletem corretamente que `Interceptors` (como `Use`/`Guards` antes) agora armazena de verdade enquanto `Filters` continua no-op
+- [x] Gate check passa
+- [x] Test count: 3+ (Interceptors armazena em ordem, OwnInterceptors cópia defensiva, teste pré-existente migrado e ainda verde)
 
 **Tests**: unit
 **Gate**: quick
