@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Exceptions & Response Contract (Milestone 2)
-**Status:** Milestone 1 COMPLETE — starting Milestone 2
+**Current Milestone:** Request Pipeline (Milestone 3)
+**Status:** Milestones 1-2 COMPLETE — starting Milestone 3
 
 ---
 
@@ -44,9 +44,9 @@
 - Built-ins: `NotFoundException`, `BadRequestException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`
 - `Exception` interface (satisfação estrutural via embedding) — base pra "Panic Recovery & Default Handler" detectar exceptions
 
-**Panic Recovery & Default Handler** - PLANNED
-- Recover global no pipeline de request
-- Exception → status/body mapeado; panic não-Exception → 500 genérico sem leak
+**Panic Recovery & Default Handler** - COMPLETE
+- Recover em `internal/fiberapp.RegisterRoute` detecta `exception.Exception` via type-assertion na interface (não type-switch fechado) — `Exception` (built-in ou custom via embedding) → status/body `{name,message,details}`; panic não-Exception → 500 genérico sem leak (comportamento T7 preservado, não regressão)
+- Milestone 2 **COMPLETE**
 
 ---
 

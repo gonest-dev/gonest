@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestone 1 **COMPLETE**. Milestone 2 iniciado: feature "HttpException Core" (T1-T3, commit `aa74048`) DONE, evaluator PASS em toda task — `Exception`/`HttpException`/5 built-ins prontos, `internal/exception` novo pacote. Próxima: "Panic Recovery & Default Handler" (2ª e última feature de Milestone 2) — precisa ligar `internal/fiberapp`'s recover wrapper (T7 da feature Controller & Route) pra detectar `Exception` via `recover()` e formatar `{name,message,details}` na resposta real, em vez do 500 genérico atual.
+**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 2 fechado com "Panic Recovery & Default Handler" (T1, commit `bc3941f`) — `internal/fiberapp`'s recover branch agora detecta `exception.Exception` via type-assertion (não type-switch fechado) e formata `{name,message,details}` na resposta real; panic não-Exception continua 500 genérico sem leak (T7 preservado, provado por teste de não-regressão). Próxima: especificar primeira feature de Milestone 3 (Request Pipeline — `Middleware`, ver ROADMAP.md).
 
 ---
 
