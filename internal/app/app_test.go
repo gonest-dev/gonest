@@ -2,12 +2,18 @@ package app
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/gonest-dev/gonest/internal/controller"
+	"github.com/gonest-dev/gonest/internal/fiberapp"
+	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/provider"
+	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/scope"
 )
 
@@ -63,7 +69,7 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 	})
 	appModule.Providers(consumer)
 
-	app, err := NewApp(appModule)
+	app, err := NewApp[recordingFakeAdapter](appModule)
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -114,7 +120,7 @@ func TestMustNewApp_PanicsOnAssembleError(t *testing.T) {
 		}
 	}()
 
-	MustNewApp(root)
+	MustNewApp[recordingFakeAdapter](root)
 }
 
 func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
@@ -128,7 +134,7 @@ func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app := MustNewApp(root)
+	app := MustNewApp[recordingFakeAdapter](root)
 	if app == nil {
 		t.Fatalf("MustNewApp() returned nil *App")
 	}
@@ -152,7 +158,7 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 		m.Providers(pa, pb)
 	})
 
-	_, err := NewApp(root)
+	_, err := NewApp[recordingFakeAdapter](root)
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want circular dependency error")
 	}
@@ -181,7 +187,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 		m.Providers(firstProvider)
 	})
 
-	firstApp, err := NewApp(firstRoot)
+	firstApp, err := NewApp[recordingFakeAdapter](firstRoot)
 	if err != nil {
 		t.Fatalf("first NewApp() error = %v", err)
 	}
@@ -215,7 +221,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 		m.Providers(secondProvider, consumer)
 	})
 
-	secondApp, err := NewApp(secondRoot)
+	secondApp, err := NewApp[recordingFakeAdapter](secondRoot)
 	if err != nil {
 		t.Fatalf("second NewApp() error = %v, want nil -- must not be affected by the first call's leftover state", err)
 	}
@@ -242,11 +248,219 @@ func TestNewApp_ConstructorError_ReturnsError(t *testing.T) {
 		m.Providers(p)
 	})
 
-	_, err := NewApp(root)
+	_, err := NewApp[recordingFakeAdapter](root)
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want the Constructor's returned error surfaced")
 	}
 	if !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("NewApp() error = %q, want it to contain the Constructor's error message %q", err.Error(), "boom")
+	}
+}
+
+// fakeRegisteredRoute records one RegisterRoute call's method+path, as
+// observed by recordingFakeAdapter below.
+type fakeRegisteredRoute struct {
+	method route.HttpMethod
+	path   string
+}
+
+// TestNewApp_ControllerWithRoutes_RegistersEachOnAdapter proves Stage 2.5
+// walks OwnControllers/OwnRoutes across the assembled module tree and calls
+// RegisterRoute on the adapter for each one, with the full path (Controller
+// PathPrefix + Route Path).
+func TestNewApp_ControllerWithRoutes_RegistersEachOnAdapter(t *testing.T) {
+	userController := controller.New(func(c *controller.Controller) {
+		c.Path("/user")
+		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {})
+		})
+		c.Route(route.HttpPost, "/", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(userController)
+	})
+
+	app, err := NewApp[recordingFakeAdapter](root)
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() returned nil *App")
+	}
+
+	got := lastRecordingAdapter.registered
+	want := []fakeRegisteredRoute{
+		{method: route.HttpGet, path: "/user/:id"},
+		{method: route.HttpPost, path: "/user/"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("registered routes = %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("registered[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+// TestNewApp_DuplicateRoute_ReturnsErrorBeforeRegistering proves Stage 2.5
+// detects a method+path collision (considering the controller's PathPrefix)
+// BEFORE registering anything on the adapter, and returns the exact error
+// format design.md specifies: "duplicate route: GET /user/:id".
+func TestNewApp_DuplicateRoute_ReturnsErrorBeforeRegistering(t *testing.T) {
+	dupeController := controller.New(func(c *controller.Controller) {
+		c.Path("/user")
+		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {})
+		})
+	})
+	otherDupeController := controller.New(func(c *controller.Controller) {
+		c.Path("/user")
+		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(dupeController, otherDupeController)
+	})
+
+	_, err := NewApp[recordingFakeAdapter](root)
+	if err == nil {
+		t.Fatalf("NewApp() error = nil, want a duplicate route error")
+	}
+	if err.Error() != "duplicate route: GET /user/:id" {
+		t.Fatalf("NewApp() error = %q, want %q", err.Error(), "duplicate route: GET /user/:id")
+	}
+
+	if len(lastRecordingAdapter.registered) != 0 {
+		t.Fatalf("registered = %+v, want no routes registered when a collision is detected", lastRecordingAdapter.registered)
+	}
+}
+
+// TestNewApp_ZeroControllers_BootstrapsNormally proves an app with no
+// Controllers at all (pure DI graph, like every pre-T8 test in this file)
+// bootstraps successfully through Stage 2.5 -- the edge case spec.md calls
+// out explicitly.
+func TestNewApp_ZeroControllers_BootstrapsNormally(t *testing.T) {
+	type plainService struct{ Ready bool }
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *plainService { return &plainService{Ready: true} })
+	})
+	root := module.New(func(m *module.Module) {
+		m.Providers(p)
+	})
+
+	app, err := NewApp[recordingFakeAdapter](root)
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() returned nil *App")
+	}
+	if len(lastRecordingAdapter.registered) != 0 {
+		t.Fatalf("registered = %+v, want none for a controller-less app", lastRecordingAdapter.registered)
+	}
+}
+
+// TestNewApp_EmptyPathPrefix_RegistersRouteWithBarePath proves a Controller
+// that never calls Path (empty prefix) still registers its routes correctly
+// -- full path is just the Route's own Path, no leading prefix segment
+// glued on.
+func TestNewApp_EmptyPathPrefix_RegistersRouteWithBarePath(t *testing.T) {
+	noPrefixController := controller.New(func(c *controller.Controller) {
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(noPrefixController)
+	})
+
+	_, err := NewApp[recordingFakeAdapter](root)
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	got := lastRecordingAdapter.registered
+	if len(got) != 1 || got[0] != (fakeRegisteredRoute{method: route.HttpGet, path: "/ping"}) {
+		t.Fatalf("registered = %+v, want a single GET /ping route", got)
+	}
+}
+
+// recordingFakeAdapter is identical to fakeAdapter but records itself into
+// lastRecordingAdapter on Init, so tests using it as NewApp[T]'s type
+// argument can read back what got registered on the specific instance
+// NewApp[T] constructed internally.
+type recordingFakeAdapter struct {
+	registered []fakeRegisteredRoute
+}
+
+var lastRecordingAdapter *recordingFakeAdapter
+
+func (f *recordingFakeAdapter) Init() {
+	lastRecordingAdapter = f
+}
+
+func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error {
+	f.registered = append(f.registered, fakeRegisteredRoute{method: method, path: path})
+	return nil
+}
+
+func (f *recordingFakeAdapter) Listen(addr string) error {
+	return nil
+}
+
+// TestNewApp_FiberApp_RealEndToEndWiring proves the generic wiring truly
+// works with the real fiberapp.FiberApp adapter (not just the fake spy
+// above): NewApp[fiberapp.FiberApp] constructs a genuinely usable FiberApp
+// (Init sets a non-nil *fiber.App, see internal/fiberapp/fiberapp.go),
+// registers a real route on it, and dispatches a real HTTP request through
+// Fiber's own app.Test -- proving reflect.New(...).Interface() + Init()
+// produces something other than a nil-panic waiting to happen.
+func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
+	called := false
+	pingController := controller.New(func(c *controller.Controller) {
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				called = true
+				ctx.Json(map[string]string{"pong": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(pingController)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root)
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() returned nil *App")
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if !called {
+		t.Fatalf("expected the registered Handler to run, but it did not")
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 }

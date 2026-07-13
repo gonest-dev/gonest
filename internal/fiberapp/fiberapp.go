@@ -26,7 +26,28 @@ type FiberApp struct {
 // themselves) so T8's NewApp[T] can construct one via reflection/generics
 // without importing Fiber itself.
 func New() *FiberApp {
-	return &FiberApp{app: fiber.New()}
+	f := &FiberApp{}
+	f.Init()
+	return f
+}
+
+// Init lazily sets f.app to a freshly constructed *fiber.App if it is not
+// already set. It is a no-op on any call after the first (mirroring
+// Controller.Declare/Provider.Declare's idempotency pattern), so it is safe
+// to call unconditionally.
+//
+// This exists for internal/app's generic NewApp[T HttpAdapter]: it builds
+// the zero-value T via reflect.New(reflect.TypeFor[T]()).Interface(), which
+// for FiberApp produces &FiberApp{app: nil} -- calling RegisterRoute on that
+// would nil-panic dereferencing f.app. NewApp[T] calls Init() once right
+// after construction (part of the HttpAdapter contract), which for FiberApp
+// fills in the real *fiber.App. New() above also calls Init() internally so
+// both construction paths converge on the same lazy-init logic instead of
+// duplicating "fiber.New() unless already set".
+func (f *FiberApp) Init() {
+	if f.app == nil {
+		f.app = fiber.New()
+	}
 }
 
 // FiberApp returns the underlying *fiber.App. Exported for tests (this

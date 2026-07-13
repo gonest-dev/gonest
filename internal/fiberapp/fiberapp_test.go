@@ -10,6 +10,48 @@ import (
 	"github.com/gonest-dev/gonest/internal/route"
 )
 
+// TestInit_ZeroValueFiberApp_BecomesUsable proves Init lazily sets up the
+// internal *fiber.App on a zero-value FiberApp{} (as reflect.New would
+// produce inside NewApp[T] in internal/app, T8) -- without Init, RegisterRoute
+// on a zero-value FiberApp would nil-panic dereferencing a nil f.app.
+func TestInit_ZeroValueFiberApp_BecomesUsable(t *testing.T) {
+	app := &FiberApp{}
+
+	app.Init()
+
+	if err := app.RegisterRoute(route.HttpGet, "/ping", func(ctx *httpctx.Context) {
+		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error after Init: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+// TestInit_CalledTwice_DoesNotResetExistingApp proves Init is idempotent: if
+// f.app is already set (e.g. by New()), calling Init again does not replace
+// it with a fresh *fiber.App (which would silently drop any routes already
+// registered on the original one).
+func TestInit_CalledTwice_DoesNotResetExistingApp(t *testing.T) {
+	app := New()
+	original := app.FiberApp()
+
+	app.Init()
+
+	if app.FiberApp() != original {
+		t.Fatalf("Init replaced an already-initialized *fiber.App")
+	}
+}
+
 // TestNew_RegisterRoute_NoError proves RegisterRoute accepts a simple GET
 // route against a fresh FiberApp without returning an error -- the minimal
 // "registration succeeds" case before any dispatch is exercised.

@@ -145,3 +145,27 @@ func TestHasParam_FalseForUndeclaredName(t *testing.T) {
 		t.Fatal("expected HasParam(\"nonexistent\") to be false, path does not declare it")
 	}
 }
+
+// TestMethod_ReturnsConstructedMethod proves Method returns the HttpMethod
+// passed to New -- needed by Stage 2.5 (app bootstrap route collection) to
+// build a method+path collision key without reaching into Route's
+// unexported fields.
+func TestMethod_ReturnsConstructedMethod(t *testing.T) {
+	r := New(HttpPost, "/users", func(r *Route) {})
+
+	if got := r.Method(); got != HttpPost {
+		t.Fatalf("Method() = %v, want %v", got, HttpPost)
+	}
+}
+
+// TestPath_ReturnsConstructedPath proves Path returns the path string passed
+// to New -- needed by Stage 2.5 to build the full route path (controller
+// PathPrefix + route Path) for both collision detection and adapter
+// registration.
+func TestPath_ReturnsConstructedPath(t *testing.T) {
+	r := New(HttpGet, "/users/:id", func(r *Route) {})
+
+	if got := r.Path(); got != "/users/:id" {
+		t.Fatalf("Path() = %q, want %q", got, "/users/:id")
+	}
+}

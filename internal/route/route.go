@@ -45,6 +45,21 @@ func New(method HttpMethod, path string, fn func(*Route)) *Route {
 	return r
 }
 
+// Method returns this Route's HTTP method, as passed to New. Used by Stage
+// 2.5 of app bootstrap (internal/app) to build the method+path collision key
+// and to register the route on the HttpAdapter.
+func (r *Route) Method() HttpMethod {
+	return r.method
+}
+
+// Path returns this Route's declared path pattern, as passed to New (not
+// combined with any owning Controller's PathPrefix -- that composition is
+// Stage 2.5's job, not Route's). Used alongside Method for the same
+// collision-key/registration purposes.
+func (r *Route) Path() string {
+	return r.path
+}
+
 // HttpCode stores the default status code this Route's Handler responds
 // with (unless the Handler itself overrides it via ctx.Status).
 func (r *Route) HttpCode(status int) {
