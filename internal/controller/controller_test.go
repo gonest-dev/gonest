@@ -3,6 +3,7 @@ package controller
 import (
 	"testing"
 
+	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
@@ -148,7 +149,7 @@ func TestPipelineStubs_DoNotAffectObservableState(t *testing.T) {
 	withStubs := New(func(c *Controller) {
 		c.Path("/things")
 		c.Use(middleware.New(nil))
-		c.Guards(Middleware{})
+		c.Guards(guard.New(nil))
 		c.Interceptors(Middleware{})
 		c.Filters(Middleware{})
 		c.Route(route.HttpGet, "/", nil)
@@ -214,5 +215,53 @@ func TestOwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
 	got2 := c.OwnMiddleware()
 	if got2[0] != m1 {
 		t.Fatalf("OwnMiddleware() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+}
+
+func TestGuards_StoresGuardsInRegistrationOrder(t *testing.T) {
+	var order []string
+
+	g1 := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			order = append(order, "g1")
+			return true
+		})
+	})
+	g2 := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			order = append(order, "g2")
+			return true
+		})
+	})
+
+	c := New(func(c *Controller) {
+		c.Guards(g1, g2)
+	})
+	c.Declare()
+
+	got := c.OwnGuards()
+	if len(got) != 2 {
+		t.Fatalf("OwnGuards() returned %d items, want 2", len(got))
+	}
+	if got[0] != g1 || got[1] != g2 {
+		t.Fatalf("OwnGuards() = %v, want [g1, g2] in registration order", got)
+	}
+}
+
+func TestOwnGuards_ReturnsCopyNotInternalSlice(t *testing.T) {
+	g1 := guard.New(nil)
+	g2 := guard.New(nil)
+
+	c := New(func(c *Controller) {
+		c.Guards(g1)
+	})
+	c.Declare()
+
+	got := c.OwnGuards()
+	got[0] = g2
+
+	got2 := c.OwnGuards()
+	if got2[0] != g1 {
+		t.Fatalf("OwnGuards() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }

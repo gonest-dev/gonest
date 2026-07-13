@@ -8,6 +8,7 @@
 package controller
 
 import (
+	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -31,7 +32,7 @@ type Controller struct {
 	routes     []*route.Route
 
 	middleware   []*middleware.Middleware
-	guards       []Middleware
+	guards       []*guard.Guard
 	interceptors []Middleware
 	filters      []Middleware
 }
@@ -134,10 +135,22 @@ func (c *Controller) OwnMiddleware() []*middleware.Middleware {
 	return append([]*middleware.Middleware(nil), c.middleware...)
 }
 
-// Guards registers items as route guards for this controller. Stub only --
-// nothing reads the stored values yet.
-func (c *Controller) Guards(items ...Middleware) {
+// Guards registers items as route guards for this controller, using the
+// real *guard.Guard type (internal/guard, feature "Guard" T1). Guards was
+// never called by any shipped code path with the placeholder Middleware
+// stub, so it is safe to change its signature directly rather than
+// deprecate-and-migrate (same class of change as Use's earlier migration to
+// *middleware.Middleware).
+func (c *Controller) Guards(items ...*guard.Guard) {
 	c.guards = append(c.guards, items...)
+}
+
+// OwnGuards returns a copy of the guards registered on this controller via
+// Guards. Read-only: mutating the returned slice does not affect this
+// Controller's internal state (same defensive-copy pattern as
+// OwnMiddleware).
+func (c *Controller) OwnGuards() []*guard.Guard {
+	return append([]*guard.Guard(nil), c.guards...)
 }
 
 // Interceptors registers items as interceptors for this controller. Stub
