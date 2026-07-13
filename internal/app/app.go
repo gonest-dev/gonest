@@ -14,6 +14,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
+	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/resolver"
@@ -230,21 +231,23 @@ func newAdapter[T any, PT httpAdapterPtr[T]]() PT {
 
 // routableController is a locally-declared interface used to type-assert
 // module.ControllerRef values down to the methods Stage 2.5 needs
-// (PathPrefix, OwnRoutes, OwnMiddleware, OwnGuards) but that
-// module.ControllerRef itself does not expose -- same pattern as this
+// (PathPrefix, OwnRoutes, OwnMiddleware, OwnGuards, OwnInterceptors) but
+// that module.ControllerRef itself does not expose -- same pattern as this
 // file's own declarable interface just below, and for the same reason:
-// PathPrefix/OwnRoutes/OwnMiddleware/OwnGuards are route-collection/
-// composition concerns, not something module.Module needs to know about a
-// registered controller. Already implemented by *controller.Controller (see
-// internal/controller/controller.go) -- OwnMiddleware was added there by
-// T2 of the "Middleware" feature, OwnGuards by T2 of the "Guard" feature,
-// no controller-side change was needed here beyond widening this
-// interface.
+// PathPrefix/OwnRoutes/OwnMiddleware/OwnGuards/OwnInterceptors are route-
+// collection/composition concerns, not something module.Module needs to
+// know about a registered controller. Already implemented by
+// *controller.Controller (see internal/controller/controller.go) --
+// OwnMiddleware was added there by T2 of the "Middleware" feature,
+// OwnGuards by T2 of the "Guard" feature, OwnInterceptors by T2 of the
+// "Interceptor" feature -- no controller-side change was needed here beyond
+// widening this interface.
 type routableController interface {
 	PathPrefix() string
 	OwnRoutes() []*route.Route
 	OwnMiddleware() []*middleware.Middleware
 	OwnGuards() []*guard.Guard
+	OwnInterceptors() []*interceptor.Interceptor
 }
 
 // registerRoutes implements Stage 2.5: walk every module's OwnControllers,
@@ -286,6 +289,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 			prefix := rc.PathPrefix()
 			controllerMiddleware := rc.OwnMiddleware()
 			controllerGuards := rc.OwnGuards()
+			controllerInterceptors := rc.OwnInterceptors()
 			for _, r := range rc.OwnRoutes() {
 				fullPath := prefix + r.Path()
 				key := r.Method().String() + " " + fullPath
@@ -294,7 +298,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				}
 				seen[key] = true
 				gated := gatedHandler(controllerGuards, r.HandlerFunc())
-				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, gated)
+				intercepted := interceptedHandler(controllerInterceptors, gated)
+				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, intercepted)
 				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: composedHandler})
 			}
 		}
@@ -332,6 +337,34 @@ func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *httpct
 		}
 		routeHandler(ctx)
 	}
+}
+
+// interceptedHandler builds the new layer Stage 2.5 inserts BETWEEN the
+// existing gatedHandler (Guard) and the existing middleware-composition loop
+// (composeHandler, unchanged): it wraps gatedHandler with the controller's
+// interceptor chain, using the exact same composition shape composeHandler
+// itself already uses (registration order, outward composition -- the first
+// registered interceptor ends up OUTERMOST, matching Nest's own interceptor
+// semantics and this feature's design.md "Composition change"). Each
+// interceptor's HandlerFunc is a (ctx, next) continuation -- calling next
+// runs the rest of the chain (a later interceptor, or eventually
+// gatedHandler itself); code physically after that call in the
+// interceptor's own function body runs AFTER the whole inner chain returns.
+// Neither gatedHandler nor composeHandler's loop is restructured by this --
+// interceptedHandler only changes what gets passed BETWEEN them (was
+// gatedHandler directly, now interceptedHandler's output). When
+// controllerInterceptors is empty, the loop runs zero iterations and the
+// returned func behaves identically to calling gatedHandler directly --
+// zero regression for controllers that never call Interceptors.
+func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, gated func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
+	next := interceptor.Next(gated)
+	for i := len(controllerInterceptors) - 1; i >= 0; i-- {
+		it := controllerInterceptors[i]
+		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
+		next = func(ctx *httpctx.Context) { it.HandlerFunc()(ctx, captured) }
+	}
+
+	return func(ctx *httpctx.Context) { next(ctx) }
 }
 
 // composeHandler builds the final handler for one route: global middleware

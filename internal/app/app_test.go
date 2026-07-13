@@ -17,6 +17,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
+	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/provider"
@@ -2001,4 +2002,352 @@ func TestNewApp_GuardPanicsWithNonException_StillGeneric500(t *testing.T) {
 	if handlerRan {
 		t.Fatalf("route Handler ran, want it to be skipped when the guard panics")
 	}
+}
+
+// --- T3 of "Interceptor": Stage 2.5 interceptedHandler in internal/app ---
+
+// TestNewApp_SingleInterceptor_RunsBeforeAndAfterHandler proves a single
+// interceptor runs code BEFORE calling next(ctx), then the route Handler
+// runs, then the interceptor's own code AFTER next(ctx) returns runs too --
+// observed via a real app.Test dispatch appending to a shared order-recorder
+// slice, asserting the exact sequence ["before", "handler", "after"].
+func TestNewApp_SingleInterceptor_RunsBeforeAndAfterHandler(t *testing.T) {
+	var order []string
+	it := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			order = append(order, "before")
+			next(ctx)
+			order = append(order, "after")
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Interceptors(it)
+		c.Route(route.HttpGet, "/wrap", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				order = append(order, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/wrap", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	want := []string{"before", "handler", "after"}
+	if len(order) != len(want) {
+		t.Fatalf("execution order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("execution order = %v, want %v", order, want)
+		}
+	}
+}
+
+// TestNewApp_InterceptorNotCallingNext_SkipsRouteHandler proves an
+// interceptor that never calls next(ctx) short-circuits the chain: the route
+// Handler must not run, proven via a flag the Handler would have set.
+func TestNewApp_InterceptorNotCallingNext_SkipsRouteHandler(t *testing.T) {
+	blocking := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			ctx.Status(http.StatusForbidden).Json(map[string]string{"blocked": "true"})
+			// deliberately never calls next(ctx)
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Interceptors(blocking)
+		c.Route(route.HttpGet, "/blocked", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/blocked", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it to be skipped when an interceptor never calls next")
+	}
+}
+
+// TestNewApp_MultipleInterceptors_ComposeInRegistrationOrder proves 2+
+// interceptors registered on a controller compose in registration order:
+// interceptor1's before-code runs first, then interceptor2's before-code,
+// then the Handler, then interceptor2's after-code, then interceptor1's
+// after-code -- the classic nested-onion composition order.
+func TestNewApp_MultipleInterceptors_ComposeInRegistrationOrder(t *testing.T) {
+	var order []string
+	first := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			order = append(order, "interceptor1-before")
+			next(ctx)
+			order = append(order, "interceptor1-after")
+		})
+	})
+	second := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			order = append(order, "interceptor2-before")
+			next(ctx)
+			order = append(order, "interceptor2-after")
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Interceptors(first, second)
+		c.Route(route.HttpGet, "/multi", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				order = append(order, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/multi", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	want := []string{
+		"interceptor1-before", "interceptor2-before",
+		"handler",
+		"interceptor2-after", "interceptor1-after",
+	}
+	if len(order) != len(want) {
+		t.Fatalf("execution order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("execution order = %v, want %v", order, want)
+		}
+	}
+}
+
+// TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence proves a
+// controller with Middleware + Guards + Interceptors registered together
+// runs, in order: Middleware -> Interceptor(before) -> Guard -> Handler ->
+// Interceptor(after), the full Stage 2.5 pipeline order proven via one
+// explicit ordered-sequence assertion covering all 3 stages simultaneously.
+//
+// SPEC_DEVIATION (documented, not a blocker): ROADMAP.md's prose ("Middleware
+// -> Guard -> Interceptor -> Pipe -> Handler") and design.md's own summary
+// line ("Matches ROADMAP.md's documented order exactly: Middleware -> Guard
+// -> Interceptor -> Handler") both describe Guard running BEFORE Interceptor.
+// But design.md's own literal numbered composition steps (and this task's
+// T3 prompt's own "Composition change" code block, reproduced verbatim in
+// interceptedHandler below) build gatedHandler first (step 2, wraps
+// routeHandler with guards) and THEN wrap gatedHandler with the interceptor
+// chain (step 3) -- meaning interceptedHandler's outermost interceptor's
+// pre-next code runs and calls next BEFORE gatedHandler's guards ever
+// evaluate. Literal code takes precedence per this task's explicit
+// instruction ("siga o algoritmo exato" from design.md's Data Models code
+// block) over the prose summary line, which appears to be a documentation
+// inconsistency in design.md itself (line 30) and ROADMAP.md (line 79) --
+// the actual composition order this implementation produces, and this test
+// proves, is Middleware -> Interceptor(before) -> Guard -> Handler ->
+// Interceptor(after).
+func TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence(t *testing.T) {
+	var order []string
+	mw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "middleware")
+			next(ctx)
+		})
+	})
+	g := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			order = append(order, "guard")
+			return true
+		})
+	})
+	it := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			order = append(order, "interceptor-before")
+			next(ctx)
+			order = append(order, "interceptor-after")
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(mw)
+		c.Guards(g)
+		c.Interceptors(it)
+		c.Route(route.HttpGet, "/full-pipeline", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				order = append(order, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/full-pipeline", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	want := []string{"middleware", "interceptor-before", "guard", "handler", "interceptor-after"}
+	if len(order) != len(want) {
+		t.Fatalf("execution order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("execution order = %v, want %v -- pipeline must run Middleware -> Interceptor(before) -> Guard -> Handler -> Interceptor(after)", order, want)
+		}
+	}
+}
+
+// TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper proves
+// an interceptor that panics BEFORE calling next(ctx) -- with a custom
+// exception.Exception -- is caught by the SAME existing recover wrapper in
+// internal/fiberapp (unchanged by this feature) and produces that
+// exception's own structured response, with the route Handler never
+// running.
+func TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper(t *testing.T) {
+	panicky := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			panic(exception.NewBadRequestException(nil))
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Interceptors(panicky)
+		c.Route(route.HttpGet, "/panic-before", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/panic-before", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it to be skipped when an interceptor panics before calling next")
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["name"] != "BadRequestException" {
+		t.Fatalf("body[name] = %v, want %q", body["name"], "BadRequestException")
+	}
+}
+
+// TestNewApp_InterceptorPanicsAfterNext_StillGeneric500 proves an
+// interceptor that panics AFTER next(ctx) returns -- with a plain, non-
+// exception.Exception value (a plain error) -- still produces the generic
+// 500 fallback any other panic already gets, and that the route Handler DID
+// run before the panic (the panic happens in the interceptor's own
+// post-next code, not before dispatch reached the Handler).
+func TestNewApp_InterceptorPanicsAfterNext_StillGeneric500(t *testing.T) {
+	var handlerRan bool
+	buggy := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			next(ctx)
+			panic(errors.New("bug after next"))
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Interceptors(buggy)
+		c.Route(route.HttpGet, "/panic-after", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/panic-after", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+	if !handlerRan {
+		t.Fatalf("route Handler did not run, want it to run before the interceptor's post-next panic")
+	}
+}
+
+// TestNewApp_ZeroInterceptors_NonRegressionReference proves an existing
+// pre-feature test (T9's UserController end-to-end example, defined earlier
+// in this file and left completely UNMODIFIED by this task) still passes
+// unmodified after adding interceptedHandler -- a controller with zero
+// Interceptors() calls must behave exactly as before this feature.
+func TestNewApp_ZeroInterceptors_NonRegressionReference(t *testing.T) {
+	t.Run("UserControllerEndToEnd_NonRegressionReference", func(t *testing.T) {
+		TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t)
+	})
 }
