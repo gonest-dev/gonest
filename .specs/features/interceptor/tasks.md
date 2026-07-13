@@ -71,7 +71,7 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 
 ---
 
-### T3: Stage 2.5 `interceptedHandler` em `internal/app`
+### T3: Stage 2.5 `interceptedHandler` em `internal/app` ✅ DONE (evaluator: PASS, commits `2f7fbc4`+`d74ec71` — segundo commit corrige ordem Guard/Interceptor achada durante revisão do design, ver design.md's nota CORRECTION)
 
 **What** (CORRIGIDO 2026-07-13 — versão anterior tinha a ordem de wrapping trocada, ver design.md's nota de CORRECTION): insere uma NOVA camada envolvendo o `routeHandler` BRUTO (não o `gatedHandler` já gateado por Guards) — o interceptor decora o Handler puro, e o `gatedHandler` de "Guard" passa a envolver ESSA camada (não mais o `routeHandler` direto), garantindo que Guard consiga rejeitar a request ANTES de qualquer lógica "before" de Interceptor rodar (bate com ROADMAP.md: Middleware → Guard → Interceptor → Handler). Encadeia `controllerRC.OwnInterceptors()` em torno de `routeHandler`, mesma forma de composição (ordem de registro, de fora pra dentro) já usada por middleware. Estende `routableController` com `OwnInterceptors() []*interceptor.Interceptor` (já satisfeito por `*controller.Controller` pós-T2).
 **Where**: `internal/app/app.go` (existente, estendido — novo import `internal/interceptor`), `internal/app/app_test.go` (existente — adiciona testes)
@@ -84,14 +84,15 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 - Skill: NONE
 
 **Done when** (tudo via dispatch real `app.Test`):
-- [ ] Um interceptor único roda código ANTES de `next(ctx)`, depois o Handler roda, depois roda código DEPOIS de `next(ctx)` retornar — prova via recorder de ordem observável (ex: `["before","handler","after"]`), não só "os dois rodaram em algum momento"
-- [ ] Interceptor que NÃO chama `next(ctx)` faz o Handler NÃO rodar (mesmo short-circuit já estabelecido pra Middleware)
-- [ ] Múltiplos interceptors (2+) compõem em ordem de registro — prova via sequência ordenada explícita
-- [ ] Controller com Guards + Interceptors + Middleware juntos: ordem final é Middleware → Guard → Interceptor(before) → Handler → Interceptor(after) — prova via sequência ordenada explícita cobrindo os 3 estágios ao mesmo tempo
-- [ ] Interceptor que panica (antes ou depois de `next`) é capturado pelo MESMO recover wrapper existente, produz resposta correta (Exception ou 500 genérico conforme o tipo do panic)
-- [ ] Controller com ZERO `Interceptors()` se comporta EXATAMENTE como antes desta feature (zero regressão) — confirmar teste pré-existente (de "Guard" ou "Middleware", ou T9's `UserController`) continua passando SEM MODIFICAÇÃO
-- [ ] Gate check passa
-- [ ] Test count: 8+ (before/handler/after em ordem, short-circuit sem next, múltiplos interceptors em ordem, pipeline completo Middleware→Guard→Interceptor→Handler, panic antes de next, panic depois de next, zero-regressão)
+- [x] Um interceptor único roda código ANTES de `next(ctx)`, depois o Handler roda, depois roda código DEPOIS de `next(ctx)` retornar — prova via recorder de ordem observável (`["before","handler","after"]`)
+- [x] Interceptor que NÃO chama `next(ctx)` faz o Handler NÃO rodar (mesmo short-circuit já estabelecido pra Middleware)
+- [x] Múltiplos interceptors (2+) compõem em ordem de registro (onion) — prova via sequência ordenada explícita
+- [x] Controller com Guards + Interceptors + Middleware juntos: ordem final é Middleware → Guard → Interceptor(before) → Handler → Interceptor(after) — prova via sequência ordenada explícita cobrindo os 3 estágios ao mesmo tempo (CORRIGIDO: versão inicial tinha Guard e Interceptor trocados, ver design.md's nota CORRECTION)
+- [x] Guard rejeitando (`false`) impede TANTO o Handler QUANTO a lógica "before" do Interceptor de rodar — prova direta via 2 flags independentes (`TestNewApp_GuardRejects_InterceptorBeforeNeverRuns`, adicionado na correção)
+- [x] Interceptor que panica (antes ou depois de `next`) é capturado pelo MESMO recover wrapper existente, produz resposta correta (Exception ou 500 genérico conforme o tipo do panic)
+- [x] Controller com ZERO `Interceptors()` se comporta EXATAMENTE como antes desta feature (zero regressão) — confirmar teste pré-existente (de "Guard" ou "Middleware", ou T9's `UserController`) continua passando SEM MODIFICAÇÃO
+- [x] Gate check passa
+- [x] Test count: 8+ (before/handler/after em ordem, short-circuit sem next, múltiplos interceptors em ordem, pipeline completo Middleware→Guard→Interceptor→Handler, guard bloqueia interceptor-before, panic antes de next, panic depois de next, zero-regressão)
 
 **Tests**: integration (dispatch real via `app.Test`)
 **Gate**: full
