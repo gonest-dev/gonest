@@ -305,7 +305,26 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				intercepted := interceptedHandler(controllerInterceptors, r.HandlerFunc())
 				gated := gatedHandler(controllerGuards, intercepted)
 				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, gated)
-				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: composedHandler})
+				// withRoute is the outermost layer of all: it attaches r
+				// (this specific *route.Route) to ctx via ctx.WithRoute
+				// BEFORE anything else in the composed chain runs --
+				// MustParam[T] (root param.go) relies on ctx.Route()
+				// returning the current *route.Route to find a custom Pipe
+				// registered via Route.Param; without this, ctx.Route()
+				// would always be nil during real dispatch and MustParam
+				// would silently fall back to defaultCoerce, never using a
+				// custom Pipe a dev explicitly registered. currentRoute is
+				// captured per-iteration (loop variable, not a pointer to a
+				// shared slice element) so each route's closure captures
+				// its own *route.Route correctly. Named currentRoute, not
+				// route, to avoid shadowing the internal/route package
+				// import used elsewhere in this function/file.
+				currentRoute := r
+				withRoute := func(ctx *httpctx.Context) {
+					ctx.WithRoute(currentRoute)
+					composedHandler(ctx)
+				}
+				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: withRoute})
 			}
 		}
 	}
