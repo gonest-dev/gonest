@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/http-exception-core/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T3, todos evaluator PASS)
 
 ---
 
@@ -72,7 +72,7 @@ Sequential: T2 depends on `HttpException`/`NewHttpException` from T1 (same packa
 
 ---
 
-### T3: Root re-exports
+### T3: Root re-exports ✅ DONE (evaluator: PASS, commit `aa74048`)
 
 **What**: root `gonest` package gets `Exception`, `HttpException`, `NewHttpException`, and the 5 built-in types + constructors, all via type aliases (`type X = exception.X`) and plain `var` function aliases (`var NewX = exception.NewX` — no generic-wrapper needed, these aren't generic functions, see design.md's Tech Decisions and AD-004 in STATE.md for the general pattern).
 **Where**: new file at repo root, e.g. `exception.go` (mirrors `internal/exception`'s own file name for discoverability), root-level test file
@@ -85,11 +85,11 @@ Sequential: T2 depends on `HttpException`/`NewHttpException` from T1 (same packa
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.NewHttpException(...)`, `gonest.Exception`, `gonest.HttpException` all resolve and work at root
-- [ ] All 5 `gonest.New*Exception(details)` constructors resolve and work at root, matching INSIGHT.md's exact call shapes
-- [ ] A dev-defined type embedding `gonest.HttpException` (INSIGHT.md's `FooExampleError` example, reproduced verbatim in a test) compiles and satisfies `gonest.Exception`
-- [ ] Gate check passes
-- [ ] Test count: 3+ (root-level smoke test reproducing INSIGHT.md's `FooExampleError` example end-to-end, one panic/recover round-trip through a root-aliased built-in, one Exception-interface assertion through the root alias)
+- [x] `gonest.NewHttpException(...)`, `gonest.Exception`, `gonest.HttpException` all resolve and work at root
+- [x] All 5 `gonest.New*Exception(details)` constructors resolve and work at root, matching INSIGHT.md's exact call shapes
+- [x] A dev-defined type embedding `gonest.HttpException` (INSIGHT.md's `FooExampleError` example, reproduced with `net/http.StatusBadRequest` substituted for the not-yet-existing `gonest.HttpStatusBadRequest`) compiles and satisfies `gonest.Exception`
+- [x] Gate check passes
+- [x] Test count: 3+ (root-level smoke test reproducing INSIGHT.md's `FooExampleError` example end-to-end, one panic/recover round-trip through a root-aliased built-in, one Exception-interface assertion through the root alias)
 
 **Tests**: unit
 **Gate**: quick

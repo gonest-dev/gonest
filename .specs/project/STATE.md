@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestone 1 **COMPLETE** — "Provider & DI Graph", "Module Composition", "Controller & Route Registration" e "App Bootstrap & Listen" (T1-T6, commit `667a328`) todas DONE, evaluator PASS em toda task. Primeiro `go run` funcional provado via teste e2e real (`net/http.Client` contra porta bindada de verdade). Próxima: especificar primeira feature de Milestone 2 (Exceptions & Response Contract — `HttpException Core`, ver ROADMAP.md).
+**Current Work:** Milestone 1 **COMPLETE**. Milestone 2 iniciado: feature "HttpException Core" (T1-T3, commit `aa74048`) DONE, evaluator PASS em toda task — `Exception`/`HttpException`/5 built-ins prontos, `internal/exception` novo pacote. Próxima: "Panic Recovery & Default Handler" (2ª e última feature de Milestone 2) — precisa ligar `internal/fiberapp`'s recover wrapper (T7 da feature Controller & Route) pra detectar `Exception` via `recover()` e formatar `{name,message,details}` na resposta real, em vez do 500 genérico atual.
 
 ---
 

@@ -39,9 +39,10 @@
 
 ### Features
 
-**HttpException Core** - PLANNED
-- `HttpException`, `NewHttpException`
+**HttpException Core** - COMPLETE
+- `HttpException`, `NewHttpException` (`internal/exception`, re-exportado na raiz)
 - Built-ins: `NotFoundException`, `BadRequestException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`
+- `Exception` interface (satisfação estrutural via embedding) — base pra "Panic Recovery & Default Handler" detectar exceptions
 
 **Panic Recovery & Default Handler** - PLANNED
 - Recover global no pipeline de request
