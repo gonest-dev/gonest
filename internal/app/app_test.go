@@ -108,7 +108,7 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 	})
 	appModule.Providers(consumer)
 
-	app, err := NewApp[recordingFakeAdapter](appModule)
+	app, err := NewApp[recordingFakeAdapter](appModule, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -159,7 +159,7 @@ func TestMustNewApp_PanicsOnAssembleError(t *testing.T) {
 		}
 	}()
 
-	MustNewApp[recordingFakeAdapter](root)
+	MustNewApp[recordingFakeAdapter](root, AppOptions{})
 }
 
 func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
@@ -173,7 +173,7 @@ func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app := MustNewApp[recordingFakeAdapter](root)
+	app := MustNewApp[recordingFakeAdapter](root, AppOptions{})
 	if app == nil {
 		t.Fatalf("MustNewApp() returned nil *App")
 	}
@@ -197,7 +197,7 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 		m.Providers(pa, pb)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root)
+	_, err := NewApp[recordingFakeAdapter](root, AppOptions{})
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want circular dependency error")
 	}
@@ -226,7 +226,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 		m.Providers(firstProvider)
 	})
 
-	firstApp, err := NewApp[recordingFakeAdapter](firstRoot)
+	firstApp, err := NewApp[recordingFakeAdapter](firstRoot, AppOptions{})
 	if err != nil {
 		t.Fatalf("first NewApp() error = %v", err)
 	}
@@ -260,7 +260,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 		m.Providers(secondProvider, consumer)
 	})
 
-	secondApp, err := NewApp[recordingFakeAdapter](secondRoot)
+	secondApp, err := NewApp[recordingFakeAdapter](secondRoot, AppOptions{})
 	if err != nil {
 		t.Fatalf("second NewApp() error = %v, want nil -- must not be affected by the first call's leftover state", err)
 	}
@@ -287,7 +287,7 @@ func TestNewApp_ConstructorError_ReturnsError(t *testing.T) {
 		m.Providers(p)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root)
+	_, err := NewApp[recordingFakeAdapter](root, AppOptions{})
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want the Constructor's returned error surfaced")
 	}
@@ -322,7 +322,7 @@ func TestNewApp_ControllerWithRoutes_RegistersEachOnAdapter(t *testing.T) {
 		m.Controllers(userController)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root)
+	app, err := NewApp[recordingFakeAdapter](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -367,7 +367,7 @@ func TestNewApp_DuplicateRoute_ReturnsErrorBeforeRegistering(t *testing.T) {
 		m.Controllers(dupeController, otherDupeController)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root)
+	_, err := NewApp[recordingFakeAdapter](root, AppOptions{})
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want a duplicate route error")
 	}
@@ -393,7 +393,7 @@ func TestNewApp_ZeroControllers_BootstrapsNormally(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root)
+	app, err := NewApp[recordingFakeAdapter](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -420,7 +420,7 @@ func TestNewApp_EmptyPathPrefix_RegistersRouteWithBarePath(t *testing.T) {
 		m.Controllers(noPrefixController)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root)
+	_, err := NewApp[recordingFakeAdapter](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -476,7 +476,7 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 		m.Controllers(pingController)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root)
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -616,7 +616,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		m.Imports(userModule)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root)
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -774,5 +774,77 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		if len(got) != 0 {
 			t.Fatalf("List(after delete): got %d users, want 0 after Delete", len(got))
 		}
+	}
+}
+
+// TestNewApp_ZeroValueAppOptions_BootstrapsIdenticallyToPreT2Behavior proves
+// NewApp[T, PT](root, AppOptions{}) bootstraps the DI graph and registers
+// routes exactly as NewApp[T, PT](root) did before this task's signature
+// change -- zero behavior regression from adding the required AppOptions
+// parameter.
+func TestNewApp_ZeroValueAppOptions_BootstrapsIdenticallyToPreT2Behavior(t *testing.T) {
+	userController := controller.New(func(c *controller.Controller) {
+		c.Path("/user")
+		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Providers(UserProvider)
+		m.Controllers(userController)
+	})
+
+	app, err := NewApp[recordingFakeAdapter](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() returned nil *App")
+	}
+
+	got := lastRecordingAdapter.registered
+	want := []fakeRegisteredRoute{{method: route.HttpGet, path: "/user/:id"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("registered routes = %+v, want %+v", got, want)
+	}
+
+	if app.opts.BufferLogs != false || app.opts.LogLevels != nil {
+		t.Fatalf("app.opts = %+v, want zero-value AppOptions{}", app.opts)
+	}
+}
+
+// TestNewApp_NonZeroAppOptions_StoredOnApp proves NewApp stores whatever
+// AppOptions it was given on the returned *App's unexported opts field,
+// verified here via direct same-package field access (no public getter
+// exists yet -- nothing public reads opts in this task, per design.md's
+// "App (extended)" component: "stored, unused beyond storage").
+func TestNewApp_NonZeroAppOptions_StoredOnApp(t *testing.T) {
+	type plainService struct{ Ready bool }
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *plainService { return &plainService{Ready: true} })
+	})
+	root := module.New(func(m *module.Module) {
+		m.Providers(p)
+	})
+
+	opts := AppOptions{
+		BufferLogs: true,
+		LogLevels:  []LogLevel{LogLevelWarn, LogLevelError},
+	}
+
+	app, err := NewApp[recordingFakeAdapter](root, opts)
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() returned nil *App")
+	}
+
+	if app.opts.BufferLogs != true {
+		t.Fatalf("app.opts.BufferLogs = %v, want true", app.opts.BufferLogs)
+	}
+	if len(app.opts.LogLevels) != 2 || app.opts.LogLevels[0] != LogLevelWarn || app.opts.LogLevels[1] != LogLevelError {
+		t.Fatalf("app.opts.LogLevels = %+v, want [Warn Error]", app.opts.LogLevels)
 	}
 }

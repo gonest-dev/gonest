@@ -34,6 +34,7 @@ const bootstrapTimeout = 30 * time.Second
 type App struct {
 	root    *module.Module
 	adapter HttpAdapter
+	opts    AppOptions
 }
 
 // Adapter returns the HttpAdapter NewApp[T] constructed and registered
@@ -142,7 +143,14 @@ type httpAdapterPtr[T any] interface {
 // NewApp concurrently from multiple goroutines in the same process is not
 // supported; NewApp is meant to run once, synchronously, at process
 // startup.
-func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module) (*App, error) {
+//
+// opts is a required second positional parameter (not optional/variadic --
+// ground truth is INSIGHT.md's own call sites, which always pass it, even
+// as a zero value AppOptions{}). It is stored on the returned *App after
+// every bootstrap stage above completes, and does not influence any of
+// them -- no Logger exists yet in this codebase to act on BufferLogs/
+// LogLevels (see AppOptions' doc comment in options.go).
+func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (*App, error) {
 	inject.Reset()
 
 	modules, err := root.Assemble()
@@ -164,13 +172,13 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module) (*App, error) {
 		return nil, err
 	}
 
-	return &App{root: root, adapter: adapter}, nil
+	return &App{root: root, adapter: adapter, opts: opts}, nil
 }
 
 // MustNewApp calls NewApp and panics if it returns an error. Convenience
 // for callers (typically main) that treat bootstrap failure as fatal.
-func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module) *App {
-	app, err := NewApp[T, PT](root)
+func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) *App {
+	app, err := NewApp[T, PT](root, opts)
 	if err != nil {
 		panic(err)
 	}
