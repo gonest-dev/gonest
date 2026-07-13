@@ -267,8 +267,13 @@ type routableController interface {
 // to imported modules. Each route's registered handler is not the bare
 // route.HandlerFunc() but a composed chain: root's global middleware
 // (outermost, runs first) wrapping that route's own controller's
-// middleware (via OwnMiddleware()) wrapping the route Handler itself
-// (innermost) -- see composeHandler below for the composition algorithm.
+// middleware (via OwnMiddleware()), wrapping the controller's Guards,
+// wrapping the controller's Interceptor chain, wrapping the route Handler
+// itself (innermost) -- Middleware -> Guard -> Interceptor -> Handler, per
+// ROADMAP.md's documented order and the interceptor feature's design.md
+// CORRECTION note (a Guard must be able to reject a request BEFORE any
+// Interceptor "before" logic runs) -- see composeHandler/gatedHandler/
+// interceptedHandler below for the composition algorithm.
 func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.Module) error {
 	type collected struct {
 		method  route.HttpMethod
@@ -297,9 +302,9 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 					return fmt.Errorf("duplicate route: %s", key)
 				}
 				seen[key] = true
-				gated := gatedHandler(controllerGuards, r.HandlerFunc())
-				intercepted := interceptedHandler(controllerInterceptors, gated)
-				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, intercepted)
+				intercepted := interceptedHandler(controllerInterceptors, r.HandlerFunc())
+				gated := gatedHandler(controllerGuards, intercepted)
+				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, gated)
 				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: composedHandler})
 			}
 		}
@@ -314,9 +319,11 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	return nil
 }
 
-// gatedHandler builds the new innermost layer Stage 2.5 feeds into the
-// EXISTING middleware-composition loop (composeHandler, unchanged): it
-// evaluates controllerGuards in order BEFORE calling routeHandler. Any guard
+// gatedHandler builds the OUTER of the two new layers Stage 2.5 feeds into
+// the EXISTING middleware-composition loop (composeHandler, unchanged): it
+// evaluates controllerGuards in order BEFORE calling routeHandler (which, as
+// wired from registerRoutes, is actually interceptedHandler's output -- see
+// the CORRECTION note in the interceptor feature's design.md). Any guard
 // whose HandlerFunc() returns false stops the chain by panicking
 // exception.NewForbiddenException(nil) -- caught by the same recover
 // wrapper any other panic (Handler or middleware) already is, per
@@ -324,10 +331,12 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 // with a custom exception.Exception propagates unchanged (no recover here)
 // so that panic is formatted with ITS OWN status/body downstream. Guards run
 // in registration order and short-circuit on the first false -- later
-// guards never run once an earlier one fails. When controllerGuards is
-// empty, the loop runs zero iterations and routeHandler runs immediately --
-// behaviorally identical to calling routeHandler directly (zero regression
-// for controllers that never call Guards).
+// guards never run once an earlier one fails, and (per this fix) an
+// Interceptor's own "before" logic never runs either, since gatedHandler now
+// wraps interceptedHandler's output rather than the bare route Handler. When
+// controllerGuards is empty, the loop runs zero iterations and routeHandler
+// runs immediately -- behaviorally identical to calling routeHandler
+// directly (zero regression for controllers that never call Guards).
 func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
 	return func(ctx *httpctx.Context) {
 		for _, g := range controllerGuards {
@@ -339,25 +348,28 @@ func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *httpct
 	}
 }
 
-// interceptedHandler builds the new layer Stage 2.5 inserts BETWEEN the
-// existing gatedHandler (Guard) and the existing middleware-composition loop
-// (composeHandler, unchanged): it wraps gatedHandler with the controller's
+// interceptedHandler builds the INNER of the two new layers Stage 2.5
+// inserts BELOW gatedHandler (Guard) and the existing middleware-composition
+// loop (composeHandler, unchanged): it wraps the BARE route Handler
+// (routeHandler, NOT gatedHandler's output) with the controller's
 // interceptor chain, using the exact same composition shape composeHandler
 // itself already uses (registration order, outward composition -- the first
 // registered interceptor ends up OUTERMOST, matching Nest's own interceptor
 // semantics and this feature's design.md "Composition change"). Each
 // interceptor's HandlerFunc is a (ctx, next) continuation -- calling next
-// runs the rest of the chain (a later interceptor, or eventually
-// gatedHandler itself); code physically after that call in the
-// interceptor's own function body runs AFTER the whole inner chain returns.
-// Neither gatedHandler nor composeHandler's loop is restructured by this --
-// interceptedHandler only changes what gets passed BETWEEN them (was
-// gatedHandler directly, now interceptedHandler's output). When
-// controllerInterceptors is empty, the loop runs zero iterations and the
-// returned func behaves identically to calling gatedHandler directly --
-// zero regression for controllers that never call Interceptors.
-func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, gated func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
-	next := interceptor.Next(gated)
+// runs the rest of the chain (a later interceptor, or eventually routeHandler
+// itself); code physically after that call in the interceptor's own function
+// body runs AFTER the whole inner chain returns. registerRoutes then feeds
+// THIS function's output into gatedHandler (Guard wraps Interceptor, not the
+// other way around) -- see the CORRECTION note in the interceptor feature's
+// design.md for why: a Guard must be able to reject a request BEFORE any
+// Interceptor "before" logic runs, matching ROADMAP.md's documented order
+// (Middleware -> Guard -> Interceptor -> Handler). When controllerInterceptors
+// is empty, the loop runs zero iterations and the returned func behaves
+// identically to calling routeHandler directly -- zero regression for
+// controllers that never call Interceptors.
+func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
+	next := interceptor.Next(routeHandler)
 	for i := len(controllerInterceptors) - 1; i >= 0; i-- {
 		it := controllerInterceptors[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise

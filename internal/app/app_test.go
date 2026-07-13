@@ -2163,27 +2163,15 @@ func TestNewApp_MultipleInterceptors_ComposeInRegistrationOrder(t *testing.T) {
 
 // TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence proves a
 // controller with Middleware + Guards + Interceptors registered together
-// runs, in order: Middleware -> Interceptor(before) -> Guard -> Handler ->
+// runs, in order: Middleware -> Guard -> Interceptor(before) -> Handler ->
 // Interceptor(after), the full Stage 2.5 pipeline order proven via one
 // explicit ordered-sequence assertion covering all 3 stages simultaneously.
-//
-// SPEC_DEVIATION (documented, not a blocker): ROADMAP.md's prose ("Middleware
-// -> Guard -> Interceptor -> Pipe -> Handler") and design.md's own summary
-// line ("Matches ROADMAP.md's documented order exactly: Middleware -> Guard
-// -> Interceptor -> Handler") both describe Guard running BEFORE Interceptor.
-// But design.md's own literal numbered composition steps (and this task's
-// T3 prompt's own "Composition change" code block, reproduced verbatim in
-// interceptedHandler below) build gatedHandler first (step 2, wraps
-// routeHandler with guards) and THEN wrap gatedHandler with the interceptor
-// chain (step 3) -- meaning interceptedHandler's outermost interceptor's
-// pre-next code runs and calls next BEFORE gatedHandler's guards ever
-// evaluate. Literal code takes precedence per this task's explicit
-// instruction ("siga o algoritmo exato" from design.md's Data Models code
-// block) over the prose summary line, which appears to be a documentation
-// inconsistency in design.md itself (line 30) and ROADMAP.md (line 79) --
-// the actual composition order this implementation produces, and this test
-// proves, is Middleware -> Interceptor(before) -> Guard -> Handler ->
-// Interceptor(after).
+// Matches ROADMAP.md's documented order exactly -- a Guard must be able to
+// reject a request BEFORE any Interceptor "before" logic runs (see the
+// CORRECTION note in the interceptor feature's design.md: an earlier version
+// of this test asserted the reverse, Interceptor-before-Guard, which matched
+// an earlier -- buggy -- version of design.md's composition steps; both have
+// since been fixed to match ROADMAP.md).
 func TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence(t *testing.T) {
 	var order []string
 	mw := middleware.New(func(m *middleware.Middleware) {
@@ -2233,14 +2221,70 @@ func TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence(t *testing.T) 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
-	want := []string{"middleware", "interceptor-before", "guard", "handler", "interceptor-after"}
+	want := []string{"middleware", "guard", "interceptor-before", "handler", "interceptor-after"}
 	if len(order) != len(want) {
 		t.Fatalf("execution order = %v, want %v", order, want)
 	}
 	for i := range want {
 		if order[i] != want[i] {
-			t.Fatalf("execution order = %v, want %v -- pipeline must run Middleware -> Interceptor(before) -> Guard -> Handler -> Interceptor(after)", order, want)
+			t.Fatalf("execution order = %v, want %v -- pipeline must run Middleware -> Guard -> Interceptor(before) -> Handler -> Interceptor(after)", order, want)
 		}
+	}
+}
+
+// TestNewApp_GuardRejects_InterceptorBeforeNeverRuns proves the exact
+// behavior that motivated the Guard/Interceptor composition-order fix: when
+// a Guard rejects a request (HandlerFunc returns false), NEITHER the route
+// Handler NOR the Interceptor's "before" logic runs -- a Guard must be able
+// to reject a request before any Interceptor setup work (e.g. starting a
+// timer) happens for that request, per ROADMAP.md's documented order
+// (Middleware -> Guard -> Interceptor -> Handler) and the CORRECTION note in
+// the interceptor feature's design.md.
+func TestNewApp_GuardRejects_InterceptorBeforeNeverRuns(t *testing.T) {
+	var interceptorBeforeRan, handlerRan bool
+	g := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *httpctx.Context) bool {
+			return false
+		})
+	})
+	it := interceptor.New(func(i *interceptor.Interceptor) {
+		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+			interceptorBeforeRan = true
+			next(ctx)
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Guards(g)
+		c.Interceptors(it)
+		c.Route(route.HttpGet, "/guard-blocks-interceptor", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/guard-blocks-interceptor", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if interceptorBeforeRan {
+		t.Fatalf("interceptor's before-next logic ran, want it skipped when a Guard rejects the request first")
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want it skipped when a Guard rejects the request")
 	}
 }
 
