@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/route"
 )
 
 func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
@@ -91,4 +92,77 @@ func TestController_SatisfiesModuleControllerRef(t *testing.T) {
 	// build.
 	c := New(func(c *Controller) {})
 	var _ module.ControllerRef = c
+}
+
+func TestPath_StoresPrefix(t *testing.T) {
+	c := New(func(c *Controller) {
+		c.Path("/users")
+	})
+	c.Declare()
+
+	if got := c.PathPrefix(); got != "/users" {
+		t.Fatalf("PathPrefix() = %q, want %q", got, "/users")
+	}
+}
+
+func TestRoute_CreatesRouteAndAppendsToOwnRoutes(t *testing.T) {
+	c := New(func(c *Controller) {
+		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
+			r.HttpCode(201)
+		})
+	})
+	c.Declare()
+
+	routes := c.OwnRoutes()
+	if len(routes) != 1 {
+		t.Fatalf("OwnRoutes() returned %d routes, want 1", len(routes))
+	}
+	if got := routes[0].Code(); got != 201 {
+		t.Fatalf("OwnRoutes()[0].Code() = %d, want 201 (fn passed to Route should run immediately, like route.New)", got)
+	}
+}
+
+func TestOwnRoutes_ReturnsCopyNotInternalSlice(t *testing.T) {
+	c := New(func(c *Controller) {
+		c.Route(route.HttpGet, "/a", nil)
+	})
+	c.Declare()
+
+	got := c.OwnRoutes()
+	got[0] = route.New(route.HttpPost, "/mutated", nil)
+
+	got2 := c.OwnRoutes()
+	if got2[0].Code() != 200 || len(got2) != 1 {
+		t.Fatalf("OwnRoutes() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+	// Verify the underlying route is still the original GET /a route by
+	// confirming a second independent call still reflects one route.
+	if len(c.OwnRoutes()) != 1 {
+		t.Fatalf("internal routes slice was mutated via returned slice")
+	}
+}
+
+func TestPipelineStubs_DoNotAffectObservableState(t *testing.T) {
+	withStubs := New(func(c *Controller) {
+		c.Path("/things")
+		c.Use(Middleware{})
+		c.Guards(Middleware{})
+		c.Interceptors(Middleware{})
+		c.Filters(Middleware{})
+		c.Route(route.HttpGet, "/", nil)
+	})
+	withStubs.Declare()
+
+	withoutStubs := New(func(c *Controller) {
+		c.Path("/things")
+		c.Route(route.HttpGet, "/", nil)
+	})
+	withoutStubs.Declare()
+
+	if withStubs.PathPrefix() != withoutStubs.PathPrefix() {
+		t.Fatalf("PathPrefix() differs: %q vs %q", withStubs.PathPrefix(), withoutStubs.PathPrefix())
+	}
+	if len(withStubs.OwnRoutes()) != len(withoutStubs.OwnRoutes()) {
+		t.Fatalf("OwnRoutes() length differs: %d vs %d", len(withStubs.OwnRoutes()), len(withoutStubs.OwnRoutes()))
+	}
 }

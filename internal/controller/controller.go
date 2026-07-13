@@ -7,7 +7,10 @@
 // "Controller & Route Registration" feature.
 package controller
 
-import "github.com/gonest-dev/gonest/internal/module"
+import (
+	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/route"
+)
 
 // Controller represents a declarative unit that consumes providers via
 // MustInject. It does not participate in the provider resolution graph --
@@ -22,7 +25,21 @@ type Controller struct {
 
 	owner    *module.Module
 	declared bool
+
+	pathPrefix string
+	routes     []*route.Route
+
+	middleware   []Middleware
+	guards       []Middleware
+	interceptors []Middleware
+	filters      []Middleware
 }
+
+// Middleware is a minimal placeholder type for the pipeline stubs (Use,
+// Guards, Interceptors, Filters). It carries no behavior yet -- it exists so
+// those methods have a plausible "list of middleware-like things" signature
+// to grow into once a later feature defines what middleware actually does.
+type Middleware struct{}
 
 // New creates a Controller that defers fn until bootstrap runs it. fn is
 // expected to declare routes/handlers and call MustInject for its
@@ -66,4 +83,57 @@ func (c *Controller) SetOwnerModule(m *module.Module) {
 // SetOwnerModule has been called on this controller.
 func (c *Controller) OwnerModule() *module.Module {
 	return c.owner
+}
+
+// Path stores prefix as this controller's route path prefix. Route
+// registration itself does not yet apply the prefix to individual routes --
+// that composition happens later, when routes are wired into the HTTP
+// server (out of scope for this task).
+func (c *Controller) Path(prefix string) {
+	c.pathPrefix = prefix
+}
+
+// PathPrefix returns the prefix stored via Path, or "" if Path was never
+// called.
+func (c *Controller) PathPrefix() string {
+	return c.pathPrefix
+}
+
+// Route creates a *route.Route via route.New(method, path, fn) -- which
+// runs fn immediately, see route.New's own doc comment -- and appends it to
+// this controller's internal route list.
+func (c *Controller) Route(method route.HttpMethod, path string, fn func(*route.Route)) {
+	c.routes = append(c.routes, route.New(method, path, fn))
+}
+
+// OwnRoutes returns a copy of the routes registered on this controller via
+// Route. Read-only: mutating the returned slice does not affect this
+// Controller's internal state (same defensive-copy pattern as
+// Module.OwnProviders/Module.OwnControllers).
+func (c *Controller) OwnRoutes() []*route.Route {
+	return append([]*route.Route(nil), c.routes...)
+}
+
+// Use registers items as general middleware for this controller. Stub only
+// -- nothing reads the stored values yet.
+func (c *Controller) Use(items ...Middleware) {
+	c.middleware = append(c.middleware, items...)
+}
+
+// Guards registers items as route guards for this controller. Stub only --
+// nothing reads the stored values yet.
+func (c *Controller) Guards(items ...Middleware) {
+	c.guards = append(c.guards, items...)
+}
+
+// Interceptors registers items as interceptors for this controller. Stub
+// only -- nothing reads the stored values yet.
+func (c *Controller) Interceptors(items ...Middleware) {
+	c.interceptors = append(c.interceptors, items...)
+}
+
+// Filters registers items as exception filters for this controller. Stub
+// only -- nothing reads the stored values yet.
+func (c *Controller) Filters(items ...Middleware) {
+	c.filters = append(c.filters, items...)
 }
