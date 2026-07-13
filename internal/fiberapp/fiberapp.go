@@ -115,11 +115,26 @@ func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(ct
 	return nil
 }
 
-// Listen starts the underlying Fiber app listening on addr. Only used by a
-// later feature (per design.md's Interfaces note on the httpAdapter
-// contract) -- included now so FiberApp already satisfies the full contract
-// T8 needs.
-func (f *FiberApp) Listen(addr string) error {
+// Listen starts the underlying Fiber app listening on addr, blocking until
+// it stops. If onListen is non-nil, it is registered via Fiber's own
+// Hooks().OnListen BEFORE the blocking f.app.Listen(addr) call -- per
+// design.md's "HttpAdapter.Listen (extended contract)" component, Fiber
+// runs its onListen hooks synchronously right after its own bind succeeds
+// (app.go's startupProcess/runOnListenHooks, called from Listen's own
+// goroutine setup, right before the accept loop's app.server.Serve(ln)
+// takes over) -- exactly the "signal bind succeeded before blocking for
+// good" semantics this contract needs, without gonest reimplementing that
+// synchronization itself with a goroutine+channel (see design.md's Tech
+// Decisions table). onListen being nil means "no hook wanted": Fiber's own
+// Hooks().OnListen never gets called, so nothing is registered and no
+// nil-func-call panic risk exists.
+func (f *FiberApp) Listen(addr string, onListen func()) error {
+	if onListen != nil {
+		f.app.Hooks().OnListen(func(fiber.ListenData) error {
+			onListen()
+			return nil
+		})
+	}
 	return f.app.Listen(addr)
 }
 

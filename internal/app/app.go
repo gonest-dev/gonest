@@ -76,10 +76,15 @@ type HttpAdapter interface {
 	// underlying HTTP engine, translating h into whatever handler shape
 	// that engine expects.
 	RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error
-	// Listen starts the underlying HTTP engine serving on addr. Not
-	// exercised by NewApp[T] itself -- reserved for the "App Bootstrap &
-	// Listen" feature that follows this one.
-	Listen(addr string) error
+	// Listen starts the underlying HTTP engine serving on addr, blocking
+	// until it stops. onListen, if non-nil, is invoked exactly once, after
+	// the underlying engine has successfully bound addr but before Listen's
+	// call blocks for good (i.e. before its accept loop takes over
+	// permanently) -- implementations must guard against a nil onListen
+	// rather than calling it unconditionally. Not exercised by NewApp[T]
+	// itself -- reserved for the "App Bootstrap & Listen" feature that
+	// follows this one (see App.MustListen).
+	Listen(addr string, onListen func()) error
 }
 
 // httpAdapterPtr is the generic-constraint counterpart to HttpAdapter,

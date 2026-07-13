@@ -450,7 +450,7 @@ func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path strin
 	return nil
 }
 
-func (f *recordingFakeAdapter) Listen(addr string) error {
+func (f *recordingFakeAdapter) Listen(addr string, onListen func()) error {
 	return nil
 }
 

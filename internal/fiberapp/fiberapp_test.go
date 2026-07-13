@@ -2,9 +2,11 @@ package fiberapp
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -200,5 +202,114 @@ func TestRegisterRoute_ParamReachesHandler(t *testing.T) {
 
 	if gotID != "42" {
 		t.Fatalf("expected param id %q, got %q", "42", gotID)
+	}
+}
+
+// TestListen_OnListenFires_BeforeBlockingForGood proves the onListen
+// callback fires exactly once, and fires BEFORE Listen's call blocks for
+// good (i.e. before the accept loop takes over permanently) -- per
+// design.md's HttpAdapter.Listen (extended contract): Fiber's own
+// Hooks().OnListen runs synchronously right after bind succeeds, from
+// inside Listen's own goroutine, before app.server.Serve(ln) starts
+// blocking. Proven with a channel the callback closes, NOT a time.Sleep
+// race: Listen runs in its own goroutine (it blocks by design), the test
+// waits on the channel with a timeout, then dials the now-bound address to
+// confirm the server really is accepting connections by the time the
+// callback fired.
+func TestListen_OnListenFires_BeforeBlockingForGood(t *testing.T) {
+	app := New()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve an ephemeral port: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("failed to release reserved port: %v", err)
+	}
+
+	fired := make(chan struct{})
+	var callCount int
+	onListen := func() {
+		callCount++
+		close(fired)
+	}
+
+	listenErrCh := make(chan error, 1)
+	go func() {
+		listenErrCh <- app.Listen(addr, onListen)
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := app.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+	})
+
+	select {
+	case <-fired:
+		// onListen fired -- proceed to confirm the server is really up.
+	case err := <-listenErrCh:
+		t.Fatalf("Listen returned before onListen fired: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for onListen to fire")
+	}
+
+	if callCount != 1 {
+		t.Fatalf("expected onListen to fire exactly once, fired %d times", callCount)
+	}
+
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		t.Fatalf("expected to dial %s after onListen fired, got error: %v", addr, err)
+	}
+	conn.Close()
+}
+
+// TestListen_NilOnListen_DoesNotPanicAndBlocksNormally proves Listen(addr,
+// nil) is safe: no hook gets registered with Fiber (Fiber's own OnListen
+// handler slice stays empty), and the call still blocks/serves normally
+// instead of panicking on a nil func call.
+func TestListen_NilOnListen_DoesNotPanicAndBlocksNormally(t *testing.T) {
+	app := New()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve an ephemeral port: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("failed to release reserved port: %v", err)
+	}
+
+	listenErrCh := make(chan error, 1)
+	go func() {
+		listenErrCh <- app.Listen(addr, nil)
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := app.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	var dialErr error
+	for time.Now().Before(deadline) {
+		var conn net.Conn
+		conn, dialErr = net.DialTimeout("tcp", addr, 100*time.Millisecond)
+		if dialErr == nil {
+			conn.Close()
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if dialErr != nil {
+		t.Fatalf("expected to dial %s with nil onListen, got error: %v", addr, dialErr)
+	}
+
+	select {
+	case err := <-listenErrCh:
+		t.Fatalf("Listen returned unexpectedly (should still be blocking/serving): %v", err)
+	default:
+		// Still blocking, as expected.
 	}
 }
