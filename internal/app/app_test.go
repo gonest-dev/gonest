@@ -1,4 +1,4 @@
-package gonest
+package app
 
 import (
 	"errors"
@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/inject"
+	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/provider"
+	"github.com/gonest-dev/gonest/internal/scope"
 )
 
 // UserProperties/UserEntity/UserService/UserProvider/UserModule/AppModule
@@ -34,27 +37,27 @@ func (t *UserService) Create(name string) *UserEntity {
 	return u
 }
 
-var UserProvider = NewProvider(func(provider *Provider) {
-	provider.Scope(ScopeSingleton)
-	provider.Constructor(func() *UserService {
+var UserProvider = provider.New(func(p *provider.Provider) {
+	p.Scope(scope.Singleton)
+	p.Constructor(func() *UserService {
 		return &UserService{index: 0, list: make([]*UserEntity, 0)}
 	})
 })
 
-var exampleUserModule = NewModule(func(module *Module) {
-	module.Providers(UserProvider)
-	module.Exports(UserProvider)
+var exampleUserModule = module.New(func(m *module.Module) {
+	m.Providers(UserProvider)
+	m.Exports(UserProvider)
 })
 
 func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
-	appModule := NewModule(func(module *Module) {
-		module.Imports(exampleUserModule)
+	appModule := module.New(func(m *module.Module) {
+		m.Imports(exampleUserModule)
 	})
 
 	var userService *UserService
-	consumer := NewProvider(func(provider *Provider) {
-		userService = MustInject[*UserService](provider)
-		provider.Constructor(func() *consumerMarker {
+	consumer := provider.New(func(p *provider.Provider) {
+		userService = inject.MustInject[*UserService](p)
+		p.Constructor(func() *consumerMarker {
 			return &consumerMarker{}
 		})
 	})
@@ -92,16 +95,16 @@ type consumerMarker struct{}
 
 func TestMustNewApp_PanicsOnAssembleError(t *testing.T) {
 	type undeclaredService struct{}
-	badProvider := NewProvider(func(provider *Provider) {
-		provider.Constructor(func() *undeclaredService {
+	badProvider := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *undeclaredService {
 			return &undeclaredService{}
 		})
 	})
 
-	root := NewModule(func(module *Module) {
+	root := module.New(func(m *module.Module) {
 		// Exports a provider it never declared via Providers -- Stage 1
 		// validation error (design.md's Error Handling Strategy table).
-		module.Exports(badProvider)
+		m.Exports(badProvider)
 	})
 
 	defer func() {
@@ -116,13 +119,13 @@ func TestMustNewApp_PanicsOnAssembleError(t *testing.T) {
 
 func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
 	type simpleService struct{ Ready bool }
-	p := NewProvider(func(provider *Provider) {
-		provider.Constructor(func() *simpleService {
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *simpleService {
 			return &simpleService{Ready: true}
 		})
 	})
-	root := NewModule(func(module *Module) {
-		module.Providers(p)
+	root := module.New(func(m *module.Module) {
+		m.Providers(p)
 	})
 
 	app := MustNewApp(root)
@@ -135,18 +138,18 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 	type cycleA struct{}
 	type cycleB struct{}
 
-	var pa, pb *Provider
-	pa = NewProvider(func(provider *Provider) {
-		MustInject[*cycleB](pa)
-		provider.Constructor(func() *cycleA { return &cycleA{} })
+	var pa, pb *provider.Provider
+	pa = provider.New(func(p *provider.Provider) {
+		inject.MustInject[*cycleB](pa)
+		p.Constructor(func() *cycleA { return &cycleA{} })
 	})
-	pb = NewProvider(func(provider *Provider) {
-		MustInject[*cycleA](pb)
-		provider.Constructor(func() *cycleB { return &cycleB{} })
+	pb = provider.New(func(p *provider.Provider) {
+		inject.MustInject[*cycleA](pb)
+		p.Constructor(func() *cycleB { return &cycleB{} })
 	})
 
-	root := NewModule(func(module *Module) {
-		module.Providers(pa, pb)
+	root := module.New(func(m *module.Module) {
+		m.Providers(pa, pb)
 	})
 
 	_, err := NewApp(root)
@@ -169,13 +172,13 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 // placeholdersFor's unscoped inject.PendingEdges() read).
 func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) {
 	type firstTreeService struct{ Value string }
-	firstProvider := NewProvider(func(provider *Provider) {
-		provider.Constructor(func() *firstTreeService {
+	firstProvider := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *firstTreeService {
 			return &firstTreeService{Value: "first"}
 		})
 	})
-	firstRoot := NewModule(func(module *Module) {
-		module.Providers(firstProvider)
+	firstRoot := module.New(func(m *module.Module) {
+		m.Providers(firstProvider)
 	})
 
 	firstApp, err := NewApp(firstRoot)
@@ -196,20 +199,20 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 
 	type secondTreeService struct{ Value string }
 	var resolved *secondTreeService
-	secondProvider := NewProvider(func(provider *Provider) {
-		provider.Constructor(func() *secondTreeService {
+	secondProvider := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *secondTreeService {
 			return &secondTreeService{Value: "second"}
 		})
 	})
-	var consumer *Provider
-	consumer = NewProvider(func(provider *Provider) {
-		resolved = MustInject[*secondTreeService](consumer)
-		provider.Constructor(func() *consumerMarker {
+	var consumer *provider.Provider
+	consumer = provider.New(func(p *provider.Provider) {
+		resolved = inject.MustInject[*secondTreeService](consumer)
+		p.Constructor(func() *consumerMarker {
 			return &consumerMarker{}
 		})
 	})
-	secondRoot := NewModule(func(module *Module) {
-		module.Providers(secondProvider, consumer)
+	secondRoot := module.New(func(m *module.Module) {
+		m.Providers(secondProvider, consumer)
 	})
 
 	secondApp, err := NewApp(secondRoot)
@@ -230,13 +233,13 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 
 func TestNewApp_ConstructorError_ReturnsError(t *testing.T) {
 	type failingService struct{}
-	p := NewProvider(func(provider *Provider) {
-		provider.Constructor(func() (*failingService, error) {
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() (*failingService, error) {
 			return nil, errors.New("boom")
 		})
 	})
-	root := NewModule(func(module *Module) {
-		module.Providers(p)
+	root := module.New(func(m *module.Module) {
+		m.Providers(p)
 	})
 
 	_, err := NewApp(root)
