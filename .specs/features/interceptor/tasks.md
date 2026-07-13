@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/interceptor/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T4, todos evaluator PASS — T3 teve correção de ordem Guard/Interceptor achada durante revisão)
 
 ---
 
@@ -101,7 +101,7 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 
 ---
 
-### T4: Root re-exports
+### T4: Root re-exports ✅ DONE (evaluator: PASS, commit `f357df0`)
 
 **What**: pacote raiz `gonest` ganha `Interceptor` (alias de tipo) e `NewInterceptor` (`var NewInterceptor = interceptor.New` — alias simples, não-genérico, mesmo idioma de `NewGuard`/`NewMiddleware`).
 **Where**: arquivo novo na raiz, `interceptor.go`, arquivo de teste raiz
@@ -114,10 +114,10 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.NewInterceptor(fn)`, `gonest.Interceptor` resolvem e funcionam na raiz
-- [ ] Exemplo do INSIGHT.md `TimingInterceptor` (adaptado per spec.md's Out of Scope: sem `MustInject`, capturar logger via closure) reproduzido via aliases raiz, anexado via `controller.Interceptors(...)` através de `Controller`/`Module`/`NewApp` raiz, dispatch real via `app.Test`, confirma que before/after rodaram na ordem certa
-- [ ] Gate check passa
-- [ ] Test count: 2+ (smoke test raiz pra `NewInterceptor`/`Interceptor` resolverem, reprodução do `TimingInterceptor` end-to-end via aliases raiz)
+- [x] `gonest.NewInterceptor(fn)`, `gonest.Interceptor` resolvem e funcionam na raiz
+- [x] Exemplo do INSIGHT.md `TimingInterceptor` (adaptado per spec.md's Out of Scope: sem `MustInject`, capturar logger via closure) reproduzido via aliases raiz, anexado via `controller.Interceptors(...)` através de `Controller`/`Module`/`NewApp` raiz, dispatch real via `app.Test`, confirma que before/after rodaram na ordem certa
+- [x] Gate check passa
+- [x] Test count: 2+ (smoke test raiz pra `NewInterceptor`/`Interceptor` resolverem, reprodução do `TimingInterceptor` end-to-end via aliases raiz)
 
 **Tests**: unit (dispatch integration-style, convenção já estabelecida pros testes raiz)
 **Gate**: quick
