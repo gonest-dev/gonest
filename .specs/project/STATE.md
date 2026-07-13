@@ -96,6 +96,13 @@
 **Solution:** `resolve.Reset()` exportado, chamado como primeira linha de `NewApp` (antes de Stage 1) — cada bootstrap começa com o log de edges limpo. Contrato documentado explicitamente: "um bootstrap por vez por processo" (chamadas concorrentes de `NewApp` corrompem estado umas das outras). Teste de regressão prova que a fuga era real (RED genuíno antes do fix: 3 edges vazando).
 **Prevents:** ao adicionar qualquer estado global/package-level `var` em `internal/*`, perguntar de imediato "isso precisa ser resetado no início de cada `NewApp`?" — não esperar o próximo task achar o vazamento.
 
+### AD-009: pacote raiz `gonest` consolidado num único `gonest.go`/`gonest_test.go` (2026-07-13)
+
+**Decision:** todos os re-exports da raiz (antes espalhados em 13 arquivos — `app.go`, `controller.go`, `exception.go`, `guard.go`, `inject.go`, `interceptor.go`, `middleware.go`, `module.go`, `options.go`, `param.go`, `pipe.go`, `provider.go`, `scope.go` — cada um espelhando 1 pacote `internal/*`) fundidos num único `gonest.go` (+ `gonest_test.go` pros testes correspondentes). Commit `be09f7e`.
+**Reason:** pedido explícito do usuário — achava a listagem de arquivos na raiz visualmente confusa/poluída, esperava só `gonest.go`+`gonest_test.go` mantendo o máximo de código real dentro de `internal/`. Preferência puramente organizacional, sem trade-off técnico: todos já eram `package gonest`, fundir num arquivo só não muda compilação nem a barreira de privacidade de `internal/*` (essa barreira é sobre estrutura de diretório, não quantidade de arquivo dentro de 1 pacote).
+**Trade-off:** nenhum técnico. `gonest.go`/`gonest_test.go` ficam maiores (>500 linhas cada), organizados em seções com comentário separador por conceito (DI graph, App/bootstrap, Route params, Exceptions, Middleware, Guard, Interceptor).
+**Impact:** daí em diante, qualquer novo re-export raiz (nova feature de Milestone 3+ como Filter) deve ser ADICIONADO em `gonest.go`/`gonest_test.go` existentes, não criar arquivo novo. Salvo como memória de feedback (`feedback_root_package_single_file.md`) pra persistir entre sessões.
+
 ## Lessons Learned (cont. 11)
 
 ### L-012: `Pipe.Declare()` e `ctx.WithRoute()` nunca eram chamados em produção — só testes internos "trapaceavam" chamando manualmente (2026-07-13)
