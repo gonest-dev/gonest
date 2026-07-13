@@ -87,7 +87,20 @@ func (r *Route) HandlerFunc() func(ctx *httpctx.Context) {
 // MustParam[T] is called for this param name on a Context attached to this
 // Route, it uses p's Handler instead of the default reflect+strconv
 // coercion.
+//
+// Calls p.Declare() before storing it: pipe.New(fn) defers fn (the call
+// that registers p's own Handler) until Declare runs, mirroring
+// Provider/Controller/Module's own deferred-fn pattern -- but unlike those,
+// nothing in the DI bootstrap (internal/app's declareAll) ever walks
+// Route's registered Pipes to declare them, since Pipes aren't tracked by
+// any Module. Without this call, a Pipe attached via Param would never run
+// its own Handler(...) registration, and PipeFor/HandlerFunc would return a
+// zero reflect.Value the first time MustParam[T] tried to use it. Declare
+// is idempotent (no-op after the first call, per pipe.Pipe's own contract),
+// so calling it here is always safe even if the Pipe var is reused across
+// multiple Route.Param registrations.
 func (r *Route) Param(name string, p *pipe.Pipe) {
+	p.Declare()
 	r.paramPipes[name] = p
 }
 

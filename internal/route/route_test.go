@@ -109,6 +109,34 @@ func TestParam_RegistersCustomPipe(t *testing.T) {
 	}
 }
 
+// TestParam_DeclaresPipeWithoutManualDeclareCall proves Route.Param itself
+// runs the Pipe's deferred Handler registration -- a caller does NOT need
+// to call p.Declare() manually before registering it, unlike
+// TestParam_RegistersCustomPipe above (which calls Declare explicitly,
+// masking what would otherwise be a bug: nothing in the DI bootstrap
+// declares Route-attached Pipes, since Route/Pipe aren't tracked by any
+// Module -- see the doc comment on Route.Param).
+func TestParam_DeclaresPipeWithoutManualDeclareCall(t *testing.T) {
+	p := pipe.New(func(p *pipe.Pipe) {
+		p.Handler(func(ctx *httpctx.Context, raw string) int {
+			return 99
+		})
+	})
+	// deliberately NOT calling p.Declare() here
+
+	r := New(HttpGet, "/users/:id", func(r *Route) {
+		r.Param("id", p)
+	})
+
+	got, ok := r.PipeFor("id")
+	if !ok {
+		t.Fatal("expected PipeFor(\"id\") to report ok=true")
+	}
+	if !got.HandlerFunc().IsValid() {
+		t.Fatal("expected Route.Param to have declared the Pipe, so HandlerFunc() is a valid, callable reflect.Value -- got an invalid (zero) Value, meaning Handler was never registered")
+	}
+}
+
 // TestParam_UnregisteredNameReportsNotOk proves PipeFor reports ok=false for
 // a param name that never had a custom Pipe registered via Route.Param.
 func TestParam_UnregisteredNameReportsNotOk(t *testing.T) {
