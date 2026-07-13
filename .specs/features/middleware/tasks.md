@@ -54,7 +54,7 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 
 ---
 
-### T2: `Controller.Use` real type + `OwnMiddleware` [P]
+### T2: `Controller.Use` real type + `OwnMiddleware` [P] ✅ DONE (evaluator: PASS, commit `39b969e`)
 
 **What**: `internal/controller/controller.go`'s existing `Use(items ...Middleware)` stub (T6, placeholder `Middleware struct{}`) changes signature to `Use(items ...*middleware.Middleware)` (real type from T1), storing them for real (already stores into `c.middleware []Middleware` today — change that field's type to `[]*middleware.Middleware`). Add `OwnMiddleware() []*middleware.Middleware` accessor (defensive copy, mirrors `OwnRoutes`). Do NOT touch `Guards`/`Interceptors`/`Filters` — those keep the existing placeholder `Middleware struct{}` stub type unchanged (still out of scope, separate future features).
 **Where**: `internal/controller/controller.go` (existing, extend), `internal/controller/controller_test.go` (existing — update any test currently passing the OLD placeholder type to `Use`, add new tests)
@@ -67,11 +67,11 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 - Skill: NONE
 
 **Done when**:
-- [ ] `Controller.Use(m1, m2, ...)` stores real `*middleware.Middleware` values (not the placeholder stub) in registration order
-- [ ] `OwnMiddleware()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (same proof style as `TestOwnRoutes_ReturnsCopyNotInternalSlice`)
-- [ ] Any PRE-EXISTING test in `controller_test.go` that called `Use` with the OLD placeholder type is updated to use real `*middleware.Middleware` values and still passes (check `TestPipelineStubs_DoNotAffectObservableState` from T6 specifically — it likely calls `Use` with the old stub, needs updating)
-- [ ] Gate check passes
-- [ ] Test count: 3+ (Use stores in order, OwnMiddleware defensive copy, pre-existing test migrated and still green)
+- [x] `Controller.Use(m1, m2, ...)` stores real `*middleware.Middleware` values (not the placeholder stub) in registration order
+- [x] `OwnMiddleware()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (same proof style as `TestOwnRoutes_ReturnsCopyNotInternalSlice`)
+- [x] Any PRE-EXISTING test in `controller_test.go` that called `Use` with the OLD placeholder type is updated to use real `*middleware.Middleware` values and still passes (check `TestPipelineStubs_DoNotAffectObservableState` from T6 specifically — it likely calls `Use` with the old stub, needs updating)
+- [x] Gate check passes
+- [x] Test count: 3+ (Use stores in order, OwnMiddleware defensive copy, pre-existing test migrated and still green)
 
 **Tests**: unit
 **Gate**: quick
@@ -80,7 +80,7 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 
 ---
 
-### T3: `Module.Use` (new) + `OwnMiddleware` [P]
+### T3: `Module.Use` (new) + `OwnMiddleware` [P] ✅ DONE (evaluator: PASS, commit `bb4558f`)
 
 **What**: `internal/module/module.go` gains a NEW method (did not exist before this feature): `func (m *Module) Use(items ...*middleware.Middleware)`, storing into a new `middleware []*middleware.Middleware` field. Add `OwnMiddleware() []*middleware.Middleware` accessor (defensive copy, mirrors `OwnProviders`/`OwnControllers`). Per design.md: ANY `*Module` can call `Use` (no type-level restriction to "root only" — Go can't express that), but this task only adds the storage/accessor; whether it's actually CONSULTED only for the root module is T4's concern, not this task's.
 **Where**: `internal/module/module.go` (existing, extend), `internal/module/module_test.go` (existing — add tests)
@@ -93,10 +93,10 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 - Skill: NONE
 
 **Done when**:
-- [ ] `Module.Use(m1, m2, ...)` stores real `*middleware.Middleware` values in registration order (new method, no pre-existing behavior to preserve)
-- [ ] `OwnMiddleware()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (same proof style as `TestModule_OwnProviders_ReturnsCopyNotInternalSlice`)
-- [ ] Gate check passes
-- [ ] Test count: 2+ (Use stores in order, OwnMiddleware defensive copy)
+- [x] `Module.Use(m1, m2, ...)` stores real `*middleware.Middleware` values in registration order (new method, no pre-existing behavior to preserve)
+- [x] `OwnMiddleware()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (same proof style as `TestModule_OwnProviders_ReturnsCopyNotInternalSlice`)
+- [x] Gate check passes
+- [x] Test count: 2+ (Use stores in order, OwnMiddleware defensive copy)
 
 **Tests**: unit
 **Gate**: quick
