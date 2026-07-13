@@ -70,7 +70,7 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 
 ---
 
-### T3: Stage 2.5 `gatedHandler` in `internal/app`
+### T3: Stage 2.5 `gatedHandler` in `internal/app` ✅ DONE (evaluator: PASS, commit `2f7fbc4`)
 
 **What**: `internal/app/app.go`'s `registerRoutes`/`composeHandler` (extended by "Middleware", T4 of that feature) currently composes the middleware chain around `route.HandlerFunc()` directly. Insert a new innermost layer, `gatedHandler`, that evaluates the route's controller's guards (in registration order, short-circuiting at the first `false` via `panic(exception.NewForbiddenException(nil))`) before calling `route.HandlerFunc()` — then feed `gatedHandler` (not `route.HandlerFunc()`) into the EXISTING, UNCHANGED middleware-composition loop. Extend the local `routableController` interface to also require `OwnGuards() []*guard.Guard` (already satisfied by `*controller.Controller` post-T2).
 **Where**: `internal/app/app.go` (existing, extended — new import `internal/guard`, new import `internal/exception`), `internal/app/app_test.go` (existing — add tests)
@@ -83,15 +83,15 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 - Skill: NONE
 
 **Done when** (all require REAL `app.Test` dispatch):
-- [ ] A single guard returning `true` lets the route Handler run
-- [ ] A single guard returning `false` produces `403 Forbidden` (`{"name":"ForbiddenException","message":"","details":null}`), route Handler does NOT run
-- [ ] A guard panicking with a custom `exception.Exception` (e.g. `exception.NewUnauthorizedException(nil)`) produces THAT exception's status/body, route Handler does NOT run
-- [ ] Multiple guards (2+) evaluate in registration order; if the FIRST returns `false`, the SECOND never runs (test proves this via an observable side-effect in the second guard that must NOT have happened — e.g. a flag/counter checked to be untouched)
-- [ ] A controller with BOTH `Use()` (middleware) and `Guards()` registered runs middleware BEFORE guards BEFORE the Handler — proven via explicit ordered-sequence assertion (reuse the order-recorder technique from "Middleware"'s own T4 tests)
-- [ ] A controller with zero `Guards()` calls behaves EXACTLY as it did before this feature (zero regression) — confirm an EXISTING pre-feature test (e.g. "Middleware"'s own T4 tests, or T9's `UserController` end-to-end example) still passes UNMODIFIED
-- [ ] A guard panicking with a NON-Exception value still produces the same generic 500 as any other panic (non-regression of the existing recovery behavior, not new to this feature but worth one explicit proof)
-- [ ] Gate check passes
-- [ ] Test count: 8+ (true proceeds, false→403, custom exception panic, short-circuit on 2+ guards, middleware-then-guard-then-handler ordering, zero-regression for no-Guards controllers, non-Exception guard panic still generic 500)
+- [x] A single guard returning `true` lets the route Handler run
+- [x] A single guard returning `false` produces `403 Forbidden` (`{"name":"ForbiddenException","message":"","details":null}`), route Handler does NOT run
+- [x] A guard panicking with a custom `exception.Exception` (e.g. `exception.NewUnauthorizedException(nil)`) produces THAT exception's status/body, route Handler does NOT run
+- [x] Multiple guards (2+) evaluate in registration order; if the FIRST returns `false`, the SECOND never runs (test proves this via an observable side-effect in the second guard that must NOT have happened — e.g. a flag/counter checked to be untouched)
+- [x] A controller with BOTH `Use()` (middleware) and `Guards()` registered runs middleware BEFORE guards BEFORE the Handler — proven via explicit ordered-sequence assertion (reuse the order-recorder technique from "Middleware"'s own T4 tests)
+- [x] A controller with zero `Guards()` calls behaves EXACTLY as it did before this feature (zero regression) — confirm an EXISTING pre-feature test (e.g. "Middleware"'s own T4 tests, or T9's `UserController` end-to-end example) still passes UNMODIFIED
+- [x] A guard panicking with a NON-Exception value still produces the same generic 500 as any other panic (non-regression of the existing recovery behavior, not new to this feature but worth one explicit proof)
+- [x] Gate check passes
+- [x] Test count: 8+ (true proceeds, false→403, custom exception panic, short-circuit on 2+ guards, middleware-then-guard-then-handler ordering, zero-regression for no-Guards controllers, non-Exception guard panic still generic 500)
 
 **Tests**: integration (real Fiber dispatch via `app.Test`)
 **Gate**: full
