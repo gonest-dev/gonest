@@ -8,6 +8,7 @@
 package controller
 
 import (
+	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
 )
@@ -29,7 +30,7 @@ type Controller struct {
 	pathPrefix string
 	routes     []*route.Route
 
-	middleware   []Middleware
+	middleware   []*middleware.Middleware
 	guards       []Middleware
 	interceptors []Middleware
 	filters      []Middleware
@@ -114,10 +115,23 @@ func (c *Controller) OwnRoutes() []*route.Route {
 	return append([]*route.Route(nil), c.routes...)
 }
 
-// Use registers items as general middleware for this controller. Stub only
-// -- nothing reads the stored values yet.
-func (c *Controller) Use(items ...Middleware) {
+// Use registers items as general middleware for this controller, using the
+// real *middleware.Middleware type (internal/middleware, feature
+// "Middleware" T1). Use was never called by any shipped code path with the
+// placeholder Middleware stub, so it is safe to change its signature
+// directly rather than deprecate-and-migrate (same class of change as the
+// earlier "Controller & Route Registration" feature's HttpAdapter.Listen
+// signature change).
+func (c *Controller) Use(items ...*middleware.Middleware) {
 	c.middleware = append(c.middleware, items...)
+}
+
+// OwnMiddleware returns a copy of the middleware registered on this
+// controller via Use. Read-only: mutating the returned slice does not
+// affect this Controller's internal state (same defensive-copy pattern as
+// OwnRoutes).
+func (c *Controller) OwnMiddleware() []*middleware.Middleware {
+	return append([]*middleware.Middleware(nil), c.middleware...)
 }
 
 // Guards registers items as route guards for this controller. Stub only --

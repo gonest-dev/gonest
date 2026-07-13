@@ -3,6 +3,8 @@ package controller
 import (
 	"testing"
 
+	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
 )
@@ -145,7 +147,7 @@ func TestOwnRoutes_ReturnsCopyNotInternalSlice(t *testing.T) {
 func TestPipelineStubs_DoNotAffectObservableState(t *testing.T) {
 	withStubs := New(func(c *Controller) {
 		c.Path("/things")
-		c.Use(Middleware{})
+		c.Use(middleware.New(nil))
 		c.Guards(Middleware{})
 		c.Interceptors(Middleware{})
 		c.Filters(Middleware{})
@@ -164,5 +166,53 @@ func TestPipelineStubs_DoNotAffectObservableState(t *testing.T) {
 	}
 	if len(withStubs.OwnRoutes()) != len(withoutStubs.OwnRoutes()) {
 		t.Fatalf("OwnRoutes() length differs: %d vs %d", len(withStubs.OwnRoutes()), len(withoutStubs.OwnRoutes()))
+	}
+}
+
+func TestUse_StoresMiddlewareInRegistrationOrder(t *testing.T) {
+	var order []string
+
+	m1 := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "m1")
+			next(ctx)
+		})
+	})
+	m2 := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "m2")
+			next(ctx)
+		})
+	})
+
+	c := New(func(c *Controller) {
+		c.Use(m1, m2)
+	})
+	c.Declare()
+
+	got := c.OwnMiddleware()
+	if len(got) != 2 {
+		t.Fatalf("OwnMiddleware() returned %d items, want 2", len(got))
+	}
+	if got[0] != m1 || got[1] != m2 {
+		t.Fatalf("OwnMiddleware() = %v, want [m1, m2] in registration order", got)
+	}
+}
+
+func TestOwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
+	m1 := middleware.New(nil)
+	m2 := middleware.New(nil)
+
+	c := New(func(c *Controller) {
+		c.Use(m1)
+	})
+	c.Declare()
+
+	got := c.OwnMiddleware()
+	got[0] = m2
+
+	got2 := c.OwnMiddleware()
+	if got2[0] != m1 {
+		t.Fatalf("OwnMiddleware() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
