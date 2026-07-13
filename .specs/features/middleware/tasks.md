@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/middleware/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T5, todos evaluator PASS)
 
 ---
 
@@ -136,7 +136,7 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 
 ---
 
-### T5: Root re-exports
+### T5: Root re-exports ✅ DONE (evaluator: PASS, commit `1d70b8c`)
 
 **What**: root `gonest` package gets `Middleware`, `Next` (type aliases) and `NewMiddleware` (`var NewMiddleware = middleware.New` — plain alias, `New` is not generic, no wrapper needed, same idiom as `NewHttpException`/the 5 built-in exception constructors from the previous feature).
 **Where**: new file at repo root, e.g. `middleware.go`, root-level test file
@@ -149,10 +149,10 @@ T1 (internal/middleware: Next/Middleware/New/Handler)
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.NewMiddleware(fn)`, `gonest.Middleware`, `gonest.Next` all resolve and work at root
-- [ ] INSIGHT.md's `RequestIdMiddleware` example (UUID generation, `ctx.SetHeader`, `next(ctx)`) reproduced verbatim via root aliases, attached via `controller.Use(RequestIdMiddleware)` through the root `Controller`/`Module` aliases, dispatched via a real `app.Test` request, confirms the header lands correctly — this is the feature's own Independent Test from spec.md, run one more time through the ROOT package specifically (not `internal/*` directly) to prove the public API surface is real, not just the internal implementation
-- [ ] Gate check passes
-- [ ] Test count: 2+ (root-level smoke test for `NewMiddleware`/`Middleware`/`Next` resolving, the INSIGHT.md `RequestIdMiddleware` reproduction end-to-end through root aliases)
+- [x] `gonest.NewMiddleware(fn)`, `gonest.Middleware`, `gonest.Next` all resolve and work at root
+- [x] INSIGHT.md's `RequestIdMiddleware` example (UUID generation, `ctx.SetHeader`, `next(ctx)`) reproduced verbatim via root aliases, attached via `controller.Use(RequestIdMiddleware)` through the root `Controller`/`Module` aliases, dispatched via a real `app.Test` request, confirms the header lands correctly (UUID-parse-validated, not just presence)
+- [x] Gate check passes
+- [x] Test count: 2+ (root-level smoke test for `NewMiddleware`/`Middleware`/`Next` resolving, the INSIGHT.md `RequestIdMiddleware` reproduction end-to-end through root aliases)
 
 **Tests**: unit (the INSIGHT.md reproduction is itself an integration-style dispatch, but lives in root-package test file per this codebase's established "root smoke test" convention — see `exception_test.go`/`app_test.go` at repo root for precedent)
 

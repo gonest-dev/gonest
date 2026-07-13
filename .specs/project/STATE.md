@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 2 fechado com "Panic Recovery & Default Handler" (T1, commit `bc3941f`) — `internal/fiberapp`'s recover branch agora detecta `exception.Exception` via type-assertion (não type-switch fechado) e formata `{name,message,details}` na resposta real; panic não-Exception continua 500 genérico sem leak (T7 preservado, provado por teste de não-regressão). Próxima: especificar primeira feature de Milestone 3 (Request Pipeline — `Middleware`, ver ROADMAP.md).
+**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 3 iniciado: feature "Middleware" (T1-T5, commit `1d70b8c`) DONE, evaluator PASS em toda task — `internal/middleware` novo pacote, `Controller.Use` (real, era stub) + `Module.Use` (novo, global só-root) compõem chain em Stage 2.5 (`internal/app`), global sempre outermost. Próxima: "Guard" (2ª feature de Milestone 3, ver ROADMAP.md).
 
 ---
 
@@ -89,6 +89,15 @@
 **Solution:** `resolve.Reset()` exportado, chamado como primeira linha de `NewApp` (antes de Stage 1) — cada bootstrap começa com o log de edges limpo. Contrato documentado explicitamente: "um bootstrap por vez por processo" (chamadas concorrentes de `NewApp` corrompem estado umas das outras). Teste de regressão prova que a fuga era real (RED genuíno antes do fix: 3 edges vazando).
 **Prevents:** ao adicionar qualquer estado global/package-level `var` em `internal/*`, perguntar de imediato "isso precisa ser resetado no início de cada `NewApp`?" — não esperar o próximo task achar o vazamento.
 
+## Lessons Learned (cont. 9)
+
+### L-010: `httpctx.Context.Header()`/`SetHeader()` são stores diferentes (request vs response) — não dá pra "ler, concatenar, escrever de volta" (2026-07-13)
+
+**Context:** T4 da feature "Middleware" tentou provar ordem de execução de múltiplos middlewares fazendo cada um ler o header atual, concatenar um marcador, escrever de volta (`ctx.Header(...)` → `ctx.SetHeader(...)`) — técnica sugerida no dispatch da task.
+**Problem:** `Context.Header(name)` delega pra `Responder.GetHeader`, que no `fiberResponder` real (`internal/fiberapp`) mapeia pra `fiber.Ctx.Get` — isso lê o header da REQUEST recebida, não da resposta sendo construída. `Context.SetHeader(name, value)` delega pra `Responder.SetHeaderValue` → `fiber.Ctx.Set`, que escreve no header da RESPONSE. São dois stores completamente diferentes — "ler o que acabei de escrever" nunca funciona através de `Header()`/`SetHeader()`, porque `Header()` nunca vê o que `SetHeader()` gravou.
+**Solution:** T4 adaptou pra 3 técnicas alternativas, todas via dispatch real (`app.Test`): (1) slice `[]string` compartilhado via closure pra provar ordem, (2) `resp.Header` do `*http.Response` real (o que efetivamente chegou no wire) pra provar presença/valor final, (3) `ctx.WithRoute`/`ctx.Route()` (campo `any` genérico, normalmente usado pra anexar `*route.Route` pro `MustParam`) reaproveitado como carrier de valor arbitrário pra provar que múltiplos middlewares/Handler enxergam a MESMA instância de `*Context` — evaluator confirmou isolamento (nenhum teste que usa essa técnica também depende de `MustParam` via Pipe-por-Route na mesma request).
+**Prevents:** qualquer teste futuro que precise "ler o header que acabei de setar, dentro da mesma request, através da API pública de `Context`" precisa saber que isso não é possível hoje — `Header()` é só request-read. Se essa capacidade (ler resposta já escrita) vier a ser necessária de verdade (não só em teste), precisa de um método novo tipo `Context.GetResponseHeader` — não existe ainda.
+
 ## Lessons Learned (cont. 8)
 
 ### L-009: Fiber v3 `Ctx.Params()` devolve view zero-copy sobre buffer reusado — precisa `strings.Clone` (2026-07-13)
@@ -170,6 +179,7 @@ _Nenhuma ainda._
 - [ ] Abstração multi-adapter HTTP (net/http, Echo, Gin) — Captured during: definição de escopo v1
 - [ ] Emitter/Scheduler/Terminus — Captured during: definição de escopo v1 (ver Future Considerations no ROADMAP.md)
 - [ ] `gonest.FiberApp` como alias raiz de `internal/fiberapp.FiberApp` — Captured during: T5 de "App Bootstrap & Listen" (2026-07-13). Gap pré-existente (nenhuma feature anterior adicionou esse re-export) — INSIGHT.md usa `gonest.FiberApp` no call-site literal (`gonest.NewApp[gonest.FiberApp](...)`), mas hoje só `fiberapp.FiberApp` existe. Não bloqueou nada (testes usam o import direto), mas API pública fica incompleta até alguém adicionar `type FiberApp = fiberapp.FiberApp` num arquivo apropriado na raiz. Baixo custo, baixa prioridade — pegar quando mexer na raiz de novo por outro motivo, ou antes de considerar a API "pronta pra uso externo".
+- [ ] `gonest.Context`/`gonest.Route`/`gonest.HttpGet` (e resto do enum `HttpMethod`) como aliases raiz — Captured during: T5 de "Middleware" (2026-07-13). Mesmo padrão do gap de `FiberApp` acima: `internal/httpctx.Context` e `internal/route.Route`/`HttpMethod` nunca ganharam re-export na raiz em nenhuma feature anterior, mesmo já sendo usados extensivamente (Route/Context são centrais desde "Controller & Route Registration"). Todo teste raiz que precisa desses tipos importa `internal/httpctx`/`internal/route` direto. Vale revisar TODOS os re-exports faltantes de uma vez (`FiberApp`, `Context`, `Route`, `HttpMethod`+constantes) antes de considerar a API pública "completa" — provavelmente uma única task de housekeeping, não uma feature própria.
 - [ ] Renomear `MustResolve`→`MustInject` (e nomes públicos relacionados: `internal/resolve`→`internal/inject`) — Captured during: T8 evaluator. Motivo: evitar colisão de vocabulário com "Resolver" do GraphQL, caso o projeto suporte GraphQL no futuro. Nest já usa `@Injectable`/`@Inject`, `MustInject` fica mais alinhado. Usuário decidiu fazer o rename só depois de fechar a feature "Provider & DI Graph" inteira (T9-T11), não agora. `internal/resolver` (motor de grafo/DFS) NÃO precisa renomear — é implementação interna, não API pública.
 
 ---

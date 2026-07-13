@@ -56,8 +56,10 @@
 
 ### Features
 
-**Middleware** - PLANNED
-- `NewMiddleware`, `Handler(ctx, next)`, `Use()` por controller/módulo
+**Middleware** - COMPLETE
+- `NewMiddleware`, `Handler(ctx, next)` (`internal/middleware`, re-exportado na raiz)
+- `Controller.Use()` (real, era stub desde T6) + `Module.Use()` (novo, global — só o módulo raiz é consultado)
+- Composição da chain em Stage 2.5 (`internal/app`): global (root) sempre outermost, depois controller, depois Handler; panic de middleware cai no mesmo recover de "Panic Recovery & Default Handler"
 
 **Guard** - PLANNED
 - `NewGuard`, retorno bool → 403 automático, panic pra exception custom
