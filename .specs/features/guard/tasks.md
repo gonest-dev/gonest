@@ -18,7 +18,7 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 
 ## Task Breakdown
 
-### T1: `internal/guard` — `Guard`/`New`/`Handler`
+### T1: `internal/guard` — `Guard`/`New`/`Handler` ✅ DONE (evaluator: PASS, commit `4e8d03f`)
 
 **What**: new package. `type Guard struct { handler func(ctx *httpctx.Context) bool }` (unexported field), `func New(fn func(*Guard)) *Guard` (runs `fn` IMMEDIATELY, not deferred — mirrors `internal/middleware.New`'s precedent, see design.md's Tech Decisions), `func (g *Guard) Handler(h func(ctx *httpctx.Context) bool)`, `func (g *Guard) HandlerFunc() func(ctx *httpctx.Context) bool` (`nil` if `Handler` never called).
 **Where**: `internal/guard/guard.go`, `internal/guard/guard_test.go`
@@ -31,11 +31,11 @@ Fully sequential — unlike "Middleware" (which had `Controller.Use`/`Module.Use
 - Skill: NONE
 
 **Done when**:
-- [ ] `New(fn)` runs `fn` immediately (test proves it, e.g. observable side-effect right after `New` returns)
-- [ ] `Handler(h)` stores `h`, `HandlerFunc()` returns exactly that stored function — call it in a test with a fake `ctx`, confirm the returned `bool` is genuinely the handler's own decision (test both `true` and `false` paths)
-- [ ] `HandlerFunc()` returns `nil` if `Handler` was never called
-- [ ] Gate check passes
-- [ ] Test count: 4+ (immediate execution, Handler/HandlerFunc round-trip returning true, round-trip returning false, nil zero-value)
+- [x] `New(fn)` runs `fn` immediately (test proves it, e.g. observable side-effect right after `New` returns)
+- [x] `Handler(h)` stores `h`, `HandlerFunc()` returns exactly that stored function — call it in a test with a fake `ctx`, confirm the returned `bool` is genuinely the handler's own decision (test both `true` and `false` paths)
+- [x] `HandlerFunc()` returns `nil` if `Handler` was never called
+- [x] Gate check passes
+- [x] Test count: 4+ (immediate execution, Handler/HandlerFunc round-trip returning true, round-trip returning false, nil zero-value)
 
 **Tests**: unit
 **Gate**: quick
