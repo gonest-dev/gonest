@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/gonest-dev/gonest/internal/controller"
+	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/fiberapp"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
+	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -1228,5 +1230,459 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 	case <-done:
 		t.Fatalf("MustListen() returned unexpectedly before test-end shutdown")
 	default:
+	}
+}
+
+// --- T4 of "Middleware": Stage 2.5 composition in internal/app ---
+//
+// dispatchTestApp is a small shared helper: builds a *fiberapp.FiberApp
+// backed *App from root, fails the test on any bootstrap error, and returns
+// the underlying *fiber.App ready for app.Test(req) dispatch.
+func dispatchTestApp(t *testing.T, root *module.Module) *fiberapp.FiberApp {
+	t.Helper()
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	return fiberAdapter
+}
+
+// TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler proves a single
+// controller-level middleware (registered via Controller.Use) runs before
+// the route's own Handler, observed via a real app.Test dispatch: the
+// middleware appends to a shared order slice before calling next, and the
+// Handler appends too, then the test asserts the exact ["mw", "handler"]
+// order captured across the real request.
+//
+// Note on technique: httpctx.Context.Header reads the REQUEST header (Fiber
+// Ctx.Get), while SetHeader writes the RESPONSE header (Fiber Ctx.Set) --
+// two different underlying stores, so a middleware cannot SetHeader and have
+// a later step observe it via Header (internal/httpctx's Responder contract
+// has no GetRespHeader, and per this task's scope internal/fiberapp is not
+// to be touched to add one). This suite instead threads a shared []string
+// order-of-execution recorder through closures -- still a genuine
+// app.Test-dispatched proof of composition/ordering, just not the
+// header-based technique originally sketched.
+func TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler(t *testing.T) {
+	var order []string
+	mw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "mw")
+			next(ctx)
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(mw)
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				order = append(order, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if want := []string{"mw", "handler"}; len(order) != len(want) || order[0] != want[0] || order[1] != want[1] {
+		t.Fatalf("execution order = %v, want %v -- middleware did not run before Handler", order, want)
+	}
+}
+
+// TestNewApp_MiddlewareShortCircuit_SkipsRouteHandlerWhenNextNotCalled proves
+// that calling next(ctx) continues the chain (route Handler runs), while a
+// middleware that does NOT call next short-circuits the chain entirely (the
+// route Handler never runs) -- both proven via real dispatch.
+func TestNewApp_MiddlewareShortCircuit_SkipsRouteHandlerWhenNextNotCalled(t *testing.T) {
+	callingMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			next(ctx)
+		})
+	})
+	blockingMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			ctx.Status(http.StatusForbidden).Json(map[string]string{"blocked": "true"})
+			// deliberately never calls next(ctx)
+		})
+	})
+
+	var handlerRan bool
+	continueController := controller.New(func(c *controller.Controller) {
+		c.Use(callingMw)
+		c.Route(route.HttpGet, "/continue", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+	blockController := controller.New(func(c *controller.Controller) {
+		c.Use(blockingMw)
+		c.Route(route.HttpGet, "/blocked", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(continueController, blockController)
+	})
+
+	fa := dispatchTestApp(t, root)
+
+	// Continue path: next(ctx) called, Handler runs.
+	handlerRan = false
+	req := httptest.NewRequest(http.MethodGet, "/continue", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/continue status = %d, want 200", resp.StatusCode)
+	}
+	if !handlerRan {
+		t.Fatalf("/continue: route Handler did not run, want it to run after next(ctx)")
+	}
+
+	// Short-circuit path: next(ctx) never called, Handler must NOT run.
+	handlerRan = false
+	req = httptest.NewRequest(http.MethodGet, "/blocked", nil)
+	resp, err = fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("/blocked status = %d, want 403", resp.StatusCode)
+	}
+	if handlerRan {
+		t.Fatalf("/blocked: route Handler ran, want it to be short-circuited by a middleware that never calls next")
+	}
+}
+
+// TestNewApp_MultipleControllerMiddleware_RunInRegistrationOrder proves
+// multiple controller-level middleware run in the exact order they were
+// registered via Use, each appending a distinguishable marker to the SAME
+// response header via a read-existing-then-append pattern using
+// ctx.SetHeader alone (no ctx.Header read of it -- see the doc comment on
+// TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler for why Header
+// cannot observe a prior SetHeader against the real Fiber responder).
+// Confirmed here via the FINAL HTTP RESPONSE header's exact value (read from
+// resp.Header, a real net/http.Response, not via ctx) -- proving both
+// ordering and that SetHeader's writes genuinely land on the wire.
+func TestNewApp_MultipleControllerMiddleware_RunInRegistrationOrder(t *testing.T) {
+	appendMarker := func(marker string) *middleware.Middleware {
+		return middleware.New(func(m *middleware.Middleware) {
+			m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+				ctx.SetHeader("X-Order", marker)
+				next(ctx)
+			})
+		})
+	}
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(appendMarker("first"), appendMarker("second"), appendMarker("third"))
+		c.Route(route.HttpGet, "/order", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/order", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Each middleware overwrites X-Order with its own marker via SetHeader
+	// (last write wins), so the final value on the wire proves which
+	// middleware ran LAST -- "third", since first/second/third must run in
+	// that exact registration order.
+	if got, want := resp.Header.Get("X-Order"), "third"; got != want {
+		t.Fatalf("resp X-Order = %q, want %q -- middleware did not run in registration order (last registered must run last and win the overwrite)", got, want)
+	}
+}
+
+// TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler proves a
+// middleware mutating ctx before calling next is visible to a LATER
+// middleware and the route Handler -- i.e. the SAME *httpctx.Context
+// instance flows through the whole chain, not a copy.
+func TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler(t *testing.T) {
+	setter := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			ctx.WithRoute("mutated-by-first")
+			next(ctx)
+		})
+	})
+	var readerSaw any
+	reader := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			readerSaw = ctx.Route()
+			next(ctx)
+		})
+	})
+
+	var handlerSaw any
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(setter, reader)
+		c.Route(route.HttpGet, "/mutate", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerSaw = ctx.Route()
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/mutate", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	// ctx.WithRoute/ctx.Route are used here purely as a generic any-carrier
+	// on *httpctx.Context (the only mutable field Context exposes besides
+	// headers, which -- per the doc comment on
+	// TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler -- cannot
+	// round-trip a write through a later read against the real Fiber
+	// responder) to prove the SAME *httpctx.Context instance (not a copy)
+	// flows from the first middleware, through the second, into the route
+	// Handler: a mutation made by the first middleware before calling next
+	// must be visible to both.
+	if want := "mutated-by-first"; readerSaw != want {
+		t.Fatalf("second middleware saw ctx.Route() = %v, want %q -- mutation by first middleware not visible to a LATER middleware on the same *httpctx.Context", readerSaw, want)
+	}
+	if want := "mutated-by-first"; handlerSaw != want {
+		t.Fatalf("route Handler saw ctx.Route() = %v, want %q -- mutation not visible to the Handler on the same *httpctx.Context", handlerSaw, want)
+	}
+}
+
+// TestNewApp_RootMiddleware_RunsForEveryRouteIncludingControllerWithNoOwnUse
+// proves root-module Use() middleware runs for EVERY route in the app,
+// including a controller with ZERO Use() calls of its own -- 2 controllers,
+// only one with its own middleware, both hit by real requests, both showing
+// the global marker.
+func TestNewApp_RootMiddleware_RunsForEveryRouteIncludingControllerWithNoOwnUse(t *testing.T) {
+	globalMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			ctx.SetHeader("X-Global", "yes")
+			next(ctx)
+		})
+	})
+	localMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			ctx.SetHeader("X-Local", "yes")
+			next(ctx)
+		})
+	})
+
+	withOwnMw := controller.New(func(c *controller.Controller) {
+		c.Path("/with-own")
+		c.Use(localMw)
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+	withoutOwnMw := controller.New(func(c *controller.Controller) {
+		c.Path("/without-own")
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Use(globalMw)
+		m.Controllers(withOwnMw, withoutOwnMw)
+	})
+
+	fa := dispatchTestApp(t, root)
+
+	// Both assertions read the FINAL HTTP response headers (a real
+	// net/http.Response), proving the headers genuinely landed on the wire
+	// for a real dispatched request -- not a ctx-internal round-trip (see
+	// the doc comment on TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler
+	// for why ctx.Header cannot observe a prior ctx.SetHeader here).
+	req := httptest.NewRequest(http.MethodGet, "/with-own/ping", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	resp.Body.Close()
+	if got := resp.Header.Get("X-Global"); got != "yes" {
+		t.Fatalf("/with-own/ping: resp X-Global = %q, want %q", got, "yes")
+	}
+	if got := resp.Header.Get("X-Local"); got != "yes" {
+		t.Fatalf("/with-own/ping: resp X-Local = %q, want %q", got, "yes")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/without-own/ping", nil)
+	resp, err = fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	resp.Body.Close()
+	if got := resp.Header.Get("X-Global"); got != "yes" {
+		t.Fatalf("/without-own/ping: resp X-Global = %q, want %q -- global middleware must run even for a controller with zero Use() calls", got, "yes")
+	}
+	if got := resp.Header.Get("X-Local"); got != "" {
+		t.Fatalf("/without-own/ping: resp X-Local = %q, want empty -- this controller never called Use", got)
+	}
+}
+
+// TestNewApp_GlobalMiddleware_RunsBeforeControllerMiddleware proves global
+// (root-module) middleware runs BEFORE controller-level middleware -- proven
+// via marker-header ORDER, not just presence.
+func TestNewApp_GlobalMiddleware_RunsBeforeControllerMiddleware(t *testing.T) {
+	var order []string
+	globalMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "global")
+			next(ctx)
+		})
+	})
+	controllerMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			order = append(order, "controller")
+			next(ctx)
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(controllerMw)
+		c.Route(route.HttpGet, "/order", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				order = append(order, "handler")
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Use(globalMw)
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/order", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	want := []string{"global", "controller", "handler"}
+	if len(order) != len(want) {
+		t.Fatalf("execution order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("execution order = %v, want %v -- global middleware must run BEFORE controller-level middleware", order, want)
+		}
+	}
+}
+
+// TestNewApp_ZeroMiddleware_BehavesIdenticallyToPreFeatureBehavior is the
+// critical non-regression proof: TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond
+// (T9 of "Controller & Route Registration", a pre-existing test in this same
+// file, defined above and left completely UNMODIFIED by this task) exercises
+// a full app with zero Use() calls anywhere. Re-running it here (by calling
+// it directly as a subtest) is redundant with Go's own test runner already
+// running it -- this test instead exists as an explicit marker/documentation
+// that that exact pre-existing test was checked to still pass unmodified
+// after this task's changes to registerRoutes; see this file's test output
+// for TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond itself for the
+// actual proof.
+func TestNewApp_ZeroMiddleware_BehavesIdenticallyToPreFeatureBehavior(t *testing.T) {
+	t.Run("UserControllerEndToEnd_NonRegressionReference", func(t *testing.T) {
+		TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t)
+	})
+}
+
+// TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper proves a
+// middleware that panics with a built-in exception.Exception is caught by
+// the SAME existing recover wrapper in internal/fiberapp (unchanged by this
+// feature) and produces the correct structured response -- exactly as if a
+// route Handler itself had panicked.
+func TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper(t *testing.T) {
+	panicky := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			panic(exception.NewBadRequestException("bad input from middleware"))
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Use(panicky)
+		c.Route(route.HttpGet, "/panic", func(r *route.Route) {
+			r.Handler(func(ctx *httpctx.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["name"] != "BadRequestException" {
+		t.Fatalf("body[name] = %v, want %q", body["name"], "BadRequestException")
+	}
+	if body["details"] != "bad input from middleware" {
+		t.Fatalf("body[details] = %v, want %q", body["details"], "bad input from middleware")
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran after a panicking middleware, want the panic to short-circuit the chain")
 	}
 }

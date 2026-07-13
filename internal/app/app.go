@@ -12,6 +12,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
+	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/resolver"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -192,7 +193,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	}
 
 	adapter := newAdapter[T, PT]()
-	if err := registerRoutes(adapter, modules); err != nil {
+	if err := registerRoutes(adapter, root, modules); err != nil {
 		return nil, err
 	}
 
@@ -227,15 +228,19 @@ func newAdapter[T any, PT httpAdapterPtr[T]]() PT {
 
 // routableController is a locally-declared interface used to type-assert
 // module.ControllerRef values down to the methods Stage 2.5 needs
-// (PathPrefix, OwnRoutes) but that module.ControllerRef itself does not
-// expose -- same pattern as this file's own declarable interface just
-// below, and for the same reason: PathPrefix/OwnRoutes are route-collection
-// concerns, not something module.Module needs to know about a registered
-// controller. Already implemented by *controller.Controller (see
-// internal/controller/controller.go).
+// (PathPrefix, OwnRoutes, OwnMiddleware) but that module.ControllerRef
+// itself does not expose -- same pattern as this file's own declarable
+// interface just below, and for the same reason: PathPrefix/OwnRoutes/
+// OwnMiddleware are route-collection/composition concerns, not something
+// module.Module needs to know about a registered controller. Already
+// implemented by *controller.Controller (see
+// internal/controller/controller.go) -- OwnMiddleware was added there by
+// T2 of the "Middleware" feature, no controller-side change was needed
+// here beyond widening this interface.
 type routableController interface {
 	PathPrefix() string
 	OwnRoutes() []*route.Route
+	OwnMiddleware() []*middleware.Middleware
 }
 
 // registerRoutes implements Stage 2.5: walk every module's OwnControllers,
@@ -247,7 +252,17 @@ type routableController interface {
 // got registered -- per design.md's Error Handling Strategy ("servidor não
 // sobe"), a colliding app must never end up with some routes live and
 // others rejected.
-func registerRoutes(adapter HttpAdapter, modules []*module.Module) error {
+//
+// root is the literal *module.Module NewApp was called with -- the SAME
+// value, not every module in the assembled tree -- since per the
+// "Middleware" feature's design.md Tech Decisions, global middleware
+// (root.OwnMiddleware()) is scoped to the root module only, never cascaded
+// to imported modules. Each route's registered handler is not the bare
+// route.HandlerFunc() but a composed chain: root's global middleware
+// (outermost, runs first) wrapping that route's own controller's
+// middleware (via OwnMiddleware()) wrapping the route Handler itself
+// (innermost) -- see composeHandler below for the composition algorithm.
+func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.Module) error {
 	type collected struct {
 		method  route.HttpMethod
 		path    string
@@ -256,6 +271,7 @@ func registerRoutes(adapter HttpAdapter, modules []*module.Module) error {
 
 	var routes []collected
 	seen := map[string]bool{}
+	globalMiddleware := root.OwnMiddleware()
 
 	for _, m := range modules {
 		for _, c := range m.OwnControllers() {
@@ -264,6 +280,7 @@ func registerRoutes(adapter HttpAdapter, modules []*module.Module) error {
 				continue
 			}
 			prefix := rc.PathPrefix()
+			controllerMiddleware := rc.OwnMiddleware()
 			for _, r := range rc.OwnRoutes() {
 				fullPath := prefix + r.Path()
 				key := r.Method().String() + " " + fullPath
@@ -271,7 +288,8 @@ func registerRoutes(adapter HttpAdapter, modules []*module.Module) error {
 					return fmt.Errorf("duplicate route: %s", key)
 				}
 				seen[key] = true
-				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: r.HandlerFunc()})
+				composedHandler := composeHandler(globalMiddleware, controllerMiddleware, r.HandlerFunc())
+				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: composedHandler})
 			}
 		}
 	}
@@ -283,6 +301,28 @@ func registerRoutes(adapter HttpAdapter, modules []*module.Module) error {
 	}
 
 	return nil
+}
+
+// composeHandler builds the final handler for one route: global middleware
+// (outermost, runs first) wrapping controllerMiddleware wrapping handler
+// (innermost). Follows design.md's "Composition algorithm" exactly --
+// starting from handler as the innermost middleware.Next and composing
+// outward so chain[0] (global-first) ends up OUTERMOST. When both
+// globalMiddleware and controllerMiddleware are empty (an app with zero
+// Use() calls anywhere), the loop body never runs and the returned func
+// behaves identically to registering handler directly -- zero regression
+// per design.md's Error Handling Strategy table.
+func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
+	chain := append(append([]*middleware.Middleware{}, globalMiddleware...), controllerMiddleware...)
+
+	next := middleware.Next(handler)
+	for i := len(chain) - 1; i >= 0; i-- {
+		mw := chain[i]
+		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
+		next = func(ctx *httpctx.Context) { mw.HandlerFunc()(ctx, captured) }
+	}
+
+	return func(ctx *httpctx.Context) { next(ctx) }
 }
 
 // declarable is satisfied by both *provider.Provider and
