@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/route"
 )
@@ -95,18 +96,46 @@ func fiberMethod(method route.HttpMethod) string {
 // signature is func(ctx *httpctx.Context) with no return value -- panic is
 // the only way a Handler signals failure, consistent with how
 // Constructor/MustInject already work elsewhere in this framework (see
-// internal/provider, param.go). A panic with anything that is not (yet --
-// Milestone 2 introduces a structured Exception type) recognized becomes a
-// generic 500, never crashes the process, and leaks no internal detail.
+// internal/provider, param.go).
+//
+// The recover branch first type-asserts the recovered value against
+// exception.Exception -- an interface satisfied structurally by anything
+// embedding exception.HttpException (see internal/exception's doc comment).
+// Per design.md's Tech Decisions, detection is interface-based rather than a
+// type switch over the framework's five built-ins: a dev-defined exception
+// type (INSIGHT.md's `type FooExampleError struct { gonest.HttpException }`
+// pattern) must be recognized identically to a built-in, with zero
+// awareness on this package's part of what concrete types exist. When the
+// assertion succeeds, the response is built via ctx.Json -- the SAME
+// *httpctx.Context already constructed above for the Handler call -- so the
+// Exception branch goes through the one Fiber-agnostic path every other
+// gonest response does, rather than reaching for raw fiber.Ctx calls. A
+// panic value that does NOT satisfy Exception (including panic(nil), which
+// Go 1.21+ turns into a non-nil *runtime.PanicNilError rather than a nil
+// recover() -- see https://go.dev/doc/go1.21#runtime) falls through to the
+// pre-existing generic-500 fallback UNCHANGED: that fallback intentionally
+// keeps using raw fiber.Ctx calls (not ctx.Json) because it is a
+// last-resort, best-effort write for a case where we deliberately know
+// nothing about the panic value and must not risk it leaking into the
+// response -- it never crashes the process and leaks no internal detail.
 func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error {
 	wrapped := func(c fiber.Ctx) error {
+		ctx := httpctx.New(&fiberResponder{c: c})
+
 		defer func() {
 			if r := recover(); r != nil {
+				if exc, ok := r.(exception.Exception); ok {
+					ctx.Status(exc.Status()).Json(map[string]any{ //nolint:errcheck // best-effort write on an already-failed request
+						"name":    exc.Name(),
+						"message": exc.Message(),
+						"details": exc.Details(),
+					})
+					return
+				}
 				c.Status(fiber.StatusInternalServerError).SendString("Internal Server Error") //nolint:errcheck // best-effort write on an already-failed request
 			}
 		}()
 
-		ctx := httpctx.New(&fiberResponder{c: c})
 		h(ctx)
 		return nil
 	}

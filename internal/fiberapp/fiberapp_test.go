@@ -1,13 +1,17 @@
 package fiberapp
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/route"
 )
@@ -311,5 +315,288 @@ func TestListen_NilOnListen_DoesNotPanicAndBlocksNormally(t *testing.T) {
 		t.Fatalf("Listen returned unexpectedly (should still be blocking/serving): %v", err)
 	default:
 		// Still blocking, as expected.
+	}
+}
+
+// customTestException mirrors INSIGHT.md's dev-defined-exception pattern
+// (`type FooExampleError struct { gonest.HttpException }`) -- a type this
+// package never named anywhere in fiberapp.go, that satisfies
+// exception.Exception purely because it embeds exception.HttpException. Used
+// to prove RegisterRoute's recover branch detects Exception structurally
+// (via a type assertion against the Exception interface), not via a type
+// switch hardcoded to the framework's five built-ins.
+type customTestException struct {
+	exception.HttpException
+}
+
+// TestRegisterRoute_HandlerPanicsWithException_RespondsWithStructuredBody
+// proves that panicking with anything satisfying exception.Exception --
+// each of the five built-ins, plus a dev-defined type that only embeds
+// exception.HttpException -- is detected by RegisterRoute's recover branch
+// and turned into {status, name, message, details} instead of the generic
+// 500 fallback. Table-driven across all six cases since they all assert the
+// same shape.
+func TestRegisterRoute_HandlerPanicsWithException_RespondsWithStructuredBody(t *testing.T) {
+	tests := []struct {
+		name        string
+		panicValue  any
+		wantStatus  int
+		wantName    string
+		wantDetails any
+	}{
+		{
+			name:        "NotFoundException",
+			panicValue:  exception.NewNotFoundException(map[string]any{"id": "42"}),
+			wantStatus:  http.StatusNotFound,
+			wantName:    "NotFoundException",
+			wantDetails: map[string]any{"id": "42"},
+		},
+		{
+			name:        "BadRequestException",
+			panicValue:  exception.NewBadRequestException("bad input"),
+			wantStatus:  http.StatusBadRequest,
+			wantName:    "BadRequestException",
+			wantDetails: "bad input",
+		},
+		{
+			name:        "ConflictException",
+			panicValue:  exception.NewConflictException("already exists"),
+			wantStatus:  http.StatusConflict,
+			wantName:    "ConflictException",
+			wantDetails: "already exists",
+		},
+		{
+			name:        "UnauthorizedException",
+			panicValue:  exception.NewUnauthorizedException("no token"),
+			wantStatus:  http.StatusUnauthorized,
+			wantName:    "UnauthorizedException",
+			wantDetails: "no token",
+		},
+		{
+			name:        "ForbiddenException",
+			panicValue:  exception.NewForbiddenException("nope"),
+			wantStatus:  http.StatusForbidden,
+			wantName:    "ForbiddenException",
+			wantDetails: "nope",
+		},
+		{
+			name: "dev-defined exception via embedding",
+			panicValue: customTestException{
+				HttpException: exception.NewHttpException(
+					http.StatusTeapot, "customTestException", "I am a teapot", "extra",
+				),
+			},
+			wantStatus:  http.StatusTeapot,
+			wantName:    "customTestException",
+			wantDetails: "extra",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			app := New()
+
+			if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *httpctx.Context) {
+				panic(tc.panicValue)
+			}); err != nil {
+				t.Fatalf("RegisterRoute returned error: %v", err)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/boom", nil)
+			resp, err := app.FiberApp().Test(req)
+			if err != nil {
+				t.Fatalf("app.Test returned error: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected status %d, got %d", tc.wantStatus, resp.StatusCode)
+			}
+
+			var body map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode JSON body: %v", err)
+			}
+			if body["name"] != tc.wantName {
+				t.Fatalf("expected name %q, got %v", tc.wantName, body["name"])
+			}
+			if _, ok := body["message"]; !ok {
+				t.Fatalf("expected body to contain a message field, got %v", body)
+			}
+			gotDetails, gotOK := body["details"]
+			if !gotOK {
+				t.Fatalf("expected body to contain a details field, got %v", body)
+			}
+			if wantMap, ok := tc.wantDetails.(map[string]any); ok {
+				gotMap, ok := gotDetails.(map[string]any)
+				if !ok {
+					t.Fatalf("expected details to decode as an object, got %T: %v", gotDetails, gotDetails)
+				}
+				for k, v := range wantMap {
+					if gotMap[k] != v {
+						t.Fatalf("expected details[%q] = %v, got %v", k, v, gotMap[k])
+					}
+				}
+			} else if gotDetails != tc.wantDetails {
+				t.Fatalf("expected details %v, got %v", tc.wantDetails, gotDetails)
+			}
+		})
+	}
+}
+
+// TestRegisterRoute_ExceptionWithNilDetails_SerializesDetailsAsJsonNull
+// proves that an exception constructed with nil details round-trips as a
+// JSON `null` for the "details" key -- present in the body, not omitted --
+// since HttpException.Details() explicitly promises to return a bare nil
+// rather than a synthesized zero value (see exception.go's doc comment),
+// and the recover branch must not paper over that with omitempty or similar.
+func TestRegisterRoute_ExceptionWithNilDetails_SerializesDetailsAsJsonNull(t *testing.T) {
+	app := New()
+
+	if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *httpctx.Context) {
+		panic(exception.NewNotFoundException(nil))
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/boom", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes := new(bytes.Buffer)
+	if _, err := bodyBytes.ReadFrom(resp.Body); err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	rawBody := bodyBytes.String()
+
+	if !strings.Contains(rawBody, `"details":null`) {
+		t.Fatalf(`expected raw body to contain "details":null, got: %s`, rawBody)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(strings.NewReader(rawBody)).Decode(&body); err != nil {
+		t.Fatalf("failed to decode JSON body: %v", err)
+	}
+	details, ok := body["details"]
+	if !ok {
+		t.Fatalf("expected body to contain a details key, got %v", body)
+	}
+	if details != nil {
+		t.Fatalf("expected details to decode as nil, got %v", details)
+	}
+}
+
+// TestRegisterRoute_HandlerPanicsWithNonException_StillRespondsGeneric500
+// proves that panicking with a value that does NOT satisfy exception.Exception
+// -- an *errors.errorString, a raw string, and a genuine runtime panic
+// (index out of range) -- all still fall through to the EXACT SAME generic
+// 500 + "Internal Server Error" body that existed before this feature, and
+// crucially that no internal detail (e.g. the wrapped error's own message)
+// ever leaks into the response body.
+func TestRegisterRoute_HandlerPanicsWithNonException_StillRespondsGeneric500(t *testing.T) {
+	tests := []struct {
+		name       string
+		makePanic  func()
+		leakString string
+	}{
+		{
+			name: "errors.New",
+			makePanic: func() {
+				panic(errors.New("some internal detail"))
+			},
+			leakString: "some internal detail",
+		},
+		{
+			name: "raw string",
+			makePanic: func() {
+				panic("raw string panic detail")
+			},
+			leakString: "raw string panic detail",
+		},
+		{
+			name: "index out of range",
+			makePanic: func() {
+				s := []int{}
+				_ = s[0]
+			},
+			leakString: "index out of range",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			app := New()
+
+			if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *httpctx.Context) {
+				tc.makePanic()
+			}); err != nil {
+				t.Fatalf("RegisterRoute returned error: %v", err)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/boom", nil)
+			resp, err := app.FiberApp().Test(req)
+			if err != nil {
+				t.Fatalf("app.Test returned error: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusInternalServerError {
+				t.Fatalf("expected status 500, got %d", resp.StatusCode)
+			}
+
+			bodyBytes := new(bytes.Buffer)
+			if _, err := bodyBytes.ReadFrom(resp.Body); err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+			body := bodyBytes.String()
+
+			if body != "Internal Server Error" {
+				t.Fatalf("expected body %q, got %q", "Internal Server Error", body)
+			}
+			if strings.Contains(body, tc.leakString) {
+				t.Fatalf("expected body to NOT contain leaked detail %q, got %q", tc.leakString, body)
+			}
+		})
+	}
+}
+
+// TestRegisterRoute_HandlerPanicsWithNil_FallsThroughToGeneric500 proves
+// panic(nil) is handled safely. As of Go 1.21, the runtime turns a bare
+// panic(nil) into recover() returning a non-nil *runtime.PanicNilError
+// (see https://go.dev/doc/go1.21#runtime and go.mod's `go 1.25.0`, well
+// past that change) -- so this is NOT the "recover() returned nil, meaning
+// no panic occurred" case; recover() genuinely returns a non-nil value that
+// does not satisfy exception.Exception, and must fall through to the
+// generic 500 fallback exactly like any other non-Exception panic value,
+// without crashing the test process.
+func TestRegisterRoute_HandlerPanicsWithNil_FallsThroughToGeneric500(t *testing.T) {
+	app := New()
+
+	if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *httpctx.Context) {
+		panic(nil)
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/boom", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", resp.StatusCode)
+	}
+
+	bodyBytes := new(bytes.Buffer)
+	if _, err := bodyBytes.ReadFrom(resp.Body); err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	if bodyBytes.String() != "Internal Server Error" {
+		t.Fatalf("expected body %q, got %q", "Internal Server Error", bodyBytes.String())
 	}
 }
