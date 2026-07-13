@@ -7,6 +7,8 @@
 package fiberapp
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/gonest-dev/gonest/internal/httpctx"
@@ -156,6 +158,20 @@ func (r *fiberResponder) SetHeaderValue(name, value string) {
 // Ctx.Params, which itself returns "" for a param that doesn't exist on the
 // matched route -- the same ambiguity route.Route.HasParam (internal/route/
 // route.go) exists to disambiguate at the MustParam[T] layer.
+//
+// Fiber's own Ctx.Params doc comment warns the returned string is "only
+// valid within the handler" and to "make copies... to use the value outside
+// the Handler" -- it is a zero-copy view into a fasthttp request buffer
+// that gets reused for the NEXT request once this handler returns. gonest's
+// MustParam[T] contract (design.md, CTRL-04/05) gives callers a plain typed
+// value with no such caveat -- e.g. a Handler doing
+// `name := gonest.MustParam[string](ctx, "name"); entity.Name = name` and
+// persisting entity beyond the request is the expected, supported usage,
+// not a misuse of an internal API. Without this copy, that string's bytes
+// can be silently overwritten by a later request sharing the same
+// underlying buffer (observed as flaky corrupted param values under
+// sequential app.Test calls in internal/app's UserController end-to-end
+// test). strings.Clone forces a fresh, independently-backed copy.
 func (r *fiberResponder) GetParam(name string) string {
-	return r.c.Params(name)
+	return strings.Clone(r.c.Params(name))
 }

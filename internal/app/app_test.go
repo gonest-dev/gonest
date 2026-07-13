@@ -1,7 +1,9 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,11 +38,48 @@ type UserService struct {
 
 func (t *UserService) List() []*UserEntity { return t.list }
 
+// Get returns the UserEntity with the given ID, or nil if none exists.
+// INSIGHT.md's version panics via gonest.NewNotFoundException when the user
+// is missing (Milestone 2's Exceptions feature, not built yet) -- T9 of
+// this feature keeps it simple and returns nil, which the UserController
+// route below turns into a 404 without a structured Exception type.
+func (t *UserService) Get(userID int64) *UserEntity {
+	for _, u := range t.list {
+		if u.ID == userID {
+			return u
+		}
+	}
+	return nil
+}
+
 func (t *UserService) Create(name string) *UserEntity {
 	t.index++
 	u := &UserEntity{ID: int64(t.index), Name: name}
 	t.list = append(t.list, u)
 	return u
+}
+
+// Update sets the Name of the UserEntity with the given ID and returns it,
+// or nil if no such user exists.
+func (t *UserService) Update(userID int64, name string) *UserEntity {
+	u := t.Get(userID)
+	if u == nil {
+		return nil
+	}
+	u.Name = name
+	return u
+}
+
+// Delete removes the UserEntity with the given ID from the list and
+// returns the removed entity, or nil if no such user exists.
+func (t *UserService) Delete(userID int64) *UserEntity {
+	for i, u := range t.list {
+		if u.ID == userID {
+			t.list = append(t.list[:i], t.list[i+1:]...)
+			return u
+		}
+	}
+	return nil
 }
 
 var UserProvider = provider.New(func(p *provider.Provider) {
@@ -462,5 +501,278 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+// TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond is T9 of this
+// feature: it adapts the UserController/UserService example from
+// INSIGHT.md (lines 1-100) into a real integration test proving the whole
+// feature -- Provider & DI Graph + Module Composition + Controller & Route
+// Registration -- works together end-to-end via a real fiberapp.FiberApp
+// dispatched through app.Test(req).
+//
+// SPEC_DEVIATION (documented, not a blocker -- spec.md's own Independent
+// Test line for P1 explicitly allows "rotas... adaptadas"): INSIGHT.md's
+// full example uses gonest.Value[T] field wrappers, HttpStatusOk/
+// HttpStatusCreated named constants, and MustJsonBody[T] to parse a JSON
+// request body into UserProperties for Create/Update. None of those exist
+// in this codebase yet -- spec.md's CTRL-01..08 requirement list has no
+// JSON-body-parsing requirement, it is out of scope for this feature (a
+// future milestone, see spec.md's "Out of Scope" table). This test adapts
+// by using a plain Go string for UserEntity.Name (no Value[T] wrapper),
+// plain int status codes (200/201/404, no named constants), and for
+// Create/Update -- since there is no body-parsing primitive available
+// today -- accepts the "name" via a route param instead of a JSON body.
+// This still exercises a real POST/PUT round-trip through app.Test: the
+// route dispatches, MustParam converts params, and the response shape/
+// status match INSIGHT.md's intent (200 for List/Get/Update/Delete, 201
+// for Create).
+func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
+	userController := controller.New(func(c *controller.Controller) {
+		c.Path("/user")
+
+		userService := inject.MustInject[*UserService](c)
+
+		// QUERY /user/ -- List. INSIGHT.md uses gonest.HttpQuery for the
+		// list route; route.HttpQuery maps to fiberapp's "QUERY" method
+		// string (internal/fiberapp/fiberapp.go's fiberMethod), which
+		// httptest.NewRequest below dispatches as a plain HTTP method
+		// string like any other -- QUERY is not a net/http constant, but
+		// Fiber and net/http/httptest both treat the method as an opaque
+		// string, so this round-trips fine.
+		c.Route(route.HttpQuery, "/", func(r *route.Route) {
+			r.HttpCode(200)
+			r.Handler(func(ctx *httpctx.Context) {
+				ctx.Status(r.Code()).Json(userService.List())
+			})
+		})
+
+		// GET /user/:user_id -- Get. 404 (plain int, no structured
+		// Exception type yet -- Milestone 2) if the user doesn't exist.
+		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
+			r.HttpCode(200)
+			r.Handler(func(ctx *httpctx.Context) {
+				userID := route.MustParam[int64](ctx, "user_id")
+				u := userService.Get(userID)
+				if u == nil {
+					ctx.Status(404).Json(map[string]string{"error": "not found"})
+					return
+				}
+				ctx.Status(r.Code()).Json(u)
+			})
+		})
+
+		// POST /user/:name -- Create. SPEC_DEVIATION: INSIGHT.md POSTs to
+		// "/" with a JSON body (MustJsonBody[*UserProperties]); no
+		// body-parsing primitive exists yet, so this adaptation takes the
+		// new user's name via a route param instead, proving the same
+		// "POST creates and returns 201" round-trip.
+		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
+			r.HttpCode(201)
+			r.Handler(func(ctx *httpctx.Context) {
+				name := route.MustParam[string](ctx, "name")
+				ctx.Status(r.Code()).Json(userService.Create(name))
+			})
+		})
+
+		// PUT /user/:user_id/:name -- Update. Same body-parsing
+		// SPEC_DEVIATION as Create above: the new name travels as a
+		// second route param instead of a JSON body.
+		c.Route(route.HttpPut, "/:user_id/:name", func(r *route.Route) {
+			r.HttpCode(200)
+			r.Handler(func(ctx *httpctx.Context) {
+				userID := route.MustParam[int64](ctx, "user_id")
+				name := route.MustParam[string](ctx, "name")
+				u := userService.Update(userID, name)
+				if u == nil {
+					ctx.Status(404).Json(map[string]string{"error": "not found"})
+					return
+				}
+				ctx.Status(r.Code()).Json(u)
+			})
+		})
+
+		// DELETE /user/:user_id -- Delete.
+		c.Route(route.HttpDelete, "/:user_id", func(r *route.Route) {
+			r.HttpCode(200)
+			r.Handler(func(ctx *httpctx.Context) {
+				userID := route.MustParam[int64](ctx, "user_id")
+				u := userService.Delete(userID)
+				if u == nil {
+					ctx.Status(404).Json(map[string]string{"error": "not found"})
+					return
+				}
+				ctx.Status(r.Code()).Json(u)
+			})
+		})
+	})
+
+	userModule := module.New(func(m *module.Module) {
+		m.Providers(UserProvider)
+		m.Controllers(userController)
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Imports(userModule)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root)
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+	fa := fiberAdapter.FiberApp()
+
+	// 1. List (empty) -- QUERY /user/
+	{
+		req := httptest.NewRequest("QUERY", "/user/", nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("List: app.Test error = %v", err)
+		}
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			t.Fatalf("List: status = %d, want 200", resp.StatusCode)
+		}
+		var got []*UserEntity
+		decodeErr := json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		// app.Test's response body is backed by a pooled fasthttp buffer
+		// that is only guaranteed valid until the NEXT app.Test call on the
+		// same *fiber.App -- draining+closing it here, right after
+		// decoding and BEFORE the next block's fa.Test(...), avoids
+		// cross-request buffer reuse corrupting an earlier response still
+		// held open via `defer` (observed as a flaky, garbled JSON body
+		// when this originally used `defer resp.Body.Close()` at function
+		// scope instead of per-block).
+		if decodeErr != nil {
+			t.Fatalf("List: decode error = %v", decodeErr)
+		}
+		if len(got) != 0 {
+			t.Fatalf("List: got %d users, want 0 before any Create", len(got))
+		}
+	}
+
+	// 2. Create -- POST /user/Ada
+	var created UserEntity
+	{
+		req := httptest.NewRequest(http.MethodPost, "/user/Ada", nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("Create: app.Test error = %v", err)
+		}
+		if resp.StatusCode != 201 {
+			resp.Body.Close()
+			t.Fatalf("Create: status = %d, want 201", resp.StatusCode)
+		}
+		decodeErr := json.NewDecoder(resp.Body).Decode(&created)
+		resp.Body.Close()
+		if decodeErr != nil {
+			t.Fatalf("Create: decode error = %v", decodeErr)
+		}
+		if created.ID != 1 || created.Name != "Ada" {
+			t.Fatalf("Create: got %+v, want ID=1 Name=Ada", created)
+		}
+	}
+
+	// 3. Get -- GET /user/:user_id (MustParam[int64] round-trip)
+	{
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%d", created.ID), nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("Get: app.Test error = %v", err)
+		}
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			t.Fatalf("Get: status = %d, want 200", resp.StatusCode)
+		}
+		var got UserEntity
+		decodeErr := json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if decodeErr != nil {
+			t.Fatalf("Get: decode error = %v", decodeErr)
+		}
+		if got.ID != created.ID || got.Name != "Ada" {
+			t.Fatalf("Get: got %+v, want %+v", got, created)
+		}
+	}
+
+	// 3b. Get -- unknown ID returns 404
+	{
+		req := httptest.NewRequest(http.MethodGet, "/user/999", nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("Get(missing): app.Test error = %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 404 {
+			t.Fatalf("Get(missing): status = %d, want 404", resp.StatusCode)
+		}
+	}
+
+	// 4. Update -- PUT /user/:user_id/:name (MustParam[int64] round-trip)
+	{
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/user/%d/Grace", created.ID), nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("Update: app.Test error = %v", err)
+		}
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			t.Fatalf("Update: status = %d, want 200", resp.StatusCode)
+		}
+		var got UserEntity
+		decodeErr := json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if decodeErr != nil {
+			t.Fatalf("Update: decode error = %v", decodeErr)
+		}
+		if got.ID != created.ID || got.Name != "Grace" {
+			t.Fatalf("Update: got %+v, want ID=%d Name=Grace", got, created.ID)
+		}
+	}
+
+	// 5. Delete -- DELETE /user/:user_id (MustParam[int64] round-trip)
+	{
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%d", created.ID), nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("Delete: app.Test error = %v", err)
+		}
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			t.Fatalf("Delete: status = %d, want 200", resp.StatusCode)
+		}
+		var got UserEntity
+		decodeErr := json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if decodeErr != nil {
+			t.Fatalf("Delete: decode error = %v", decodeErr)
+		}
+		if got.ID != created.ID {
+			t.Fatalf("Delete: got %+v, want ID=%d", got, created.ID)
+		}
+	}
+
+	// 5b. List (empty again) -- proves Delete actually removed the entry
+	{
+		req := httptest.NewRequest("QUERY", "/user/", nil)
+		resp, err := fa.Test(req)
+		if err != nil {
+			t.Fatalf("List(after delete): app.Test error = %v", err)
+		}
+		var got []*UserEntity
+		decodeErr := json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if decodeErr != nil {
+			t.Fatalf("List(after delete): decode error = %v", decodeErr)
+		}
+		if len(got) != 0 {
+			t.Fatalf("List(after delete): got %d users, want 0 after Delete", len(got))
+		}
 	}
 }
