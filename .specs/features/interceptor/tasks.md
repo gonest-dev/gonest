@@ -73,10 +73,10 @@ Fully sequential — mesmo padrão de "Guard" (sem `Module.Interceptors`, sem se
 
 ### T3: Stage 2.5 `interceptedHandler` em `internal/app`
 
-**What**: insere uma NOVA camada entre o `gatedHandler` já existente (de "Guard") e o loop de composição de middleware já existente (de "Middleware") — nenhum dos dois é reescrito, essa feature só insere um passo novo de composição entre eles. Encadeia `controllerRC.OwnInterceptors()` em torno de `gatedHandler`, na mesma forma de composição (ordem de registro, de fora pra dentro) já usada por middleware. Estende `routableController` com `OwnInterceptors() []*interceptor.Interceptor` (já satisfeito por `*controller.Controller` pós-T2).
+**What** (CORRIGIDO 2026-07-13 — versão anterior tinha a ordem de wrapping trocada, ver design.md's nota de CORRECTION): insere uma NOVA camada envolvendo o `routeHandler` BRUTO (não o `gatedHandler` já gateado por Guards) — o interceptor decora o Handler puro, e o `gatedHandler` de "Guard" passa a envolver ESSA camada (não mais o `routeHandler` direto), garantindo que Guard consiga rejeitar a request ANTES de qualquer lógica "before" de Interceptor rodar (bate com ROADMAP.md: Middleware → Guard → Interceptor → Handler). Encadeia `controllerRC.OwnInterceptors()` em torno de `routeHandler`, mesma forma de composição (ordem de registro, de fora pra dentro) já usada por middleware. Estende `routableController` com `OwnInterceptors() []*interceptor.Interceptor` (já satisfeito por `*controller.Controller` pós-T2).
 **Where**: `internal/app/app.go` (existente, estendido — novo import `internal/interceptor`), `internal/app/app_test.go` (existente — adiciona testes)
 **Depends on**: T2
-**Reuses**: `interceptor.Interceptor`/`HandlerFunc` (T1), `Controller.OwnInterceptors()` (T2), `gatedHandler` já existente (de "Guard", lógica intocada), o loop de composição de middleware já existente (de "Middleware", lógica intocada, só o argumento de entrada muda)
+**Reuses**: `interceptor.Interceptor`/`HandlerFunc` (T1), `Controller.OwnInterceptors()` (T2), o padrão de guard-gating já existente (de "Guard" — o corpo de `gatedHandler` muda minimamente, envolvendo `interceptedHandler` em vez de `routeHandler` direto), o loop de composição de middleware já existente (de "Middleware", totalmente intocado)
 **Requirement**: ITC-01, ITC-02, ITC-03, ITC-04, ITC-05
 
 **Tools**:
