@@ -1075,3 +1075,158 @@ func TestMustListen_RealFiberApp_IntegrationSmoke(t *testing.T) {
 	default:
 	}
 }
+
+// TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort is T6 of this
+// feature ("App Bootstrap & Listen") -- the final task. It closes the loop
+// left open by TestMustListen_RealFiberApp_IntegrationSmoke (above, T4/T3
+// territory: proves MustListen+OnListen work end-to-end, but with a
+// controller-less root module and only http.Get, not a real net/http.Client
+// dial) and by TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond (T9 of
+// the earlier "Controller & Route Registration" feature: proves the full
+// UserController/UserService/AppModule DI+routing example works, but only
+// via Fiber's own in-process app.Test, never a real bound TCP port).
+//
+// This test reuses that same UserController/UserService example (the
+// package-level UserProvider var and the userController builder shape
+// defined right above TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond)
+// but bootstraps it through App.MustListen against a real, OS-reachable
+// 127.0.0.1 address, waits for OnListen to fire (channel-synchronized, no
+// time.Sleep -- same pattern as TestMustListen_RealFiberApp_IntegrationSmoke
+// and fiberapp's TestListen_OnListenFires_BeforeBlockingForGood), then
+// dispatches an actual net/http.Client request (a genuine TCP dial, NOT
+// app.Test) against the bound port to prove the WHOLE chain -- NewApp's DI
+// bootstrap, Stage 2.5 route registration, App.MustListen, the adapter's
+// real Listen, and Fiber's real accept loop -- works together, not just each
+// layer in isolation.
+func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) {
+	userController := controller.New(func(c *controller.Controller) {
+		c.Path("/user")
+
+		userService := inject.MustInject[*UserService](c)
+
+		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
+			r.HttpCode(200)
+			r.Handler(func(ctx *httpctx.Context) {
+				userID := route.MustParam[int64](ctx, "user_id")
+				u := userService.Get(userID)
+				if u == nil {
+					ctx.Status(404).Json(map[string]string{"error": "not found"})
+					return
+				}
+				ctx.Status(r.Code()).Json(u)
+			})
+		})
+
+		// POST /user/:name -- Create. Same SPEC_DEVIATION as T9's version
+		// above (INSIGHT.md's JSON body is not available yet, see this
+		// file's TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond doc
+		// comment): the new user's name travels as a route param. Needed
+		// here purely to seed a real user for the GET round-trip below --
+		// this test's focus is the real net/http.Client dial, not exercising
+		// every one of the 5 routes again (T9 already covers that via
+		// app.Test).
+		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
+			r.HttpCode(201)
+			r.Handler(func(ctx *httpctx.Context) {
+				name := route.MustParam[string](ctx, "name")
+				ctx.Status(r.Code()).Json(userService.Create(name))
+			})
+		})
+	})
+
+	userModule := module.New(func(m *module.Module) {
+		m.Providers(UserProvider)
+		m.Controllers(userController)
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Imports(userModule)
+	})
+
+	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+	}
+
+	const addr = "127.0.0.1:34599"
+
+	fired := make(chan struct{})
+	var once sync.Once
+	onListen := OnListen(func() {
+		once.Do(func() { close(fired) })
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		app.MustListen(addr, onListen)
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := fiberAdapter.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Errorf("MustListen goroutine did not return within timeout after Shutdown")
+		}
+	})
+
+	select {
+	case <-fired:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	// A real net/http.Client, genuinely dialing TCP against the bound
+	// address -- not app.Test, which never opens a socket.
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// Create a user through the real HTTP round-trip first: the /:user_id
+	// GET route needs a real ID to fetch, and this simultaneously proves the
+	// running server's UserService is genuinely usable, mutable state (not a
+	// zero-value placeholder) reached over a real socket.
+	createReq, err := http.NewRequest(http.MethodPost, "http://"+addr+"/user/Ada", nil)
+	if err != nil {
+		t.Fatalf("failed to build create request: %v", err)
+	}
+	createResp, err := client.Do(createReq)
+	if err != nil {
+		t.Fatalf("real net/http.Client create request failed: %v", err)
+	}
+	var created UserEntity
+	decodeErr := json.NewDecoder(createResp.Body).Decode(&created)
+	createResp.Body.Close()
+	if decodeErr != nil {
+		t.Fatalf("failed to decode create response: %v", decodeErr)
+	}
+
+	getResp, err := client.Get(fmt.Sprintf("http://%s/user/%d", addr, created.ID))
+	if err != nil {
+		t.Fatalf("real net/http.Client GET request failed: %v", err)
+	}
+	if getResp.StatusCode != http.StatusOK {
+		getResp.Body.Close()
+		t.Fatalf("GET /user/%d status = %d, want 200", created.ID, getResp.StatusCode)
+	}
+	var got UserEntity
+	decodeErr = json.NewDecoder(getResp.Body).Decode(&got)
+	getResp.Body.Close()
+	if decodeErr != nil {
+		t.Fatalf("failed to decode get response: %v", decodeErr)
+	}
+	if got.ID != created.ID || got.Name != "Ada" {
+		t.Fatalf("GET /user/%d body = %+v, want ID=%d Name=Ada", created.ID, got, created.ID)
+	}
+
+	select {
+	case <-done:
+		t.Fatalf("MustListen() returned unexpectedly before test-end shutdown")
+	default:
+	}
+}
