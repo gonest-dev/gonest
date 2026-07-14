@@ -11,6 +11,7 @@ type fakeResponder struct {
 	headers    map[string]string
 	params     map[string]string
 	body       []byte
+	queries    map[string]string
 }
 
 func newFakeResponder() *fakeResponder {
@@ -43,6 +44,10 @@ func (f *fakeResponder) GetParam(name string) string {
 
 func (f *fakeResponder) Body() []byte {
 	return f.body
+}
+
+func (f *fakeResponder) Queries() map[string]string {
+	return f.queries
 }
 
 func TestContext_Json_DelegatesToResponder(t *testing.T) {
@@ -146,6 +151,32 @@ func TestContext_Body_EmptyByDefault(t *testing.T) {
 
 	if got := ctx.Body(); len(got) != 0 {
 		t.Fatalf("expected Body() to be empty by default, got %q", got)
+	}
+}
+
+// TestContext_Queries_ReadsFromResponder proves Queries() returns exactly
+// the map the underlying Responder provides -- same one-line delegation
+// pattern as Body()/Param().
+func TestContext_Queries_ReadsFromResponder(t *testing.T) {
+	fake := newFakeResponder()
+	fake.queries = map[string]string{"page": "2", "limit": "10"}
+	ctx := New(fake)
+
+	got := ctx.Queries()
+
+	if len(got) != 2 || got["page"] != "2" || got["limit"] != "10" {
+		t.Fatalf("expected Queries() to return %+v, got %+v", fake.queries, got)
+	}
+}
+
+// TestContext_Queries_EmptyByDefault proves Queries() returns whatever the
+// Responder reports for an unset query map (nil/empty), not a panic.
+func TestContext_Queries_EmptyByDefault(t *testing.T) {
+	fake := newFakeResponder()
+	ctx := New(fake)
+
+	if got := ctx.Queries(); len(got) != 0 {
+		t.Fatalf("expected Queries() to be empty by default, got %v", got)
 	}
 }
 

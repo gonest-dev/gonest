@@ -349,6 +349,60 @@ func TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes(t *testing.T) {
 	}
 }
 
+// TestRegisterRoute_QueriesReachHandler_WithRealQueryString proves the
+// fiber.Ctx-backed Responder's Queries() is wired to Fiber's own
+// Ctx.Queries(), via a real HTTP dispatch (app.Test) with a real query
+// string -- not just that a fake Responder in a unit test returns whatever
+// map it was handed.
+func TestRegisterRoute_QueriesReachHandler_WithRealQueryString(t *testing.T) {
+	app := New()
+
+	var got map[string]string
+	if err := app.RegisterRoute(route.HttpGet, "/search", func(ctx *execution.Context) {
+		got = ctx.Queries()
+		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/search?term=gonest&page=2", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if got["term"] != "gonest" || got["page"] != "2" {
+		t.Fatalf("expected Queries() to return term=gonest page=2, got %+v", got)
+	}
+}
+
+// TestRegisterRoute_QueriesEmpty_WithNoQueryString proves Queries() returns
+// an empty (not nil-panicking) map when the request has no query string at
+// all.
+func TestRegisterRoute_QueriesEmpty_WithNoQueryString(t *testing.T) {
+	app := New()
+
+	var got map[string]string
+	if err := app.RegisterRoute(route.HttpGet, "/search", func(ctx *execution.Context) {
+		got = ctx.Queries()
+		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/search", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if len(got) != 0 {
+		t.Fatalf("expected Queries() to be empty with no query string, got %+v", got)
+	}
+}
+
 // customTestException mirrors INSIGHT.md's dev-defined-exception pattern
 // (`type FooExampleError struct { gonest.HttpException }`) -- a type this
 // package never named anywhere in fiber.go, that satisfies

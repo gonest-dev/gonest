@@ -21,6 +21,7 @@ type Responder interface {
 	SetHeaderValue(name, value string)
 	GetParam(name string) string
 	Body() []byte
+	Queries() map[string]string
 }
 
 // Context encapsulates the HTTP request/response for a single route Handler.
@@ -100,4 +101,13 @@ func (ctx *Context) Param(name string) string {
 // request reusing the same underlying buffer, exactly like L-009's bug.
 func (ctx *Context) Body() []byte {
 	return ctx.res.Body()
+}
+
+// Queries returns the raw query-string params as a map, exactly as reported
+// by the underlying Responder -- one-line delegation, same pattern as
+// Body(). Used by MustQuery[T] (internal/validate) as its source of
+// presence/raw values, mirroring how MustParams[T] consults Route.HasParam/
+// Context.Param instead.
+func (ctx *Context) Queries() map[string]string {
+	return ctx.res.Queries()
 }

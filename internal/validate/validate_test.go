@@ -102,6 +102,7 @@ func (f *fakeResponder) GetHeader(name string) string      { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string) {}
 func (f *fakeResponder) GetParam(name string) string       { return "" }
 func (f *fakeResponder) Body() []byte                      { return f.body }
+func (f *fakeResponder) Queries() map[string]string        { return nil }
 
 func expectBadRequest(t *testing.T, r any) *exception.BadRequestException {
 	t.Helper()
@@ -711,3 +712,4 @@ func (r *httpFiberResponder) GetHeader(name string) string      { return r.c.Get
 func (r *httpFiberResponder) SetHeaderValue(name, value string) { r.c.Set(name, value) }
 func (r *httpFiberResponder) GetParam(name string) string       { return r.c.Params(name) }
 func (r *httpFiberResponder) Body() []byte                      { return r.c.Body() }
+func (r *httpFiberResponder) Queries() map[string]string        { return r.c.Queries() }

@@ -235,3 +235,21 @@ func (r *fiberResponder) GetParam(name string) string {
 func (r *fiberResponder) Body() []byte {
 	return r.c.Body()
 }
+
+// Queries returns the request's query-string params via Fiber's own
+// Ctx.Queries. Although Fiber allocates a FRESH map on every call (unlike
+// GetParam's single string lookup), its keys/values are built via the
+// app's configured toString conversion, which defaults to
+// utils.UnsafeString -- an unsafe, zero-copy view into fasthttp's
+// underlying request buffer (same class of footgun L-009 in STATE.md
+// documents for GetParam). That buffer gets reused for the NEXT request
+// once this handler returns, so each string is defensively cloned here,
+// same rationale/precedent as GetParam's strings.Clone.
+func (r *fiberResponder) Queries() map[string]string {
+	raw := r.c.Queries()
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		out[strings.Clone(k)] = strings.Clone(v)
+	}
+	return out
+}
