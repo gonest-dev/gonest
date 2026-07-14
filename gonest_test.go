@@ -1584,3 +1584,86 @@ func TestNumericMetadata_RootAlias_RemainingThreeBranches(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// DateTime/Date (wrapper-less PropertyBuilder branches)
+// ---------------------------------------------------------------------------
+
+// TestDateTime_RootAlias_UserEntityInsightCallShape reproduces INSIGHT.md's
+// UserEntity CreatedAt/UpdatedAt/DeletedAt chains (lines ~399-401) verbatim
+// through the root gonest package's NewMetadata/Metadata/PropertyBuilder
+// aliases, confirming DateTime()/Date() need no alias of their own -- they
+// return the bare *PropertyBuilder, already re-exported since Metadata
+// Registration Core (same reasoning gonest.go's NumericMetadata doc comment
+// already spells out for Boolean()).
+func TestDateTime_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+	type UserEntity struct {
+		CreatedAt time.Time  `json:"createdAt"`
+		UpdatedAt time.Time  `json:"updatedAt"`
+		DeletedAt *time.Time `json:"deletedAt"`
+	}
+
+	now := time.Now()
+
+	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(now)
+		m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(now)
+		m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
+	})
+
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range m.OwnProperties() {
+		byName[p.Field().Name] = p
+	}
+
+	createdAt, ok := byName["CreatedAt"]
+	if !ok {
+		t.Fatal("CreatedAt was not registered via Property")
+	}
+	if createdAt.FormatValue() != "date-time" {
+		t.Fatalf("CreatedAt: FormatValue() = %q, want %q", createdAt.FormatValue(), "date-time")
+	}
+	if !createdAt.IsRequired() {
+		t.Fatal("CreatedAt: IsRequired() = false, want true")
+	}
+
+	deletedAt, ok := byName["DeletedAt"]
+	if !ok {
+		t.Fatal("DeletedAt was not registered via Property")
+	}
+	if deletedAt.FormatValue() != "date-time" {
+		t.Fatalf("DeletedAt: FormatValue() = %q, want %q", deletedAt.FormatValue(), "date-time")
+	}
+	if !deletedAt.IsNullable() {
+		t.Fatal("DeletedAt: IsNullable() = false, want true")
+	}
+	examples := deletedAt.ExamplesList()
+	if len(examples) != 2 || examples[0] != nil || examples[1] != now {
+		t.Fatalf("DeletedAt: ExamplesList() = %v, want [nil %v]", examples, now)
+	}
+}
+
+// TestDate_RootAlias_TypeCheck proves gonest.PropertyBuilder.Date() resolves
+// and type-checks at the root gonest package -- Date() needs no alias of its
+// own for the same reason DateTime() doesn't (see
+// TestDateTime_RootAlias_UserEntityInsightCallShape's doc comment).
+func TestDate_RootAlias_TypeCheck(t *testing.T) {
+	type entity struct {
+		BirthDate time.Time
+	}
+
+	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+		m.Property(&t.BirthDate).Date().Required()
+	})
+
+	props := m.OwnProperties()
+	if len(props) != 1 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+	}
+	if got := props[0].FormatValue(); got != "date" {
+		t.Fatalf("FormatValue() = %q, want %q", got, "date")
+	}
+	if !props[0].IsRequired() {
+		t.Fatal("IsRequired() = false, want true")
+	}
+}

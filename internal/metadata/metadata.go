@@ -336,3 +336,23 @@ func (p *PropertyBuilder) Boolean() *PropertyBuilder {
 	p.format = ""
 	return p
 }
+
+// DateTime selects OpenAPI's "date-time" string format (RFC 3339
+// timestamp -- INSIGHT.md's UserEntity example uses this for CreatedAt/
+// UpdatedAt/DeletedAt, all time.Time/*time.Time fields). Like Boolean, this
+// family has no extra validators beyond Required/Nullable/Description/
+// Examples (INSIGHT.md documents none for the date/date-time branches), so
+// DateTime returns the BARE *PropertyBuilder itself rather than constructing
+// a disposable wrapper type -- same reasoning as Boolean's own doc comment.
+func (p *PropertyBuilder) DateTime() *PropertyBuilder {
+	p.format = "date-time"
+	return p
+}
+
+// Date selects OpenAPI's "date" string format (calendar date only, no time
+// component). See DateTime's doc comment for why this returns the bare
+// *PropertyBuilder rather than a wrapper type.
+func (p *PropertyBuilder) Date() *PropertyBuilder {
+	p.format = "date"
+	return p
+}
