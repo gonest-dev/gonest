@@ -356,3 +356,20 @@ func (p *PropertyBuilder) Date() *PropertyBuilder {
 	p.format = "date"
 	return p
 }
+
+// Array selects OpenAPI's "array" type and returns a brand new
+// *ArrayMetadata (array.go, array-builder feature) -- the first branch
+// method whose extra state can't be captured by simply wrapping p itself
+// (see String/Integer/Boolean above): an array needs a SEPARATE builder for
+// its own items (Tags []string's element is itself a string with its own
+// Min/Max), distinct from p's own field-level Required/Nullable/
+// Description/Examples. p.format is set to "array" here (same
+// last-call-wins precedent as every other branch method), and a fresh
+// SYNTHETIC item *PropertyBuilder is allocated every call -- calling
+// Array() twice on the same p discards whatever item state the first
+// *ArrayMetadata had (see array.go's own doc comment for the full
+// rationale).
+func (p *PropertyBuilder) Array() *ArrayMetadata {
+	p.format = "array"
+	return &ArrayMetadata{PropertyBuilder: p, item: &PropertyBuilder{}}
+}
