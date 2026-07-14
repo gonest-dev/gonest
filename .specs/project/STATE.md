@@ -103,6 +103,13 @@
 **Trade-off:** nenhum técnico. `gonest.go`/`gonest_test.go` ficam maiores (>500 linhas cada), organizados em seções com comentário separador por conceito (DI graph, App/bootstrap, Route params, Exceptions, Middleware, Guard, Interceptor).
 **Impact:** daí em diante, qualquer novo re-export raiz (nova feature de Milestone 3+ como Filter) deve ser ADICIONADO em `gonest.go`/`gonest_test.go` existentes, não criar arquivo novo. Salvo como memória de feedback (`feedback_root_package_single_file.md`) pra persistir entre sessões.
 
+### AD-010: `internal/httpctx`→`internal/execution`, `internal/fiberapp`→`internal/adapter/fiber` (2026-07-13)
+
+**Decision:** `internal/httpctx` renomeado pra `internal/execution` (tipo continua `Context`, vira `execution.Context` — só o pacote muda de nome, não o tipo, evitando redundância `execution.ExecutionContext`). `internal/fiberapp` renomeado pra `internal/adapter/fiber` (pacote `fiber`, arquivo `fiber.go`), seguindo o padrão AD-004 "1 pacote por implementação". Commit `f2bdff3`.
+**Reason:** pedido do usuário — `httpctx` queria ficar mais próximo do termo `ExecutionContext` do NestJS; `fiberapp` "ficou tosco" e faz mais sentido morar em `internal/adapter/fiber`, preparando terreno pra multi-adapter futuro (net/http, Echo — ver ROADMAP.md's Future Considerations) sem colisão de nome quando um 2º adapter for adicionado.
+**Trade-off:** dentro de `internal/adapter/fiber/fiber.go`, o pacote se chama `fiber` E importa `github.com/gofiber/fiber/v3` (que também se chama `fiber` por padrão) — não é erro de compilação (Go nunca qualifica símbolos do próprio pacote com prefixo, só o import ocupa o identificador `fiber` dentro do arquivo), mas é visualmente confuso de ler (`fiber.New()` dentro de um arquivo que já é `package fiber`). Aceito como trade-off do nome pedido.
+**Impact:** rename puro, zero mudança de comportamento — 16 pacotes + raiz verdes, `go vet` limpo, `gofmt` limpo. Docs de features já completas (`.specs/features/*/spec.md`/`design.md`/`tasks.md`) NÃO foram atualizadas — ficam como registro histórico do que foi construído na época (mesmo tratamento do rename `MustResolve`→`MustInject`, AD-006). `TESTING.md` (doc vivo) foi atualizado. Qualquer código/doc novo a partir de agora usa `internal/execution`/`internal/adapter/fiber`.
+
 ## Lessons Learned (cont. 11)
 
 ### L-012: `Pipe.Declare()` e `ctx.WithRoute()` nunca eram chamados em produção — só testes internos "trapaceavam" chamando manualmente (2026-07-13)
