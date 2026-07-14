@@ -18,7 +18,7 @@ Sequencial — T2 depende inteiramente de T1.
 
 ## Task Breakdown
 
-### T1: `internal/metadata` — `Metadata`/`PropertyBuilder` core
+### T1: `internal/metadata` — `Metadata`/`PropertyBuilder` core ✅ DONE (evaluator: PASS, commit `f60415a` — técnica de offset via ponteiro confirmada empiricamente sem ajustes, incluindo campos `time.Time`/`*time.Time`)
 
 **What**: pacote novo `internal/metadata/metadata.go`:
 - `type Metadata struct { structType reflect.Type; baseAddr uintptr; description string; properties map[uintptr]*PropertyBuilder }` (todos não-exportados)
@@ -38,15 +38,15 @@ Sequencial — T2 depende inteiramente de T1.
 **Where**: `internal/metadata/metadata.go`, `internal/metadata/metadata_test.go`
 
 **Done when**:
-- [ ] `Property(&t.X)` identifica corretamente CADA campo de uma struct multi-campo (reproduza a struct `UserEntity` de 7 campos do INSIGHT.md — `Id int64`, `Name string`, `Email string`, `IsActive bool`, `CreatedAt time.Time`, `UpdatedAt time.Time`, `DeletedAt *time.Time` — chame `Property` pra CADA um, confirme via `Field()` que cada `PropertyBuilder` aponta pro `reflect.StructField` CERTO, não trocado com o vizinho)
-- [ ] `Property` com um ponteiro que NÃO pertence ao tipo passado a `New` panica com mensagem clara
-- [ ] `Property` chamado DUAS VEZES pro MESMO campo panica com mensagem clara ("already registered")
-- [ ] `Required()`/`Nullable()`/`Description(s)`/`Examples(...)` armazenam corretamente, cada um retorna o MESMO `*PropertyBuilder` (chain continua), getters (`IsRequired`/`IsNullable`/`DescriptionText`/`ExamplesList`) confirmam o que foi armazenado
-- [ ] `Metadata.Description(s)`/`DescriptionText()` funciona no nível do tipo inteiro, distinto de qualquer `Description` de campo individual
-- [ ] `OwnProperties()` devolve cópia defensiva — mutar o slice devolvido não afeta estado interno
-- [ ] `New` com um `structType` que NÃO é struct (ex: `reflect.TypeOf(42)`) panica com mensagem clara
-- [ ] Gate check passa
-- [ ] Test count: 12+ (identificação correta de 7 campos individualmente, ponteiro estranho panica, double-registration panica, round-trip dos 4 métodos comuns com getters, Description de nível-tipo distinto de nível-campo, OwnProperties cópia defensiva, non-struct panica)
+- [x] `Property(&t.X)` identifica corretamente CADA campo de uma struct multi-campo (reproduza a struct `UserEntity` de 7 campos do INSIGHT.md — `Id int64`, `Name string`, `Email string`, `IsActive bool`, `CreatedAt time.Time`, `UpdatedAt time.Time`, `DeletedAt *time.Time` — chame `Property` pra CADA um, confirme via `Field()` que cada `PropertyBuilder` aponta pro `reflect.StructField` CERTO, não trocado com o vizinho)
+- [x] `Property` com um ponteiro que NÃO pertence ao tipo passado a `New` panica com mensagem clara
+- [x] `Property` chamado DUAS VEZES pro MESMO campo panica com mensagem clara ("already registered")
+- [x] `Required()`/`Nullable()`/`Description(s)`/`Examples(...)` armazenam corretamente, cada um retorna o MESMO `*PropertyBuilder` (chain continua), getters (`IsRequired`/`IsNullable`/`DescriptionText`/`ExamplesList`) confirmam o que foi armazenado
+- [x] `Metadata.Description(s)`/`DescriptionText()` funciona no nível do tipo inteiro, distinto de qualquer `Description` de campo individual
+- [x] `OwnProperties()` devolve cópia defensiva — mutar o slice devolvido não afeta estado interno
+- [x] `New` com um `structType` que NÃO é struct (ex: `reflect.TypeOf(42)`) panica com mensagem clara
+- [x] Gate check passa
+- [x] Test count: 12+ (identificação correta de 7 campos individualmente, ponteiro estranho panica, double-registration panica, round-trip dos 4 métodos comuns com getters, Description de nível-tipo distinto de nível-campo, OwnProperties cópia defensiva, non-struct panica)
 
 **Tests**: unit
 **Gate**: quick
