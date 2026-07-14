@@ -59,7 +59,7 @@ func TestDefaultCoerce_InvalidConversion(t *testing.T) {
 	}
 }
 
-// Context.Param (internal/httpctx) returns "" for a param name that doesn't
+// Context.Param (internal/execution) returns "" for a param name that doesn't
 // exist on the current route (Fiber's c.Params semantics: unmatched key
 // yields the zero value, not an error). defaultCoerce itself has no
 // knowledge of "this route" — it only sees the raw string handed to it.

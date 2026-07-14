@@ -5,13 +5,13 @@
 // Nest interceptors. See design.md's "Next / Interceptor" component.
 package interceptor
 
-import "github.com/gonest-dev/gonest/internal/httpctx"
+import "github.com/gonest-dev/gonest/internal/execution"
 
 // Next represents the continuation of the interceptor chain: calling it runs
 // whatever comes after the current interceptor (the next interceptor, or
 // eventually the already-guard-gated route Handler). This is a package-own
 // type -- NOT reused from internal/middleware.Next -- even though both share
-// the identical underlying shape (func(ctx *httpctx.Context)). See
+// the identical underlying shape (func(ctx *execution.Context)). See
 // design.md's Tech Decisions: internal/interceptor and internal/middleware
 // are parallel, conceptually independent pipeline-stage packages (different
 // composition position, different semantic framing) that only coincide in
@@ -20,12 +20,12 @@ import "github.com/gonest-dev/gonest/internal/httpctx"
 // runtime benefit (Go's structural function-type compatibility already
 // makes both Next types freely interchangeable at the underlying-function
 // level for composition purposes).
-type Next func(ctx *httpctx.Context)
+type Next func(ctx *execution.Context)
 
 // Interceptor represents a single interceptor unit: it holds the (ctx, next)
 // handler function registered via Handler.
 type Interceptor struct {
-	handler func(ctx *httpctx.Context, next Next)
+	handler func(ctx *execution.Context, next Next)
 }
 
 // New creates an Interceptor and runs fn on it IMMEDIATELY -- unlike
@@ -46,13 +46,13 @@ func New(fn func(*Interceptor)) *Interceptor {
 }
 
 // Handler stores h as this Interceptor's (ctx, next) handler function.
-func (i *Interceptor) Handler(h func(ctx *httpctx.Context, next Next)) {
+func (i *Interceptor) Handler(h func(ctx *execution.Context, next Next)) {
 	i.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors middleware.Middleware.HandlerFunc()'s zero-value
 // contract).
-func (i *Interceptor) HandlerFunc() func(ctx *httpctx.Context, next Next) {
+func (i *Interceptor) HandlerFunc() func(ctx *execution.Context, next Next) {
 	return i.handler
 }

@@ -3,11 +3,11 @@ package guard
 import (
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 )
 
-// fakeResponder is a minimal test-only httpctx.Responder, mirroring the one
-// in internal/middleware/middleware_test.go (httpctx.Responder is exported
+// fakeResponder is a minimal test-only execution.Responder, mirroring the one
+// in internal/middleware/middleware_test.go (execution.Responder is exported
 // precisely so packages like this one can build their own fake -- see
 // L-004 in STATE.md).
 type fakeResponder struct {
@@ -49,10 +49,10 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 // with ctx reaching the handler body and the handler's own `true` decision
 // coming back out unchanged.
 func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
-	var gotCtx *httpctx.Context
+	var gotCtx *execution.Context
 
 	g := New(func(g *Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			gotCtx = ctx
 			return true
 		})
@@ -63,7 +63,7 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 		t.Fatal("expected HandlerFunc to return the function stored via Handler, got nil")
 	}
 
-	ctx := httpctx.New(newFakeResponder())
+	ctx := execution.New(newFakeResponder())
 	got := fn(ctx)
 
 	if gotCtx != ctx {
@@ -78,10 +78,10 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 // above but for a handler whose own logic decides false, confirming the
 // returned bool is not hardcoded/always-true.
 func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
-	var gotCtx *httpctx.Context
+	var gotCtx *execution.Context
 
 	g := New(func(g *Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			gotCtx = ctx
 			return false
 		})
@@ -92,7 +92,7 @@ func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
 		t.Fatal("expected HandlerFunc to return the function stored via Handler, got nil")
 	}
 
-	ctx := httpctx.New(newFakeResponder())
+	ctx := execution.New(newFakeResponder())
 	got := fn(ctx)
 
 	if gotCtx != ctx {

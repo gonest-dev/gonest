@@ -3,12 +3,12 @@ package route
 import (
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/pipe"
 )
 
-// fakeResponder is a minimal test-only httpctx.Responder, mirroring the one
-// in internal/httpctx/context_test.go (that one is unexported to its own
+// fakeResponder is a minimal test-only execution.Responder, mirroring the one
+// in internal/execution/context_test.go (that one is unexported to its own
 // package, so route's tests need their own).
 type fakeResponder struct {
 	params map[string]string
@@ -71,7 +71,7 @@ func TestHttpCode_DefaultsTo200(t *testing.T) {
 func TestHandler_StoresFn(t *testing.T) {
 	called := false
 	r := New(HttpGet, "/users", func(r *Route) {
-		r.Handler(func(ctx *httpctx.Context) {
+		r.Handler(func(ctx *execution.Context) {
 			called = true
 		})
 	})
@@ -80,7 +80,7 @@ func TestHandler_StoresFn(t *testing.T) {
 	if h == nil {
 		t.Fatal("expected HandlerFunc() to return the stored handler, got nil")
 	}
-	h(httpctx.New(newFakeResponder()))
+	h(execution.New(newFakeResponder()))
 	if !called {
 		t.Fatal("expected stored handler to be callable and run")
 	}
@@ -90,7 +90,7 @@ func TestHandler_StoresFn(t *testing.T) {
 // custom Pipe for that param name, retrievable via PipeFor.
 func TestParam_RegistersCustomPipe(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) int {
+		p.Handler(func(ctx *execution.Context, raw string) int {
 			return 99
 		})
 	})
@@ -118,7 +118,7 @@ func TestParam_RegistersCustomPipe(t *testing.T) {
 // Module -- see the doc comment on Route.Param).
 func TestParam_DeclaresPipeWithoutManualDeclareCall(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) int {
+		p.Handler(func(ctx *execution.Context, raw string) int {
 			return 99
 		})
 	})

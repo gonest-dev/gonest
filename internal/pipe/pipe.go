@@ -8,11 +8,11 @@ package pipe
 import (
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 )
 
 // contextType is used to validate Handler's accepted signature via reflect.
-var contextType = reflect.TypeOf((*httpctx.Context)(nil))
+var contextType = reflect.TypeOf((*execution.Context)(nil))
 
 // stringType is used to validate Handler's accepted signature via reflect.
 var stringType = reflect.TypeOf("")
@@ -52,7 +52,7 @@ func (p *Pipe) Declare() {
 // string into a typed value. It accepts exactly one signature (validated via
 // reflect immediately):
 //
-//	func(ctx *httpctx.Context, raw string) T
+//	func(ctx *execution.Context, raw string) T
 //
 // for any T. Any other signature panics with a clear message at declaration
 // time. Actual invocation of the stored handler happens in a later task --
@@ -60,7 +60,7 @@ func (p *Pipe) Declare() {
 func (p *Pipe) Handler(fn any) {
 	v := reflect.ValueOf(fn)
 	if v.Kind() != reflect.Func || !isValidHandlerSignature(v.Type()) {
-		panic("gonest: invalid Pipe.Handler signature, expected func(ctx *httpctx.Context, raw string) T")
+		panic("gonest: invalid Pipe.Handler signature, expected func(ctx *execution.Context, raw string) T")
 	}
 	p.handler = v
 }
@@ -74,7 +74,7 @@ func (p *Pipe) HandlerFunc() reflect.Value {
 }
 
 // isValidHandlerSignature reports whether t matches the single accepted
-// Handler signature: func(ctx *httpctx.Context, raw string) T, for any T.
+// Handler signature: func(ctx *execution.Context, raw string) T, for any T.
 func isValidHandlerSignature(t reflect.Type) bool {
 	if t.NumIn() != 2 {
 		return false

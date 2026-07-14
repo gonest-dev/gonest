@@ -3,7 +3,7 @@ package route
 import (
 	"strings"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/pipe"
 )
 
@@ -20,7 +20,7 @@ type Route struct {
 	path   string
 
 	httpCode int
-	handler  func(ctx *httpctx.Context)
+	handler  func(ctx *execution.Context)
 
 	paramPipes map[string]*pipe.Pipe
 }
@@ -73,13 +73,13 @@ func (r *Route) Code() int {
 }
 
 // Handler stores fn as this Route's request handler.
-func (r *Route) Handler(fn func(ctx *httpctx.Context)) {
+func (r *Route) Handler(fn func(ctx *execution.Context)) {
 	r.handler = fn
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called.
-func (r *Route) HandlerFunc() func(ctx *httpctx.Context) {
+func (r *Route) HandlerFunc() func(ctx *execution.Context) {
 	return r.handler
 }
 
@@ -113,7 +113,7 @@ func (r *Route) PipeFor(name string) (*pipe.Pipe, bool) {
 
 // HasParam reports whether this Route's declared path pattern contains a
 // ":name" segment matching name. This is the existence-check mechanism
-// MustParam[T] (root param.go) relies on: httpctx.Context.Param mirrors
+// MustParam[T] (root param.go) relies on: execution.Context.Param mirrors
 // Fiber's own c.Params semantics and returns a bare "" for a param that
 // doesn't exist on the route -- which is indistinguishable, at that layer
 // alone, from a param that exists but genuinely carries an empty string

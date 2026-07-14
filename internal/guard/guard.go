@@ -4,14 +4,14 @@
 // design.md's "Guard" component.
 package guard
 
-import "github.com/gonest-dev/gonest/internal/httpctx"
+import "github.com/gonest-dev/gonest/internal/execution"
 
 // Guard represents a single authorization-check unit: it holds the
 // ctx-in/bool-out handler function registered via Handler. Unlike
 // Middleware, a Guard doesn't decorate/wrap a continuation -- it gates:
 // true means continue, false means stop.
 type Guard struct {
-	handler func(ctx *httpctx.Context) bool
+	handler func(ctx *execution.Context) bool
 }
 
 // New creates a Guard and runs fn on it IMMEDIATELY -- unlike
@@ -33,13 +33,13 @@ func New(fn func(*Guard)) *Guard {
 }
 
 // Handler stores h as this Guard's ctx-in/bool-out handler function.
-func (g *Guard) Handler(h func(ctx *httpctx.Context) bool) {
+func (g *Guard) Handler(h func(ctx *execution.Context) bool) {
 	g.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors middleware.Middleware.HandlerFunc()'s zero-value
 // contract).
-func (g *Guard) HandlerFunc() func(ctx *httpctx.Context) bool {
+func (g *Guard) HandlerFunc() func(ctx *execution.Context) bool {
 	return g.handler
 }

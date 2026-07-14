@@ -4,21 +4,21 @@
 // "Next / Middleware" component.
 package middleware
 
-import "github.com/gonest-dev/gonest/internal/httpctx"
+import "github.com/gonest-dev/gonest/internal/execution"
 
 // Next represents the continuation of the middleware chain: calling it runs
 // whatever comes after the current middleware (the next middleware, or
 // eventually the route's own Handler). Its underlying type
-// (func(ctx *httpctx.Context)) is IDENTICAL in shape to a route Handler --
+// (func(ctx *execution.Context)) is IDENTICAL in shape to a route Handler --
 // this is what lets internal/app's Stage 2.5 wrap a route's Handler as the
 // innermost Next with a direct assignment, no conversion shim needed (see
 // design.md's Data Models "Relationships").
-type Next func(ctx *httpctx.Context)
+type Next func(ctx *execution.Context)
 
 // Middleware represents a single middleware unit: it holds the (ctx, next)
 // handler function registered via Handler.
 type Middleware struct {
-	handler func(ctx *httpctx.Context, next Next)
+	handler func(ctx *execution.Context, next Next)
 }
 
 // New creates a Middleware and runs fn on it IMMEDIATELY -- unlike
@@ -37,12 +37,12 @@ func New(fn func(*Middleware)) *Middleware {
 }
 
 // Handler stores h as this Middleware's (ctx, next) handler function.
-func (m *Middleware) Handler(h func(ctx *httpctx.Context, next Next)) {
+func (m *Middleware) Handler(h func(ctx *execution.Context, next Next)) {
 	m.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors pipe.Pipe.HandlerFunc()'s zero-value contract).
-func (m *Middleware) HandlerFunc() func(ctx *httpctx.Context, next Next) {
+func (m *Middleware) HandlerFunc() func(ctx *execution.Context, next Next) {
 	return m.handler
 }

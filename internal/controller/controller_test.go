@@ -3,8 +3,8 @@ package controller
 import (
 	"testing"
 
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
@@ -175,13 +175,13 @@ func TestUse_StoresMiddlewareInRegistrationOrder(t *testing.T) {
 	var order []string
 
 	m1 := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "m1")
 			next(ctx)
 		})
 	})
 	m2 := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "m2")
 			next(ctx)
 		})
@@ -223,13 +223,13 @@ func TestGuards_StoresGuardsInRegistrationOrder(t *testing.T) {
 	var order []string
 
 	g1 := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			order = append(order, "g1")
 			return true
 		})
 	})
 	g2 := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			order = append(order, "g2")
 			return true
 		})
@@ -271,13 +271,13 @@ func TestInterceptors_StoresInterceptorsInRegistrationOrder(t *testing.T) {
 	var order []string
 
 	i1 := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			order = append(order, "i1")
 			next(ctx)
 		})
 	})
 	i2 := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			order = append(order, "i2")
 			next(ctx)
 		})

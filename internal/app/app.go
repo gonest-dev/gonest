@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gonest-dev/gonest/internal/exception"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -44,7 +44,7 @@ type App struct {
 // Adapter returns the HttpAdapter NewApp[T] constructed and registered
 // routes on during Stage 2.5. Unexported callers within internal/app (and
 // this package's own tests) use it to reach the concrete adapter instance --
-// e.g. to call fiberapp.FiberApp's Listen for a later feature, or in this
+// e.g. to call fiber.FiberApp's Listen for a later feature, or in this
 // task's own end-to-end test to dispatch a request through the real
 // *fiber.App. Not part of any public re-export decision yet; that belongs to
 // whichever future feature adds Listen to the public API.
@@ -76,29 +76,29 @@ func (a *App) MustListen(addr string, onListen OnListen) {
 // component's stated contract exactly: RegisterRoute wires one gonest Route
 // onto the real underlying HTTP engine, Listen starts it serving (only used
 // by a later feature, per INSIGHT.md's note next to the httpAdapter
-// contract -- included here now so implementers, like *fiberapp.FiberApp,
+// contract -- included here now so implementers, like *fiber.FiberApp,
 // already satisfy the whole contract T8 needs).
 //
 // Init is the one addition beyond design.md's stated RegisterRoute/Listen
 // pair, needed to solve a real construction problem: NewApp[T] builds T's
 // zero value via reflect (see newAdapter below), and for a type like
-// *fiberapp.FiberApp whose real work happens in its own New() constructor
+// *fiber.FiberApp whose real work happens in its own New() constructor
 // (wrapping a *fiber.App), a reflect-constructed zero value has a nil
 // underlying engine -- calling RegisterRoute on it would nil-panic. Init is
 // the lazy-init hook NewApp[T] calls once, immediately after construction,
 // so any adapter needing real setup work gets the chance to do it (see
-// FiberApp.Init in internal/fiberapp/fiberapp.go for the concrete case).
+// FiberApp.Init in internal/adapter/fiber/fiber.go for the concrete case).
 type HttpAdapter interface {
 	// Init performs any setup a freshly, reflectively constructed zero
 	// value of this adapter type needs before RegisterRoute/Listen are
 	// safe to call. Implementations must be idempotent -- NewApp[T] calls
 	// it exactly once, but nothing prevents an adapter's own constructor
-	// (like fiberapp.New) from also calling it internally.
+	// (like fiber.New) from also calling it internally.
 	Init()
 	// RegisterRoute wires one route (method + full path) onto the real
 	// underlying HTTP engine, translating h into whatever handler shape
 	// that engine expects.
-	RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error
+	RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error
 	// Listen starts the underlying HTTP engine serving on addr, blocking
 	// until it stops. onListen, if non-nil, is invoked exactly once, after
 	// the underlying engine has successfully bound addr but before Listen's
@@ -113,7 +113,7 @@ type HttpAdapter interface {
 // httpAdapterPtr is the generic-constraint counterpart to HttpAdapter,
 // needed because the call-site contract (INSIGHT.md lines 103/317/658) is
 // `gonest.NewApp[gonest.FiberApp](AppModule)` -- FiberApp passed BY VALUE as
-// the sole type argument -- while *fiberapp.FiberApp's methods (and any
+// the sole type argument -- while *fiber.FiberApp's methods (and any
 // other real adapter's) are pointer-receiver only, so FiberApp itself does
 // not satisfy HttpAdapter, only *FiberApp does.
 //
@@ -278,7 +278,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	type collected struct {
 		method  route.HttpMethod
 		path    string
-		handler func(ctx *httpctx.Context)
+		handler func(ctx *execution.Context)
 	}
 
 	var routes []collected
@@ -320,7 +320,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				// route, to avoid shadowing the internal/route package
 				// import used elsewhere in this function/file.
 				currentRoute := r
-				withRoute := func(ctx *httpctx.Context) {
+				withRoute := func(ctx *execution.Context) {
 					ctx.WithRoute(currentRoute)
 					composedHandler(ctx)
 				}
@@ -356,8 +356,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 // controllerGuards is empty, the loop runs zero iterations and routeHandler
 // runs immediately -- behaviorally identical to calling routeHandler
 // directly (zero regression for controllers that never call Guards).
-func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
-	return func(ctx *httpctx.Context) {
+func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *execution.Context)) func(ctx *execution.Context) {
+	return func(ctx *execution.Context) {
 		for _, g := range controllerGuards {
 			if !g.HandlerFunc()(ctx) {
 				panic(exception.NewForbiddenException(nil))
@@ -387,15 +387,15 @@ func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *httpct
 // is empty, the loop runs zero iterations and the returned func behaves
 // identically to calling routeHandler directly -- zero regression for
 // controllers that never call Interceptors.
-func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
+func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(ctx *execution.Context)) func(ctx *execution.Context) {
 	next := interceptor.Next(routeHandler)
 	for i := len(controllerInterceptors) - 1; i >= 0; i-- {
 		it := controllerInterceptors[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
-		next = func(ctx *httpctx.Context) { it.HandlerFunc()(ctx, captured) }
+		next = func(ctx *execution.Context) { it.HandlerFunc()(ctx, captured) }
 	}
 
-	return func(ctx *httpctx.Context) { next(ctx) }
+	return func(ctx *execution.Context) { next(ctx) }
 }
 
 // composeHandler builds the final handler for one route: global middleware
@@ -407,17 +407,17 @@ func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, route
 // Use() calls anywhere), the loop body never runs and the returned func
 // behaves identically to registering handler directly -- zero regression
 // per design.md's Error Handling Strategy table.
-func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(ctx *httpctx.Context)) func(ctx *httpctx.Context) {
+func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(ctx *execution.Context)) func(ctx *execution.Context) {
 	chain := append(append([]*middleware.Middleware{}, globalMiddleware...), controllerMiddleware...)
 
 	next := middleware.Next(handler)
 	for i := len(chain) - 1; i >= 0; i-- {
 		mw := chain[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
-		next = func(ctx *httpctx.Context) { mw.HandlerFunc()(ctx, captured) }
+		next = func(ctx *execution.Context) { mw.HandlerFunc()(ctx, captured) }
 	}
 
-	return func(ctx *httpctx.Context) { next(ctx) }
+	return func(ctx *execution.Context) { next(ctx) }
 }
 
 // declarable is satisfied by both *provider.Provider and

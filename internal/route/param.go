@@ -5,21 +5,21 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/pipe"
 )
 
 // defaultCoerce converts raw (a route param's raw string value, e.g. from
-// httpctx.Context.Param) into the requested type T via reflect+strconv.
+// execution.Context.Param) into the requested type T via reflect+strconv.
 //
 // Supported T: string, int, int64, bool, float64. Any other T, or a raw
 // value that fails to parse as T, returns a non-nil error describing the
 // failure — this function never panics itself. It is deliberately isolated
-// from *httpctx.Context/*Route (see T5): the future public MustParam[T]
+// from *execution.Context/*Route (see T5): the future public MustParam[T]
 // wrapper is expected to convert this error into a panic, after first
 // checking for a custom Pipe and for param existence via ctx.Param.
 //
-// Note on absence: httpctx.Context.Param returns "" for a param name that
+// Note on absence: execution.Context.Param returns "" for a param name that
 // doesn't exist on the current route (Fiber's c.Params semantics — no
 // separate "not found" signal). defaultCoerce has no notion of "this
 // route's params" at all; it only ever sees the raw string already handed
@@ -68,8 +68,8 @@ func defaultCoerce[T any](raw string) (T, error) {
 // var, see AD-004 -- same reasoning as inject.MustInject/gonest.MustInject).
 //
 // It resolves ctx's currently-attached *Route (via ctx.Route(), an `any`
-// that MustParam type-asserts back to *Route -- see httpctx.Context's
-// WithRoute/Route doc comment for why the link is untyped at the httpctx
+// that MustParam type-asserts back to *Route -- see execution.Context's
+// WithRoute/Route doc comment for why the link is untyped at the execution
 // layer) and:
 //
 //  1. If a Route is attached and its declared path does NOT have a ":name"
@@ -84,7 +84,7 @@ func defaultCoerce[T any](raw string) (T, error) {
 //  3. Otherwise (no Route attached, or no custom Pipe for name), falls back
 //     to defaultCoerce[T]. A conversion failure panics with the
 //     "could not be converted" message.
-func MustParam[T any](ctx *httpctx.Context, name string) T {
+func MustParam[T any](ctx *execution.Context, name string) T {
 	raw := ctx.Param(name)
 
 	r, hasRoute := ctx.Route().(*Route)
@@ -106,11 +106,11 @@ func MustParam[T any](ctx *httpctx.Context, name string) T {
 	return v
 }
 
-// callPipeHandler invokes p's stored Handler (func(ctx *httpctx.Context, raw
+// callPipeHandler invokes p's stored Handler (func(ctx *execution.Context, raw
 // string) T) via reflect and returns its typed result. Panics from the
 // Handler itself propagate unchanged -- reflect.Value.Call does not recover
 // panics, so this is naturally pass-through.
-func callPipeHandler[T any](p *pipe.Pipe, ctx *httpctx.Context, raw, name string) T {
+func callPipeHandler[T any](p *pipe.Pipe, ctx *execution.Context, raw, name string) T {
 	fn := p.HandlerFunc()
 	out := fn.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(raw)})
 	result, ok := out[0].Interface().(T)

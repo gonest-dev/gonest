@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gonest-dev/gonest/internal/fiberapp"
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/adapter/fiber"
+	"github.com/gonest-dev/gonest/internal/execution"
 	interceptorpkg "github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/pipe"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -24,11 +24,11 @@ import (
 // shape gonest.NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
 // compiles and works through the root gonest package. gonest.FiberApp does
 // not exist as a root alias yet (a pre-existing gap from an earlier
-// feature) -- fiberapp.FiberApp is used directly here via import instead.
+// feature) -- fiber.FiberApp is used directly here via import instead.
 func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app := MustNewApp[fiberapp.FiberApp](root, AppOptions{
+	app := MustNewApp[fiber.FiberApp](root, AppOptions{
 		BufferLogs: true,
 		LogLevels:  []LogLevel{LogLevelWarn, LogLevelError},
 	})
@@ -60,14 +60,14 @@ func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()
@@ -111,14 +111,14 @@ func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()
@@ -159,7 +159,7 @@ func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 // Route params
 // ---------------------------------------------------------------------------
 
-// paramFakeResponder is a minimal test-only httpctx.Responder for exercising
+// paramFakeResponder is a minimal test-only execution.Responder for exercising
 // MustParam[T] end to end (Context -> Route -> Pipe/defaultCoerce).
 type paramFakeResponder struct {
 	params map[string]string
@@ -183,7 +183,7 @@ func TestMustParam_WithoutCustomPipe_UsesDefaultCoerce(t *testing.T) {
 
 	res := newParamFakeResponder()
 	res.params["id"] = "42"
-	ctx := httpctx.New(res).WithRoute(r)
+	ctx := execution.New(res).WithRoute(r)
 
 	got := MustParam[int](ctx, "id")
 	if got != 42 {
@@ -197,7 +197,7 @@ func TestMustParam_WithoutCustomPipe_UsesDefaultCoerce(t *testing.T) {
 // defaultCoerce.
 func TestMustParam_WithCustomPipe_UsesCustomPipeInsteadOfDefault(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) int {
+		p.Handler(func(ctx *execution.Context, raw string) int {
 			// Deliberately does NOT match defaultCoerce's behavior (would
 			// return 42 for raw "42") -- proves the custom Pipe ran, not
 			// the default coercion.
@@ -212,7 +212,7 @@ func TestMustParam_WithCustomPipe_UsesCustomPipeInsteadOfDefault(t *testing.T) {
 
 	res := newParamFakeResponder()
 	res.params["id"] = "42"
-	ctx := httpctx.New(res).WithRoute(r)
+	ctx := execution.New(res).WithRoute(r)
 
 	got := MustParam[int](ctx, "id")
 	if got != 999 {
@@ -227,7 +227,7 @@ func TestMustParam_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) {
 	r := route.New(route.HttpGet, "/users", func(r *route.Route) {})
 
 	res := newParamFakeResponder()
-	ctx := httpctx.New(res).WithRoute(r)
+	ctx := execution.New(res).WithRoute(r)
 
 	defer func() {
 		rec := recover()
@@ -255,7 +255,7 @@ func TestMustParam_PanicsOnConversionFailure_DefaultCoerce(t *testing.T) {
 
 	res := newParamFakeResponder()
 	res.params["id"] = "not-a-number"
-	ctx := httpctx.New(res).WithRoute(r)
+	ctx := execution.New(res).WithRoute(r)
 
 	defer func() {
 		rec := recover()
@@ -279,7 +279,7 @@ func TestMustParam_PanicsOnConversionFailure_DefaultCoerce(t *testing.T) {
 // (pass-through, not caught/rewrapped).
 func TestMustParam_PanicsWhenCustomPipeHandlerPanics(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) int {
+		p.Handler(func(ctx *execution.Context, raw string) int {
 			panic("custom pipe exploded")
 		})
 	})
@@ -291,7 +291,7 @@ func TestMustParam_PanicsWhenCustomPipeHandlerPanics(t *testing.T) {
 
 	res := newParamFakeResponder()
 	res.params["id"] = "42"
-	ctx := httpctx.New(res).WithRoute(r)
+	ctx := execution.New(res).WithRoute(r)
 
 	defer func() {
 		rec := recover()
@@ -313,7 +313,7 @@ func TestMustParam_PanicsWhenCustomPipeHandlerPanics(t *testing.T) {
 func TestMustParam_WithoutAttachedRoute_UsesDefaultCoerce(t *testing.T) {
 	res := newParamFakeResponder()
 	res.params["id"] = "7"
-	ctx := httpctx.New(res)
+	ctx := execution.New(res)
 
 	got := MustParam[int](ctx, "id")
 	if got != 7 {
@@ -339,7 +339,7 @@ func stringsContains(s, substr string) bool {
 // deferred fn) without the caller needing to call Declare manually.
 func TestNewPipe_RootAlias_TypeCheck(t *testing.T) {
 	p := NewPipe(func(p *Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) int {
+		p.Handler(func(ctx *execution.Context, raw string) int {
 			return 0
 		})
 	})
@@ -365,7 +365,7 @@ func TestNewPipe_RootAlias_TypeCheck(t *testing.T) {
 // an int64, panicking a BadRequestException with the invalid raw value as
 // Details on failure.
 var ParseIntPipe = NewPipe(func(pipe *Pipe) {
-	pipe.Handler(func(ctx *httpctx.Context, raw string) int64 {
+	pipe.Handler(func(ctx *execution.Context, raw string) int64 {
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
 			panic(NewBadRequestException(map[string]any{"raw": raw}))
@@ -389,7 +389,7 @@ func TestParseIntPipe_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
 			r.Param("id", ParseIntPipe)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				gotID = MustParam[int64](ctx, "id")
 				handlerRan = true
 				ctx.Json(map[string]int64{"id": gotID})
@@ -401,14 +401,14 @@ func TestParseIntPipe_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()
@@ -533,11 +533,11 @@ func TestHttpException_RootAlias_SatisfiesException(t *testing.T) {
 // resulting HandlerFunc genuinely reaches ctx/next through to the handler
 // body.
 func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
-	var gotCtx *httpctx.Context
+	var gotCtx *execution.Context
 	nextCalled := false
 
 	m := NewMiddleware(func(m *Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next Next) {
+		m.Handler(func(ctx *execution.Context, next Next) {
 			gotCtx = ctx
 			next(ctx)
 		})
@@ -551,8 +551,8 @@ func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 		t.Fatal("HandlerFunc() returned nil after Handler was called")
 	}
 
-	ctx := httpctx.New(nil)
-	fn(ctx, func(ctx *httpctx.Context) {
+	ctx := execution.New(nil)
+	fn(ctx, func(ctx *execution.Context) {
 		nextCalled = true
 	})
 
@@ -569,7 +569,7 @@ func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 // UUID and sets it as the X-Request-Id response header before calling
 // next(ctx).
 var RequestIdMiddleware = NewMiddleware(func(middleware *Middleware) {
-	middleware.Handler(func(ctx *httpctx.Context, next Next) {
+	middleware.Handler(func(ctx *execution.Context, next Next) {
 		requestId, _ := uuid.NewV7()
 		ctx.SetHeader("X-Request-Id", requestId.String())
 		next(ctx)
@@ -586,7 +586,7 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Use(RequestIdMiddleware)
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				ctx.Json(map[string]string{"ok": "true"})
 			})
 		})
@@ -596,14 +596,14 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()
@@ -638,10 +638,10 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 // accepts a func(ctx) bool, and the resulting HandlerFunc genuinely reaches
 // ctx through to the handler body and returns its own decision.
 func TestNewGuard_RootAlias_TypeCheck(t *testing.T) {
-	var gotCtx *httpctx.Context
+	var gotCtx *execution.Context
 
 	g := NewGuard(func(g *Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			gotCtx = ctx
 			return true
 		})
@@ -655,7 +655,7 @@ func TestNewGuard_RootAlias_TypeCheck(t *testing.T) {
 		t.Fatal("HandlerFunc() returned nil after Handler was called")
 	}
 
-	ctx := httpctx.New(nil)
+	ctx := execution.New(nil)
 	result := fn(ctx)
 
 	if gotCtx != ctx {
@@ -691,7 +691,7 @@ var stubAuthService = &authService{}
 // plain bool (proving the false->automatic 403 path and the true->Handler-
 // runs path).
 var AuthGuard = NewGuard(func(guard *Guard) {
-	guard.Handler(func(ctx *httpctx.Context) bool {
+	guard.Handler(func(ctx *execution.Context) bool {
 		token := ctx.Header("Authorization")
 		if token == "" {
 			panic(NewUnauthorizedException(nil))
@@ -712,7 +712,7 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Guards(AuthGuard)
 		c.Route(route.HttpGet, "/secure", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -723,14 +723,14 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()
@@ -804,11 +804,11 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 // its own type, not reused from middleware.Next), so internal/interceptor
 // is imported directly here for the Next parameter type.
 func TestNewInterceptor_RootAlias_TypeCheck(t *testing.T) {
-	var gotCtx *httpctx.Context
+	var gotCtx *execution.Context
 	nextCalled := false
 
 	i := NewInterceptor(func(i *Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptorpkg.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptorpkg.Next) {
 			gotCtx = ctx
 			next(ctx)
 		})
@@ -822,8 +822,8 @@ func TestNewInterceptor_RootAlias_TypeCheck(t *testing.T) {
 		t.Fatal("HandlerFunc() returned nil after Handler was called")
 	}
 
-	ctx := httpctx.New(nil)
-	fn(ctx, func(ctx *httpctx.Context) {
+	ctx := execution.New(nil)
+	fn(ctx, func(ctx *execution.Context) {
 		nextCalled = true
 	})
 
@@ -852,7 +852,7 @@ var timingLog []string
 // next(ctx) returns via observable ordering (timingLog's contents), not by
 // measuring real elapsed time precisely.
 var TimingInterceptor = NewInterceptor(func(interceptor *Interceptor) {
-	interceptor.Handler(func(ctx *httpctx.Context, next interceptorpkg.Next) {
+	interceptor.Handler(func(ctx *execution.Context, next interceptorpkg.Next) {
 		start := time.Now()
 		timingLog = append(timingLog, "before")
 		next(ctx)
@@ -875,7 +875,7 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Interceptors(TimingInterceptor)
 		c.Route(route.HttpGet, "/timed", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				timingLog = append(timingLog, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
@@ -887,14 +887,14 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()

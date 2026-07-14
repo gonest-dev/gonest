@@ -3,11 +3,11 @@ package interceptor
 import (
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 )
 
-// fakeResponder is a minimal test-only httpctx.Responder, mirroring the one
-// in internal/middleware/middleware_test.go (httpctx.Responder is exported
+// fakeResponder is a minimal test-only execution.Responder, mirroring the one
+// in internal/middleware/middleware_test.go (execution.Responder is exported
 // precisely so packages like this one can build their own fake -- see L-004
 // in STATE.md).
 type fakeResponder struct {
@@ -48,11 +48,11 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 // and HandlerFunc returns exactly that function, genuinely callable with
 // both ctx and next parameters reaching the handler body correctly.
 func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
-	var gotCtx *httpctx.Context
+	var gotCtx *execution.Context
 	nextCalled := false
 
 	i := New(func(i *Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next Next) {
+		i.Handler(func(ctx *execution.Context, next Next) {
 			gotCtx = ctx
 			next(ctx)
 		})
@@ -63,8 +63,8 @@ func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
 		t.Fatal("expected HandlerFunc to return the function stored via Handler, got nil")
 	}
 
-	ctx := httpctx.New(newFakeResponder())
-	fn(ctx, func(ctx *httpctx.Context) {
+	ctx := execution.New(newFakeResponder())
+	fn(ctx, func(ctx *execution.Context) {
 		nextCalled = true
 	})
 
@@ -88,22 +88,22 @@ func TestHandlerFunc_NilWhenNeverCalled(t *testing.T) {
 }
 
 // TestNext_TypeIdentityWithRouteHandlerSignature proves a plain
-// func(ctx *httpctx.Context) value is directly assignable to a Next
+// func(ctx *execution.Context) value is directly assignable to a Next
 // variable with zero conversion code -- the type-identity design.md relies
 // on for composing interceptedHandler out of gatedHandler with no adapter
 // code (same proof internal/middleware's own T1 already made for its own
 // Next).
 func TestNext_TypeIdentityWithRouteHandlerSignature(t *testing.T) {
 	called := false
-	someFunc := func(ctx *httpctx.Context) {
+	someFunc := func(ctx *execution.Context) {
 		called = true
 	}
 
 	var n Next = someFunc
 
-	n(httpctx.New(newFakeResponder()))
+	n(execution.New(newFakeResponder()))
 
 	if !called {
-		t.Fatal("expected Next-typed variable assigned from a plain func(ctx *httpctx.Context) to be callable")
+		t.Fatal("expected Next-typed variable assigned from a plain func(ctx *execution.Context) to be callable")
 	}
 }

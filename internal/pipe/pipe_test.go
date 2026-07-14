@@ -3,7 +3,7 @@ package pipe_test
 import (
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/httpctx"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/pipe"
 )
 
@@ -25,10 +25,10 @@ func TestNewDoesNotExecuteFn(t *testing.T) {
 }
 
 // TestHandlerAcceptsValidSignatureInt proves Handler accepts
-// func(ctx *httpctx.Context, raw string) T for T = int.
+// func(ctx *execution.Context, raw string) T for T = int.
 func TestHandlerAcceptsValidSignatureInt(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) int {
+		p.Handler(func(ctx *execution.Context, raw string) int {
 			return 0
 		})
 	})
@@ -46,7 +46,7 @@ func TestHandlerAcceptsValidSignatureInt(t *testing.T) {
 // over T, not hardcoded to one return type.
 func TestHandlerAcceptsValidSignatureString(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) string {
+		p.Handler(func(ctx *execution.Context, raw string) string {
 			return raw
 		})
 	})
@@ -63,7 +63,7 @@ func TestHandlerAcceptsValidSignatureString(t *testing.T) {
 // time (clear message) when fn doesn't take exactly (ctx, raw string).
 func TestHandlerPanicsOnWrongParamCount(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context) int {
+		p.Handler(func(ctx *execution.Context) int {
 			return 0
 		})
 	})
@@ -78,10 +78,10 @@ func TestHandlerPanicsOnWrongParamCount(t *testing.T) {
 }
 
 // TestHandlerPanicsOnWrongParamTypes proves Handler panics when the param
-// types don't match (ctx *httpctx.Context, raw string).
+// types don't match (ctx *execution.Context, raw string).
 func TestHandlerPanicsOnWrongParamTypes(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(raw string, ctx *httpctx.Context) int {
+		p.Handler(func(raw string, ctx *execution.Context) int {
 			return 0
 		})
 	})
@@ -99,7 +99,7 @@ func TestHandlerPanicsOnWrongParamTypes(t *testing.T) {
 // zero or more than one value.
 func TestHandlerPanicsOnWrongReturnCount(t *testing.T) {
 	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *httpctx.Context, raw string) (int, error) {
+		p.Handler(func(ctx *execution.Context, raw string) (int, error) {
 			return 0, nil
 		})
 	})

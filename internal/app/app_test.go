@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonest-dev/gonest/internal/adapter/fiber"
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/fiberapp"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -317,10 +317,10 @@ func TestNewApp_ControllerWithRoutes_RegistersEachOnAdapter(t *testing.T) {
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {})
+			r.Handler(func(ctx *execution.Context) {})
 		})
 		c.Route(route.HttpPost, "/", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {})
+			r.Handler(func(ctx *execution.Context) {})
 		})
 	})
 
@@ -359,13 +359,13 @@ func TestNewApp_DuplicateRoute_ReturnsErrorBeforeRegistering(t *testing.T) {
 	dupeController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {})
+			r.Handler(func(ctx *execution.Context) {})
 		})
 	})
 	otherDupeController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {})
+			r.Handler(func(ctx *execution.Context) {})
 		})
 	})
 
@@ -418,7 +418,7 @@ func TestNewApp_ZeroControllers_BootstrapsNormally(t *testing.T) {
 func TestNewApp_EmptyPathPrefix_RegistersRouteWithBarePath(t *testing.T) {
 	noPrefixController := controller.New(func(c *controller.Controller) {
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {})
+			r.Handler(func(ctx *execution.Context) {})
 		})
 	})
 
@@ -451,7 +451,7 @@ func (f *recordingFakeAdapter) Init() {
 	lastRecordingAdapter = f
 }
 
-func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error {
+func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error {
 	f.registered = append(f.registered, fakeRegisteredRoute{method: method, path: path})
 	return nil
 }
@@ -461,9 +461,9 @@ func (f *recordingFakeAdapter) Listen(addr string, onListen func()) error {
 }
 
 // TestNewApp_FiberApp_RealEndToEndWiring proves the generic wiring truly
-// works with the real fiberapp.FiberApp adapter (not just the fake spy
-// above): NewApp[fiberapp.FiberApp] constructs a genuinely usable FiberApp
-// (Init sets a non-nil *fiber.App, see internal/fiberapp/fiberapp.go),
+// works with the real fiber.FiberApp adapter (not just the fake spy
+// above): NewApp[fiber.FiberApp] constructs a genuinely usable FiberApp
+// (Init sets a non-nil *fiber.App, see internal/adapter/fiber/fiber.go),
 // registers a real route on it, and dispatches a real HTTP request through
 // Fiber's own app.Test -- proving reflect.New(...).Interface() + Init()
 // produces something other than a nil-panic waiting to happen.
@@ -471,7 +471,7 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 	called := false
 	pingController := controller.New(func(c *controller.Controller) {
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				called = true
 				ctx.Json(map[string]string{"pong": "true"})
 			})
@@ -482,7 +482,7 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 		m.Controllers(pingController)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -490,9 +490,9 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 		t.Fatalf("NewApp() returned nil *App")
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
@@ -514,7 +514,7 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 // feature: it adapts the UserController/UserService example from
 // INSIGHT.md (lines 1-100) into a real integration test proving the whole
 // feature -- Provider & DI Graph + Module Composition + Controller & Route
-// Registration -- works together end-to-end via a real fiberapp.FiberApp
+// Registration -- works together end-to-end via a real fiber.FiberApp
 // dispatched through app.Test(req).
 //
 // SPEC_DEVIATION (documented, not a blocker -- spec.md's own Independent
@@ -540,15 +540,15 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		userService := inject.MustInject[*UserService](c)
 
 		// QUERY /user/ -- List. INSIGHT.md uses gonest.HttpQuery for the
-		// list route; route.HttpQuery maps to fiberapp's "QUERY" method
-		// string (internal/fiberapp/fiberapp.go's fiberMethod), which
+		// list route; route.HttpQuery maps to fiber's "QUERY" method
+		// string (internal/adapter/fiber/fiber.go's fiberMethod), which
 		// httptest.NewRequest below dispatches as a plain HTTP method
 		// string like any other -- QUERY is not a net/http constant, but
 		// Fiber and net/http/httptest both treat the method as an opaque
 		// string, so this round-trips fine.
 		c.Route(route.HttpQuery, "/", func(r *route.Route) {
 			r.HttpCode(200)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				ctx.Status(r.Code()).Json(userService.List())
 			})
 		})
@@ -557,7 +557,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		// Exception type yet -- Milestone 2) if the user doesn't exist.
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				userID := route.MustParam[int64](ctx, "user_id")
 				u := userService.Get(userID)
 				if u == nil {
@@ -575,7 +575,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		// "POST creates and returns 201" round-trip.
 		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
 			r.HttpCode(201)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				name := route.MustParam[string](ctx, "name")
 				ctx.Status(r.Code()).Json(userService.Create(name))
 			})
@@ -586,7 +586,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		// second route param instead of a JSON body.
 		c.Route(route.HttpPut, "/:user_id/:name", func(r *route.Route) {
 			r.HttpCode(200)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				userID := route.MustParam[int64](ctx, "user_id")
 				name := route.MustParam[string](ctx, "name")
 				u := userService.Update(userID, name)
@@ -601,7 +601,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		// DELETE /user/:user_id -- Delete.
 		c.Route(route.HttpDelete, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				userID := route.MustParam[int64](ctx, "user_id")
 				u := userService.Delete(userID)
 				if u == nil {
@@ -622,14 +622,14 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		m.Imports(userModule)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	fa := fiberAdapter.FiberApp()
 
@@ -792,7 +792,7 @@ func TestNewApp_ZeroValueAppOptions_BootstrapsIdenticallyToPreT2Behavior(t *test
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {})
+			r.Handler(func(ctx *execution.Context) {})
 		})
 	})
 
@@ -877,7 +877,7 @@ type listenSpyAdapter struct {
 
 func (f *listenSpyAdapter) Init() {}
 
-func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *httpctx.Context)) error {
+func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error {
 	return nil
 }
 
@@ -1026,7 +1026,7 @@ func TestMustListen_ListenError_PanicsWithAddrAndError(t *testing.T) {
 }
 
 // TestMustListen_RealFiberApp_IntegrationSmoke proves the whole chain works
-// end-to-end through App.MustListen with a real fiberapp.FiberApp: it binds
+// end-to-end through App.MustListen with a real fiber.FiberApp: it binds
 // a real (OS-chosen) port, MustListen's wrapped OnListen fires exactly once,
 // and a real HTTP request against the bound addr succeeds. Kept deliberately
 // minimal -- a full DI+routing dial-the-whole-stack proof belongs to T6, not
@@ -1034,14 +1034,14 @@ func TestMustListen_ListenError_PanicsWithAddrAndError(t *testing.T) {
 func TestMustListen_RealFiberApp_IntegrationSmoke(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	t.Cleanup(func() {
 		_ = fiberAdapter.FiberApp().Shutdown()
@@ -1096,7 +1096,7 @@ func TestMustListen_RealFiberApp_IntegrationSmoke(t *testing.T) {
 // but bootstraps it through App.MustListen against a real, OS-reachable
 // 127.0.0.1 address, waits for OnListen to fire (channel-synchronized, no
 // time.Sleep -- same pattern as TestMustListen_RealFiberApp_IntegrationSmoke
-// and fiberapp's TestListen_OnListenFires_BeforeBlockingForGood), then
+// and fiber's TestListen_OnListenFires_BeforeBlockingForGood), then
 // dispatches an actual net/http.Client request (a genuine TCP dial, NOT
 // app.Test) against the bound port to prove the WHOLE chain -- NewApp's DI
 // bootstrap, Stage 2.5 route registration, App.MustListen, the adapter's
@@ -1110,7 +1110,7 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				userID := route.MustParam[int64](ctx, "user_id")
 				u := userService.Get(userID)
 				if u == nil {
@@ -1131,7 +1131,7 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		// app.Test).
 		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
 			r.HttpCode(201)
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				name := route.MustParam[string](ctx, "name")
 				ctx.Status(r.Code()).Json(userService.Create(name))
 			})
@@ -1147,14 +1147,14 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		m.Imports(userModule)
 	})
 
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 
 	const addr = "127.0.0.1:34599"
@@ -1237,18 +1237,18 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 
 // --- T4 of "Middleware": Stage 2.5 composition in internal/app ---
 //
-// dispatchTestApp is a small shared helper: builds a *fiberapp.FiberApp
+// dispatchTestApp is a small shared helper: builds a *fiber.FiberApp
 // backed *App from root, fails the test on any bootstrap error, and returns
 // the underlying *fiber.App ready for app.Test(req) dispatch.
-func dispatchTestApp(t *testing.T, root *module.Module) *fiberapp.FiberApp {
+func dispatchTestApp(t *testing.T, root *module.Module) *fiber.FiberApp {
 	t.Helper()
-	app, err := NewApp[fiberapp.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
-	fiberAdapter, ok := app.Adapter().(*fiberapp.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
 	if !ok {
-		t.Fatalf("app.Adapter() is not a *fiberapp.FiberApp: %T", app.Adapter())
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
 	return fiberAdapter
 }
@@ -1260,11 +1260,11 @@ func dispatchTestApp(t *testing.T, root *module.Module) *fiberapp.FiberApp {
 // Handler appends too, then the test asserts the exact ["mw", "handler"]
 // order captured across the real request.
 //
-// Note on technique: httpctx.Context.Header reads the REQUEST header (Fiber
+// Note on technique: execution.Context.Header reads the REQUEST header (Fiber
 // Ctx.Get), while SetHeader writes the RESPONSE header (Fiber Ctx.Set) --
 // two different underlying stores, so a middleware cannot SetHeader and have
-// a later step observe it via Header (internal/httpctx's Responder contract
-// has no GetRespHeader, and per this task's scope internal/fiberapp is not
+// a later step observe it via Header (internal/execution's Responder contract
+// has no GetRespHeader, and per this task's scope internal/adapter/fiber is not
 // to be touched to add one). This suite instead threads a shared []string
 // order-of-execution recorder through closures -- still a genuine
 // app.Test-dispatched proof of composition/ordering, just not the
@@ -1272,7 +1272,7 @@ func dispatchTestApp(t *testing.T, root *module.Module) *fiberapp.FiberApp {
 func TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler(t *testing.T) {
 	var order []string
 	mw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "mw")
 			next(ctx)
 		})
@@ -1281,7 +1281,7 @@ func TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Use(mw)
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				order = append(order, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1314,12 +1314,12 @@ func TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler(t *testing.T) {
 // route Handler never runs) -- both proven via real dispatch.
 func TestNewApp_MiddlewareShortCircuit_SkipsRouteHandlerWhenNextNotCalled(t *testing.T) {
 	callingMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			next(ctx)
 		})
 	})
 	blockingMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			ctx.Status(http.StatusForbidden).Json(map[string]string{"blocked": "true"})
 			// deliberately never calls next(ctx)
 		})
@@ -1329,7 +1329,7 @@ func TestNewApp_MiddlewareShortCircuit_SkipsRouteHandlerWhenNextNotCalled(t *tes
 	continueController := controller.New(func(c *controller.Controller) {
 		c.Use(callingMw)
 		c.Route(route.HttpGet, "/continue", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1338,7 +1338,7 @@ func TestNewApp_MiddlewareShortCircuit_SkipsRouteHandlerWhenNextNotCalled(t *tes
 	blockController := controller.New(func(c *controller.Controller) {
 		c.Use(blockingMw)
 		c.Route(route.HttpGet, "/blocked", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1395,7 +1395,7 @@ func TestNewApp_MiddlewareShortCircuit_SkipsRouteHandlerWhenNextNotCalled(t *tes
 func TestNewApp_MultipleControllerMiddleware_RunInRegistrationOrder(t *testing.T) {
 	appendMarker := func(marker string) *middleware.Middleware {
 		return middleware.New(func(m *middleware.Middleware) {
-			m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+			m.Handler(func(ctx *execution.Context, next middleware.Next) {
 				ctx.SetHeader("X-Order", marker)
 				next(ctx)
 			})
@@ -1405,7 +1405,7 @@ func TestNewApp_MultipleControllerMiddleware_RunInRegistrationOrder(t *testing.T
 	c := controller.New(func(c *controller.Controller) {
 		c.Use(appendMarker("first"), appendMarker("second"), appendMarker("third"))
 		c.Route(route.HttpGet, "/order", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				ctx.Json(map[string]string{"ok": "true"})
 			})
 		})
@@ -1434,18 +1434,18 @@ func TestNewApp_MultipleControllerMiddleware_RunInRegistrationOrder(t *testing.T
 
 // TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler proves a
 // middleware mutating ctx before calling next is visible to a LATER
-// middleware and the route Handler -- i.e. the SAME *httpctx.Context
+// middleware and the route Handler -- i.e. the SAME *execution.Context
 // instance flows through the whole chain, not a copy.
 func TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler(t *testing.T) {
 	setter := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			ctx.WithRoute("mutated-by-first")
 			next(ctx)
 		})
 	})
 	var readerSaw any
 	reader := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			readerSaw = ctx.Route()
 			next(ctx)
 		})
@@ -1455,7 +1455,7 @@ func TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler(t *testing
 	c := controller.New(func(c *controller.Controller) {
 		c.Use(setter, reader)
 		c.Route(route.HttpGet, "/mutate", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerSaw = ctx.Route()
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1475,19 +1475,19 @@ func TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler(t *testing
 	defer resp.Body.Close()
 
 	// ctx.WithRoute/ctx.Route are used here purely as a generic any-carrier
-	// on *httpctx.Context (the only mutable field Context exposes besides
+	// on *execution.Context (the only mutable field Context exposes besides
 	// headers, which -- per the doc comment on
 	// TestNewApp_ControllerMiddleware_RunsBeforeRouteHandler -- cannot
 	// round-trip a write through a later read against the real Fiber
-	// responder) to prove the SAME *httpctx.Context instance (not a copy)
+	// responder) to prove the SAME *execution.Context instance (not a copy)
 	// flows from the first middleware, through the second, into the route
 	// Handler: a mutation made by the first middleware before calling next
 	// must be visible to both.
 	if want := "mutated-by-first"; readerSaw != want {
-		t.Fatalf("second middleware saw ctx.Route() = %v, want %q -- mutation by first middleware not visible to a LATER middleware on the same *httpctx.Context", readerSaw, want)
+		t.Fatalf("second middleware saw ctx.Route() = %v, want %q -- mutation by first middleware not visible to a LATER middleware on the same *execution.Context", readerSaw, want)
 	}
 	if want := "mutated-by-first"; handlerSaw != want {
-		t.Fatalf("route Handler saw ctx.Route() = %v, want %q -- mutation not visible to the Handler on the same *httpctx.Context", handlerSaw, want)
+		t.Fatalf("route Handler saw ctx.Route() = %v, want %q -- mutation not visible to the Handler on the same *execution.Context", handlerSaw, want)
 	}
 }
 
@@ -1498,13 +1498,13 @@ func TestNewApp_MiddlewareMutation_VisibleToLaterMiddlewareAndHandler(t *testing
 // the global marker.
 func TestNewApp_RootMiddleware_RunsForEveryRouteIncludingControllerWithNoOwnUse(t *testing.T) {
 	globalMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			ctx.SetHeader("X-Global", "yes")
 			next(ctx)
 		})
 	})
 	localMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			ctx.SetHeader("X-Local", "yes")
 			next(ctx)
 		})
@@ -1514,7 +1514,7 @@ func TestNewApp_RootMiddleware_RunsForEveryRouteIncludingControllerWithNoOwnUse(
 		c.Path("/with-own")
 		c.Use(localMw)
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				ctx.Json(map[string]string{"ok": "true"})
 			})
 		})
@@ -1522,7 +1522,7 @@ func TestNewApp_RootMiddleware_RunsForEveryRouteIncludingControllerWithNoOwnUse(
 	withoutOwnMw := controller.New(func(c *controller.Controller) {
 		c.Path("/without-own")
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				ctx.Json(map[string]string{"ok": "true"})
 			})
 		})
@@ -1573,13 +1573,13 @@ func TestNewApp_RootMiddleware_RunsForEveryRouteIncludingControllerWithNoOwnUse(
 func TestNewApp_GlobalMiddleware_RunsBeforeControllerMiddleware(t *testing.T) {
 	var order []string
 	globalMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "global")
 			next(ctx)
 		})
 	})
 	controllerMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "controller")
 			next(ctx)
 		})
@@ -1588,7 +1588,7 @@ func TestNewApp_GlobalMiddleware_RunsBeforeControllerMiddleware(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Use(controllerMw)
 		c.Route(route.HttpGet, "/order", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				order = append(order, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1638,12 +1638,12 @@ func TestNewApp_ZeroMiddleware_BehavesIdenticallyToPreFeatureBehavior(t *testing
 
 // TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper proves a
 // middleware that panics with a built-in exception.Exception is caught by
-// the SAME existing recover wrapper in internal/fiberapp (unchanged by this
+// the SAME existing recover wrapper in internal/adapter/fiber (unchanged by this
 // feature) and produces the correct structured response -- exactly as if a
 // route Handler itself had panicked.
 func TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper(t *testing.T) {
 	panicky := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			panic(exception.NewBadRequestException("bad input from middleware"))
 		})
 	})
@@ -1652,7 +1652,7 @@ func TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Use(panicky)
 		c.Route(route.HttpGet, "/panic", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1696,14 +1696,14 @@ func TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper(t *testing.T) {
 // own response comes back on a real app.Test dispatch.
 func TestNewApp_SingleGuardReturnsTrue_RouteHandlerRuns(t *testing.T) {
 	allow := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool { return true })
+		g.Handler(func(ctx *execution.Context) bool { return true })
 	})
 
 	var handlerRan bool
 	c := controller.New(func(c *controller.Controller) {
 		c.Guards(allow)
 		c.Route(route.HttpGet, "/allowed", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1743,14 +1743,14 @@ func TestNewApp_SingleGuardReturnsTrue_RouteHandlerRuns(t *testing.T) {
 // Handler never runs.
 func TestNewApp_SingleGuardReturnsFalse_Produces403AndSkipsHandler(t *testing.T) {
 	deny := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool { return false })
+		g.Handler(func(ctx *execution.Context) bool { return false })
 	})
 
 	var handlerRan bool
 	c := controller.New(func(c *controller.Controller) {
 		c.Guards(deny)
 		c.Route(route.HttpGet, "/denied", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1799,7 +1799,7 @@ func TestNewApp_SingleGuardReturnsFalse_Produces403AndSkipsHandler(t *testing.T)
 // never runs.
 func TestNewApp_GuardPanicsWithCustomException_ProducesThatExceptionsStatus(t *testing.T) {
 	unauthorized := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			panic(exception.NewUnauthorizedException(nil))
 		})
 	})
@@ -1808,7 +1808,7 @@ func TestNewApp_GuardPanicsWithCustomException_ProducesThatExceptionsStatus(t *t
 	c := controller.New(func(c *controller.Controller) {
 		c.Guards(unauthorized)
 		c.Route(route.HttpGet, "/needs-auth", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1850,10 +1850,10 @@ func TestNewApp_GuardPanicsWithCustomException_ProducesThatExceptionsStatus(t *t
 func TestNewApp_MultipleGuards_ShortCircuitsOnFirstFalse(t *testing.T) {
 	var secondGuardRan bool
 	first := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool { return false })
+		g.Handler(func(ctx *execution.Context) bool { return false })
 	})
 	second := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			secondGuardRan = true
 			return true
 		})
@@ -1863,7 +1863,7 @@ func TestNewApp_MultipleGuards_ShortCircuitsOnFirstFalse(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Guards(first, second)
 		c.Route(route.HttpGet, "/multi", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1901,13 +1901,13 @@ func TestNewApp_MultipleGuards_ShortCircuitsOnFirstFalse(t *testing.T) {
 func TestNewApp_MiddlewareThenGuardThenHandler_OrderedSequence(t *testing.T) {
 	var order []string
 	mw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "middleware")
 			next(ctx)
 		})
 	})
 	g := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			order = append(order, "guard")
 			return true
 		})
@@ -1917,7 +1917,7 @@ func TestNewApp_MiddlewareThenGuardThenHandler_OrderedSequence(t *testing.T) {
 		c.Use(mw)
 		c.Guards(g)
 		c.Route(route.HttpGet, "/sequence", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				order = append(order, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -1968,7 +1968,7 @@ func TestNewApp_ZeroGuards_NonRegressionReference(t *testing.T) {
 // existing behavior, proof the gatedHandler composition didn't break it.
 func TestNewApp_GuardPanicsWithNonException_StillGeneric500(t *testing.T) {
 	buggy := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			panic(errors.New("bug"))
 		})
 	})
@@ -1977,7 +1977,7 @@ func TestNewApp_GuardPanicsWithNonException_StillGeneric500(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Guards(buggy)
 		c.Route(route.HttpGet, "/buggy-guard", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2014,7 +2014,7 @@ func TestNewApp_GuardPanicsWithNonException_StillGeneric500(t *testing.T) {
 func TestNewApp_SingleInterceptor_RunsBeforeAndAfterHandler(t *testing.T) {
 	var order []string
 	it := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			order = append(order, "before")
 			next(ctx)
 			order = append(order, "after")
@@ -2024,7 +2024,7 @@ func TestNewApp_SingleInterceptor_RunsBeforeAndAfterHandler(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Interceptors(it)
 		c.Route(route.HttpGet, "/wrap", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				order = append(order, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2062,7 +2062,7 @@ func TestNewApp_SingleInterceptor_RunsBeforeAndAfterHandler(t *testing.T) {
 // Handler must not run, proven via a flag the Handler would have set.
 func TestNewApp_InterceptorNotCallingNext_SkipsRouteHandler(t *testing.T) {
 	blocking := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			ctx.Status(http.StatusForbidden).Json(map[string]string{"blocked": "true"})
 			// deliberately never calls next(ctx)
 		})
@@ -2072,7 +2072,7 @@ func TestNewApp_InterceptorNotCallingNext_SkipsRouteHandler(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Interceptors(blocking)
 		c.Route(route.HttpGet, "/blocked", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2107,14 +2107,14 @@ func TestNewApp_InterceptorNotCallingNext_SkipsRouteHandler(t *testing.T) {
 func TestNewApp_MultipleInterceptors_ComposeInRegistrationOrder(t *testing.T) {
 	var order []string
 	first := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			order = append(order, "interceptor1-before")
 			next(ctx)
 			order = append(order, "interceptor1-after")
 		})
 	})
 	second := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			order = append(order, "interceptor2-before")
 			next(ctx)
 			order = append(order, "interceptor2-after")
@@ -2124,7 +2124,7 @@ func TestNewApp_MultipleInterceptors_ComposeInRegistrationOrder(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Interceptors(first, second)
 		c.Route(route.HttpGet, "/multi", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				order = append(order, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2175,19 +2175,19 @@ func TestNewApp_MultipleInterceptors_ComposeInRegistrationOrder(t *testing.T) {
 func TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence(t *testing.T) {
 	var order []string
 	mw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *httpctx.Context, next middleware.Next) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
 			order = append(order, "middleware")
 			next(ctx)
 		})
 	})
 	g := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			order = append(order, "guard")
 			return true
 		})
 	})
 	it := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			order = append(order, "interceptor-before")
 			next(ctx)
 			order = append(order, "interceptor-after")
@@ -2199,7 +2199,7 @@ func TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence(t *testing.T) 
 		c.Guards(g)
 		c.Interceptors(it)
 		c.Route(route.HttpGet, "/full-pipeline", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				order = append(order, "handler")
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2243,12 +2243,12 @@ func TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence(t *testing.T) 
 func TestNewApp_GuardRejects_InterceptorBeforeNeverRuns(t *testing.T) {
 	var interceptorBeforeRan, handlerRan bool
 	g := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *httpctx.Context) bool {
+		g.Handler(func(ctx *execution.Context) bool {
 			return false
 		})
 	})
 	it := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			interceptorBeforeRan = true
 			next(ctx)
 		})
@@ -2258,7 +2258,7 @@ func TestNewApp_GuardRejects_InterceptorBeforeNeverRuns(t *testing.T) {
 		c.Guards(g)
 		c.Interceptors(it)
 		c.Route(route.HttpGet, "/guard-blocks-interceptor", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2291,12 +2291,12 @@ func TestNewApp_GuardRejects_InterceptorBeforeNeverRuns(t *testing.T) {
 // TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper proves
 // an interceptor that panics BEFORE calling next(ctx) -- with a custom
 // exception.Exception -- is caught by the SAME existing recover wrapper in
-// internal/fiberapp (unchanged by this feature) and produces that
+// internal/adapter/fiber (unchanged by this feature) and produces that
 // exception's own structured response, with the route Handler never
 // running.
 func TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper(t *testing.T) {
 	panicky := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			panic(exception.NewBadRequestException(nil))
 		})
 	})
@@ -2305,7 +2305,7 @@ func TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper(t *testin
 	c := controller.New(func(c *controller.Controller) {
 		c.Interceptors(panicky)
 		c.Route(route.HttpGet, "/panic-before", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})
@@ -2349,7 +2349,7 @@ func TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper(t *testin
 func TestNewApp_InterceptorPanicsAfterNext_StillGeneric500(t *testing.T) {
 	var handlerRan bool
 	buggy := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *httpctx.Context, next interceptor.Next) {
+		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
 			next(ctx)
 			panic(errors.New("bug after next"))
 		})
@@ -2358,7 +2358,7 @@ func TestNewApp_InterceptorPanicsAfterNext_StillGeneric500(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Interceptors(buggy)
 		c.Route(route.HttpGet, "/panic-after", func(r *route.Route) {
-			r.Handler(func(ctx *httpctx.Context) {
+			r.Handler(func(ctx *execution.Context) {
 				handlerRan = true
 				ctx.Json(map[string]string{"ok": "true"})
 			})

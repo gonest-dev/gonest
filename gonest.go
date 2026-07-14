@@ -12,8 +12,8 @@ import (
 	"github.com/gonest-dev/gonest/internal/app"
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
+	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/httpctx"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -164,7 +164,7 @@ func MustNewApp[T any, PT interface {
 // if the value fails to convert. Go cannot re-export a generic function via
 // var, so this is a real wrapper calling the internal one (same pattern as
 // MustInject, see AD-004 in STATE.md).
-func MustParam[T any](ctx *httpctx.Context, name string) T {
+func MustParam[T any](ctx *execution.Context, name string) T {
 	return route.MustParam[T](ctx, name)
 }
 
