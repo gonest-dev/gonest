@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestones 1, 2 e 3 **COMPLETE**. Milestone 3 (Request Pipeline) fechado com "Pipeline Ordering" (T1, commit `52cff89`) — teste de integração único reproduzindo o `UserController` completo do INSIGHT.md (Middleware global+controller, Guard, Interceptor, Pipe, Filter, tudo na mesma rota), ordem observada bate exatamente com ROADMAP.md, ZERO bugs de composição encontrados (cada peça já garantia sua própria ordem corretamente desde a feature que a construiu). Evaluator reproduziu experimento de inverter a ordem esperada e confirmou que a asserção é genuína, não frouxa. Também nesta sessão: pacote raiz consolidado (AD-009), `internal/httpctx`→`internal/execution` e `internal/fiberapp`→`internal/adapter/fiber` renomeados (AD-010). Próxima: especificar primeira feature de Milestone 4 (Metadata Builder — Primitivos: `Metadata Registration Core`, ver ROADMAP.md).
+**Current Work:** Milestones 1, 2 e 3 **COMPLETE**. Milestone 4 (Metadata Builder — Primitivos) iniciado: feature "Metadata Registration Core" (T1-T2, commit `11ba9d4`) DONE, evaluator PASS em toda task — `internal/metadata` novo pacote, primeiro domínio genuinamente novo da sessão (schema/reflection, não DI/HTTP). `Property(&t.X)` identifica campo via aritmética de offset de ponteiro (`unsafe.Pointer`+`reflect.VisibleFields`), técnica confirmada empiricamente sem ajuste pros 7 tipos de campo do exemplo `UserEntity` do INSIGHT.md (incluindo `time.Time`/`*time.Time`). Base comum (`Required`/`Nullable`/`Description`/`Examples`) pronta; branches de tipo+format ficam pra próxima feature. Próxima: especificar "String-family Branches" (2ª feature de Milestone 4, ver ROADMAP.md).
 
 ---
 
