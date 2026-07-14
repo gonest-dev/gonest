@@ -164,10 +164,13 @@ func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 // The old singular gonest.MustParam[T](ctx, name) (and the whole Pipe
 // mechanism it could fall back to) is REMOVED per param-query-validation's
 // T3 (context.md's Decisions 2/3) -- every path param access is now
-// struct-based via validate.MustParams[T] (gonest.go itself doesn't
-// re-export MustParams/MustQuery yet, that's T4; these tests reach the real
+// struct-based via MustParams[T]. gonest.go re-exports MustParams[T]/
+// MustQuery[T] at root as of T4 (see TestMustParamsAndMustQuery_RootAlias_InsightCallShape
+// below for the root-alias reproduction); the tests directly below this
+// comment predate that wrapper and intentionally still reach the real
 // implementation via internal/validate directly, same as internal/route's
-// own tests do for HasParam). The Pipe-specific custom-transform coverage
+// own tests do for HasParam -- left as-is since they still pass and add
+// coverage at that layer. The Pipe-specific custom-transform coverage
 // (TestMustParam_WithCustomPipe_.../TestMustParam_PanicsWhenCustomPipeHandlerPanics/
 // TestNewPipe_RootAlias_TypeCheck/TestParseIntPipe_RootAlias_InsightCallShape)
 // is intentionally NOT ported here -- that capability now lives in
@@ -340,6 +343,115 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 		}
 		if handlerRan {
 			t.Fatal("route Handler ran, want it NOT to run when the param fails to parse")
+		}
+	})
+}
+
+// insightUserIdParams mirrors INSIGHT.md's settled "exemplo de Param/Query
+// Validation" section's UserIdParams: a single required path param.
+type insightUserIdParams struct {
+	UserId int64 `param:"user_id"`
+}
+
+var insightUserIdParamsMetadata = NewMetadata[insightUserIdParams](func(t *insightUserIdParams, m *Metadata) {
+	m.Property(&t.UserId).Integer().Min(1).Required()
+})
+
+// insightListUsersQuery mirrors INSIGHT.md's settled ListUsersQuery: two
+// required query params.
+type insightListUsersQuery struct {
+	Page  int `query:"page"`
+	Limit int `query:"limit"`
+}
+
+var insightListUsersQueryMetadata = NewMetadata[insightListUsersQuery](func(t *insightListUsersQuery, m *Metadata) {
+	m.Property(&t.Page).Integer().Min(1).Required()
+	m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
+})
+
+// TestMustParamsAndMustQuery_RootAlias_InsightCallShape reproduces INSIGHT.md's
+// settled "exemplo de Param/Query Validation" example end to end through the
+// root gonest package: a single route combining a path param
+// (gonest.MustParams[T]) AND a query string (gonest.MustQuery[T]),
+// dispatched via a REAL app.Test HTTP request (T4 of
+// param-query-validation -- confirms gonest.MustParams/gonest.MustQuery
+// resolve at root and behave identically to the internal/validate
+// implementations exercised directly by the tests above).
+func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
+
+	var gotUserId int64
+	var gotPage, gotLimit int
+	handlerRan := false
+
+	controller := NewController(func(c *Controller) {
+		c.Route(route.HttpGet, "/users/:user_id/orders", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				params := MustParams[*insightUserIdParams](ctx)
+				query := MustQuery[*insightListUsersQuery](ctx)
+				gotUserId = params.UserId
+				gotPage = query.Page
+				gotLimit = query.Limit
+				handlerRan = true
+				ctx.Json(map[string]any{
+					"userId": params.UserId,
+					"page":   query.Page,
+					"limit":  query.Limit,
+				})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	t.Run("happy path: valid path param + valid query -> 200, both populated", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/users/42/orders?page=2&limit=10", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+		if !handlerRan {
+			t.Fatal("route Handler did not run")
+		}
+		if gotUserId != 42 || gotPage != 2 || gotLimit != 10 {
+			t.Fatalf("got userId=%d page=%d limit=%d, want userId=42 page=2 limit=10", gotUserId, gotPage, gotLimit)
+		}
+	})
+
+	t.Run("violation: query limit exceeds Max(100) -> 400 BadRequestException, Handler does not run", func(t *testing.T) {
+		handlerRan = false
+		req := httptest.NewRequest(http.MethodGet, "/users/42/orders?page=1&limit=500", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+		}
+		if handlerRan {
+			t.Fatal("route Handler ran, want it NOT to run when a query param violates its constraint")
 		}
 	})
 }

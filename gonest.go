@@ -471,3 +471,30 @@ type ObjectMetadata = metadata.ObjectMetadata
 func MustJsonBody[T any](ctx *execution.Context) T {
 	return validate.MustJsonBody[T](ctx)
 }
+
+// MustParams reads ctx's current route's path params, validates every field
+// of T (dereferenced) against its registered *Metadata (built via
+// NewMetadata[T] beforehand, matched via a `param:"name"` struct tag) and
+// returns a populated T. It panics *BadRequestException (collecting EVERY
+// violation found, not just the first) if a required param is missing or
+// any param fails its declared constraint, and panics with a plain string
+// if T was never registered via NewMetadata[T]. Go cannot re-export a
+// generic function via var, so this is a real wrapper calling the internal
+// one (same pattern as MustJsonBody, see AD-004 in STATE.md).
+func MustParams[T any](ctx *execution.Context) T {
+	return validate.MustParams[T](ctx)
+}
+
+// MustQuery reads ctx's request query string, validates every field of T
+// (dereferenced) against its registered *Metadata (built via NewMetadata[T]
+// beforehand, matched via a `query:"name"` struct tag) and returns a
+// populated T. It panics *BadRequestException (collecting EVERY violation
+// found, not just the first) if a required query param is missing or any
+// query param fails its declared constraint, and panics with a plain
+// string if T was never registered via NewMetadata[T]. Go cannot re-export
+// a generic function via var, so this is a real wrapper calling the
+// internal one (same pattern as MustJsonBody/MustParams, see AD-004 in
+// STATE.md).
+func MustQuery[T any](ctx *execution.Context) T {
+	return validate.MustQuery[T](ctx)
+}
