@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-14
-**Current Work:** Milestones 1-6 **COMPLETE**. Milestone 7 (OpenAPI Generation) em progresso: "OpenAPI Document Builder" e "Schema Generation from Metadata" DONE. Falta só "Swagger UI Setup" (servir o documento gerado + Swagger UI HTML, depende da geração já existir -- ver ROADMAP.md). "Schema Generation from Metadata" (T0-T3, commits `2ef60d2`→`b27f7b2`) seguiu o mesmo padrão de discussão via INSIGHT.md que "Param/Query Validation" usou (usuário edita/responde direto no arquivo) -- ver AD-014 abaixo. Descobriu e fechou 2 gaps durante o design: `App` não expunha a árvore de módulo pós-bootstrap (novo `App.Root()`), e `gonest.Route` nunca tinha sido re-exportado na raiz (débito antigo, fechado de brinde em T3). Próxima: especificar "Swagger UI Setup" (última feature de Milestone 7).
+**Current Work:** Milestones 1-7 **COMPLETE**. Milestone 7 (OpenAPI Generation) fechado: "OpenAPI Document Builder", "Schema Generation from Metadata" e "Swagger UI Setup" DONE (commit `22e6c9d` fecha a última). `SetupSwagger` registra 2 rotas direto no `app.Adapter()` (sem DI/Module -- primeira vez nesta sessão que uma feature registra rota fora do fluxo normal de `Controller.Route`), serve `doc.Document()` (JSON) + Swagger UI HTML (CDN, `Context.HTML` novo). Próxima: especificar Milestone 8 (Testing Helpers -- `MustNewTestApp`/`TestBuilder`/`MustOverride`/HTTP test client, ver INSIGHT.md's seção "exemplo de Testing" e ROADMAP.md).
 
 ---
 

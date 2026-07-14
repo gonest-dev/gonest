@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** OpenAPI Generation (Milestone 7)
-**Status:** Milestones 1-6 COMPLETE — starting Milestone 7
+**Current Milestone:** Testing Helpers (Milestone 8)
+**Status:** Milestones 1-7 COMPLETE — starting Milestone 8
 
 ---
 
@@ -160,8 +160,9 @@
 - `internal/openapi.Generate(doc, root)` -- walker recursivo (módulos + controllers + rotas), gera `paths`+`components.schemas` a partir de TODA a superfície de leitura de `PropertyBuilder` resolvida em AD-012/AD-013 (`KindValue`/`MinValue`/`MaxValue`/`PatternValue`/`ItemBuilder`/`ItemRef`/`MetadataRef`/`IsAdditionalProperties`), dedup por identidade de ponteiro (`$ref` reuso), nullable `$ref` via `anyOf`
 - `gonest.GenerateOpenApiSchema(app, doc)` re-exportado na raiz; fechou débito antigo -- `gonest.Route` alias raiz nunca tinha sido adicionado
 
-**Swagger UI Setup** - PLANNED
-- `SetupSwagger`, `SwaggerOptions{JsonDocumentUrl, PersistAuth, DocExpansion}`
+**Swagger UI Setup** - COMPLETE
+- `Context.HTML(s)` (novo, infra de resposta raw) + `SetupSwagger(app, uiPath, doc, options)` -- registra 2 rotas direto no `app.Adapter()` (sem DI/Module), 1 servindo `doc.Document()` JSON, 1 servindo HTML do Swagger UI (via CDN, sem asset vendored) configurado com `PersistAuth`/`DocExpansion`
+- `SwaggerOptions{JsonDocumentUrl, PersistAuth, DocExpansion}` re-exportado na raiz -- fecha Milestone 7 inteiro
 
 ---
 

@@ -1,19 +1,17 @@
 # Handoff
 
 **Date:** 2026-07-14
-**Feature:** Schema Generation from Metadata (Milestone 7, 2ª feature) — ✅ COMPLETE (T0-T3)
-**Task:** Nenhuma em progresso. Próxima: especificar "Swagger UI Setup" (última feature de Milestone 7).
+**Feature:** Swagger UI Setup (Milestone 7, 3ª e última feature) — ✅ COMPLETE. **Milestone 7 inteiro fechado.**
+**Task:** Nenhuma em progresso. Próxima: especificar Milestone 8 (Testing Helpers).
 
 ## Completed ✓
 
 - **Milestones 1-6 COMPLETE** — ver STATE.md pra histórico completo (AD-001 até AD-013).
-- **Milestone 7 (OpenAPI Generation) em progresso:**
-  - **"OpenAPI Document Builder" — COMPLETE** (commit `9b08afd`). Builder mecânico autocontido.
-  - **"Schema Generation from Metadata" — COMPLETE** (T0-T3, commits `2ef60d2`→`b27f7b2`). Mesmo padrão de discussão de "Param/Query Validation" (usuário edita/responde direto no INSIGHT.md) -- ver AD-014 em STATE.md.
-    - **T0 (`2ef60d2`)**: `App.Root()` -- gap descoberto durante pesquisa (Module/Controller já retinham a árvore rica de objetos pós-bootstrap, mas `App` não expunha ponto de entrada nenhum).
-    - **T1 (`66aef7b`)**: `Metadata.Title`, `Controller.Tags`/`BearerAuth`, `Route`'s 10 métodos de documentação -- mapeamento direto de `@nestjs/swagger`'s `@Api*` decorators.
-    - **T2 (`325155c`/`7d4f915`) — núcleo real**: `internal/openapi.Generate` walker recursivo + `schemaFor` (cobre TODAS as branch families) + `Document()`. 2 achados do evaluator corrigidos: gap de teste (nullable `$ref`/`anyOf` sem cobertura) fechado em follow-up; uma SPEC_DEVIATION do dev era FALSA (alegou INSIGHT.md desatualizado, evaluator provou que não era, era só escolha estilística do fixture de teste) -- corrigida no registro.
-    - **T3 (`0d20a9c`/`b27f7b2`)**: `gonest.GenerateOpenApiSchema(app, doc)` re-exportado + fechou débito ANTIGO -- `gonest.Route` nunca tinha sido re-exportado na raiz (aparecia na lista de débitos do HANDOFF há várias sessões), achado e corrigido de brinde pelo dev sub-agent.
+- **Milestone 7 (OpenAPI Generation) COMPLETE:**
+  - **"OpenAPI Document Builder"** (commit `9b08afd`) — builder mecânico autocontido.
+  - **"Schema Generation from Metadata"** (T0-T3, commits `2ef60d2`→`b27f7b2`) — walker recursivo + geração de schema completa, ver AD-014 em STATE.md.
+  - **"Swagger UI Setup"** (commit `22e6c9d`) — `Context.HTML(s)` (infra nova, mesma classe de `Body()`/`Queries()`), `SetupSwagger(app, uiPath, doc, options)` registra 2 rotas DIRETO no `app.Adapter()` (sem passar por Controller/Module/DI -- mecanismo de baixo nível já usado internamente pelo bootstrap), servindo `doc.Document()` (JSON) e uma página HTML do Swagger UI (via CDN `unpkg.com/swagger-ui-dist@5`, sem asset vendored) configurada com `PersistAuth`/`DocExpansion`. `SwaggerOptions` re-exportado na raiz.
+    - Nota do dev: sessão teve uma intercorrência de tooling (bloqueio temporário do PATH lookup de `go`), contornada chamando o binário por caminho absoluto -- resolvido, não afetou o resultado final (TDD seguido, gate verde).
 
 ## In Progress
 
@@ -21,8 +19,7 @@
 
 ## Pending
 
-- **"Swagger UI Setup"** (última feature de Milestone 7, ver ROADMAP.md): `SetupSwagger(app, path, doc, options)` -- serve o documento gerado (`doc.Document()`, já `json.Marshal`-ável) via HTTP + UI do Swagger. Deve ser MENOR/mais mecânica que as 2 anteriores -- toda a geração já existe, só falta servir. Provavelmente: 1 rota GET servindo o JSON, 1 rota (ou mais) servindo HTML/JS estático do Swagger UI (CDN embutido ou vendored), `SwaggerOptions{JsonDocumentUrl, PersistAuth, DocExpansion}` (INSIGHT.md's bootstrap example já mostra o shape completo).
-- Depois: Milestone 8 (Testing Helpers).
+- Especificar **Milestone 8: Testing Helpers** (ver ROADMAP.md, INSIGHT.md's seção "# exemplo de Testing"): `MustNewTestApp(module, overridesFn)`, `TestBuilder`, `MustOverride[Interface](b, mock)` (override de provider por interface -- pré-requisito: dependência tem que ser injetada por interface, não struct concreta, já documentado no próprio INSIGHT.md), `tester.MustRequest`/`AssertStatus`/`AssertJsonPath` (client HTTP de teste). Escopo provavelmente médio -- INSIGHT.md já tem exemplo completo, mas "override de provider" pode exigir mexer no grafo de DI (`internal/resolve`/`internal/module`) pra substituir um provider já resolvido, o que pode ter mais nuance que aparenta.
 
 ## Blockers
 
@@ -30,13 +27,13 @@
 
 ## Débitos leves registrados (não bloqueiam nada)
 
-- Ver HANDOFFs anteriores (git log, `.specs/features/*/`) pra lista completa.
-- `gonest.FiberApp`/`gonest.Context`/`gonest.HttpGet` (resto do enum `HttpMethod`) ainda faltam como aliases raiz -- `gonest.Route` foi fechado nesta sessão (T3), os outros continuam.
-- `internal/app/pipeline_ordering_test.go` ainda tem a modificação NÃO-relacionada (`c`→`ctrl`) não commitada, aparecendo como ruído em relatórios de sub-agent há VÁRIAS sessões agora -- ainda não resolvida, decidir o que fazer (commitar/descartar/investigar) antes que continue confundindo relatórios futuros.
+- Ver HANDOFFs anteriores pra lista completa.
+- `gonest.FiberApp`/`gonest.Context`/`gonest.HttpGet` (resto do enum `HttpMethod`) ainda faltam como aliases raiz.
+- `internal/app/pipeline_ordering_test.go` ainda tem a modificação NÃO-relacionada (`c`→`ctrl`) não commitada, aparecendo como ruído em relatórios de sub-agent há VÁRIAS sessões -- ainda não resolvida.
 
 ## Context
 
 - Branch: `master`
 - Todo trabalho desta sessão commitado, pathspec explícito, `-m` antes de `--`.
 - Fluxo de trabalho: ver STATE.md (AD-001 até AD-014).
-- Pra retomar: ler STATE.md inteiro (AD-014 é a decisão mais recente), depois ROADMAP.md Milestone 7 pra especificar "Swagger UI Setup" -- escopo pequeno, provavelmente não precisa de discussão extensa (INSIGHT.md já mostra o call shape completo de `SetupSwagger`/`SwaggerOptions`).
+- Pra retomar: ler STATE.md inteiro, depois ROADMAP.md Milestone 8 pra especificar "Test App Bootstrap"/"HTTP Test Client" -- ler a seção "exemplo de Testing" do INSIGHT.md primeiro, já tem bastante coisa concreta especificada.
