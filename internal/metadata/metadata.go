@@ -373,3 +373,22 @@ func (p *PropertyBuilder) Array() *ArrayMetadata {
 	p.format = "array"
 	return &ArrayMetadata{PropertyBuilder: p, item: &PropertyBuilder{}}
 }
+
+// Object selects OpenAPI's "object" type and returns a brand new
+// *ObjectMetadata wrapping p itself (object.go, object-builder feature) --
+// unlike Array, Object has no separate "item" concept: the field itself IS
+// the nested object (e.g. `Address AddressEntity`), so there is no second
+// synthetic *PropertyBuilder to allocate here, just p.format = "object" and
+// a fresh *ObjectMetadata view onto the SAME p (see object.go's own doc
+// comment for the full rationale). fn is invoked with that same
+// *ObjectMetadata (pointer identity, same callback shape as
+// ArrayMetadata.Items(fn) for API-surface consistency per INSIGHT.md), and
+// Object returns it so the caller can keep chaining Required()/Nullable()/
+// etc after the callback returns (INSIGHT.md's
+// `Object(fn).Nullable().Description(...)` shape).
+func (p *PropertyBuilder) Object(fn func(om *ObjectMetadata)) *ObjectMetadata {
+	p.format = "object"
+	om := &ObjectMetadata{PropertyBuilder: p}
+	fn(om)
+	return om
+}
