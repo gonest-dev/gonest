@@ -266,6 +266,37 @@ func TestMustJsonBody_OutOfRangeValue_RecordsViolation(t *testing.T) {
 	MustJsonBody[*UserProperties](ctx)
 }
 
+func TestMustJsonBody_FractionalValueOnIntegerField_RecordsViolation(t *testing.T) {
+	// SPEC_DEVIATION documented on validatePrimitive: a JSON number with a
+	// non-zero fractional part (e.g. 30.5) posted for an Integer()/Int32()
+	// field is a type violation, not silently truncated. This proves that
+	// code path (f != float64(int64(f))) actually fires.
+	body, _ := json.Marshal(map[string]any{
+		"id":       int64(1),
+		"name":     "John Doe",
+		"age":      30.5, // fractional -- Age is Integer()
+		"isActive": true,
+		"address": map[string]any{
+			"street": "Rua B, 456", "city": "Rio de Janeiro", "zip": "22000-000",
+		},
+	})
+	ctx := newCtx(body)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		exc := expectBadRequest(t, r)
+		vs := violationsOf(t, exc)
+		if !hasFieldViolation(vs, "age") {
+			t.Fatalf("expected a violation for field %q, got %+v", "age", vs)
+		}
+	}()
+
+	MustJsonBody[*UserProperties](ctx)
+}
+
 func TestMustJsonBody_MultipleViolations_AllCollected(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{
 		// "id" missing (required)
