@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Metadata Builder — Array & Object (Milestone 5)
-**Status:** Milestones 1-4 COMPLETE — starting Milestone 5
+**Current Milestone:** Runtime Validation (Milestone 6)
+**Status:** Milestones 1-5 COMPLETE — starting Milestone 6
 
 ---
 
@@ -121,9 +121,10 @@
 - `Array()` (`internal/metadata/array.go`, re-exportado na raiz) devolve `*ArrayMetadata`, builder DUAL-STATE: `Items(fn func(m *ArrayMetadata))` (callback, não variádico -- revisão de INSIGHT.md nesta sessão) roteia `String`/`Integer`/etc pro ITEM sintético (reusa `StringMetadata`/`NumericMetadata` de graça) e `Required`/`Nullable`/`Description`/`Examples` sempre pro CAMPO container
 - `Min`/`Max` do `ArrayMetadata` direto (fora do callback, ex: `Items(fn).Min(1)`) = quantidade do array; `Min`/`Max` do item vive no wrapper devolvido dentro do callback (`m.String().Min(1).Max(50)`) -- duas storages separadas, sem colisão
 
-**Object Builder** - PLANNED
-- `Object(metadataValue)` reusa metadata registrada (equivalente `$ref`)
-- `Object(func(om))` schema livre/aberto (`AdditionalProperties`)
+**Object Builder** - COMPLETE
+- `Object(fn func(om *ObjectMetadata))` (`internal/metadata/object.go`, re-exportado na raiz) -- SEMPRE callback, mas SINGLE-STATE (sem synthetic separado como `ArrayMetadata` -- campo INTEIRO é o objeto, sem conceito de item)
+- `om.Metadata(ref)` reusa `*Metadata` já registrada (equivalente `$ref`); `om.AdditionalProperties()` marca schema aberto/livre
+- `Required`/`Nullable`/`Description`/`Examples` funcionam idênticos chamados dentro OU fora do callback (mesmo `*PropertyBuilder`, sem ambiguidade de escopo)
 
 ---
 

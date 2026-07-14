@@ -1,17 +1,18 @@
 # Handoff
 
 **Date:** 2026-07-14
-**Feature:** Array Builder (Milestone 5) — ✅ COMPLETE (T1-T2)
-**Task:** Nenhuma em progresso. Próxima: especificar "Object Builder" (última feature de Milestone 5, ver ROADMAP.md).
+**Feature:** Object Builder (Milestone 5) — ✅ COMPLETE (T1-T2). Milestone 5 inteiro fechado.
+**Task:** Nenhuma em progresso. Próxima: especificar Milestone 6 (Runtime Validation).
 
 ## Completed ✓
 
-- **Milestones 1-4 COMPLETE** — DI graph, módulos, controllers/rotas, adapter Fiber real, bootstrap+listen, exceções+recovery, pipeline completo, Metadata Builder Primitivos (String/Numeric/Boolean/DateTime family). Ver STATE.md pra histórico completo.
-- **Milestone 5 (Metadata Builder — Array & Object) em progresso:**
+- **Milestones 1-4 COMPLETE** — DI graph, módulos, controllers/rotas, adapter Fiber real, bootstrap+listen, exceções+recovery, pipeline completo, Metadata Builder Primitivos. Ver STATE.md pra histórico completo.
+- **Milestone 5 (Metadata Builder — Array & Object) COMPLETE:**
   - **"Array Builder" (T1-T2) — COMPLETE**
-    - T1 (`ArrayMetadata` novo, `Array()` no `PropertyBuilder`, `internal/metadata/array.go`) — DONE, evaluator PASS, commit `31a76b3`
-    - T2 (re-export raiz `ArrayMetadata`) — DONE, evaluator PASS, commit `1c5ea45`
-    - **Ponto novo desta feature (AD-011, STATE.md)**: primeiro tipo DUAL-STATE do projeto — `ArrayMetadata` guarda 2 `*PropertyBuilder` reais simultâneos (campo container + item sintético, este último nunca registrado em `Metadata.properties`). `Items(fn func(m *ArrayMetadata))` é CALLBACK (usuário revisou INSIGHT.md nesta sessão pra resolver ambiguidade de escopo Required/Description campo-vs-item) — reverte PARCIALMENTE AD-002 (só Array/Object, branches primitivos continuam builder linear puro). Dentro do callback, `m.Required()`/etc sempre mutam o campo; `m.String()`/`m.Integer()`/etc sempre configuram o item, reusando `StringMetadata`/`NumericMetadata` já existentes de graça (zero validador novo). `Min`/`Max` do array (quantidade) e `Min`/`Max` do item (bounds) são storages genuinamente separadas, sem colisão possível por construção de tipo.
+    - `ArrayMetadata` (`internal/metadata/array.go`, commits `31a76b3`/`1c5ea45`) — builder DUAL-STATE: 2 `*PropertyBuilder` reais (campo container + item sintético, nunca registrado em `Metadata.properties`). `Items(fn func(m *ArrayMetadata))` é CALLBACK (AD-011, STATE.md) -- resolve ambiguidade real: `m.Required()`/`Description()` sempre mutam o campo, `m.String()`/`m.Integer()`/etc sempre configuram o item (reusa `StringMetadata`/`NumericMetadata` já existentes de graça). `Min`/`Max` do array (quantidade) e do item (bounds) são storages separadas, sem colisão por construção de tipo.
+  - **"Object Builder" (T1-T2) — COMPLETE**
+    - `ObjectMetadata` (`internal/metadata/object.go`, commits `6a602fb`/`1e734ba`) — builder SINGLE-STATE: ao contrário de Array, NÃO tem synthetic separado — o campo inteiro É o objeto, sem conceito de "item" distinto. `Object(fn func(om *ObjectMetadata))` também é callback (consistência de API com `Items`), mas SEM ambiguidade real pra resolver: `Required`/`Nullable`/`Description`/`Examples` chamados dentro OU fora do callback produzem resultado idêntico (mesmo `*PropertyBuilder`, testado explicitamente). `om.Metadata(ref)` reusa `*Metadata` já registrada (`$ref`); `om.AdditionalProperties()` marca schema aberto/livre.
+    - **Milestone 5 inteiro fechado** — Metadata Builder (Primitivos + Array & Object) completo.
 
 ## In Progress
 
@@ -19,8 +20,7 @@
 
 ## Pending
 
-- Especificar **"Object Builder"** (última feature de Milestone 5, ver ROADMAP.md): `Object(metadataValue)` reusa metadata registrada (equivalente `$ref`), `Object(func(om *gonest.ObjectMetadata){...})` schema livre/aberto (`AdditionalProperties()`). Provavelmente mesmo padrão dual-state/callback de AD-011 se aplica (a decidir no design.md quando especificar).
-- Depois: Milestone 6 (Runtime Validation).
+- Especificar **Milestone 6: Runtime Validation** (ver ROADMAP.md): "JSON Body Validation" (`MustJsonBody[T]` valida contra `NewMetadata[T]`, panic `BadRequestException` com details por campo) e "Param/Query Validation" (`MustParam[T]` integra `Pipe` + coerção via metadata). Primeira vez que a metadata registrada (Milestones 4-5) é LIDA/USADA de verdade, não só armazenada -- toda a introspecção (`FormatValue()`, `OwnProperties()`, `ItemBuilder()`/`ItemRef()`, `MetadataRef()`/`IsAdditionalProperties()`) construída até aqui vira consumida pela primeira vez.
 
 ## Blockers
 
@@ -35,11 +35,11 @@
 - `gonest.FiberApp`/`gonest.Context`/`gonest.Route`/`gonest.HttpGet` não existem como aliases raiz — gaps pré-existentes.
 - `HttpStatus` enum completo não existe ainda.
 - `gofmt` em 2 arquivos pré-existentes (`internal/resolver/stage3_test.go`, `transient_test.go`) — cosmético.
-- T1 de "Array Builder" entregou 12 testes (alvo era "15+" no tasks.md) — evaluator aceitou como suficiente (todo item do Done-when coberto por teste substantivo), mas registrar caso o padrão de "15+ sugerido, menos entregue" se repita em Object Builder — talvez o número sugerido nas tasks esteja sistematicamente alto.
+- Sub-agents de Object Builder (T1 e T2) tiveram erro de sintaxe com `git commit -- <paths> -m "..."` (ordem de flags mal-parseada nesse shell) — os dois contornaram corretamente (`git commit -m "..." -- <paths>` ou `git add` explícito + `git status` de confirmação antes do commit), evaluators confirmaram escopo limpo nos dois casos. Vale ajustar o texto padrão do dispatch de sub-agent pra já sugerir `git commit -m "..." -- <paths>` (ordem que funciona) em vez de `git commit -- <paths> -m "..."`.
 
 ## Context
 
 - Branch: `master`
 - Todo trabalho desta sessão commitado (código via sub-agents, docs `.specs/*` via orquestrador, sempre com pathspec explícito). `.vscode/` untracked (não gerado por mim, deixado como está).
-- Fluxo de trabalho: AD-001 (planner→developer→evaluator), AD-004 (1 pacote por tipo em `internal/` — mas note que `internal/metadata` quebra essa regra deliberadamente pra branches de tipo, que ficam no MESMO pacote que `PropertyBuilder` por precisar de acesso a campos privados), AD-008 (pipeline-stage types sem MustInject), AD-009 (raiz consolidada em `gonest.go`/`gonest_test.go` único), AD-010 (`internal/execution` era `httpctx`, `internal/adapter/fiber` era `fiberapp`), AD-011 (Array/Object usam callback com escopo, reversão parcial de AD-002), L-007 (`git commit -- <arquivos>` sempre com pathspec)
-- Pra retomar: ler STATE.md inteiro primeiro, depois `.specs/features/array-builder/design.md`'s Tech Decisions (o padrão dual-state já está resolvido e documentado) ANTES de especificar "Object Builder" — bem provável que o mesmo padrão (campo container + estado sintético interno, callback com escopo) reaplique quase mecanicamente, só trocando "item" por "propriedades do objeto aninhado".
+- Fluxo de trabalho: AD-001 (planner→developer→evaluator), AD-004 (1 pacote por tipo em `internal/` — mas note que `internal/metadata` quebra essa regra deliberadamente pra branches de tipo), AD-008 (pipeline-stage types sem MustInject), AD-009 (raiz consolidada em `gonest.go`/`gonest_test.go` único), AD-010 (`internal/execution` era `httpctx`, `internal/adapter/fiber` era `fiberapp`), AD-011 (Array/Object usam callback com escopo; Object mostrou que callback nem sempre resolve ambiguidade real — às vezes é só consistência de API), L-007 (`git commit -- <arquivos>` sempre com pathspec, mas ver nota acima sobre ordem de flags)
+- Pra retomar: ler STATE.md inteiro primeiro, depois ROADMAP.md Milestone 6 pra especificar "JSON Body Validation" (Specify phase, feature nova) — esta é a primeira feature que CONSOME a metadata (Milestones 4-5), não só constrói -- vale revisar toda a superfície de leitura já disponível (`OwnProperties`, `FormatValue`, `IsRequired`, `ItemBuilder`/`ItemRef`, `MetadataRef`/`IsAdditionalProperties`) antes de desenhar o validador, pra não duplicar acesso.
