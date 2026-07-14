@@ -442,6 +442,46 @@ func TestSchemaFor_Object_Ref(t *testing.T) {
 	}
 }
 
+// TestSchemaFor_Object_Ref_Nullable covers the gap left by
+// TestSchemaFor_Object_Ref (Required, not Nullable) and
+// TestSchemaFor_Object_AdditionalProperties (Nullable, but no MetadataRef):
+// a field that is BOTH Object(...).Metadata(ref) (MetadataRef set) AND
+// Nullable(). schemaFor's "object" case (generate.go) special-cases this
+// combination -- since a bare "$ref" cannot carry a sibling "nullable"/type
+// marker, it wraps the ref in "anyOf": [{"$ref": ...}, {"type": "null"}]
+// instead of returning the bare $ref schema that TestSchemaFor_Object_Ref
+// asserts for the non-nullable case.
+func TestSchemaFor_Object_Ref_Nullable(t *testing.T) {
+	_, addressMetadata := newUserMetadata(t)
+
+	type ownerEntity struct {
+		Address addressEntity `json:"address"`
+	}
+	var owner ownerEntity
+	ownerBase := reflect.ValueOf(&owner).Pointer()
+	m := metadata.New(reflect.TypeOf(owner), ownerBase)
+	t.Cleanup(func() { metadata.Deregister(reflect.TypeOf(owner)) })
+
+	m.Property(&owner.Address).Object(func(om *metadata.ObjectMetadata) {
+		om.Metadata(addressMetadata)
+	}).Nullable().Description("Endereco opcional")
+
+	doc := New("3.1.0", nil)
+	pb := m.OwnProperties()[0]
+
+	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+
+	want := map[string]any{
+		"anyOf": []any{
+			map[string]any{"$ref": "#/components/schemas/addressEntity"},
+			map[string]any{"type": "null"},
+		},
+	}
+	if !reflect.DeepEqual(schema, want) {
+		t.Fatalf("schema = %#v, want %#v", schema, want)
+	}
+}
+
 func TestSchemaFor_Object_AdditionalProperties(t *testing.T) {
 	userMeta, _ := newUserMetadata(t)
 	doc := New("3.1.0", nil)
