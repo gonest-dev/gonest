@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/string-family-branches/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T2, todos evaluator PASS)
 
 ---
 
@@ -49,7 +49,7 @@ Cria arquivo NOVO `internal/metadata/string.go` (MESMO pacote, não pacote novo 
 
 ---
 
-### T2: Root re-exports
+### T2: Root re-exports ✅ DONE (evaluator: PASS, commit `be6d062`)
 
 **What**: pacote raiz `gonest` ganha `type StringMetadata = metadata.StringMetadata`. Per AD-009, ADICIONE à seção `// Metadata` já existente em `gonest.go`/`gonest_test.go` — não crie arquivo novo. Nenhuma função nova precisa de wrapper genérico aqui (os 10 métodos de branch já são métodos de `PropertyBuilder`/`StringMetadata`, que já são aliases raiz desde a feature anterior — só falta o alias do TIPO `StringMetadata` em si).
 **Where**: `gonest.go` (existente, adiciona à seção Metadata), `gonest_test.go` (existente, testes correspondentes)
@@ -62,11 +62,11 @@ Cria arquivo NOVO `internal/metadata/string.go` (MESMO pacote, não pacote novo 
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.StringMetadata` resolve na raiz
-- [ ] Reprodução do exemplo `UserEntity`/`AddressEntity` do INSIGHT.md através dos aliases raiz usando pelo menos `.String()`/`.Email()`/`.Pattern()` (os únicos branches string mostrados explicitamente no INSIGHT.md) — confirma correto
-- [ ] Os OUTROS 7 branches (`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byte`/`Binary`, não mostrados no exemplo do INSIGHT.md) também exercitados através dos aliases raiz pelo menos uma vez cada, confirmando `FormatValue()` correto
-- [ ] Gate check passa
-- [ ] Test count: 3+ (StringMetadata resolve, reprodução INSIGHT.md, os 7 branches restantes)
+- [x] `gonest.StringMetadata` resolve na raiz
+- [x] Reprodução do exemplo `UserEntity`/`AddressEntity` do INSIGHT.md através dos aliases raiz usando pelo menos `.String()`/`.Email()`/`.Pattern()` (os únicos branches string mostrados explicitamente no INSIGHT.md) — confirma correto
+- [x] Os OUTROS 7 branches (`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byte`/`Binary`, não mostrados no exemplo do INSIGHT.md) também exercitados através dos aliases raiz pelo menos uma vez cada, confirmando `FormatValue()` correto
+- [x] Gate check passa
+- [x] Test count: 3+ (StringMetadata resolve, reprodução INSIGHT.md, os 7 branches restantes)
 
 **Tests**: unit
 **Gate**: quick
