@@ -27,7 +27,7 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 
 ## Task Breakdown
 
-### T1: `internal/filter` — `Filter`/`New`/`Catch`/`HandlerFor`
+### T1: `internal/filter` — `Filter`/`New`/`Catch`/`HandlerFor` ✅ DONE (evaluator: PASS, commit `f0fe0af`)
 
 **What**: new package. `type Filter struct { catches map[reflect.Type]reflect.Value }` (unexported field). `func New(fn func(*Filter)) *Filter` — runs `fn` IMMEDIATELY (AD-008, mirrors `middleware.New`/`guard.New`/`interceptor.New`). `func (f *Filter) Catch(exemplar any, handler any)` — `exemplar` identifies the exception type to match via `reflect.TypeOf(exemplar)`; `handler` must be `func(ctx *execution.Context, exc T)` where `T` is exactly that type — reflect-validate at registration time (mirror `internal/pipe/pipe.go`'s `isValidHandlerSignature` style), panic with a clear message if the signature doesn't match. `func (f *Filter) HandlerFor(excType reflect.Type) (reflect.Value, bool)` — exact map lookup.
 **Where**: `internal/filter/filter.go`, `internal/filter/filter_test.go`
@@ -40,14 +40,14 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 - Skill: NONE
 
 **Done when**:
-- [ ] `New(fn)` runs `fn` immediately (test proves it, mirrors T1 pattern from Middleware/Guard/Interceptor)
-- [ ] `Catch(exemplar, handler)` with a valid `func(ctx *execution.Context, exc T)` signature (T matching `reflect.TypeOf(exemplar)`) registers successfully, `HandlerFor(reflect.TypeOf(exemplar))` returns the stored handler, `ok=true`
-- [ ] `HandlerFor` with a type that was never `Catch`-registered returns `ok=false`
-- [ ] `Catch` with a handler whose signature does NOT match (wrong param count, wrong ctx type, wrong exception type, not a func at all) panics with a clear message at registration time — mirror `internal/pipe`'s test coverage shape (wrong param count, wrong types, wrong return, non-func)
-- [ ] A single `Filter` can `Catch` MULTIPLE distinct exemplar types, each retrievable independently via `HandlerFor`
-- [ ] The retrieved handler is genuinely callable via reflect (`handlerVal.Call([]reflect.Value{...})`) and the call reaches the original handler body with both `ctx` and the typed exception value intact
-- [ ] Gate check passes
-- [ ] Test count: 8+ (immediate execution, Catch+HandlerFor round-trip, HandlerFor miss, 4+ invalid-signature panic cases mirroring Pipe's coverage, multiple distinct Catch types, real reflect.Call round-trip proof)
+- [x] `New(fn)` runs `fn` immediately (test proves it, mirrors T1 pattern from Middleware/Guard/Interceptor)
+- [x] `Catch(exemplar, handler)` with a valid `func(ctx *execution.Context, exc T)` signature (T matching `reflect.TypeOf(exemplar)`) registers successfully, `HandlerFor(reflect.TypeOf(exemplar))` returns the stored handler, `ok=true`
+- [x] `HandlerFor` with a type that was never `Catch`-registered returns `ok=false`
+- [x] `Catch` with a handler whose signature does NOT match (wrong param count, wrong ctx type, wrong exception type, not a func at all) panics with a clear message at registration time — mirror `internal/pipe`'s test coverage shape (wrong param count, wrong types, wrong return, non-func)
+- [x] A single `Filter` can `Catch` MULTIPLE distinct exemplar types, each retrievable independently via `HandlerFor`
+- [x] The retrieved handler is genuinely callable via reflect (`handlerVal.Call([]reflect.Value{...})`) and the call reaches the original handler body with both `ctx` and the typed exception value intact
+- [x] Gate check passes
+- [x] Test count: 8+ (immediate execution, Catch+HandlerFor round-trip, HandlerFor miss, 4+ invalid-signature panic cases mirroring Pipe's coverage, multiple distinct Catch types, real reflect.Call round-trip proof)
 
 **Tests**: unit
 **Gate**: quick
