@@ -1667,3 +1667,183 @@ func TestDate_RootAlias_TypeCheck(t *testing.T) {
 		t.Fatal("IsRequired() = false, want true")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// ArrayMetadata (Array Builder feature)
+// ---------------------------------------------------------------------------
+
+// TestArrayMetadata_RootAlias_TypeCheck proves gonest.ArrayMetadata resolves
+// and type-checks at the root gonest package: PropertyBuilder.Array()
+// returns a *ArrayMetadata, Items(fn) hands the same *ArrayMetadata into the
+// callback (pointer identity), the item-branch methods
+// (String/Integer/Object/etc) mutate the synthetic item builder, and
+// Required/Nullable/Description/Examples plus the array's own Min/Max mutate
+// the field itself -- all reachable purely through root aliases, no
+// internal/metadata import.
+func TestArrayMetadata_RootAlias_TypeCheck(t *testing.T) {
+	type entity struct {
+		Tags []string
+	}
+
+	var identity *ArrayMetadata
+	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+		am := m.Property(&t.Tags).Array()
+		var _ *ArrayMetadata = am
+		am.Items(func(m *ArrayMetadata) {
+			identity = m
+			m.String().Min(1).Max(50)
+			m.Required()
+			m.Description("Tags")
+			m.Examples("admin", "beta")
+		}).Min(1).Max(10)
+	})
+	if m == nil {
+		t.Fatal("NewMetadata() returned nil *Metadata")
+	}
+	if identity == nil {
+		t.Fatal("Items(fn) callback never invoked")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 1 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+	}
+	p := props[0]
+	if p.FormatValue() != "array" {
+		t.Fatalf("FormatValue() = %q, want %q", p.FormatValue(), "array")
+	}
+	if !p.IsRequired() {
+		t.Fatal("IsRequired() = false, want true")
+	}
+	if p.DescriptionText() != "Tags" {
+		t.Fatalf("DescriptionText() = %q, want %q", p.DescriptionText(), "Tags")
+	}
+	examples := p.ExamplesList()
+	if len(examples) != 2 || examples[0] != "admin" || examples[1] != "beta" {
+		t.Fatalf("ExamplesList() = %v, want [admin beta]", examples)
+	}
+	if min, ok := identity.MinValue(); !ok || min != 1 {
+		t.Fatalf("array MinValue() = (%d, %v), want (1, true)", min, ok)
+	}
+	if max, ok := identity.MaxValue(); !ok || max != 10 {
+		t.Fatalf("array MaxValue() = (%d, %v), want (10, true)", max, ok)
+	}
+
+	item := identity.ItemBuilder()
+	if item.FormatValue() != "" {
+		t.Fatalf("item FormatValue() = %q, want %q (String() sets no format)", item.FormatValue(), "")
+	}
+}
+
+// TestArrayMetadata_RootAlias_UserEntityInsightCallShape reproduces
+// INSIGHT.md's UserEntity.Tags/Scores/Addresses example (lines ~437-486,
+// "exemplo de Array e Object aninhados") verbatim through the root gonest
+// package's NewMetadata/Metadata/PropertyBuilder/ArrayMetadata aliases --
+// confirms the 3 array shapes (string item, int item, and Object() item
+// referencing an already-registered gonest.NewMetadata[AddressEntity])
+// all resolve and behave correctly at the root package, no
+// internal/metadata import required.
+func TestArrayMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+	type AddressEntity struct {
+		Street string `json:"street"`
+		City   string `json:"city"`
+		Zip    string `json:"zip"`
+	}
+
+	type UserEntity struct {
+		Id        int64           `json:"id"`
+		Tags      []string        `json:"tags"`
+		Scores    []int           `json:"scores"`
+		Addresses []AddressEntity `json:"addresses"`
+	}
+
+	addressMetadata := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+		m.Description("Endereço")
+		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+	})
+
+	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Description("Entidade de usuário com campos aninhados")
+		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+
+		m.Property(&t.Tags).Array().Items(func(m *ArrayMetadata) {
+			m.String().Min(1).Max(50)
+			m.Required()
+			m.Description("Tags do usuário")
+			m.Examples("admin", "beta")
+		})
+
+		m.Property(&t.Scores).Array().Items(func(m *ArrayMetadata) {
+			m.Integer().Min(0).Max(100)
+			m.Required()
+			m.Description("Notas do usuário")
+			m.Examples(80, 95)
+		})
+
+		m.Property(&t.Addresses).Array().Items(func(m *ArrayMetadata) {
+			m.Object(addressMetadata)
+			m.Required()
+			m.Min(1)
+			m.Description("Endereços do usuário")
+			m.Examples("admin", "beta")
+		})
+	})
+
+	props := m.OwnProperties()
+	if len(props) != 4 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 4", len(props))
+	}
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range props {
+		byName[p.Field().Name] = p
+	}
+
+	// Tags: array of string item, Min(1)/Max(50) on the ITEM (not the array).
+	tags, ok := byName["Tags"]
+	if !ok {
+		t.Fatal("Tags was not registered via Property")
+	}
+	if tags.FormatValue() != "array" {
+		t.Fatalf("Tags: FormatValue() = %q, want %q", tags.FormatValue(), "array")
+	}
+	if !tags.IsRequired() {
+		t.Fatal("Tags: IsRequired() = false, want true")
+	}
+	if tags.DescriptionText() != "Tags do usuário" {
+		t.Fatalf("Tags: DescriptionText() = %q, want %q", tags.DescriptionText(), "Tags do usuário")
+	}
+
+	// Scores: array of int item, Min(0)/Max(100) on the ITEM.
+	scores, ok := byName["Scores"]
+	if !ok {
+		t.Fatal("Scores was not registered via Property")
+	}
+	if scores.FormatValue() != "array" {
+		t.Fatalf("Scores: FormatValue() = %q, want %q", scores.FormatValue(), "array")
+	}
+	if !scores.IsRequired() {
+		t.Fatal("Scores: IsRequired() = false, want true")
+	}
+	examples := scores.ExamplesList()
+	if len(examples) != 2 || examples[0] != 80 || examples[1] != 95 {
+		t.Fatalf("Scores: ExamplesList() = %v, want [80 95]", examples)
+	}
+
+	// Addresses: array of Object(addressMetadata) item, Min(1) on the ARRAY
+	// itself (item count, not item constraints).
+	addresses, ok := byName["Addresses"]
+	if !ok {
+		t.Fatal("Addresses was not registered via Property")
+	}
+	if addresses.FormatValue() != "array" {
+		t.Fatalf("Addresses: FormatValue() = %q, want %q", addresses.FormatValue(), "array")
+	}
+	if !addresses.IsRequired() {
+		t.Fatal("Addresses: IsRequired() = false, want true")
+	}
+	if addresses.DescriptionText() != "Endereços do usuário" {
+		t.Fatalf("Addresses: DescriptionText() = %q, want %q", addresses.DescriptionText(), "Endereços do usuário")
+	}
+}

@@ -446,3 +446,24 @@ func NewMetadata[T any](fn func(t *T, m *Metadata)) *Metadata {
 // STATE.md: this section lives in this consolidated file rather than a
 // separate metadata.go).
 type NumericMetadata = metadata.NumericMetadata
+
+// ---------------------------------------------------------------------------
+// ArrayMetadata (Array Builder feature)
+// ---------------------------------------------------------------------------
+
+// ArrayMetadata is the dual-state branch builder returned by
+// PropertyBuilder.Array (Array Builder feature). Unlike StringMetadata/
+// NumericMetadata above, which describe a single field's own constraints,
+// ArrayMetadata holds TWO separate states: the embedded *PropertyBuilder
+// (the FIELD itself, e.g. `Tags []string` -- mutated by Required/Nullable/
+// Description/Examples) and a synthetic item builder (the array's ELEMENTS
+// -- mutated by the type+format branch methods String()/Integer()/.../
+// Object() inside an Items(fn) callback), plus the array's own item-count
+// bounds via Min/Max (distinct from the item's own Min/Max). It is a true Go
+// type alias, so all of its methods are automatically visible on
+// gonest.ArrayMetadata with zero extra wrapper code, same as
+// gonest.StringMetadata/gonest.NumericMetadata above. See
+// internal/metadata.ArrayMetadata's doc comment for the full dual-state
+// contract (AD-009 in STATE.md: this section lives in this consolidated
+// file rather than a separate metadata.go).
+type ArrayMetadata = metadata.ArrayMetadata
