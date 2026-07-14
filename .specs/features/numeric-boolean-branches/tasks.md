@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/numeric-boolean-branches/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T2, todos evaluator PASS)
 
 ---
 
@@ -52,7 +52,7 @@ Cria arquivo NOVO `internal/metadata/numeric.go` (MESMO pacote):
 
 ---
 
-### T2: Root re-exports
+### T2: Root re-exports ✅ DONE (evaluator: PASS, commit `3b32728`)
 
 **What**: pacote raiz `gonest` ganha `type NumericMetadata = metadata.NumericMetadata`. Per AD-009, ADICIONE à seção `// Metadata` já existente em `gonest.go`/`gonest_test.go`. `Boolean()` não precisa de re-export próprio (é só um método a mais em `PropertyBuilder`, já re-exportado).
 **Where**: `gonest.go` (existente), `gonest_test.go` (existente)
@@ -65,11 +65,11 @@ Cria arquivo NOVO `internal/metadata/numeric.go` (MESMO pacote):
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.NumericMetadata` resolve na raiz
-- [ ] Reprodução do exemplo `UserEntity.Id`/`UserEntity.IsActive` do INSIGHT.md através dos aliases raiz — confirma correto
-- [ ] `Int32()`/`Float()`/`Double()` (não mostrados no INSIGHT.md) também exercitados via aliases raiz, `FormatValue()` conferido pra cada
-- [ ] Gate check passa
-- [ ] Test count: 3+ (NumericMetadata resolve, reprodução INSIGHT.md Integer+Boolean, os 3 branches numéricos restantes)
+- [x] `gonest.NumericMetadata` resolve na raiz
+- [x] Reprodução do exemplo `UserEntity.Id`/`UserEntity.IsActive` do INSIGHT.md através dos aliases raiz — confirma correto
+- [x] `Int32()`/`Float()`/`Double()` (não mostrados no INSIGHT.md) também exercitados via aliases raiz, `FormatValue()` conferido pra cada
+- [x] Gate check passa
+- [x] Test count: 3+ (NumericMetadata resolve, reprodução INSIGHT.md Integer+Boolean, os 3 branches numéricos restantes)
 
 **Tests**: unit
 **Gate**: quick

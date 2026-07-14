@@ -1,8 +1,8 @@
 # Handoff
 
 **Date:** 2026-07-13
-**Feature:** String-family Branches (Milestone 4) — ✅ COMPLETE (T1-T2)
-**Task:** Nenhuma em progresso. Próxima: especificar "Numeric & Boolean Branches" (3ª feature de Milestone 4, ver ROADMAP.md).
+**Feature:** Numeric & Boolean Branches (Milestone 4) — ✅ COMPLETE (T1-T2)
+**Task:** Nenhuma em progresso. Próxima: especificar "Date/Time Branches" (última feature de Milestone 4, ver ROADMAP.md).
 
 ## Completed ✓
 
@@ -10,9 +10,13 @@
 - **Milestone 4 (Metadata Builder — Primitivos) em progresso:**
   - **"Metadata Registration Core" (T1-T2) — COMPLETE.** `internal/metadata` novo pacote. `Property(&t.X)` identifica campo via offset de ponteiro (`unsafe.Pointer`+`reflect.VisibleFields`), confirmado empiricamente sem ajuste. Base comum `Required`/`Nullable`/`Description`/`Examples` pronta.
   - **"String-family Branches" (T1-T2) — COMPLETE**
-    - T1 (`PropertyBuilder` estendido + `StringMetadata` novo, 10 branches: `String`/`Email`/`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byte`/`Binary`) — DONE, evaluator PASS (com ênfase máxima no teste crítico de encadeamento), commit `604dbc2`
+    - T1 (`PropertyBuilder` estendido + `StringMetadata` novo, 10 branches: `String`/`Email`/`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byte`/`Binary`) — DONE, evaluator PASS, commit `604dbc2`
     - T2 (re-export raiz `StringMetadata`) — DONE, evaluator PASS, commit `be6d062`
-    - **Padrão arquitetural resolvido nesta feature** (vai se repetir mecanicamente nas próximas 2): campo `format` fica armazenado no `PropertyBuilder` COMPARTILHADO (não no wrapper `StringMetadata` descartável cada chamada de branch cria) — isso é o que garante que a escolha de branch sobrevive mesmo que o dev descarte o wrapper específico sem usar. Os 4 métodos comuns (`Required`/`Nullable`/`Description`/`Examples`) são REDECLARADOS manualmente em `StringMetadata` (delegam pro objeto embutido, devolvem `*StringMetadata`) — NÃO se pode confiar na promoção automática de método via embedding, que devolveria o tipo BASE (`*PropertyBuilder`) e quebraria a chain fluente.
+    - **Padrão arquitetural resolvido nesta feature** (repetido mecanicamente nas próximas): campo `format` fica armazenado no `PropertyBuilder` COMPARTILHADO (não no wrapper descartável cada chamada de branch cria). Os 4 métodos comuns (`Required`/`Nullable`/`Description`/`Examples`) são REDECLARADOS manualmente em cada wrapper — NÃO se pode confiar na promoção automática de método via embedding.
+  - **"Numeric & Boolean Branches" (T1-T2) — COMPLETE**
+    - T1 (`NumericMetadata` novo, `Integer`/`Int32`/`Float`/`Double` + `Min`/`Max`, mesmo padrão embed+redeclare; `Boolean()` novo) — DONE, evaluator PASS, commit `45e5d22`
+    - T2 (re-export raiz `NumericMetadata`) — DONE, evaluator PASS, commit `3b32728`
+    - **Ponto novo desta feature**: `Boolean()` é o PRIMEIRO branch sem wrapper próprio — devolve o `*PropertyBuilder` base direto (sem `BooleanMetadata`), já que não tem format nem validador extra. Identidade de ponteiro confirmada por teste (`got == p`). Prova que a decisão original de "Metadata Registration Core" (base `PropertyBuilder` usável sozinho) estava certa.
 
 ## In Progress
 
@@ -20,8 +24,8 @@
 
 ## Pending
 
-- Especificar **Numeric & Boolean Branches** (`Integer`/`Int32`/`Float`/`Double` + `Min`/`Max`, `Boolean`, ver ROADMAP.md Milestone 4). **Reusar o padrão já resolvido**: provavelmente `NumericMetadata` (mesmo pacote `internal/metadata`, novo arquivo `numeric.go`) servindo `Integer`/`Int32`/`Float`/`Double` (todos compartilham `Min`/`Max` numérico, igual String-family compartilhou `Min`/`Max`/`Pattern`), e talvez um tipo separado ou nenhum extra pra `Boolean` (sem validador extra documentado no INSIGHT.md além dos 4 comuns — se não precisar de validador próprio, `Boolean()` pode simplesmente devolver o `*PropertyBuilder` base direto, sem precisar de wrapper novo — avaliar isso no design.md dessa próxima feature).
-- Depois: Date/Time Branches (`DateTime`/`Date`) fecha Milestone 4, depois Milestone 5 (Array & Object — AD-002 já resolveu o formato de builder linear)
+- Especificar **Date/Time Branches** (`DateTime`/`Date`, última feature de Milestone 4, ver ROADMAP.md). Reusar o padrão já resolvido: provavelmente `DateTimeMetadata` (mesmo pacote `internal/metadata`, novo arquivo `datetime.go`), mecanicamente igual a `StringMetadata`/`NumericMetadata` — avaliar no design.md se `Date`/`DateTime` compartilham um tipo só (igual numeric) ou precisam de validadores diferentes.
+- Depois: Milestone 5 (Array & Object — AD-002 já resolveu o formato de builder linear/encadeável, `Items()` variádico)
 
 ## Blockers
 
@@ -41,5 +45,5 @@
 
 - Branch: `master`
 - Todo trabalho desta sessão commitado (código via sub-agents, docs `.specs/*` via orquestrador, sempre com pathspec explícito). `.vscode/` untracked (não gerado por mim, deixado como está).
-- Fluxo de trabalho: AD-001 (planner→developer→evaluator), AD-004 (1 pacote por tipo em `internal/` — mas note que `internal/metadata` quebra essa regra deliberadamente pra `StringMetadata`, que fica no MESMO pacote que `PropertyBuilder` por precisar de acesso a campos privados; ver design.md da feature String-family Branches), AD-008 (pipeline-stage types sem MustInject), AD-009 (raiz consolidada em `gonest.go`/`gonest_test.go` único), AD-010 (`internal/execution` era `httpctx`, `internal/adapter/fiber` era `fiberapp`), L-007 (`git commit -- <arquivos>` sempre com pathspec)
-- Pra retomar: ler STATE.md inteiro primeiro, depois ROADMAP.md Milestone 4 pra especificar "Numeric & Boolean Branches" (Specify phase, feature nova) — releia `.specs/features/string-family-branches/design.md`'s Tech Decisions ANTES de especificar, o padrão de "format no objeto compartilhado + redeclaração manual dos 4 comuns" já está resolvido e só precisa ser reaplicado, não re-derivado.
+- Fluxo de trabalho: AD-001 (planner→developer→evaluator), AD-004 (1 pacote por tipo em `internal/` — mas note que `internal/metadata` quebra essa regra deliberadamente pra branches de tipo, que ficam no MESMO pacote que `PropertyBuilder` por precisar de acesso a campos privados), AD-008 (pipeline-stage types sem MustInject), AD-009 (raiz consolidada em `gonest.go`/`gonest_test.go` único), AD-010 (`internal/execution` era `httpctx`, `internal/adapter/fiber` era `fiberapp`), L-007 (`git commit -- <arquivos>` sempre com pathspec)
+- Pra retomar: ler STATE.md inteiro primeiro, depois ROADMAP.md Milestone 4 pra especificar "Date/Time Branches" (Specify phase, feature nova) — releia `.specs/features/numeric-boolean-branches/design.md`'s Tech Decisions ANTES de especificar, o padrão de "format no objeto compartilhado + redeclaração manual dos 4 comuns" já está resolvido e só precisa ser reaplicado, não re-derivado.

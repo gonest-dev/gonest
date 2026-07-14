@@ -102,8 +102,9 @@
 - `String`/`Email`/`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byte`/`Binary` + `Min`/`Max`/`Pattern` (`internal/metadata/string.go`, re-exportado na raiz)
 - Padrão de builder específico-por-branch resolvido: `format` fica no `PropertyBuilder` COMPARTILHADO (não no wrapper `StringMetadata` descartável), `Required`/`Nullable`/`Description`/`Examples` REDECLARADOS manualmente em `StringMetadata` (não confiar em promoção automática de embedding, que quebraria a chain devolvendo o tipo base) — padrão mecânico que as próximas features (Numeric/Boolean, Date/Time) vão repetir
 
-**Numeric & Boolean Branches** - PLANNED
-- `Integer`/`Int32`/`Float`/`Double` + `Min`/`Max`, `Boolean`
+**Numeric & Boolean Branches** - COMPLETE
+- `Integer`/`Int32`/`Float`/`Double` + `Min`/`Max` (`NumericMetadata`, mesmo padrão embed+redeclare de `StringMetadata`), `Boolean` (`internal/metadata/numeric.go`, re-exportado na raiz)
+- `Boolean()` é o primeiro branch sem wrapper próprio — devolve o `*PropertyBuilder` base direto (identidade de ponteiro confirmada por teste), já que não tem format nem validador extra
 
 **Date/Time Branches** - PLANNED
 - `DateTime`/`Date`
