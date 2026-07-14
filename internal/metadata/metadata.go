@@ -25,6 +25,7 @@ import "reflect"
 type Metadata struct {
 	structType  reflect.Type
 	baseAddr    uintptr
+	title       string
 	description string
 	properties  map[uintptr]*PropertyBuilder // keyed by field offset from baseAddr
 }
@@ -44,6 +45,24 @@ func New(structType reflect.Type, baseAddr uintptr) *Metadata {
 	}
 	Register(structType, m)
 	return m
+}
+
+// Title sets the whole-type title (the struct itself, not any individual
+// field -- same tier as Description) and returns m so calls can chain. Used
+// as the components.schemas key + schema "title" field by the OpenAPI
+// generator; when never called, TitleText returns "" and the generator falls
+// back to the Go type's own name (spec.md AC1 -- that fallback is the
+// generator's job, not Metadata's).
+func (m *Metadata) Title(s string) *Metadata {
+	m.title = s
+	return m
+}
+
+// TitleText returns the whole-type title set via Title, or "" if it was
+// never called. Named differently from the setter for the same reason as
+// Description/DescriptionText -- Go has no method overloading.
+func (m *Metadata) TitleText() string {
+	return m.title
 }
 
 // Description sets the whole-type description (the struct itself, not any

@@ -326,3 +326,79 @@ func TestOwnInterceptors_ReturnsCopyNotInternalSlice(t *testing.T) {
 		t.Fatalf("OwnInterceptors() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
+
+// TestTags_StoresTagsInRegistrationOrder proves Tags stores every tag passed,
+// in order, retrievable via OwnTags -- inherited by every Route under this
+// Controller unless the Route itself overrides (spec.md AC2, resolved at
+// generation time, not here).
+func TestTags_StoresTagsInRegistrationOrder(t *testing.T) {
+	c := New(func(c *Controller) {
+		c.Tags("users", "admin")
+	})
+	c.Declare()
+
+	got := c.OwnTags()
+	if len(got) != 2 {
+		t.Fatalf("OwnTags() returned %d items, want 2", len(got))
+	}
+	if got[0] != "users" || got[1] != "admin" {
+		t.Fatalf("OwnTags() = %v, want [users, admin] in registration order", got)
+	}
+}
+
+// TestOwnTags_ReturnsCopyNotInternalSlice proves OwnTags is a defensive
+// copy -- mutating the returned slice must not affect the Controller's own
+// state, same pattern as OwnMiddleware/OwnInterceptors.
+func TestOwnTags_ReturnsCopyNotInternalSlice(t *testing.T) {
+	c := New(func(c *Controller) {
+		c.Tags("users")
+	})
+	c.Declare()
+
+	got := c.OwnTags()
+	got[0] = "mutated"
+
+	got2 := c.OwnTags()
+	if got2[0] != "users" {
+		t.Fatalf("OwnTags() leaked mutable internal slice: mutation of returned slice affected subsequent call, got %v", got2)
+	}
+}
+
+// TestOwnTags_DefaultsEmpty proves OwnTags returns an empty (not nil-panic)
+// slice before Tags is ever called.
+func TestOwnTags_DefaultsEmpty(t *testing.T) {
+	c := New(func(c *Controller) {})
+	c.Declare()
+
+	if got := c.OwnTags(); len(got) != 0 {
+		t.Fatalf("OwnTags() = %v, want empty before Tags() was ever called", got)
+	}
+}
+
+// TestBearerAuth_SetsFlag proves BearerAuth sets the flag returned by
+// HasBearerAuth, and returns c so calls can chain.
+func TestBearerAuth_SetsFlag(t *testing.T) {
+	var c *Controller
+	c = New(func(cc *Controller) {
+		got := cc.BearerAuth()
+		if got != cc {
+			t.Fatal("Controller.BearerAuth did not return the same *Controller for chaining")
+		}
+	})
+	c.Declare()
+
+	if !c.HasBearerAuth() {
+		t.Fatal("HasBearerAuth() = false, want true after BearerAuth() was called")
+	}
+}
+
+// TestHasBearerAuth_DefaultsFalse proves HasBearerAuth returns false before
+// BearerAuth is ever called.
+func TestHasBearerAuth_DefaultsFalse(t *testing.T) {
+	c := New(func(c *Controller) {})
+	c.Declare()
+
+	if c.HasBearerAuth() {
+		t.Fatal("HasBearerAuth() = true, want false before BearerAuth() was ever called")
+	}
+}

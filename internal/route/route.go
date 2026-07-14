@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/metadata"
 )
 
 // defaultHttpCode is the status code a Route uses when HttpCode is never
@@ -20,6 +21,42 @@ type Route struct {
 
 	httpCode int
 	handler  func(ctx *execution.Context)
+
+	// Documentation-builder state (schema-generation feature, P1) -- every
+	// field here is purely declarative, read back only by the OpenAPI
+	// generator (P2, out of scope here). Setter-returns-self / plain-getter
+	// convention throughout, same shape as HttpCode/Code above.
+	summary     string
+	description string
+	operationId string
+
+	// tags/tagsSet: tagsSet distinguishes "Tags was never called on this
+	// Route (inherit the owning Controller's own Tags)" from "Tags WAS
+	// called" (an explicit override, replacing the controller's value
+	// entirely -- even if the route passed the exact same tags). Resolution
+	// of the inherit-vs-override choice happens at generation time (P2),
+	// not here -- Route has no back-reference to its owning Controller.
+	tags    []string
+	tagsSet bool
+
+	// bearerAuthValue/bearerAuthSet: same never-called-vs-explicit-override
+	// distinction as tags/tagsSet, but for a bool value that has no natural
+	// nil/unset sentinel of its own.
+	bearerAuthValue bool
+	bearerAuthSet   bool
+
+	requestBody *metadata.Metadata
+	// responses maps status code -> documented body schema. A nil value
+	// means "documented, no body" (Response(status) called with zero
+	// variadic args) -- the KEY's mere presence distinguishes "documented"
+	// from "never documented at all" (spec.md AC3).
+	responses map[int]*metadata.Metadata
+
+	pathParams  *metadata.Metadata
+	queryParams *metadata.Metadata
+
+	excluded   bool
+	deprecated bool
 }
 
 // New creates a Route and runs fn on it immediately -- unlike
@@ -97,4 +134,178 @@ func (r *Route) HasParam(name string) bool {
 		}
 	}
 	return false
+}
+
+// Summary sets this Route's OpenAPI operation summary and returns r so calls
+// can chain.
+func (r *Route) Summary(s string) *Route {
+	r.summary = s
+	return r
+}
+
+// SummaryText returns the summary set via Summary, or "" if it was never
+// called.
+func (r *Route) SummaryText() string {
+	return r.summary
+}
+
+// Description sets this Route's OpenAPI operation description and returns r
+// so calls can chain.
+func (r *Route) Description(s string) *Route {
+	r.description = s
+	return r
+}
+
+// DescriptionText returns the description set via Description, or "" if it
+// was never called.
+func (r *Route) DescriptionText() string {
+	return r.description
+}
+
+// OperationId sets this Route's OpenAPI operationId and returns r so calls
+// can chain.
+func (r *Route) OperationId(s string) *Route {
+	r.operationId = s
+	return r
+}
+
+// OperationIdText returns the operationId set via OperationId, or "" if it
+// was never called.
+func (r *Route) OperationIdText() string {
+	return r.operationId
+}
+
+// Tags stores tags as this Route's OWN OpenAPI tags, overriding (not
+// merging with) whatever the owning Controller's own Tags declared. Returns
+// r so calls can chain.
+func (r *Route) Tags(tags ...string) *Route {
+	r.tags = append([]string(nil), tags...)
+	r.tagsSet = true
+	return r
+}
+
+// OwnTags returns the tags set via Tags, and whether Tags was ever called on
+// this Route -- the bool distinguishes "never called, inherit the owning
+// Controller's own Tags" (generation-time resolution, P2) from "called,
+// explicit override" (spec.md AC2).
+func (r *Route) OwnTags() ([]string, bool) {
+	return append([]string(nil), r.tags...), r.tagsSet
+}
+
+// BearerAuth marks this Route as requiring bearer authentication, overriding
+// (not merging with) whatever the owning Controller's own BearerAuth
+// declared. Returns r so calls can chain.
+func (r *Route) BearerAuth() *Route {
+	r.bearerAuthValue = true
+	r.bearerAuthSet = true
+	return r
+}
+
+// HasBearerAuth returns the value set via BearerAuth, and whether
+// BearerAuth was ever called on this Route -- the second bool distinguishes
+// "never called, inherit the owning Controller's own BearerAuth" from
+// "called, explicit override" (spec.md AC2, same shape as OwnTags).
+func (r *Route) HasBearerAuth() (bool, bool) {
+	return r.bearerAuthValue, r.bearerAuthSet
+}
+
+// RequestBody stores m as this Route's documented request body schema and
+// returns r so calls can chain. Calling RequestBody more than once
+// overwrites the previous value (last-write-wins, spec.md's Edge Cases).
+func (r *Route) RequestBody(m *metadata.Metadata) *Route {
+	r.requestBody = m
+	return r
+}
+
+// RequestBodyMetadata returns the *metadata.Metadata set via RequestBody,
+// and whether RequestBody was ever called -- the bool distinguishes "never
+// documented" from "documented".
+func (r *Route) RequestBodyMetadata() (*metadata.Metadata, bool) {
+	return r.requestBody, r.requestBody != nil
+}
+
+// Response documents status as one of this Route's possible responses. With
+// zero metadata args, status is documented as having no body (the map key
+// still exists, with a nil value, distinguishing "documented, no body" from
+// "never documented" -- spec.md AC3). With one arg, status is documented
+// with that body schema. Calling Response again for the SAME status
+// overwrites that status's entry; calling it for a DIFFERENT status
+// accumulates alongside any previously documented statuses. Returns r so
+// calls can chain.
+func (r *Route) Response(status int, m ...*metadata.Metadata) *Route {
+	if r.responses == nil {
+		r.responses = map[int]*metadata.Metadata{}
+	}
+	if len(m) > 0 {
+		r.responses[status] = m[0]
+	} else {
+		r.responses[status] = nil
+	}
+	return r
+}
+
+// Responses returns a copy of the status -> body-schema map built via
+// Response. Read-only: mutating the returned map does not affect this
+// Route's internal state (same defensive-copy pattern as
+// Controller.OwnMiddleware/OwnTags).
+func (r *Route) Responses() map[int]*metadata.Metadata {
+	out := make(map[int]*metadata.Metadata, len(r.responses))
+	for status, m := range r.responses {
+		out[status] = m
+	}
+	return out
+}
+
+// PathParams stores m as this Route's documented path-parameters schema and
+// returns r so calls can chain. Calling PathParams more than once
+// overwrites the previous value (last-write-wins, spec.md's Edge Cases).
+func (r *Route) PathParams(m *metadata.Metadata) *Route {
+	r.pathParams = m
+	return r
+}
+
+// PathParamsMetadata returns the *metadata.Metadata set via PathParams, and
+// whether PathParams was ever called -- the bool distinguishes "never
+// documented" from "documented".
+func (r *Route) PathParamsMetadata() (*metadata.Metadata, bool) {
+	return r.pathParams, r.pathParams != nil
+}
+
+// QueryParams stores m as this Route's documented query-parameters schema
+// and returns r so calls can chain. Calling QueryParams more than once
+// overwrites the previous value (last-write-wins, spec.md's Edge Cases).
+func (r *Route) QueryParams(m *metadata.Metadata) *Route {
+	r.queryParams = m
+	return r
+}
+
+// QueryParamsMetadata returns the *metadata.Metadata set via QueryParams,
+// and whether QueryParams was ever called -- the bool distinguishes "never
+// documented" from "documented".
+func (r *Route) QueryParamsMetadata() (*metadata.Metadata, bool) {
+	return r.queryParams, r.queryParams != nil
+}
+
+// ExcludeFromDocs marks this Route to be omitted entirely from OpenAPI
+// generation (P2/P4) and returns r so calls can chain.
+func (r *Route) ExcludeFromDocs() *Route {
+	r.excluded = true
+	return r
+}
+
+// IsExcludedFromDocs reports whether ExcludeFromDocs was called.
+func (r *Route) IsExcludedFromDocs() bool {
+	return r.excluded
+}
+
+// Deprecated marks this Route as deprecated in OpenAPI generation and
+// returns r so calls can chain.
+func (r *Route) Deprecated() *Route {
+	r.deprecated = true
+	return r
+}
+
+// IsDeprecated reports whether Deprecated was called.
+func (r *Route) IsDeprecated() bool {
+	return r.deprecated
 }

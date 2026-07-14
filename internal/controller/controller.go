@@ -37,6 +37,9 @@ type Controller struct {
 	guards       []*guard.Guard
 	interceptors []*interceptor.Interceptor
 	filters      []*filter.Filter
+
+	tags       []string
+	bearerAuth bool
 }
 
 // New creates a Controller that defers fn until bootstrap runs it. fn is
@@ -184,4 +187,36 @@ func (c *Controller) Filters(items ...*filter.Filter) {
 // OwnInterceptors).
 func (c *Controller) OwnFilters() []*filter.Filter {
 	return append([]*filter.Filter(nil), c.filters...)
+}
+
+// Tags stores tags as this controller's OpenAPI tags, inherited by every
+// Route under this controller UNLESS the Route itself calls its own Tags,
+// which REPLACES the controller's value entirely for that route (spec.md
+// AC2 -- override resolution happens at generation time, not here).
+func (c *Controller) Tags(tags ...string) *Controller {
+	c.tags = append([]string(nil), tags...)
+	return c
+}
+
+// OwnTags returns a copy of the tags registered on this controller via Tags.
+// Read-only: mutating the returned slice does not affect this Controller's
+// internal state (same defensive-copy pattern as OwnMiddleware/
+// OwnInterceptors/OwnFilters).
+func (c *Controller) OwnTags() []string {
+	return append([]string(nil), c.tags...)
+}
+
+// BearerAuth marks this controller as requiring bearer authentication,
+// inherited by every Route under this controller UNLESS the Route itself
+// calls its own BearerAuth, which REPLACES the controller's value entirely
+// for that route (spec.md AC2, same override semantics as Tags). Returns c
+// so calls can chain.
+func (c *Controller) BearerAuth() *Controller {
+	c.bearerAuth = true
+	return c
+}
+
+// HasBearerAuth reports whether BearerAuth was called on this controller.
+func (c *Controller) HasBearerAuth() bool {
+	return c.bearerAuth
 }

@@ -240,6 +240,33 @@ func TestMetadata_DescriptionDefaultsEmpty(t *testing.T) {
 	}
 }
 
+// TestMetadata_TitleStoresAndReturnsSelf proves Metadata.Title sets the
+// whole-type title (same tier as Description, sibling field, not a
+// PropertyBuilder field) and returns m so calls can chain.
+func TestMetadata_TitleStoresAndReturnsSelf(t *testing.T) {
+	_, m := newTestMetadata(t)
+
+	got := m.Title("UserEntity")
+	if got != m {
+		t.Fatal("Metadata.Title did not return the same *Metadata for chaining")
+	}
+
+	if m.TitleText() != "UserEntity" {
+		t.Errorf("TitleText() = %q, want %q", m.TitleText(), "UserEntity")
+	}
+}
+
+// TestMetadata_TitleDefaultsEmpty proves TitleText returns "" before Title is
+// ever called on a fresh Metadata (spec.md AC1 -- caller falls back to the Go
+// type name, generator's job, not Metadata's).
+func TestMetadata_TitleDefaultsEmpty(t *testing.T) {
+	_, m := newTestMetadata(t)
+
+	if m.TitleText() != "" {
+		t.Errorf("TitleText() = %q, want \"\" before Title() was ever called", m.TitleText())
+	}
+}
+
 // TestOwnProperties_ReturnsAllRegisteredFields proves OwnProperties returns
 // every PropertyBuilder registered via Property so far.
 func TestOwnProperties_ReturnsAllRegisteredFields(t *testing.T) {
