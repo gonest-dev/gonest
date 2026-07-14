@@ -281,3 +281,58 @@ func (p *PropertyBuilder) Binary() *StringMetadata {
 	p.format = "binary"
 	return &StringMetadata{PropertyBuilder: p}
 }
+
+// Integer selects OpenAPI's "int64" numeric format (the default width for a
+// bare "integer" per INSIGHT.md's own comment: "format: int64 default") and
+// returns a *NumericMetadata view onto p -- the first of the 4
+// numeric-family branch methods (numeric-boolean-branches feature). Calling
+// Integer()/Int32()/etc a second time on the same p simply overwrites
+// p.format (last call wins, no panic), same precedent String's doc comment
+// already established for the string family.
+func (p *PropertyBuilder) Integer() *NumericMetadata {
+	p.format = "int64"
+	return &NumericMetadata{PropertyBuilder: p}
+}
+
+// Int32 selects OpenAPI's "int32" numeric format. See Integer's doc comment
+// for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Int32() *NumericMetadata {
+	p.format = "int32"
+	return &NumericMetadata{PropertyBuilder: p}
+}
+
+// Float selects OpenAPI's "float" numeric format. See Integer's doc comment
+// for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Float() *NumericMetadata {
+	p.format = "float"
+	return &NumericMetadata{PropertyBuilder: p}
+}
+
+// Double selects OpenAPI's "double" numeric format. See Integer's doc
+// comment for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Double() *NumericMetadata {
+	p.format = "double"
+	return &NumericMetadata{PropertyBuilder: p}
+}
+
+// Boolean selects OpenAPI's "boolean" type, which per INSIGHT.md's own
+// comment ("Boolean() -> sem format") has NO format string and NO extra
+// validators at all -- the first branch method this codebase has needed
+// that returns the BARE *PropertyBuilder itself rather than constructing a
+// branch-specific wrapper type. Every other branch method above (String,
+// Email, ..., Integer, Int32, ...) exists to carry a format string plus
+// extra validators (Min/Max/Pattern) that PropertyBuilder itself doesn't
+// have -- Boolean has neither, so a "BooleanMetadata" wrapper with zero
+// extra fields or methods would add a type purely for consistency's own
+// sake, not because it does anything a caller couldn't already do through
+// PropertyBuilder directly. Boolean still explicitly sets p.format = ""
+// (rather than leaving whatever was already there) so it "claims" the
+// format slot the same way every other branch method does -- this matters
+// if a dev calls e.g. `.Integer().Boolean()` by mistake, since a
+// last-write-wins Boolean() must leave FormatValue() reporting "", not a
+// stale "int64" from the earlier call (see design.md's Tech Decisions for
+// numeric-boolean-branches).
+func (p *PropertyBuilder) Boolean() *PropertyBuilder {
+	p.format = ""
+	return p
+}
