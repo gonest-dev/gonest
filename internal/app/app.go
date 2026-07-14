@@ -54,6 +54,27 @@ func (a *App) Adapter() HttpAdapter {
 	return a.adapter
 }
 
+// Root returns the same *module.Module NewApp/MustNewApp was called with --
+// the root of the fully assembled module tree, post-bootstrap. It exists so
+// something OUTSIDE internal/app (a future schema generator, most
+// immediately -- see the "Schema Generation from Metadata" feature's
+// context.md "Discovery" section) can walk the whole app graph after the
+// fact: recurse via Module.ImportedModules(), then Module.OwnControllers()
+// and Controller.OwnRoutes() (all three already exist) to reach every
+// controller/route this app registered.
+//
+// This is needed because registerRoutes (Stage 2.5, above) only ever
+// extracts 3 primitives per route (method, path, a composed handler
+// closure) for the HTTP adapter and discards its own *route.Route/
+// *controller.Controller references immediately after -- nothing from that
+// specific walk survives. The richer object graph itself does survive
+// (Module/Controller retain their own Own*() accessors for the app's whole
+// lifetime); Root is simply the missing entry point to reach it from
+// outside this package.
+func (a *App) Root() *module.Module {
+	return a.root
+}
+
 // MustListen starts the app serving on addr via the underlying adapter's
 // Listen, blocking until it stops. onListen, if non-nil, is wrapped into a
 // plain func() and passed through to adapter.Listen -- a nil onListen is

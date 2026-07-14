@@ -2803,3 +2803,104 @@ func TestNewApp_ZeroFilters_NonRegressionReference(t *testing.T) {
 		TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t)
 	})
 }
+
+// --- T0 of "Schema Generation from Metadata": App.Root() accessor ---
+
+// TestNewApp_Root_ReturnsSameModulePassedToNewApp proves App.Root() returns
+// the exact same *module.Module value NewApp was called with (identity, not
+// just an equivalent copy) -- the literal root reference the bootstrap
+// stored, unchanged.
+func TestNewApp_Root_ReturnsSameModulePassedToNewApp(t *testing.T) {
+	root := module.New(func(m *module.Module) {})
+
+	app, err := NewApp[recordingFakeAdapter](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	if app.Root() != root {
+		t.Fatalf("app.Root() = %p, want the same *module.Module NewApp was called with (%p)", app.Root(), root)
+	}
+}
+
+// TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes proves that
+// App.Root() combined with the ALREADY EXISTING Module.ImportedModules(),
+// Module.OwnControllers(), and Controller.OwnRoutes() together reach every
+// route registered anywhere in the app's module tree -- both the root
+// module's own controller/route AND a sub-module's own controller/route,
+// imported by the root -- with no gap. This is exactly the walk a future
+// schema generator needs to perform (see context.md's "Discovery: App needs
+// a NEW accessor" section), so this test exercises that walk directly
+// rather than merely checking Root()'s return value in isolation.
+func TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes(t *testing.T) {
+	subController := controller.New(func(c *controller.Controller) {
+		c.Path("/sub")
+		c.Route(route.HttpGet, "/thing", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {})
+		})
+	})
+	subModule := module.New(func(m *module.Module) {
+		m.Controllers(subController)
+	})
+
+	rootController := controller.New(func(c *controller.Controller) {
+		c.Path("/root")
+		c.Route(route.HttpPost, "/own", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {})
+		})
+	})
+	root := module.New(func(m *module.Module) {
+		m.Imports(subModule)
+		m.Controllers(rootController)
+	})
+
+	app, err := NewApp[recordingFakeAdapter](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	// Walk the whole tree starting from App.Root(), exactly as a schema
+	// generator would: this module's own controllers/routes, then recurse
+	// into every imported module and do the same.
+	type foundRoute struct {
+		method route.HttpMethod
+		path   string
+	}
+	var found []foundRoute
+	var walk func(m *module.Module)
+	walk = func(m *module.Module) {
+		for _, c := range m.OwnControllers() {
+			rc, ok := c.(interface {
+				PathPrefix() string
+				OwnRoutes() []*route.Route
+			})
+			if !ok {
+				continue
+			}
+			for _, r := range rc.OwnRoutes() {
+				found = append(found, foundRoute{method: r.Method(), path: rc.PathPrefix() + r.Path()})
+			}
+		}
+		for _, imported := range m.ImportedModules() {
+			walk(imported)
+		}
+	}
+	walk(app.Root())
+
+	want := map[foundRoute]bool{
+		{method: route.HttpPost, path: "/root/own"}: true,
+		{method: route.HttpGet, path: "/sub/thing"}: true,
+	}
+	if len(found) != len(want) {
+		t.Fatalf("found routes = %+v, want exactly %d routes matching %+v", found, len(want), want)
+	}
+	for _, f := range found {
+		if !want[f] {
+			t.Fatalf("found unexpected route %+v not in want set %+v", f, want)
+		}
+		delete(want, f)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing routes from walk: %+v -- App.Root()+ImportedModules()+OwnControllers()+OwnRoutes() did not reach every registered route", want)
+	}
+}
