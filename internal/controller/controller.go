@@ -8,6 +8,7 @@
 package controller
 
 import (
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -35,14 +36,8 @@ type Controller struct {
 	middleware   []*middleware.Middleware
 	guards       []*guard.Guard
 	interceptors []*interceptor.Interceptor
-	filters      []Middleware
+	filters      []*filter.Filter
 }
-
-// Middleware is a minimal placeholder type for the pipeline stubs (Use,
-// Guards, Interceptors, Filters). It carries no behavior yet -- it exists so
-// those methods have a plausible "list of middleware-like things" signature
-// to grow into once a later feature defines what middleware actually does.
-type Middleware struct{}
 
 // New creates a Controller that defers fn until bootstrap runs it. fn is
 // expected to declare routes/handlers and call MustInject for its
@@ -173,8 +168,20 @@ func (c *Controller) OwnInterceptors() []*interceptor.Interceptor {
 	return append([]*interceptor.Interceptor(nil), c.interceptors...)
 }
 
-// Filters registers items as exception filters for this controller. Stub
-// only -- nothing reads the stored values yet.
-func (c *Controller) Filters(items ...Middleware) {
+// Filters registers items as exception filters for this controller, using
+// the real *filter.Filter type (internal/filter, feature "Filter" T1).
+// Filters was never called by any shipped code path with the placeholder
+// Middleware stub, so it is safe to change its signature directly rather
+// than deprecate-and-migrate (same class of change as Use's/Guards'/
+// Interceptors' earlier migrations to their respective real types).
+func (c *Controller) Filters(items ...*filter.Filter) {
 	c.filters = append(c.filters, items...)
+}
+
+// OwnFilters returns a copy of the filters registered on this controller via
+// Filters. Read-only: mutating the returned slice does not affect this
+// Controller's internal state (same defensive-copy pattern as
+// OwnInterceptors).
+func (c *Controller) OwnFilters() []*filter.Filter {
+	return append([]*filter.Filter(nil), c.filters...)
 }

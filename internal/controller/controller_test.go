@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
@@ -146,28 +147,39 @@ func TestOwnRoutes_ReturnsCopyNotInternalSlice(t *testing.T) {
 	}
 }
 
-func TestPipelineStubs_DoNotAffectObservableState(t *testing.T) {
-	withStubs := New(func(c *Controller) {
-		c.Path("/things")
-		c.Use(middleware.New(nil))
-		c.Guards(guard.New(nil))
-		c.Interceptors(interceptor.New(nil))
-		c.Filters(Middleware{})
-		c.Route(route.HttpGet, "/", nil)
-	})
-	withStubs.Declare()
+func TestFilters_StoresFiltersInRegistrationOrder(t *testing.T) {
+	f1 := filter.New(nil)
+	f2 := filter.New(nil)
 
-	withoutStubs := New(func(c *Controller) {
-		c.Path("/things")
-		c.Route(route.HttpGet, "/", nil)
+	c := New(func(c *Controller) {
+		c.Filters(f1, f2)
 	})
-	withoutStubs.Declare()
+	c.Declare()
 
-	if withStubs.PathPrefix() != withoutStubs.PathPrefix() {
-		t.Fatalf("PathPrefix() differs: %q vs %q", withStubs.PathPrefix(), withoutStubs.PathPrefix())
+	got := c.OwnFilters()
+	if len(got) != 2 {
+		t.Fatalf("OwnFilters() returned %d items, want 2", len(got))
 	}
-	if len(withStubs.OwnRoutes()) != len(withoutStubs.OwnRoutes()) {
-		t.Fatalf("OwnRoutes() length differs: %d vs %d", len(withStubs.OwnRoutes()), len(withoutStubs.OwnRoutes()))
+	if got[0] != f1 || got[1] != f2 {
+		t.Fatalf("OwnFilters() = %v, want [f1, f2] in registration order", got)
+	}
+}
+
+func TestOwnFilters_ReturnsCopyNotInternalSlice(t *testing.T) {
+	f1 := filter.New(nil)
+	f2 := filter.New(nil)
+
+	c := New(func(c *Controller) {
+		c.Filters(f1)
+	})
+	c.Declare()
+
+	got := c.OwnFilters()
+	got[0] = f2
+
+	got2 := c.OwnFilters()
+	if got2[0] != f1 {
+		t.Fatalf("OwnFilters() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
 
