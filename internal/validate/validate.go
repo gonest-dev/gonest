@@ -1,13 +1,13 @@
 // Package validate is the real implementation behind the public root
 // gonest.MustJsonBody[T] wrapper (Go cannot re-export a generic function via
-// var, see AD-004 -- same reasoning as inject.MustInject/route.MustParam).
-// It reads *execution.Context's raw request body, validates it against T's
+// var, see AD-004 -- same reasoning as inject.MustInject). It reads
+// *execution.Context's raw request body, validates it against T's
 // registered *metadata.Metadata (internal/metadata), and panics
-// *exception.BadRequestException on any violation -- mirroring how
-// internal/route is a thin cross-cutting layer over internal/execution +
-// internal/pipe, this package is a thin cross-cutting layer over
-// internal/execution + internal/metadata + internal/exception, none of
-// which import each other back (design.md's Architecture Overview).
+// *exception.BadRequestException on any violation -- this package is a thin
+// cross-cutting layer over internal/execution + internal/metadata +
+// internal/exception + internal/route (for MustParams/MustQuery's
+// route.HasParam lookups), none of which import each other back (design.md's
+// Architecture Overview).
 package validate
 
 import (

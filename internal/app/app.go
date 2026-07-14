@@ -313,12 +313,11 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				// withRoute is the outermost layer of all: it attaches r
 				// (this specific *route.Route) to ctx via ctx.WithRoute
 				// BEFORE anything else in the composed chain runs --
-				// MustParam[T] (root param.go) relies on ctx.Route()
-				// returning the current *route.Route to find a custom Pipe
-				// registered via Route.Param; without this, ctx.Route()
-				// would always be nil during real dispatch and MustParam
-				// would silently fall back to defaultCoerce, never using a
-				// custom Pipe a dev explicitly registered. currentRoute is
+				// MustParams[T]/MustQuery[T] (internal/validate) rely on
+				// ctx.Route() returning the current *route.Route to check
+				// route.HasParam(key) for presence; without this, ctx.Route()
+				// would always be nil during real dispatch and every path
+				// param would be treated as absent. currentRoute is
 				// captured per-iteration (loop variable, not a pointer to a
 				// shared slice element) so each route's closure captures
 				// its own *route.Route correctly. Named currentRoute, not

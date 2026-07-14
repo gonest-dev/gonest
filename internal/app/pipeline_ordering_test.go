@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
@@ -12,48 +14,69 @@ import (
 	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/pipe"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/validate"
 )
 
 // --- "Pipeline Ordering" T1 (Milestone 3 closing task) ---
 //
 // This is the first test in the whole suite to combine ALL FIVE pipeline
 // stages -- global Middleware, controller Middleware, Guard, Interceptor,
-// Pipe, Filter -- on the SAME route, mirroring INSIGHT.md's full
-// "aplicando tudo no controller" UserController example. Every prior
+// param validation, Filter -- on the SAME route, mirroring INSIGHT.md's
+// full "aplicando tudo no controller" UserController example. Every prior
 // feature (Middleware T4, Guard T3, Interceptor T3/L-011 correction,
 // Filter T4) already proved its own slice of the order in isolation; none
 // combined all five. buildPipelineOrderingApp is shared by every subtest
 // below so the controller/module/route shape stays identical across happy
-// path, guard-rejects, and pipe-panics scenarios -- only the Guard's
+// path, guard-rejects, and param-panics scenarios -- only the Guard's
 // returned bool and the requested param differ per subtest.
+//
+// param-query-validation's T3 removed the whole Pipe mechanism (context.md's
+// Decision 3) -- this suite originally exercised a custom Pipe
+// (pipelineParamPipe) registered via Route.Param to prove a mid-pipeline
+// panic (invalid param) is caught by a matching Filter. That capability now
+// lives in PropertyBuilder.Custom(fn) (context.md's Decision 4): a
+// validate.MustParams[T] field with Custom(fn) set can panic from inside
+// fn, same as the old Pipe's Handler could, and the panic propagates through
+// validate.MustParams same as any other handler-body panic would.
 
-// pipelineParamPipe is the custom Pipe registered via Route.Param for this
-// suite's route -- it parses raw as a positive int, panicking with
+// pipelineIDParams is the struct-based path-param shape validated via
+// validate.MustParams[T] for this suite's route -- its ID field's Custom(fn)
+// parses raw as a positive int, panicking with
 // exception.NewBadRequestException when raw is not a valid positive int,
-// exactly like INSIGHT.md's own custom-Pipe example (ParseIntPipe).
-var pipelineParamPipe = pipe.New(func(p *pipe.Pipe) {
-	p.Handler(func(ctx *execution.Context, raw string) int {
-		if raw == "bad" {
+// exactly like the removed pipelineParamPipe/INSIGHT.md's own
+// custom-transform example did.
+type pipelineIDParams struct {
+	ID int `param:"id"`
+}
+
+var pipelineIDParamsMetadata = func() *metadata.Metadata {
+	f := &pipelineIDParams{}
+	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m.Property(&f.ID).Custom(func(raw any) (any, error) {
+		s, _ := raw.(string)
+		if s == "bad" {
 			panic(exception.NewBadRequestException(map[string]string{"reason": "invalid id"}))
 		}
-		return 42
+		return 42, nil
 	})
-})
+	return m
+}()
 
 // buildPipelineOrderingApp wires one controller with global+controller
 // Middleware, a Guard, an Interceptor, a Filter (controller-level, for
-// *exception.BadRequestException) and one route using Route.Param with
-// pipelineParamPipe -- the combined shape T1 exercises. order records every
+// *exception.BadRequestException) and one route validating its path param
+// via validate.MustParams[*pipelineIDParams] (whose ID field's Custom(fn)
+// can panic) -- the combined shape T1 exercises. order records every
 // stage's execution via closures, the same shared-slice technique used by
 // this package's own Middleware/Guard/Interceptor T4 tests
 // (TestNewApp_MiddlewareGuardInterceptorHandler_OrderedSequence).
 // guardAllows controls whether the Guard lets the request through.
 // withFilter controls whether the *exception.BadRequestException Filter is
-// registered on the controller at all, so the "pipe panics, no Filter"
+// registered on the controller at all, so the "param panics, no Filter"
 // subtest can prove fallback to the default {name,message,details} format.
 func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFilter bool) *module.Module {
 	t.Helper()
@@ -84,7 +107,7 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 		})
 	})
 
-	c := controller.New(func(c *controller.Controller) {
+	ctrl := controller.New(func(c *controller.Controller) {
 		c.Use(controllerMw)
 		c.Guards(g)
 		c.Interceptors(it)
@@ -98,19 +121,18 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 			c.Filters(f)
 		}
 		c.Route(route.HttpGet, "/pipeline/:id", func(r *route.Route) {
-			r.Param("id", pipelineParamPipe)
 			r.Handler(func(ctx *execution.Context) {
 				*order = append(*order, "handler-before-pipe")
-				id := route.MustParam[int](ctx, "id")
+				p := validate.MustParams[*pipelineIDParams](ctx)
 				*order = append(*order, "pipe")
-				ctx.Json(map[string]any{"id": id})
+				ctx.Json(map[string]any{"id": p.ID})
 			})
 		})
 	})
 
 	return module.New(func(m *module.Module) {
 		m.Use(globalMw)
-		m.Controllers(c)
+		m.Controllers(ctrl)
 	})
 }
 

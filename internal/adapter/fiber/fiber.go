@@ -2,7 +2,7 @@
 // Route/Context abstractions into a real Fiber v3 application. Together with
 // internal/execution, it is one of only two packages in this codebase allowed
 // to import Fiber directly (see design.md's "FiberApp (adapter)" component)
-// -- every other package (internal/route, internal/controller, internal/pipe)
+// -- every other package (internal/route, internal/controller, internal/validate)
 // only ever sees the Fiber-agnostic *execution.Context.
 package fiber
 
@@ -201,15 +201,16 @@ func (r *fiberResponder) SetHeaderValue(name, value string) {
 // GetParam returns the named route param's raw string value via Fiber's
 // Ctx.Params, which itself returns "" for a param that doesn't exist on the
 // matched route -- the same ambiguity route.Route.HasParam (internal/route/
-// route.go) exists to disambiguate at the MustParam[T] layer.
+// route.go) exists to disambiguate at the MustParams[T]/MustQuery[T] layer
+// (internal/validate).
 //
 // Fiber's own Ctx.Params doc comment warns the returned string is "only
 // valid within the handler" and to "make copies... to use the value outside
 // the Handler" -- it is a zero-copy view into a fasthttp request buffer
 // that gets reused for the NEXT request once this handler returns. gonest's
-// MustParam[T] contract (design.md, CTRL-04/05) gives callers a plain typed
-// value with no such caveat -- e.g. a Handler doing
-// `name := gonest.MustParam[string](ctx, "name"); entity.Name = name` and
+// MustParams[T] contract gives callers a plain typed struct with no such
+// caveat -- e.g. a Handler doing
+// `p := gonest.MustParams[*NameParams](ctx); entity.Name = p.Name` and
 // persisting entity beyond the request is the expected, supported usage,
 // not a misuse of an internal API. Without this copy, that string's bytes
 // can be silently overwritten by a later request sharing the same

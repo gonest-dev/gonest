@@ -32,9 +32,9 @@ type Context struct {
 
 // New builds a Context around the given Responder. Exported so other
 // packages (namely internal/route, which needs to attach a *Route to a
-// Context for MustParam[T] to consult -- see WithRoute/Route below) can
-// construct a *Context in their own tests without a real Fiber-backed
-// Responder existing yet.
+// Context for MustParams[T]/MustQuery[T] (internal/validate) to consult --
+// see WithRoute/Route below) can construct a *Context in their own tests
+// without a real Fiber-backed Responder existing yet.
 func New(res Responder) *Context {
 	return &Context{res: res}
 }
@@ -42,14 +42,14 @@ func New(res Responder) *Context {
 // WithRoute attaches an opaque reference to the *route.Route that owns this
 // Context to the Context, and returns ctx for chaining. It is stored as
 // `any` (not *route.Route) deliberately: internal/route already imports
-// internal/execution (Route.Handler takes a *Context, Route.Param takes a
-// *pipe.Pipe whose Handler also takes a *Context) -- if execution imported
-// route back to give WithRoute/Route a concrete type, that would be an
-// import cycle. Storing `any` here keeps execution's boundary exactly as
+// internal/execution (Route.Handler takes a *Context) -- if execution
+// imported route back to give WithRoute/Route a concrete type, that would be
+// an import cycle. Storing `any` here keeps execution's boundary exactly as
 // narrow as T2 established ("no Fiber", not "no Route"): execution never
 // inspects or calls anything on the stored value, it is purely a carrier.
-// The root param.go wrapper (which imports both execution and route) is the
-// only place that type-asserts this back to *route.Route.
+// internal/validate (which imports both execution and route for
+// MustParams[T]/MustQuery[T]) is the only place that type-asserts this back
+// to *route.Route.
 func (ctx *Context) WithRoute(route any) *Context {
 	ctx.route = route
 	return ctx
@@ -57,7 +57,7 @@ func (ctx *Context) WithRoute(route any) *Context {
 
 // Route returns the opaque reference previously attached via WithRoute, or
 // nil if none was attached (e.g. a Context built directly in a test that
-// doesn't exercise MustParam's custom-Pipe path).
+// doesn't exercise MustParams[T]/MustQuery[T]'s route-lookup path).
 func (ctx *Context) Route() any {
 	return ctx.route
 }

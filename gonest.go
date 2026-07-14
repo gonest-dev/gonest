@@ -23,9 +23,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/pipe"
 	"github.com/gonest-dev/gonest/internal/provider"
-	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
 )
@@ -133,7 +131,7 @@ type OnListen = app.OnListen
 // (route collection/registration onto a T-typed HttpAdapter, e.g.
 // gonest.NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})). Go cannot
 // re-export a generic function via var, so this is a real wrapper calling
-// the internal one (same pattern as MustInject/MustParam, see AD-004 in
+// the internal one (same pattern as MustInject, see AD-004 in
 // STATE.md).
 //
 // T is passed BY VALUE at the call site (e.g. FiberApp, not *FiberApp) per
@@ -160,41 +158,6 @@ func MustNewApp[T any, PT interface {
 }
 
 // ---------------------------------------------------------------------------
-// Route params (Controller & Route Registration feature)
-// ---------------------------------------------------------------------------
-
-// MustParam converts the route param named name (from ctx.Param) into the
-// requested type T, using a custom Pipe if the current route registered one
-// for name (via Route.Param), or the default reflect+strconv coercion
-// otherwise. Panics if name isn't declared on the current route's path, or
-// if the value fails to convert. Go cannot re-export a generic function via
-// var, so this is a real wrapper calling the internal one (same pattern as
-// MustInject, see AD-004 in STATE.md).
-func MustParam[T any](ctx *execution.Context, name string) T {
-	return route.MustParam[T](ctx, name)
-}
-
-// Pipe represents a param transform: a reflect-validated function that
-// coerces a raw route param string into a typed value, attached to a
-// specific route param via Route.Param (e.g. INSIGHT.md's
-// `route.Param("user_id", ParseIntPipe)`). Unlike Middleware/Guard/
-// Interceptor, Pipe.New(fn) defers fn until Route.Param declares it -- see
-// internal/pipe.Pipe's doc comment for the full contract.
-type Pipe = pipe.Pipe
-
-// NewPipe creates a Pipe that defers fn until it is attached to a route via
-// Route.Param, which declares it at that point (see internal/route.Route's
-// Param doc comment for why: nothing in the DI bootstrap walks
-// Route-registered Pipes, since Pipes aren't tracked by any Module -- Route
-// itself is responsible for declaring any Pipe it's given). Like
-// NewMiddleware/NewGuard/NewInterceptor/NewHttpException, New here is not
-// generic, so Go allows aliasing the plain func directly via var -- no
-// wrapper function is needed (root package is the only public door since
-// Go blocks external import of internal/*, per AD-004 in STATE.md). See
-// internal/pipe.New's doc comment for the full contract.
-var NewPipe = pipe.New
-
-// ---------------------------------------------------------------------------
 // Exceptions (HttpException Core feature)
 // ---------------------------------------------------------------------------
 
@@ -216,7 +179,7 @@ type HttpException = exception.HttpException
 // NewHttpException builds an HttpException from its four parts, returning a
 // VALUE (not a pointer) for embedding into a struct literal, e.g.
 // `HttpException: gonest.NewHttpException(status, name, message, details)`.
-// Unlike NewApp/MustParam elsewhere in this package, NewHttpException is not
+// Unlike NewApp elsewhere in this package, NewHttpException is not
 // generic, so Go allows aliasing the plain func directly via var -- no
 // wrapper function is needed. See internal/exception.NewHttpException's doc
 // comment for the full contract.
@@ -411,7 +374,7 @@ type StringMetadata = metadata.StringMetadata
 // own pointer address within a zero value of T (INSIGHT.md's
 // `m.Property(&t.Id)` call shape) -- no struct tags required. Go cannot
 // re-export a generic function via var, so this is a real wrapper calling
-// the internal one (same pattern as MustInject/NewApp/MustParam, see AD-004
+// the internal one (same pattern as MustInject/NewApp, see AD-004
 // in STATE.md; see also AD-009 in STATE.md for why this section lives in
 // this consolidated file rather than a separate metadata.go).
 //
@@ -502,10 +465,9 @@ type ObjectMetadata = metadata.ObjectMetadata
 // nested-object constraint is violated, and panics with a plain string if T
 // was never registered via NewMetadata[T]. Go cannot re-export a generic
 // function via var, so this is a real wrapper calling the internal one
-// (same pattern as MustInject/NewApp/MustParam, see AD-004 in STATE.md).
-// Like MustParam, ctx is *execution.Context directly -- no root Context
-// alias exists yet (a pre-existing gap from an earlier feature, same one
-// MustParam's own doc comment does not paper over).
+// (same pattern as MustInject/NewApp, see AD-004 in STATE.md). ctx is
+// *execution.Context directly -- no root Context alias exists yet (a
+// pre-existing gap from an earlier feature).
 func MustJsonBody[T any](ctx *execution.Context) T {
 	return validate.MustJsonBody[T](ctx)
 }

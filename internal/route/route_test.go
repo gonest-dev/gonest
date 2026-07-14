@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/pipe"
 )
 
 // fakeResponder is a minimal test-only execution.Responder, mirroring the one
@@ -27,7 +26,7 @@ func (f *fakeResponder) Body() []byte                      { return nil }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
 
 // TestNew_RunsFnImmediately proves route.New(method, path, fn) runs fn
-// synchronously at call time -- unlike Provider/Module/Controller/Pipe,
+// synchronously at call time -- unlike Provider/Module/Controller,
 // which all defer fn until a later bootstrap stage (see design.md's
 // rationale: by the time Controller.Route(...) invokes route.New, it is
 // already executing inside the Controller's own already-deferred fn during
@@ -88,73 +87,11 @@ func TestHandler_StoresFn(t *testing.T) {
 	}
 }
 
-// TestParam_RegistersCustomPipe proves Route.Param(name, pipe) registers a
-// custom Pipe for that param name, retrievable via PipeFor.
-func TestParam_RegistersCustomPipe(t *testing.T) {
-	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *execution.Context, raw string) int {
-			return 99
-		})
-	})
-	p.Declare()
-
-	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Param("id", p)
-	})
-
-	got, ok := r.PipeFor("id")
-	if !ok {
-		t.Fatal("expected PipeFor(\"id\") to report ok=true after Param registered a custom Pipe")
-	}
-	if got != p {
-		t.Fatal("expected PipeFor(\"id\") to return the exact *pipe.Pipe registered via Param")
-	}
-}
-
-// TestParam_DeclaresPipeWithoutManualDeclareCall proves Route.Param itself
-// runs the Pipe's deferred Handler registration -- a caller does NOT need
-// to call p.Declare() manually before registering it, unlike
-// TestParam_RegistersCustomPipe above (which calls Declare explicitly,
-// masking what would otherwise be a bug: nothing in the DI bootstrap
-// declares Route-attached Pipes, since Route/Pipe aren't tracked by any
-// Module -- see the doc comment on Route.Param).
-func TestParam_DeclaresPipeWithoutManualDeclareCall(t *testing.T) {
-	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *execution.Context, raw string) int {
-			return 99
-		})
-	})
-	// deliberately NOT calling p.Declare() here
-
-	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Param("id", p)
-	})
-
-	got, ok := r.PipeFor("id")
-	if !ok {
-		t.Fatal("expected PipeFor(\"id\") to report ok=true")
-	}
-	if !got.HandlerFunc().IsValid() {
-		t.Fatal("expected Route.Param to have declared the Pipe, so HandlerFunc() is a valid, callable reflect.Value -- got an invalid (zero) Value, meaning Handler was never registered")
-	}
-}
-
-// TestParam_UnregisteredNameReportsNotOk proves PipeFor reports ok=false for
-// a param name that never had a custom Pipe registered via Route.Param.
-func TestParam_UnregisteredNameReportsNotOk(t *testing.T) {
-	r := New(HttpGet, "/users/:id", func(r *Route) {})
-
-	_, ok := r.PipeFor("id")
-	if ok {
-		t.Fatal("expected PipeFor(\"id\") to report ok=false when no custom Pipe was registered")
-	}
-}
-
 // TestHasParam_TrueForDeclaredPathSegment proves HasParam checks the
 // Route's own declared path pattern for a ":name" segment -- this is the
-// existence-check mechanism MustParam[T] (root param.go) relies on to
-// distinguish "genuinely absent from this route" from "present but empty
-// string" (the T4-documented ambiguity in defaultCoerce for T=string).
+// existence-check mechanism MustParams[T]/MustQuery[T] (internal/validate)
+// rely on to distinguish "genuinely absent from this route" from "present
+// but empty string".
 func TestHasParam_TrueForDeclaredPathSegment(t *testing.T) {
 	r := New(HttpGet, "/users/:id/orders/:orderId", func(r *Route) {})
 

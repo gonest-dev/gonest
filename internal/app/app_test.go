@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/gonest-dev/gonest/internal/adapter/fiber"
 	"github.com/gonest-dev/gonest/internal/controller"
@@ -19,11 +21,13 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/scope"
+	"github.com/gonest-dev/gonest/internal/validate"
 )
 
 // UserProperties/UserEntity/UserService/UserProvider/UserModule/AppModule
@@ -88,6 +92,46 @@ func (t *UserService) Delete(userID int64) *UserEntity {
 	}
 	return nil
 }
+
+// userIDParams/nameParams/userIDNameParams are the struct-based path-param
+// shapes TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond validates
+// via validate.MustParams[T] (param-query-validation's T3 replaced the old
+// singular route.MustParam[T](ctx, name) with this whole-object mechanism,
+// even for a route with a single path param -- context.md's Decision 2).
+type userIDParams struct {
+	UserID int64 `param:"user_id"`
+}
+
+var userIDParamsMetadata = func() *metadata.Metadata {
+	f := &userIDParams{}
+	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m.Property(&f.UserID).Integer().Required()
+	return m
+}()
+
+type nameParams struct {
+	Name string `param:"name"`
+}
+
+var nameParamsMetadata = func() *metadata.Metadata {
+	f := &nameParams{}
+	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m.Property(&f.Name).String().Required()
+	return m
+}()
+
+type userIDNameParams struct {
+	UserID int64  `param:"user_id"`
+	Name   string `param:"name"`
+}
+
+var userIDNameParamsMetadata = func() *metadata.Metadata {
+	f := &userIDNameParams{}
+	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m.Property(&f.UserID).Integer().Required()
+	m.Property(&f.Name).String().Required()
+	return m
+}()
 
 var UserProvider = provider.New(func(p *provider.Provider) {
 	p.Scope(scope.Singleton)
@@ -531,9 +575,10 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 // Create/Update -- since there is no body-parsing primitive available
 // today -- accepts the "name" via a route param instead of a JSON body.
 // This still exercises a real POST/PUT round-trip through app.Test: the
-// route dispatches, MustParam converts params, and the response shape/
-// status match INSIGHT.md's intent (200 for List/Get/Update/Delete, 201
-// for Create).
+// route dispatches, validate.MustParams[T] converts params (param-query-
+// validation's T3 replaced the old singular MustParam[T](ctx,name) with
+// this whole-object mechanism), and the response shape/status match
+// INSIGHT.md's intent (200 for List/Get/Update/Delete, 201 for Create).
 func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
@@ -559,8 +604,8 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				userID := route.MustParam[int64](ctx, "user_id")
-				u := userService.Get(userID)
+				p := validate.MustParams[*userIDParams](ctx)
+				u := userService.Get(p.UserID)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
 					return
@@ -577,8 +622,8 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
 			r.HttpCode(201)
 			r.Handler(func(ctx *execution.Context) {
-				name := route.MustParam[string](ctx, "name")
-				ctx.Status(r.Code()).Json(userService.Create(name))
+				p := validate.MustParams[*nameParams](ctx)
+				ctx.Status(r.Code()).Json(userService.Create(p.Name))
 			})
 		})
 
@@ -588,9 +633,8 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpPut, "/:user_id/:name", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				userID := route.MustParam[int64](ctx, "user_id")
-				name := route.MustParam[string](ctx, "name")
-				u := userService.Update(userID, name)
+				p := validate.MustParams[*userIDNameParams](ctx)
+				u := userService.Update(p.UserID, p.Name)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
 					return
@@ -603,8 +647,8 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpDelete, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				userID := route.MustParam[int64](ctx, "user_id")
-				u := userService.Delete(userID)
+				p := validate.MustParams[*userIDParams](ctx)
+				u := userService.Delete(p.UserID)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
 					return
@@ -686,7 +730,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		}
 	}
 
-	// 3. Get -- GET /user/:user_id (MustParam[int64] round-trip)
+	// 3. Get -- GET /user/:user_id (MustParams[*userIDParams] round-trip)
 	{
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%d", created.ID), nil)
 		resp, err := fa.Test(req)
@@ -721,7 +765,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		}
 	}
 
-	// 4. Update -- PUT /user/:user_id/:name (MustParam[int64] round-trip)
+	// 4. Update -- PUT /user/:user_id/:name (MustParams[*userIDNameParams] round-trip)
 	{
 		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/user/%d/Grace", created.ID), nil)
 		resp, err := fa.Test(req)
@@ -743,7 +787,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		}
 	}
 
-	// 5. Delete -- DELETE /user/:user_id (MustParam[int64] round-trip)
+	// 5. Delete -- DELETE /user/:user_id (MustParams[*userIDParams] round-trip)
 	{
 		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%d", created.ID), nil)
 		resp, err := fa.Test(req)
@@ -1000,7 +1044,7 @@ func TestMustListen_NilOnListen_BlocksWithoutPanicOrCall(t *testing.T) {
 // TestMustListen_ListenError_PanicsWithAddrAndError proves MustListen
 // panics, with a message containing both addr and the underlying error's
 // text, when adapter.Listen returns an error -- the "Must"-prefixed
-// panic-on-error convention shared with MustNewApp/MustInject/MustParam.
+// panic-on-error convention shared with MustNewApp/MustInject/MustParams.
 func TestMustListen_ListenError_PanicsWithAddrAndError(t *testing.T) {
 	wantErr := errors.New("address already in use")
 	spy := &listenSpyAdapter{err: wantErr}
@@ -1112,8 +1156,8 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				userID := route.MustParam[int64](ctx, "user_id")
-				u := userService.Get(userID)
+				p := validate.MustParams[*userIDParams](ctx)
+				u := userService.Get(p.UserID)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
 					return
@@ -1133,8 +1177,8 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
 			r.HttpCode(201)
 			r.Handler(func(ctx *execution.Context) {
-				name := route.MustParam[string](ctx, "name")
-				ctx.Status(r.Code()).Json(userService.Create(name))
+				p := validate.MustParams[*nameParams](ctx)
+				ctx.Status(r.Code()).Json(userService.Create(p.Name))
 			})
 		})
 	})

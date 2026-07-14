@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -14,8 +13,8 @@ import (
 	"github.com/gonest-dev/gonest/internal/adapter/fiber"
 	"github.com/gonest-dev/gonest/internal/execution"
 	interceptorpkg "github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/pipe"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/validate"
 	"github.com/google/uuid"
 )
 
@@ -161,9 +160,98 @@ func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Route params
 // ---------------------------------------------------------------------------
+//
+// The old singular gonest.MustParam[T](ctx, name) (and the whole Pipe
+// mechanism it could fall back to) is REMOVED per param-query-validation's
+// T3 (context.md's Decisions 2/3) -- every path param access is now
+// struct-based via validate.MustParams[T] (gonest.go itself doesn't
+// re-export MustParams/MustQuery yet, that's T4; these tests reach the real
+// implementation via internal/validate directly, same as internal/route's
+// own tests do for HasParam). The Pipe-specific custom-transform coverage
+// (TestMustParam_WithCustomPipe_.../TestMustParam_PanicsWhenCustomPipeHandlerPanics/
+// TestNewPipe_RootAlias_TypeCheck/TestParseIntPipe_RootAlias_InsightCallShape)
+// is intentionally NOT ported here -- that capability now lives in
+// PropertyBuilder.Custom(fn) (context.md's Decision 4), already covered by
+// internal/validate/params_test.go's TestMustParams_CustomFunc_ReceivesRawString_NotCoerced
+// and TestMustParams_RealHTTPDispatch_CustomFunc (unit + real HTTP dispatch,
+// same intent this file's Pipe tests proved for the old mechanism).
+
+// idParams mirrors INSIGHT.md's settled MustParams[*UserIdParams] shape: a
+// single required path param.
+type idParams struct {
+	ID int `param:"id"`
+}
+
+var idParamsMetadata = NewMetadata[idParams](func(t *idParams, m *Metadata) {
+	m.Property(&t.ID).Integer().Required()
+})
+
+// TestMustParams_RootPackage_HappyPath proves the replacement for the old
+// TestMustParam_WithoutCustomPipe_UsesDefaultCoerce: a route param, present
+// and valid, populates T via MustParams[T] without panic.
+func TestMustParams_RootPackage_HappyPath(t *testing.T) {
+
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+
+	res := newParamFakeResponder()
+	res.params["id"] = "42"
+	ctx := execution.New(res).WithRoute(r)
+
+	got := validate.MustParams[*idParams](ctx)
+	if got.ID != 42 {
+		t.Fatalf("MustParams[*idParams](ctx).ID = %d, want %d", got.ID, 42)
+	}
+}
+
+// TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute proves the
+// replacement for the old TestMustParam_PanicsWhenParamNotDeclaredOnRoute:
+// a required param absent from the route's own declared path (HasParam
+// false) is collected as a violation and panics *BadRequestException.
+func TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) {
+
+	r := route.New(route.HttpGet, "/users", func(r *route.Route) {})
+
+	res := newParamFakeResponder()
+	ctx := execution.New(res).WithRoute(r)
+
+	defer func() {
+		rec := recover()
+		exc, ok := rec.(*BadRequestException)
+		if !ok {
+			t.Fatalf("expected panic *BadRequestException, got %T: %v", rec, rec)
+		}
+		if exc.Status() != http.StatusBadRequest {
+			t.Fatalf("Status() = %d, want %d", exc.Status(), http.StatusBadRequest)
+		}
+	}()
+
+	validate.MustParams[*idParams](ctx)
+}
+
+// TestMustParams_RootPackage_PanicsOnConversionFailure proves the
+// replacement for the old TestMustParam_PanicsOnConversionFailure_DefaultCoerce:
+// a param present but failing to coerce to the field's declared kind
+// (integer) is collected as a violation and panics *BadRequestException.
+func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
+
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+
+	res := newParamFakeResponder()
+	res.params["id"] = "not-a-number"
+	ctx := execution.New(res).WithRoute(r)
+
+	defer func() {
+		rec := recover()
+		if _, ok := rec.(*BadRequestException); !ok {
+			t.Fatalf("expected panic *BadRequestException, got %T: %v", rec, rec)
+		}
+	}()
+
+	validate.MustParams[*idParams](ctx)
+}
 
 // paramFakeResponder is a minimal test-only execution.Responder for exercising
-// MustParam[T] end to end (Context -> Route -> Pipe/defaultCoerce).
+// MustParams[T] end to end (Context -> Route -> validate.MustParams).
 type paramFakeResponder struct {
 	params map[string]string
 }
@@ -180,224 +268,23 @@ func (f *paramFakeResponder) GetParam(name string) string       { return f.param
 func (f *paramFakeResponder) Body() []byte                      { return nil }
 func (f *paramFakeResponder) Queries() map[string]string        { return nil }
 
-// TestMustParam_WithoutCustomPipe_UsesDefaultCoerce proves that when a
-// Route has no custom Pipe registered for a param name, MustParam[T] falls
-// back to the default reflect+strconv coercion.
-func TestMustParam_WithoutCustomPipe_UsesDefaultCoerce(t *testing.T) {
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+// TestMustParams_RootPackage_RealHTTPDispatch proves the replacement for the
+// old TestParseIntPipe_RootAlias_InsightCallShape: a route param round-trips
+// through a REAL app.Test HTTP dispatch, covering both the valid-int and
+// invalid-int paths, now via validate.MustParams[*idParams] instead of
+// MustParam[int64] + a custom Pipe.
+func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 
-	res := newParamFakeResponder()
-	res.params["id"] = "42"
-	ctx := execution.New(res).WithRoute(r)
-
-	got := MustParam[int](ctx, "id")
-	if got != 42 {
-		t.Fatalf("MustParam[int](ctx, \"id\") = %d, want %d", got, 42)
-	}
-}
-
-// TestMustParam_WithCustomPipe_UsesCustomPipeInsteadOfDefault proves that
-// when the current Route has a custom Pipe registered for a param name (via
-// Route.Param), MustParam[T] runs that Pipe's Handler instead of
-// defaultCoerce.
-func TestMustParam_WithCustomPipe_UsesCustomPipeInsteadOfDefault(t *testing.T) {
-	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *execution.Context, raw string) int {
-			// Deliberately does NOT match defaultCoerce's behavior (would
-			// return 42 for raw "42") -- proves the custom Pipe ran, not
-			// the default coercion.
-			return 999
-		})
-	})
-	p.Declare()
-
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {
-		r.Param("id", p)
-	})
-
-	res := newParamFakeResponder()
-	res.params["id"] = "42"
-	ctx := execution.New(res).WithRoute(r)
-
-	got := MustParam[int](ctx, "id")
-	if got != 999 {
-		t.Fatalf("MustParam[int](ctx, \"id\") = %d, want %d (from custom Pipe)", got, 999)
-	}
-}
-
-// TestMustParam_PanicsWhenParamNotDeclaredOnRoute proves MustParam[T] panics
-// with the distinct "no param named" message when the current Route's
-// declared path doesn't have a ":name" segment for the requested name.
-func TestMustParam_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) {
-	r := route.New(route.HttpGet, "/users", func(r *route.Route) {})
-
-	res := newParamFakeResponder()
-	ctx := execution.New(res).WithRoute(r)
-
-	defer func() {
-		rec := recover()
-		if rec == nil {
-			t.Fatal("expected MustParam to panic for a param not declared on the route, got no panic")
-		}
-		msg, ok := rec.(string)
-		if !ok {
-			t.Fatalf("expected panic value to be a string, got %T: %v", rec, rec)
-		}
-		want := `gonest: no param named "id" on this route`
-		if msg != want {
-			t.Fatalf("panic message = %q, want %q", msg, want)
-		}
-	}()
-
-	MustParam[int](ctx, "id")
-}
-
-// TestMustParam_PanicsOnConversionFailure_DefaultCoerce proves MustParam[T]
-// panics with the distinct "could not be converted" message when the raw
-// value exists but fails to convert to T via defaultCoerce.
-func TestMustParam_PanicsOnConversionFailure_DefaultCoerce(t *testing.T) {
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
-
-	res := newParamFakeResponder()
-	res.params["id"] = "not-a-number"
-	ctx := execution.New(res).WithRoute(r)
-
-	defer func() {
-		rec := recover()
-		if rec == nil {
-			t.Fatal("expected MustParam to panic on conversion failure, got no panic")
-		}
-		msg, ok := rec.(string)
-		if !ok {
-			t.Fatalf("expected panic value to be a string, got %T: %v", rec, rec)
-		}
-		if !stringsContains(msg, `gonest: param "id" could not be converted to int`) {
-			t.Fatalf("panic message = %q, want prefix %q", msg, `gonest: param "id" could not be converted to int`)
-		}
-	}()
-
-	MustParam[int](ctx, "id")
-}
-
-// TestMustParam_PanicsWhenCustomPipeHandlerPanics proves that if the custom
-// Pipe's Handler itself panics, MustParam lets that panic propagate as-is
-// (pass-through, not caught/rewrapped).
-func TestMustParam_PanicsWhenCustomPipeHandlerPanics(t *testing.T) {
-	p := pipe.New(func(p *pipe.Pipe) {
-		p.Handler(func(ctx *execution.Context, raw string) int {
-			panic("custom pipe exploded")
-		})
-	})
-	p.Declare()
-
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {
-		r.Param("id", p)
-	})
-
-	res := newParamFakeResponder()
-	res.params["id"] = "42"
-	ctx := execution.New(res).WithRoute(r)
-
-	defer func() {
-		rec := recover()
-		if rec == nil {
-			t.Fatal("expected the custom Pipe's panic to propagate, got no panic")
-		}
-		msg, ok := rec.(string)
-		if !ok || msg != "custom pipe exploded" {
-			t.Fatalf("expected panic value %q to pass through unchanged, got %v", "custom pipe exploded", rec)
-		}
-	}()
-
-	MustParam[int](ctx, "id")
-}
-
-// TestMustParam_WithoutAttachedRoute_UsesDefaultCoerce proves MustParam[T]
-// works even when Context has no attached Route (Route() returns nil) --
-// falls back straight to defaultCoerce.
-func TestMustParam_WithoutAttachedRoute_UsesDefaultCoerce(t *testing.T) {
-	res := newParamFakeResponder()
-	res.params["id"] = "7"
-	ctx := execution.New(res)
-
-	got := MustParam[int](ctx, "id")
-	if got != 7 {
-		t.Fatalf("MustParam[int](ctx, \"id\") = %d, want %d", got, 7)
-	}
-}
-
-func stringsContains(s, substr string) bool {
-	return len(s) >= len(substr) && (func() bool {
-		for i := 0; i+len(substr) <= len(s); i++ {
-			if s[i:i+len(substr)] == substr {
-				return true
-			}
-		}
-		return false
-	})()
-}
-
-// TestNewPipe_RootAlias_TypeCheck proves NewPipe/Pipe resolve and
-// type-check at the root gonest package: NewPipe builds a *Pipe, Handler
-// accepts a valid func(ctx, raw string) T signature (validated via
-// reflect), and route.Route.Param genuinely declares it (running the
-// deferred fn) without the caller needing to call Declare manually.
-func TestNewPipe_RootAlias_TypeCheck(t *testing.T) {
-	p := NewPipe(func(p *Pipe) {
-		p.Handler(func(ctx *execution.Context, raw string) int {
-			return 0
-		})
-	})
-	if p == nil {
-		t.Fatal("NewPipe() returned nil *Pipe")
-	}
-
-	r := route.New(route.HttpGet, "/x/:n", func(r *route.Route) {
-		r.Param("n", p)
-	})
-
-	got, ok := r.PipeFor("n")
-	if !ok {
-		t.Fatal("expected PipeFor(\"n\") to report ok=true")
-	}
-	if !got.HandlerFunc().IsValid() {
-		t.Fatal("expected Route.Param to have declared the Pipe (HandlerFunc() valid) without a manual Declare() call")
-	}
-}
-
-// ParseIntPipe reproduces INSIGHT.md's own ParseIntPipe example verbatim
-// through the root gonest package's Pipe/NewPipe aliases: parses raw into
-// an int64, panicking a BadRequestException with the invalid raw value as
-// Details on failure.
-var ParseIntPipe = NewPipe(func(pipe *Pipe) {
-	pipe.Handler(func(ctx *execution.Context, raw string) int64 {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			panic(NewBadRequestException(map[string]any{"raw": raw}))
-		}
-		return value
-	})
-})
-
-// TestParseIntPipe_RootAlias_InsightCallShape proves INSIGHT.md's
-// ParseIntPipe example compiles and works end-to-end through the root
-// gonest package's Pipe/NewPipe aliases, attached via
-// route.Param("id", ParseIntPipe) through the root Controller/Module/
-// NewApp aliases, dispatched via REAL app.Test requests covering both the
-// valid-int and invalid-int paths (proving MustParam[T] genuinely reaches
-// the custom Pipe's Handler through the whole real HTTP dispatch chain,
-// not just at construction time).
-func TestParseIntPipe_RootAlias_InsightCallShape(t *testing.T) {
-	var gotID int64
+	var gotID int
 	handlerRan := false
 
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
-			r.Param("id", ParseIntPipe)
 			r.Handler(func(ctx *execution.Context) {
-				gotID = MustParam[int64](ctx, "id")
+				p := validate.MustParams[*idParams](ctx)
+				gotID = p.ID
 				handlerRan = true
-				ctx.Json(map[string]int64{"id": gotID})
+				ctx.Json(map[string]int{"id": gotID})
 			})
 		})
 	})
@@ -419,7 +306,7 @@ func TestParseIntPipe_RootAlias_InsightCallShape(t *testing.T) {
 		_ = fiberAdapter.FiberApp().Shutdown()
 	})
 
-	t.Run("valid int -> 200, MustParam decodes via ParseIntPipe", func(t *testing.T) {
+	t.Run("valid int -> 200, MustParams decodes", func(t *testing.T) {
 		handlerRan = false
 		req := httptest.NewRequest(http.MethodGet, "/items/42", nil)
 		resp, err := fiberAdapter.FiberApp().Test(req)
