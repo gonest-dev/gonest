@@ -1847,3 +1847,177 @@ func TestArrayMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		t.Fatalf("Addresses: DescriptionText() = %q, want %q", addresses.DescriptionText(), "Endereços do usuário")
 	}
 }
+
+// TestObjectMetadata_RootAlias_TypeCheck proves gonest.ObjectMetadata
+// resolves and type-checks at the root gonest package: PropertyBuilder.
+// Object() returns a *ObjectMetadata, Object(fn) hands the same
+// *ObjectMetadata into the callback (pointer identity), and
+// Required/Nullable/Description/Examples called INSIDE the callback vs.
+// chained OUTSIDE it (on Object(fn)'s own return value) mutate the exact
+// same *PropertyBuilder either way -- all reachable purely through root
+// aliases, no internal/metadata import.
+func TestObjectMetadata_RootAlias_TypeCheck(t *testing.T) {
+	type entity struct {
+		Inside  map[string]any
+		Outside map[string]any
+	}
+
+	var insideIdentity *ObjectMetadata
+	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+		om := m.Property(&t.Inside).Object(func(m *ObjectMetadata) {
+			insideIdentity = m
+			m.AdditionalProperties()
+			m.Required()
+			m.Description("Inside")
+			m.Examples("a", "b")
+		})
+		var _ *ObjectMetadata = om
+
+		m.Property(&t.Outside).Object(func(m *ObjectMetadata) {
+			m.AdditionalProperties()
+		}).Required().Description("Outside").Examples("c", "d")
+	})
+	if m == nil {
+		t.Fatal("NewMetadata() returned nil *Metadata")
+	}
+	if insideIdentity == nil {
+		t.Fatal("Object(fn) callback never invoked")
+	}
+	if !insideIdentity.IsAdditionalProperties() {
+		t.Fatal("insideIdentity.IsAdditionalProperties() = false, want true")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 2 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 2", len(props))
+	}
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range props {
+		byName[p.Field().Name] = p
+	}
+
+	inside, ok := byName["Inside"]
+	if !ok {
+		t.Fatal("Inside was not registered via Property")
+	}
+	outside, ok := byName["Outside"]
+	if !ok {
+		t.Fatal("Outside was not registered via Property")
+	}
+
+	// Both fields must produce IDENTICAL results regardless of whether
+	// Required/Description/Examples were called inside the callback or
+	// chained outside it -- proving there is no dual-scope distinction
+	// the way there is for ArrayMetadata.
+	for name, p := range map[string]*PropertyBuilder{"Inside": inside, "Outside": outside} {
+		if p.FormatValue() != "object" {
+			t.Fatalf("%s: FormatValue() = %q, want %q", name, p.FormatValue(), "object")
+		}
+		if !p.IsRequired() {
+			t.Fatalf("%s: IsRequired() = false, want true", name)
+		}
+	}
+	if inside.DescriptionText() != "Inside" {
+		t.Fatalf("Inside: DescriptionText() = %q, want %q", inside.DescriptionText(), "Inside")
+	}
+	if outside.DescriptionText() != "Outside" {
+		t.Fatalf("Outside: DescriptionText() = %q, want %q", outside.DescriptionText(), "Outside")
+	}
+	insideExamples := inside.ExamplesList()
+	if len(insideExamples) != 2 || insideExamples[0] != "a" || insideExamples[1] != "b" {
+		t.Fatalf("Inside: ExamplesList() = %v, want [a b]", insideExamples)
+	}
+	outsideExamples := outside.ExamplesList()
+	if len(outsideExamples) != 2 || outsideExamples[0] != "c" || outsideExamples[1] != "d" {
+		t.Fatalf("Outside: ExamplesList() = %v, want [c d]", outsideExamples)
+	}
+}
+
+// TestObjectMetadata_RootAlias_UserEntityInsightCallShape reproduces
+// INSIGHT.md's UserEntity.Address/Metadata example (lines ~488-499,
+// "exemplo de Array e Object aninhados") verbatim through the root gonest
+// package's NewMetadata/Metadata/PropertyBuilder/ObjectMetadata aliases --
+// confirms both object shapes (a $ref-like reuse of an already-registered
+// gonest.NewMetadata[AddressEntity] via om.Metadata(ref), and a free-form
+// open schema via om.AdditionalProperties() with Nullable/Description
+// chained outside the callback) resolve and behave correctly at the root
+// package, no internal/metadata import required.
+func TestObjectMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+	type AddressEntity struct {
+		Street string `json:"street"`
+		City   string `json:"city"`
+		Zip    string `json:"zip"`
+	}
+
+	type UserEntity struct {
+		Id       int64          `json:"id"`
+		Address  AddressEntity  `json:"address"`
+		Metadata map[string]any `json:"metadata"`
+	}
+
+	addressMetadata := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+		m.Description("Endereço")
+		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+	})
+
+	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Description("Entidade de usuário com campos aninhados")
+		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+
+		// Object() direto (não-array) -- mesma reutilização via valor, sem reflect.
+		m.Property(&t.Address).Object(func(om *ObjectMetadata) {
+			om.Metadata(addressMetadata)
+			om.Required()
+			om.Description("Endereço principal")
+		})
+
+		// Object() livre (schema aberto, tipo map[string]any) -- sem struct Go aninhada
+		// pra reusar, por isso recebe callback em vez de metadata já registrada.
+		m.Property(&t.Metadata).Object(func(om *ObjectMetadata) {
+			om.AdditionalProperties()
+		}).Nullable().Description("Metadados abertos do usuário")
+	})
+
+	props := m.OwnProperties()
+	if len(props) != 3 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 3", len(props))
+	}
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range props {
+		byName[p.Field().Name] = p
+	}
+
+	// Address: object referencing addressMetadata via Metadata(ref), same
+	// pointer identity preserved, Required/Description set inside the callback.
+	address, ok := byName["Address"]
+	if !ok {
+		t.Fatal("Address was not registered via Property")
+	}
+	if address.FormatValue() != "object" {
+		t.Fatalf("Address: FormatValue() = %q, want %q", address.FormatValue(), "object")
+	}
+	if !address.IsRequired() {
+		t.Fatal("Address: IsRequired() = false, want true")
+	}
+	if address.DescriptionText() != "Endereço principal" {
+		t.Fatalf("Address: DescriptionText() = %q, want %q", address.DescriptionText(), "Endereço principal")
+	}
+
+	// Metadata: free-form object via AdditionalProperties() inside the
+	// callback, Nullable/Description chained OUTSIDE on Object(fn)'s return.
+	meta, ok := byName["Metadata"]
+	if !ok {
+		t.Fatal("Metadata was not registered via Property")
+	}
+	if meta.FormatValue() != "object" {
+		t.Fatalf("Metadata: FormatValue() = %q, want %q", meta.FormatValue(), "object")
+	}
+	if !meta.IsNullable() {
+		t.Fatal("Metadata: IsNullable() = false, want true")
+	}
+	if meta.DescriptionText() != "Metadados abertos do usuário" {
+		t.Fatalf("Metadata: DescriptionText() = %q, want %q", meta.DescriptionText(), "Metadados abertos do usuário")
+	}
+}

@@ -467,3 +467,24 @@ type NumericMetadata = metadata.NumericMetadata
 // contract (AD-009 in STATE.md: this section lives in this consolidated
 // file rather than a separate metadata.go).
 type ArrayMetadata = metadata.ArrayMetadata
+
+// ---------------------------------------------------------------------------
+// ObjectMetadata (Object Builder feature)
+// ---------------------------------------------------------------------------
+
+// ObjectMetadata is the branch-specific builder returned by
+// PropertyBuilder.Object (Object Builder feature). Unlike ArrayMetadata
+// above, it is a SINGLE-STATE builder: it embeds the field's own
+// *PropertyBuilder directly (the same shared object already held in
+// Metadata.properties[offset]), with no synthetic secondary builder --
+// the field itself IS the nested object (e.g. `Address AddressEntity`), so
+// there is no separate "element" to describe the way an array's items are.
+// It is a true Go type alias, so its own methods (Metadata/MetadataRef/
+// AdditionalProperties/IsAdditionalProperties) plus the manually
+// re-declared chain methods (Required/Nullable/Description/Examples) are
+// automatically visible on gonest.ObjectMetadata with zero extra wrapper
+// code, same as gonest.ArrayMetadata/gonest.NumericMetadata above. See
+// internal/metadata.ObjectMetadata's doc comment for the full single-state
+// contract (AD-009 in STATE.md: this section lives in this consolidated
+// file rather than a separate metadata.go).
+type ObjectMetadata = metadata.ObjectMetadata
