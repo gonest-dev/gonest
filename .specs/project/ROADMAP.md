@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Runtime Validation (Milestone 6)
-**Status:** Milestones 1-5 COMPLETE — starting Milestone 6
+**Current Milestone:** OpenAPI Generation (Milestone 7)
+**Status:** Milestones 1-6 COMPLETE — starting Milestone 7
 
 ---
 
@@ -70,9 +70,10 @@
 - `NewInterceptor`, `Handler(ctx, next)` (`internal/interceptor`, re-exportado na raiz) — mesmo padrão AD-008 (sem MustInject, execução imediata), tipo `Next` próprio (não reusa `middleware.Next`)
 - `Controller.Interceptors()` (real, era stub) — envolve o Handler puro com before/after; Guard fica MAIS EXTERNO que Interceptor na composição (ordem Middleware → Guard → Interceptor → Handler, corrigida durante revisão — ver L-011 em STATE.md)
 
-**Pipe** - COMPLETE
+**Pipe** - ~~COMPLETE~~ REMOVIDO (2026-07-14, ver "Param/Query Validation" em Milestone 6 / AD-013 em STATE.md)
 - `NewPipe`, transforma/valida param antes do handler, panic `BadRequestException` se inválido — implementação já existia desde "Controller & Route Registration" T3 (`internal/pipe`), só faltava re-export raiz
 - Corrigidos 2 bugs reais de integração achados ao adicionar o primeiro teste end-to-end via dispatch real: `Route.Param` não chamava `Pipe.Declare()`, e `ctx.WithRoute()` nunca era chamado em produção — Pipe customizado nunca funcionava fora de teste isolado. Ver L-012 em STATE.md.
+- **REMOVIDO por inteiro** (`internal/pipe`, `Route.Param`/`PipeFor`, `gonest.Pipe`/`NewPipe`) quando "Param/Query Validation" (Milestone 6) generalizou `MustParam[T](ctx,name)` avulso pra `MustParams[T]`/`MustQuery[T]` whole-object -- intenção original de Pipe (transform customizado) absorvida por `PropertyBuilder.Custom(fn)`, dentro da própria declaração de Metadata. Registro histórico mantido aqui (mesmo tratamento de rename anterior, AD-006) -- código de fato não existe mais no repo a partir do commit `db19cfc`.
 
 **Filter** - COMPLETE
 - `NewFilter`, `Catch(exemplar, handler)` (`internal/filter`, re-exportado na raiz, reflect-validado como Pipe) — execução imediata, sem MustInject (AD-008)
@@ -138,8 +139,10 @@
 - `MustJsonBody[T]` (`internal/validate`, re-exportado na raiz) valida contra `NewMetadata[T]` (via registro global auto-populado), panic `BadRequestException` com lista de `{field, message}` -- COLETA todas violações (não fail-fast), recursivo (Array valida item+quantidade, Object recursa via `ref`)
 - Prerequisito descoberto e resolvido nesta feature: storage de `Min`/`Max`/`Pattern`/`item`/`ref`/etc relocado dos wrappers descartáveis (`StringMetadata` etc) pro `PropertyBuilder` compartilhado, + campo `kind` novo (corrige colisão pré-existente `String()`/`Boolean()` ambos com `format==""`) -- ver AD-012 em STATE.md
 
-**Param/Query Validation** - PLANNED
-- `MustParam[T]` integra `Pipe` + coerção via metadata
+**Param/Query Validation** - COMPLETE
+- `MustParams[T]`/`MustQuery[T]` (`internal/validate`, re-exportados na raiz) -- whole-object, mesma forma de `MustJsonBody`, validam path/query params contra `NewMetadata[T]`, coletam todas violações
+- `PropertyBuilder.Custom(fn func(raw any) (any, error))` -- escape hatch de transform arbitrário, absorve a intenção original de `Pipe` (removido, ver acima)
+- `MustJsonBody` refatorado pra popular `T` via reflect campo-a-campo (mecanismo compartilhado com `MustParams`/`MustQuery`), não mais `json.Unmarshal` direto -- necessário pra `Custom(fn)` funcionar uniforme nos 3 pontos de entrada
 
 ---
 
