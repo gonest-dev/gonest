@@ -36,14 +36,18 @@ type kindAddressEntity struct {
 func newKindTestMetadata(t *testing.T) (*kindEntity, *metadata.Metadata) {
 	t.Helper()
 	zero := &kindEntity{}
-	m := metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { metadata.Deregister(typ) })
+	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
 func newKindAddressTestMetadata(t *testing.T) *metadata.Metadata {
 	t.Helper()
 	zero := &kindAddressEntity{}
-	return metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { metadata.Deregister(typ) })
+	return metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 }
 
 // TestPropertyBuilder_ReadsEveryBranchFamilyWithoutWrapperReference is P0's
@@ -239,7 +243,9 @@ func TestKindValue_EveryBranch(t *testing.T) {
 			// to m's own struct), so build a fresh single-field struct per
 			// case instead of reusing kindEntity's own fields.
 			zero := &struct{ V string }{}
-			fm := metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+			typ := reflect.TypeOf(*zero)
+			t.Cleanup(func() { metadata.Deregister(typ) })
+			fm := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 			var pb *metadata.PropertyBuilder
 			switch tt.name {
 			case "String":
@@ -321,7 +327,9 @@ func TestKindValue_ArrayItemBranches_MirrorPropertyBuilder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			zero := &struct{ V []string }{}
-			fm := metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+			typ := reflect.TypeOf(*zero)
+			t.Cleanup(func() { metadata.Deregister(typ) })
+			fm := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 			am := fm.Property(&zero.V).Array()
 			tt.set(am)
 			if got := am.ItemBuilder().KindValue(); got != tt.want {

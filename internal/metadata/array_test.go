@@ -31,7 +31,9 @@ type addressEntity struct {
 func newArrayTestMetadata(t *testing.T) (*arrayEntity, *metadata.Metadata) {
 	t.Helper()
 	zero := &arrayEntity{}
-	m := metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { metadata.Deregister(typ) })
+	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
@@ -41,7 +43,9 @@ func newArrayTestMetadata(t *testing.T) (*arrayEntity, *metadata.Metadata) {
 func newAddressTestMetadata(t *testing.T) *metadata.Metadata {
 	t.Helper()
 	zero := &addressEntity{}
-	return metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { metadata.Deregister(typ) })
+	return metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 }
 
 // TestArray_SetsFormatAndReturnsNewArrayMetadata proves AR-01: Array()

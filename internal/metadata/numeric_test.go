@@ -28,7 +28,9 @@ type numericBoolEntity struct {
 func newNumericTestMetadata(t *testing.T) (*numericBoolEntity, *metadata.Metadata) {
 	t.Helper()
 	zero := &numericBoolEntity{}
-	m := metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { metadata.Deregister(typ) })
+	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 

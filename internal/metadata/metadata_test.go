@@ -33,7 +33,9 @@ type userEntity struct {
 func newTestMetadata(t *testing.T) (*userEntity, *metadata.Metadata) {
 	t.Helper()
 	zero := &userEntity{}
-	m := metadata.New(reflect.TypeOf(*zero), uintptr(unsafe.Pointer(zero)))
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { metadata.Deregister(typ) })
+	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
