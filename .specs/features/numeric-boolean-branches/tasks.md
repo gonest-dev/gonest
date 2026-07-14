@@ -18,7 +18,7 @@ Sequencial.
 
 ## Task Breakdown
 
-### T1: `NumericMetadata` novo + 4 branches numéricos + `Boolean()`
+### T1: `NumericMetadata` novo + 4 branches numéricos + `Boolean()` ✅ DONE (evaluator: PASS, commit `45e5d22` — identidade de ponteiro do Boolean confirmada genuína, teste crítico de chain confirmado)
 
 **What**: estende `internal/metadata/metadata.go`'s `PropertyBuilder` (já existente) com:
 - `func (p *PropertyBuilder) Integer() *NumericMetadata` — `p.format = "int64"`
@@ -36,14 +36,14 @@ Cria arquivo NOVO `internal/metadata/numeric.go` (MESMO pacote):
 **Where**: `internal/metadata/metadata.go` (existente, estendido), `internal/metadata/numeric.go` (novo), `internal/metadata/numeric_test.go` (novo)
 
 **Done when**:
-- [ ] Cada um dos 4 branches numéricos devolve `*NumericMetadata` com `FormatValue()` correto (`"int64"`/`"int32"`/`"float"`/`"double"`), confirmado individualmente
-- [ ] `Min`/`Max` armazenam corretamente, cada um devolve o MESMO `*NumericMetadata` (chain continua)
-- [ ] `Required`/`Nullable`/`Description`/`Examples` chamados em `*NumericMetadata` mutam o `PropertyBuilder` compartilhado E continuam devolvendo `*NumericMetadata` — teste `.Required().Min(5)` numa chamada só (mesmo teste crítico já usado em `StringMetadata`, repetido aqui)
-- [ ] `Boolean()` devolve o MESMO `*PropertyBuilder` (não um tipo novo) — confirme via identidade de ponteiro (`got == p`), com `format == ""`, e que `Required()`/`Nullable()`/`Description()`/`Examples()` funcionam nele normalmente (já funcionam, são métodos do próprio `PropertyBuilder` — só confirme que não quebrou nada)
-- [ ] Chain completo reproduzindo INSIGHT.md: `m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))` e `m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)` — ambos funcionam ponta a ponta
-- [ ] Chamar `.Integer()` e depois `.Boolean()` (ou vice-versa) no MESMO `*PropertyBuilder` não panica — `format` reflete a última chamada (`""` se `Boolean()` foi por último)
-- [ ] Gate check passa
-- [ ] Test count: 12+ (4 branches numéricos individualmente + Min/Max chain + 4 comuns via NumericMetadata + Boolean sem wrapper + chain INSIGHT.md + cross-branch last-write-wins)
+- [x] Cada um dos 4 branches numéricos devolve `*NumericMetadata` com `FormatValue()` correto (`"int64"`/`"int32"`/`"float"`/`"double"`), confirmado individualmente
+- [x] `Min`/`Max` armazenam corretamente, cada um devolve o MESMO `*NumericMetadata` (chain continua)
+- [x] `Required`/`Nullable`/`Description`/`Examples` chamados em `*NumericMetadata` mutam o `PropertyBuilder` compartilhado E continuam devolvendo `*NumericMetadata` — teste `.Required().Min(5)` numa chamada só (mesmo teste crítico já usado em `StringMetadata`, repetido aqui)
+- [x] `Boolean()` devolve o MESMO `*PropertyBuilder` (não um tipo novo) — confirme via identidade de ponteiro (`got == p`), com `format == ""`, e que `Required()`/`Nullable()`/`Description()`/`Examples()` funcionam nele normalmente (já funcionam, são métodos do próprio `PropertyBuilder` — só confirme que não quebrou nada)
+- [x] Chain completo reproduzindo INSIGHT.md: `m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))` e `m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)` — ambos funcionam ponta a ponta
+- [x] Chamar `.Integer()` e depois `.Boolean()` (ou vice-versa) no MESMO `*PropertyBuilder` não panica — `format` reflete a última chamada (`""` se `Boolean()` foi por último)
+- [x] Gate check passa
+- [x] Test count: 12+ (4 branches numéricos individualmente + Min/Max chain + 4 comuns via NumericMetadata + Boolean sem wrapper + chain INSIGHT.md + cross-branch last-write-wins)
 
 **Tests**: unit
 **Gate**: quick
