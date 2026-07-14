@@ -798,3 +798,179 @@ prefixo, tipo `"usr_42"`), `PropertyBuilder.Custom(fn)` é a válvula de escape
 o valor CRU (string, no caso de param/query) e devolvendo o valor Go final ou
 um `error` que vira violation. Ver a seção "exemplo de Middleware, Guard,
 Interceptor e Filter" acima (`PrefixedUserIdParam`) pro exemplo completo.
+
+# exemplo de Schema Generation from Metadata
+
+Mapeamento NestJS `@nestjs/swagger` -> gonest (decorator -> builder method, já
+que Go não tem decorator):
+
+- `@ApiTags` -> `Controller.Tags(...)` (nível controller, herda pra toda rota)
+  / `Route.Tags(...)` (override por rota -- SUBSTITUI o valor do controller
+  por completo quando chamado, nunca soma, mesma prioridade "rota vence" do
+  Nest)
+- `@ApiOperation` -> `Route.Summary(s)` / `Route.Description(s)` /
+  `Route.OperationId(s)`
+- `@ApiBody` -> `Route.RequestBody(metadata)`
+- `@ApiResponse`/`@ApiOkResponse`/`@ApiCreatedResponse`/etc ->
+  `Route.Response(status, metadata ...*gonest.Metadata)` -- o `*Metadata` é
+  opcional (variádico): zero args documenta o status sem body, um arg
+  documenta com body. Chamar de novo pro MESMO status sobrescreve; pra status
+  DIFERENTES acumula.
+- `@ApiParam` -> `Route.PathParams(metadata)`
+- `@ApiQuery` -> `Route.QueryParams(metadata)`
+- `@ApiBearerAuth`/`@ApiBasicAuth` -> `Controller.BearerAuth()` (herda) /
+  `Route.BearerAuth()` (override, mesma prioridade "rota vence" de Tags)
+- `@ApiExcludeEndpoint` -> `Route.ExcludeFromDocs()`
+- `@ApiDeprecated` -> `Route.Deprecated()`
+- `@ApiProperty` -> já coberto, é `Property()`/`Description()`/`Examples()`/
+  `Required()` da própria `Metadata` (ver "exemplo para definição de
+  metadados em estruturas" acima)
+
+```go
+package ex
+
+import (
+  "github.com/gonest-dev/gonest"
+)
+
+type AddressEntity struct {
+  Street string `json:"street"`
+  City   string `json:"city"`
+  Zip    string `json:"zip"`
+}
+
+type UserEntity struct {
+  Id        int64           `json:"id"`
+  Name      string          `json:"name"`
+  Address   AddressEntity   `json:"address"`
+  Addresses []AddressEntity `json:"addresses"`
+}
+
+type UserIdParams struct {
+  UserId int64 `param:"user_id"`
+}
+
+var addressMetadata = gonest.NewMetadata[AddressEntity](func (t *AddressEntity, m *gonest.Metadata) {
+  m.Property(&t.Street).String().Required()
+  m.Property(&t.City).String().Required()
+  m.Property(&t.Zip).String().Required()
+})
+
+// Object(func(om *gonest.ObjectMetadata){ om.Metadata(ref) }) e
+// Array().Items(func(am *gonest.ArrayMetadata){ am.Object(ref) }) reusam a
+// MESMA addressMetadata declarada acima -- Schema Generation dedup automático
+// por identidade de ponteiro, não por nome (ver abaixo).
+var userEntityMetadata = gonest.NewMetadata[UserEntity](func (t *UserEntity, m *gonest.Metadata) {
+  m.Title("UserEntity") // nome do schema em components.schemas -- default é
+                         // o nome do tipo Go (reflect.Type.Name()), Title()
+                         // sobrescreve.
+  m.Property(&t.Id).Integer().Required()
+  m.Property(&t.Name).String().Required()
+  m.Property(&t.Address).Object(func (om *gonest.ObjectMetadata) {
+    om.Metadata(addressMetadata)
+  }).Required()
+  m.Property(&t.Addresses).Array().Items(func (am *gonest.ArrayMetadata) {
+    am.Object(addressMetadata)
+  })
+})
+
+var userIdParamsMetadata = gonest.NewMetadata[UserIdParams](func (t *UserIdParams, m *gonest.Metadata) {
+  m.Property(&t.UserId).Integer().Min(1).Required()
+})
+
+var UserController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/user")
+  controller.Tags("users")      // aplica em TODA rota deste controller
+  controller.BearerAuth()       // idem -- toda rota exige bearer, salvo override por rota
+  userService := gonest.MustInject[*UserService](controller)
+
+  controller.Route(gonest.HttpPost, "/", func (route *gonest.Route) {
+    // descritivos de documentação -- viram summary/operationId no path item
+    // OpenAPI. Tags/BearerAuth herdados do controller acima, sem repetir.
+    route.Summary("Cria um novo usuário")
+
+    // liga o corpo esperado a um *Metadata JÁ registrado (mesmo valor que
+    // MustJsonBody[*UserProperties] vai usar dentro do Handler -- reusa a
+    // MESMA declaração, não duplica). Schema Generation lê isso pra montar
+    // requestBody no OpenAPI; MustJsonBody continua sendo quem VALIDA em
+    // runtime -- RequestBody() aqui é só DECLARATIVO/documental.
+    route.RequestBody(userEntityMetadata)
+
+    // liga status HTTP -> *Metadata da resposta. Múltiplas chamadas = múltiplos
+    // status documentados (ex: 201 sucesso, 409 conflito reusando outra Metadata).
+    route.Response(201, userEntityMetadata)
+    route.Response(409) // sem body -- só documenta o status
+
+    route.HttpCode(201)
+    route.Handler(func(ctx *gonest.Context) {
+      properties := gonest.MustJsonBody[*UserEntity](ctx)
+      ctx.Json(userService.Create(properties))
+    })
+  })
+
+  controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
+    route.Summary("Busca um usuário por ID")
+    // path params TAMBÉM documentados via Metadata já registrada (mesma
+    // UserIdParams de MustParams) -- Schema Generation vira "parameters"
+    // (in: path) no OpenAPI a partir dela, sem redeclarar nada.
+    route.PathParams(userIdParamsMetadata)
+    route.Response(200, userEntityMetadata)
+    route.Response(404) // sem body
+
+    route.HttpCode(200)
+    route.Handler(func(ctx *gonest.Context) {
+      params := gonest.MustParams[*UserIdParams](ctx)
+      ctx.Json(userService.Get(params.UserId))
+    })
+  })
+
+  // rota interna, não documentada -- equivalente @ApiExcludeEndpoint.
+  controller.Route(gonest.HttpGet, "/_internal/debug", func (route *gonest.Route) {
+    route.ExcludeFromDocs()
+    route.HttpCode(200)
+    route.Handler(func(ctx *gonest.Context) { ctx.Json(map[string]any{"ok": true}) })
+  })
+})
+
+// rota SEM nenhuma chamada de documentação (Summary/RequestBody/Response/
+// PathParams) ainda aparece em paths -- Schema Generation infere o que já dá
+// pra inferir do que a Route/Controller já sabem (path/método/HttpCode), sem
+// exigir documentação explícita como pré-requisito pra aparecer.
+```
+
+`gonest.GenerateOpenApiSchema(app *gonest.App, doc *gonest.OpenApiDocument)`
+percorre `app`'s árvore de módulos inteira (root + `ImportedModules()`
+recursivo, cycle-safe) já montada pelo `NewApp` anterior, e popula
+`doc`'s `paths`/`components.schemas` a partir de TODO Controller/Route
+registrado (chamado depois de `NewApp`, antes de servir o documento):
+
+```go
+// (continuação do "exemplo de bootstrap completo" acima)
+doc := gonest.NewOpenApiDocument("3.1.0", func (b *gonest.OpenApiDocument) {
+  b.Title("Example API")
+  b.Version("1.0.0")
+  b.BearerAuth()
+})
+
+gonest.GenerateOpenApiSchema(app, doc)
+
+// doc.Document() monta a estrutura OpenAPI 3.1 completa (openapi/info/paths/
+// components/security) já pronta pra json.Marshal -- é isso que uma futura
+// feature "Swagger UI Setup" (SetupSwagger, fora de escopo aqui, ver
+// ROADMAP.md) vai servir.
+json := doc.Document()
+```
+
+Array/Object aninhado (Milestone 5): ao gerar schema de um campo `Object(ref)`
+ou `Array().Items(ref)`, Schema Generation usa `ItemRef()`/`MetadataRef()`
+(já existem, AD-012) pra emitir `"$ref": "#/components/schemas/AddressEntity"`
+em vez de inline -- MESMA `*Metadata` nomeada uma vez em `components.schemas`
+(dedup por identidade de ponteiro, não por nome), reusada por todo campo/rota
+que apontar pra ela.
+
+Quando o vocabulário fixo de `Metadata` (`Integer`/`String`/`Min`/`Max`/`Pattern`
+etc) não alcança um formato de domínio específico, `PropertyBuilder.Custom(fn)`
+ainda funciona em Schema Generation: o campo aparece no schema SEM
+type/format (só `description`/`examples`/`nullable`/`required` se setados) --
+limitação documentada, não erro.
+
