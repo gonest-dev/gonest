@@ -128,6 +128,7 @@ type PropertyBuilder struct {
 	nullable    bool
 	description string
 	examples    []any
+	format      string
 }
 
 // Required marks this field as required and returns p so calls can chain.
@@ -187,4 +188,96 @@ func (p *PropertyBuilder) ExamplesList() []any {
 // own Go type, json tag, and name.
 func (p *PropertyBuilder) Field() reflect.StructField {
 	return p.field
+}
+
+// FormatValue returns the OpenAPI 3.1 format string set by whichever
+// type+format branch method (String/Email/Uuid/... below) was last called on
+// p, or "" if none was ever called. format is stored HERE, on the SHARED
+// PropertyBuilder that Metadata.properties[offset] already holds -- not on
+// the disposable *StringMetadata wrapper each branch method constructs
+// fresh -- because that wrapper is discarded the instant a dev doesn't keep
+// chaining off it, while p itself is the one object a future consumer
+// (Metadata.OwnProperties(), Milestone 7's OpenAPI generator) actually has
+// access to (string-family-branches feature's design.md, Tech Decisions:
+// "storing format on the shared object is the ONLY way the choice survives
+// past the branch call itself").
+func (p *PropertyBuilder) FormatValue() string {
+	return p.format
+}
+
+// String selects the bare "string" OpenAPI type with no format (empty
+// format string) and returns a *StringMetadata view onto p -- the first of
+// the 10 string-family branch methods (string-family-branches feature).
+// Calling String()/Email()/etc a second time on the same p simply overwrites
+// p.format (last call wins, no panic) -- see this method group's package
+// doc / design.md's Error Handling Strategy: branch selection isn't field
+// registration, so it isn't held to Property's own stricter
+// double-registration panic.
+func (p *PropertyBuilder) String() *StringMetadata {
+	p.format = ""
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Email selects OpenAPI's "email" string format. See String's doc comment
+// for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Email() *StringMetadata {
+	p.format = "email"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Uuid selects OpenAPI's "uuid" string format. See String's doc comment for
+// the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Uuid() *StringMetadata {
+	p.format = "uuid"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Uri selects OpenAPI's "uri" string format. See String's doc comment for
+// the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Uri() *StringMetadata {
+	p.format = "uri"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Hostname selects OpenAPI's "hostname" string format. See String's doc
+// comment for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Hostname() *StringMetadata {
+	p.format = "hostname"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Ipv4 selects OpenAPI's "ipv4" string format. See String's doc comment for
+// the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Ipv4() *StringMetadata {
+	p.format = "ipv4"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Ipv6 selects OpenAPI's "ipv6" string format. See String's doc comment for
+// the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Ipv6() *StringMetadata {
+	p.format = "ipv6"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Password selects OpenAPI's "password" string format. See String's doc
+// comment for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Password() *StringMetadata {
+	p.format = "password"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Byte selects OpenAPI's "byte" string format (base64-encoded). See
+// String's doc comment for the shared branch-method behavior
+// (last-call-wins, no panic).
+func (p *PropertyBuilder) Byte() *StringMetadata {
+	p.format = "byte"
+	return &StringMetadata{PropertyBuilder: p}
+}
+
+// Binary selects OpenAPI's "binary" string format. See String's doc comment
+// for the shared branch-method behavior (last-call-wins, no panic).
+func (p *PropertyBuilder) Binary() *StringMetadata {
+	p.format = "binary"
+	return &StringMetadata{PropertyBuilder: p}
 }
