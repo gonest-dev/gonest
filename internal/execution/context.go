@@ -20,6 +20,7 @@ type Responder interface {
 	GetHeader(name string) string
 	SetHeaderValue(name, value string)
 	GetParam(name string) string
+	Body() []byte
 }
 
 // Context encapsulates the HTTP request/response for a single route Handler.
@@ -84,4 +85,19 @@ func (ctx *Context) SetHeader(name, value string) {
 // Param returns the raw string value of the named route param.
 func (ctx *Context) Param(name string) string {
 	return ctx.res.GetParam(name)
+}
+
+// Body returns the raw request body bytes.
+//
+// The returned slice must NOT be retained past synchronous use within the
+// same request/handler execution -- no defensive copy is made here, unlike
+// Param's GetParam (see L-009 in STATE.md, which DOES clone). This is safe
+// because Body() is expected to be consumed synchronously (e.g. passed
+// straight into json.Unmarshal, which copies data into the destination
+// values during decode rather than retaining the input slice); a caller
+// that stores the raw []byte in a struct field or otherwise reads it after
+// the handler returns risks seeing it corrupted/overwritten by a later
+// request reusing the same underlying buffer, exactly like L-009's bug.
+func (ctx *Context) Body() []byte {
+	return ctx.res.Body()
 }

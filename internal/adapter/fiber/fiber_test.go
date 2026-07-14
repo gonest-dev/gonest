@@ -318,6 +318,37 @@ func TestListen_NilOnListen_DoesNotPanicAndBlocksNormally(t *testing.T) {
 	}
 }
 
+// TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes proves the
+// fiber.Ctx-backed Responder's Body() is wired to Fiber's own Ctx.Body(),
+// via a real HTTP dispatch (app.Test) posting a JSON body -- per L-009's
+// precedent, body-reading through fasthttp/fiber has real footguns
+// (zero-copy buffer reuse) that only surface through a real request, not a
+// fake Responder in a unit test.
+func TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes(t *testing.T) {
+	app := New()
+
+	want := `{"name":"Ada","age":36}`
+	var got string
+	if err := app.RegisterRoute(route.HttpPost, "/echo", func(ctx *execution.Context) {
+		got = string(ctx.Body())
+		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/echo", strings.NewReader(want))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if got != want {
+		t.Fatalf("expected Body() to return %q, got %q", want, got)
+	}
+}
+
 // customTestException mirrors INSIGHT.md's dev-defined-exception pattern
 // (`type FooExampleError struct { gonest.HttpException }`) -- a type this
 // package never named anywhere in fiber.go, that satisfies

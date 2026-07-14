@@ -10,6 +10,7 @@ type fakeResponder struct {
 	statusCode int
 	headers    map[string]string
 	params     map[string]string
+	body       []byte
 }
 
 func newFakeResponder() *fakeResponder {
@@ -38,6 +39,10 @@ func (f *fakeResponder) SetHeaderValue(name, value string) {
 
 func (f *fakeResponder) GetParam(name string) string {
 	return f.params[name]
+}
+
+func (f *fakeResponder) Body() []byte {
+	return f.body
 }
 
 func TestContext_Json_DelegatesToResponder(t *testing.T) {
@@ -114,6 +119,33 @@ func TestContext_Param_ReadsFromResponder(t *testing.T) {
 
 	if got := ctx.Param("id"); got != "42" {
 		t.Fatalf("expected Param() to return %q, got %q", "42", got)
+	}
+}
+
+// TestContext_Body_ReadsFromResponder proves Body() returns exactly the
+// bytes the underlying Responder provides, unchanged -- same one-line
+// delegation pattern as every other Context method.
+func TestContext_Body_ReadsFromResponder(t *testing.T) {
+	fake := newFakeResponder()
+	fake.body = []byte(`{"name":"gonest"}`)
+	ctx := New(fake)
+
+	got := ctx.Body()
+
+	if string(got) != `{"name":"gonest"}` {
+		t.Fatalf("expected Body() to return %q, got %q", fake.body, got)
+	}
+}
+
+// TestContext_Body_EmptyByDefault proves Body() returns whatever the
+// Responder reports for an unset body (nil/empty), not a panic -- the fake's
+// zero value for body is nil.
+func TestContext_Body_EmptyByDefault(t *testing.T) {
+	fake := newFakeResponder()
+	ctx := New(fake)
+
+	if got := ctx.Body(); len(got) != 0 {
+		t.Fatalf("expected Body() to be empty by default, got %q", got)
 	}
 }
 

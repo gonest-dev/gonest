@@ -23,6 +23,7 @@ func (f *fakeResponder) SetStatus(code int)                {}
 func (f *fakeResponder) GetHeader(name string) string      { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string) {}
 func (f *fakeResponder) GetParam(name string) string       { return f.params[name] }
+func (f *fakeResponder) Body() []byte                      { return nil }
 
 // TestNew_RunsFnImmediately proves interceptor.New(fn) runs fn synchronously
 // at call time -- unlike Provider/Module/Controller/Pipe, which all defer fn

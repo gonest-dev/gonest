@@ -25,6 +25,7 @@ func (f *fakeResponder) SetStatus(code int)                {}
 func (f *fakeResponder) GetHeader(name string) string      { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string) {}
 func (f *fakeResponder) GetParam(name string) string       { return f.params[name] }
+func (f *fakeResponder) Body() []byte                      { return nil }
 
 // fooExampleError and barExampleError are two distinct exemplar types used to
 // prove Catch/HandlerFor dispatch on exact type identity, mirroring

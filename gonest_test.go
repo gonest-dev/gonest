@@ -176,6 +176,7 @@ func (f *paramFakeResponder) SetStatus(code int)                {}
 func (f *paramFakeResponder) GetHeader(name string) string      { return "" }
 func (f *paramFakeResponder) SetHeaderValue(name, value string) {}
 func (f *paramFakeResponder) GetParam(name string) string       { return f.params[name] }
+func (f *paramFakeResponder) Body() []byte                      { return nil }
 
 // TestMustParam_WithoutCustomPipe_UsesDefaultCoerce proves that when a
 // Route has no custom Pipe registered for a param name, MustParam[T] falls

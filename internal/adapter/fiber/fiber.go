@@ -219,3 +219,19 @@ func (r *fiberResponder) SetHeaderValue(name, value string) {
 func (r *fiberResponder) GetParam(name string) string {
 	return strings.Clone(r.c.Params(name))
 }
+
+// Body returns the raw request body bytes via Fiber's own Ctx.Body.
+//
+// Unlike GetParam above, this deliberately does NOT defensively copy (see
+// L-009 in STATE.md, which is why GetParam clones): L-009's bug was about a
+// value RETAINED past the request (stored in a struct field, read later by
+// some other request). execution.Context.Body()'s own doc comment documents
+// the same constraint on ITS callers -- MustJsonBody (a later feature) calls
+// json.Unmarshal on the body synchronously, within the same handler
+// execution Body() is called in, and encoding/json copies string/byte data
+// into the destination values during decode rather than retaining the input
+// slice. As long as no future caller stores the raw []byte past the
+// synchronous validation call, there is no reuse-corruption risk.
+func (r *fiberResponder) Body() []byte {
+	return r.c.Body()
+}
