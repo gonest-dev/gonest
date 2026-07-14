@@ -8,10 +8,12 @@ package app
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
@@ -248,6 +250,7 @@ type routableController interface {
 	OwnMiddleware() []*middleware.Middleware
 	OwnGuards() []*guard.Guard
 	OwnInterceptors() []*interceptor.Interceptor
+	OwnFilters() []*filter.Filter
 }
 
 // registerRoutes implements Stage 2.5: walk every module's OwnControllers,
@@ -284,6 +287,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	var routes []collected
 	seen := map[string]bool{}
 	globalMiddleware := root.OwnMiddleware()
+	globalFilters := root.OwnFilters()
 
 	for _, m := range modules {
 		for _, c := range m.OwnControllers() {
@@ -295,6 +299,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 			controllerMiddleware := rc.OwnMiddleware()
 			controllerGuards := rc.OwnGuards()
 			controllerInterceptors := rc.OwnInterceptors()
+			controllerFilters := rc.OwnFilters()
 			for _, r := range rc.OwnRoutes() {
 				fullPath := prefix + r.Path()
 				key := r.Method().String() + " " + fullPath
@@ -324,7 +329,13 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 					ctx.WithRoute(currentRoute)
 					composedHandler(ctx)
 				}
-				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: withRoute})
+				// filteredHandler is the NEW outermost layer of all: it wraps
+				// withRoute (which already wraps everything else) in its own
+				// selective recover, so it is the first thing to run and the
+				// last to get a chance at a panic before the adapter's own
+				// recover does. See filteredHandler's own doc comment.
+				filtered := filteredHandler(controllerFilters, globalFilters, withRoute)
+				routes = append(routes, collected{method: r.Method(), path: fullPath, handler: filtered})
 			}
 		}
 	}
@@ -336,6 +347,61 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	}
 
 	return nil
+}
+
+// filteredHandler builds the NEW OUTERMOST layer of the whole per-route
+// dispatch chain -- it wraps next (as wired from registerRoutes, next is
+// withRoute, which itself already wraps composeHandler -> gatedHandler ->
+// interceptedHandler -> the bare route Handler) in its own, separate
+// defer/recover. This is a MORE INNER recover than the adapter's own
+// (internal/adapter/fiber, unchanged): it runs first, selectively handling a
+// recovered exception.Exception whose concrete type matches a registered
+// Catch, and re-panicking anything it doesn't handle so the adapter's
+// EXISTING recover still applies its unchanged default {name,message,details}
+// formatting.
+//
+// Lookup order is controller-level filters first, then global (root module)
+// filters -- per design.md's Tech Decisions, more specific scope overrides
+// broader scope, matching Nest's own filter-precedence convention. A
+// recovered value that does not even satisfy exception.Exception (a bare
+// error, panic(nil)'s *runtime.PanicNilError, etc.) is re-panicked
+// immediately, without ever consulting any Filter's Catch map -- Filters only
+// ever catch structured exception.Exception values.
+func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next func(ctx *execution.Context)) func(ctx *execution.Context) {
+	return func(ctx *execution.Context) {
+		defer func() {
+			r := recover()
+			if r == nil {
+				return
+			}
+			if exc, ok := r.(exception.Exception); ok {
+				excType := reflect.TypeOf(exc)
+				if h, found := findCatch(controllerFilters, excType); found {
+					h.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
+					return
+				}
+				if h, found := findCatch(globalFilters, excType); found {
+					h.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
+					return
+				}
+			}
+			panic(r) // not caught by any Filter -- re-panic, the adapter's
+			// own EXISTING recover (unchanged) applies the default formatting
+		}()
+		next(ctx)
+	}
+}
+
+// findCatch looks up excType across filters in order, returning the first
+// match's handler -- used by filteredHandler for both the controller-level
+// and global lookup passes.
+func findCatch(filters []*filter.Filter, excType reflect.Type) (reflect.Value, bool) {
+	for _, f := range filters {
+		if h, ok := f.HandlerFor(excType); ok {
+			return h, true
+		}
+	}
+	return reflect.Value{}, false
 }
 
 // gatedHandler builds the OUTER of the two new layers Stage 2.5 feeds into

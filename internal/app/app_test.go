@@ -15,6 +15,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
@@ -2391,6 +2392,369 @@ func TestNewApp_InterceptorPanicsAfterNext_StillGeneric500(t *testing.T) {
 // unmodified after adding interceptedHandler -- a controller with zero
 // Interceptors() calls must behave exactly as before this feature.
 func TestNewApp_ZeroInterceptors_NonRegressionReference(t *testing.T) {
+	t.Run("UserControllerEndToEnd_NonRegressionReference", func(t *testing.T) {
+		TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t)
+	})
+}
+
+// --- T4 of "Filter": filteredHandler as the OUTERMOST Stage 2.5 layer ---
+//
+// fooFilterException/barFilterException are two distinct, distinguishable
+// dev-defined exception.Exception types (mirroring INSIGHT.md's
+// `type FooExampleError struct { gonest.HttpException }` pattern) used
+// throughout this suite so tests can prove exact-type Catch matching (a
+// Catch registered for fooFilterException must never fire for
+// barFilterException, and vice versa).
+type fooFilterException struct {
+	exception.HttpException
+}
+
+func newFooFilterException() *fooFilterException {
+	return &fooFilterException{HttpException: exception.NewHttpException(499, "FooFilterException", "foo", nil)}
+}
+
+type barFilterException struct {
+	exception.HttpException
+}
+
+func newBarFilterException() *barFilterException {
+	return &barFilterException{HttpException: exception.NewHttpException(498, "BarFilterException", "bar", nil)}
+}
+
+// TestNewApp_ControllerFilter_CatchesMatchingExceptionType proves a
+// controller-level Filter with a registered Catch runs when the route
+// Handler panics with a concrete exception type that exactly matches, and
+// that the Filter's own custom status+body genuinely reaches the client via
+// a real app.Test dispatch.
+func TestNewApp_ControllerFilter_CatchesMatchingExceptionType(t *testing.T) {
+	f := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "controller"})
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Filters(f)
+		c.Route(route.HttpGet, "/foo", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(newFooFilterException())
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/foo", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 499 {
+		t.Fatalf("status = %d, want 499", resp.StatusCode)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["caught"] != "controller" {
+		t.Fatalf("body = %v, want caught=controller", body)
+	}
+}
+
+// TestNewApp_UnmatchedExceptionType_FallsBackToDefaultFormatting proves an
+// exception whose concrete type matches NEITHER a controller-level nor a
+// global Catch falls through (via filteredHandler's re-panic) to the
+// EXISTING adapter-level recover, producing the unchanged default
+// {name,message,details} response -- explicit proof of non-regression.
+func TestNewApp_UnmatchedExceptionType_FallsBackToDefaultFormatting(t *testing.T) {
+	f := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "controller"})
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Filters(f)
+		c.Route(route.HttpGet, "/unmatched", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(newBarFilterException())
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/unmatched", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 498 {
+		t.Fatalf("status = %d, want 498 (barFilterException's own Status(), unmodified default formatting)", resp.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["name"] != "BarFilterException" {
+		t.Fatalf("body = %v, want name=BarFilterException (default {name,message,details} shape)", body)
+	}
+	if body["message"] != "bar" {
+		t.Fatalf("body = %v, want message=bar", body)
+	}
+}
+
+// TestNewApp_GlobalFilter_AppliesWithoutControllerOptIn proves a global
+// (root module) Filter applies to a route whose own controller has NO
+// Filters() of its own -- global filters are not opt-in per controller.
+func TestNewApp_GlobalFilter_AppliesWithoutControllerOptIn(t *testing.T) {
+	global := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "global"})
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Route(route.HttpGet, "/foo", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(newFooFilterException())
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Filters(global)
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/foo", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 499 {
+		t.Fatalf("status = %d, want 499", resp.StatusCode)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["caught"] != "global" {
+		t.Fatalf("body = %v, want caught=global", body)
+	}
+}
+
+// TestNewApp_ControllerFilterOverridesGlobalFilter proves that when BOTH a
+// controller-level Filter and a global Filter register a Catch for the SAME
+// exception type, the controller-level handler wins -- verified via two
+// distinguishable response bodies, confirming which one the client actually
+// receives.
+func TestNewApp_ControllerFilterOverridesGlobalFilter(t *testing.T) {
+	global := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "global"})
+		})
+	})
+	controllerLevel := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "controller"})
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Filters(controllerLevel)
+		c.Route(route.HttpGet, "/foo", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(newFooFilterException())
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Filters(global)
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/foo", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["caught"] != "controller" {
+		t.Fatalf("body = %v, want caught=controller (controller-level Filter must win over global)", body)
+	}
+}
+
+// TestNewApp_Filter_CatchesPanicFromGuard proves filteredHandler is
+// genuinely the OUTERMOST layer of the whole dispatch chain: a Filter still
+// catches a panic that originates from inside a Guard, not just from the
+// route Handler itself.
+func TestNewApp_Filter_CatchesPanicFromGuard(t *testing.T) {
+	f := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "from-guard"})
+		})
+	})
+
+	panicGuard := guard.New(func(g *guard.Guard) {
+		g.Handler(func(ctx *execution.Context) bool {
+			panic(newFooFilterException())
+		})
+	})
+
+	var handlerRan bool
+	c := controller.New(func(c *controller.Controller) {
+		c.Filters(f)
+		c.Guards(panicGuard)
+		c.Route(route.HttpGet, "/guarded", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				handlerRan = true
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/guarded", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 499 {
+		t.Fatalf("status = %d, want 499", resp.StatusCode)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["caught"] != "from-guard" {
+		t.Fatalf("body = %v, want caught=from-guard", body)
+	}
+	if handlerRan {
+		t.Fatalf("route Handler ran, want the Guard's panic to short-circuit before it")
+	}
+}
+
+// TestNewApp_Filter_CatchesPanicFromMiddleware proves filteredHandler also
+// catches a panic originating from a Middleware -- further evidence it truly
+// wraps EVERYTHING, not just the route Handler.
+func TestNewApp_Filter_CatchesPanicFromMiddleware(t *testing.T) {
+	f := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "from-middleware"})
+		})
+	})
+
+	panicMw := middleware.New(func(m *middleware.Middleware) {
+		m.Handler(func(ctx *execution.Context, next middleware.Next) {
+			panic(newFooFilterException())
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Filters(f)
+		c.Use(panicMw)
+		c.Route(route.HttpGet, "/mw-panic", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/mw-panic", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 499 {
+		t.Fatalf("status = %d, want 499", resp.StatusCode)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error = %v", err)
+	}
+	if body["caught"] != "from-middleware" {
+		t.Fatalf("body = %v, want caught=from-middleware", body)
+	}
+}
+
+// TestNewApp_NonExceptionPanic_NotInterceptedByAnyFilter proves a panic that
+// is NOT an exception.Exception (a bare error here) is never even looked up
+// in any Filter's Catch map -- it still produces the existing generic 500,
+// unaffected by any registered Filter (even one whose Catch happens to be
+// for a type that would otherwise seem plausible).
+func TestNewApp_NonExceptionPanic_NotInterceptedByAnyFilter(t *testing.T) {
+	f := filter.New(func(f *filter.Filter) {
+		f.Catch(&fooFilterException{}, func(ctx *execution.Context, exc *fooFilterException) {
+			ctx.Status(499).Json(map[string]string{"caught": "should-not-happen"})
+		})
+	})
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Filters(f)
+		c.Route(route.HttpGet, "/bare-error", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(errors.New("plain error, not an exception.Exception"))
+			})
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+
+	fa := dispatchTestApp(t, root)
+	req := httptest.NewRequest(http.MethodGet, "/bare-error", nil)
+	resp, err := fa.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 (generic fallback, unaffected by any registered Filter)", resp.StatusCode)
+	}
+}
+
+// TestNewApp_ZeroFilters_NonRegressionReference proves an existing
+// pre-feature test (T9's UserController end-to-end example, defined earlier
+// in this file and left completely UNMODIFIED by this task) still passes
+// unmodified after adding filteredHandler -- a controller (and root module)
+// with zero Filters() calls must behave exactly as before this feature.
+func TestNewApp_ZeroFilters_NonRegressionReference(t *testing.T) {
 	t.Run("UserControllerEndToEnd_NonRegressionReference", func(t *testing.T) {
 		TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t)
 	})
