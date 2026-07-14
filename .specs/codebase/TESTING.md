@@ -30,6 +30,7 @@
 | `Route`/`Pipe`/`Context` isolados (builder, coerção de param, validação de assinatura) | unit |
 | Dispatch de rota via Fiber real (`internal/adapter/fiber`, `app.go`'s Stage 2.5) — request HTTP de verdade batendo numa rota registrada | integration (usa `app.Test(req)` do próprio Fiber, sem subir porta real) |
 | Bind/Listen real (`internal/adapter/fiber`, `HttpAdapter.Listen`) — porta TCP de verdade aberta, `OnListen` disparando, `App.MustListen` bloqueando até shutdown | integration (sobe porta real em `127.0.0.1:<porta fixa>`, sincronizado via channel/waitgroup — nunca `time.Sleep` — e derrubada em `t.Cleanup` via `Shutdown()`) |
+| Metadata/reflection puro (`internal/metadata` — identificação de campo via offset de ponteiro, builders `Metadata`/`PropertyBuilder`) | unit (sem dependência de DI graph/HTTP — domínio isolado, cada campo confirmado individualmente por nome+tipo, não só "compilou") |
 
 **Atualizado na feature "Controller & Route Registration":** primeira camada e2e/integration do projeto — dispatch HTTP real via Fiber precisa provar que rota registrada responde corretamente, não só que a struct `Route` foi montada certo (isso é unit).
 
