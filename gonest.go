@@ -13,6 +13,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
@@ -344,3 +345,28 @@ type Interceptor = interceptor.Interceptor
 // internal/*, per AD-004 in STATE.md). See internal/interceptor.New's doc
 // comment for the full contract.
 var NewInterceptor = interceptor.New
+
+// ---------------------------------------------------------------------------
+// Filter (Filter feature)
+// ---------------------------------------------------------------------------
+
+// Filter represents a reusable set of per-exception-type response handlers,
+// registered via Catch and keyed by the exact exception type, mirroring
+// Nest's exception filters. It is attached via Controller.Filters/
+// Module.Filters (e.g. INSIGHT.md's `controller.Filters(FooExampleFilter)`).
+// See internal/filter.Filter's doc comment for the full contract.
+type Filter = filter.Filter
+
+// NewFilter creates a Filter and runs fn on it immediately (unlike
+// Provider/Module/Controller/Pipe, which defer fn until bootstrap). This
+// feature deliberately has no MustInject support (AD-008 in STATE.md:
+// pipeline-stage types don't support MustInject in v1, same reasoning as
+// NewGuard/NewMiddleware/NewInterceptor), so there is no bootstrap stage
+// left to usefully defer fn to. Like NewGuard/NewMiddleware/NewInterceptor/
+// NewHttpException, New here is not generic, so Go allows aliasing the plain
+// func directly via var -- no wrapper function is needed (root package is
+// the only public door since Go blocks external import of internal/*, per
+// AD-004 in STATE.md; see also AD-009 in STATE.md for why this section lives
+// in this consolidated file rather than a separate filter.go). See
+// internal/filter.New's doc comment for the full contract.
+var NewFilter = filter.New

@@ -1,8 +1,10 @@
 package gonest
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"sync"
 	"testing"
@@ -926,4 +928,147 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 	if timingLog[2] == "before" || timingLog[2] == "handler" {
 		t.Fatalf("timingLog[2] = %q, want an after-Handler log entry (must run after next(ctx) returns)", timingLog[2])
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Filter (Filter feature)
+// ---------------------------------------------------------------------------
+
+// TestNewFilter_RootAlias_TypeCheck proves NewFilter/Filter resolve and
+// type-check at the root gonest package: NewFilter builds a *Filter, and
+// Catch(exemplar, handler) genuinely registers a reflect-validated handler
+// findable via HandlerFor keyed by the exemplar's exact reflect.Type.
+func TestNewFilter_RootAlias_TypeCheck(t *testing.T) {
+	var gotCtx *execution.Context
+	var gotExc *FooExampleError
+
+	f := NewFilter(func(f *Filter) {
+		f.Catch(&FooExampleError{}, func(ctx *execution.Context, exc *FooExampleError) {
+			gotCtx = ctx
+			gotExc = exc
+		})
+	})
+	if f == nil {
+		t.Fatal("NewFilter() returned nil *Filter")
+	}
+
+	excType := reflect.TypeOf(&FooExampleError{})
+	fn, ok := f.HandlerFor(excType)
+	if !ok {
+		t.Fatal("expected HandlerFor(reflect.TypeOf(&FooExampleError{})) to report ok=true")
+	}
+
+	ctx := execution.New(nil)
+	exc := NewFooExampleError(nil)
+	fn.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
+
+	if gotCtx != ctx {
+		t.Fatal("ctx passed to the stored handler did not reach the handler body unchanged")
+	}
+	if gotExc != exc {
+		t.Fatal("exc passed to the stored handler did not reach the handler body unchanged")
+	}
+}
+
+// FooExampleFilter reproduces INSIGHT.md's Filter example, adapted per
+// SPEC_DEVIATION: INSIGHT.md's example uses gonest.HttpStatusTeapot, a named
+// HttpStatus constant that was explicitly scoped OUT of the "HttpException
+// Core" feature (see FooExampleError's own doc comment for the same
+// deviation elsewhere in this file), so this uses the equivalent int literal
+// 418 instead. It reuses FooExampleError (declared above in the Exceptions
+// section) rather than redeclaring a new exception type.
+var FooExampleFilter = NewFilter(func(filter *Filter) {
+	filter.Catch(&FooExampleError{}, func(ctx *execution.Context, exc *FooExampleError) {
+		ctx.Status(418).Json(map[string]any{
+			"custom": true,
+			"name":   exc.Name(),
+		})
+	})
+})
+
+// TestFooExampleFilter_RootAlias_InsightCallShape proves INSIGHT.md's
+// FooExampleFilter example (adapted per SPEC_DEVIATION, see
+// FooExampleFilter's own doc comment) compiles and works end-to-end through
+// the root gonest package's Filter/NewFilter aliases, attached via
+// controller.Filters(FooExampleFilter) through the root Controller/Module/
+// NewApp aliases, dispatched via REAL app.Test requests covering both: (a) a
+// panic with the caught *FooExampleError type -> the Filter's own custom 418
+// response, and (b) a panic with an uncaught exception type
+// (*NotFoundException) -> the EXISTING default {name,message,details}
+// response, unmodified -- proving the Filter does not interfere with
+// exceptions it did not register a Catch for.
+func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
+	controller := NewController(func(c *Controller) {
+		c.Filters(FooExampleFilter)
+		c.Route(route.HttpGet, "/caught", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(NewFooExampleError(nil))
+			})
+		})
+		c.Route(route.HttpGet, "/uncaught", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				panic(NewNotFoundException(nil))
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	t.Run("caught *FooExampleError -> Filter's own custom 418 response", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/caught", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 418 {
+			t.Fatalf("status = %d, want 418", resp.StatusCode)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode error = %v", err)
+		}
+		if body["custom"] != true {
+			t.Fatalf("body = %v, want custom=true", body)
+		}
+		if body["name"] != "FooExampleError" {
+			t.Fatalf("body = %v, want name=FooExampleError", body)
+		}
+	})
+
+	t.Run("uncaught *NotFoundException -> unchanged default {name,message,details} response", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/uncaught", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusNotFound)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode error = %v", err)
+		}
+		if body["name"] != "NotFoundException" {
+			t.Fatalf("body = %v, want name=NotFoundException (default {name,message,details} shape, Filter did not interfere)", body)
+		}
+	})
 }
