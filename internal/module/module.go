@@ -7,6 +7,7 @@ package module
 import (
 	"reflect"
 
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/middleware"
 )
 
@@ -68,6 +69,7 @@ type Module struct {
 	controllers []ControllerRef
 	exports     []ProviderRef
 	middleware  []*middleware.Middleware
+	filters     []*filter.Filter
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -123,6 +125,19 @@ func (m *Module) Use(items ...*middleware.Middleware) {
 	m.middleware = append(m.middleware, items...)
 }
 
+// Filters registers filters owned by this module. Go cannot restrict this
+// method to "the root module only" at the type level -- any *Module can
+// call Filters. Per this feature's design.md Tech Decisions, this is
+// intentional: Filters is merely the storage primitive (mirroring how
+// Use stores middleware); whether a given module's filters are actually
+// CONSULTED during dispatch -- and whether that consultation cascades
+// across imported modules or is limited to the root module -- is decided
+// later, by the code that reads OwnFilters (a later task), not by this
+// method.
+func (m *Module) Filters(items ...*filter.Filter) {
+	m.filters = append(m.filters, items...)
+}
+
 // OwnProviders returns a copy of the providers registered on this module
 // via Providers. Read-only: mutating the returned slice does not affect
 // this Module's internal state. Used by internal/resolver to search this
@@ -145,6 +160,14 @@ func (m *Module) OwnControllers() []ControllerRef {
 // middleware wrap the root module's dispatch chain.
 func (m *Module) OwnMiddleware() []*middleware.Middleware {
 	return append([]*middleware.Middleware(nil), m.middleware...)
+}
+
+// OwnFilters returns a copy of the filters registered on this module via
+// Filters. Read-only: mutating the returned slice does not affect this
+// Module's internal state. Used by a later task to determine which filters
+// apply during exception handling.
+func (m *Module) OwnFilters() []*filter.Filter {
+	return append([]*filter.Filter(nil), m.filters...)
 }
 
 // ImportedModules returns a copy of the modules registered on this module

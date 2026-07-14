@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/middleware"
 )
 
@@ -348,6 +349,42 @@ func TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
 	got2 := m.OwnMiddleware()
 	if got2[0] != mw {
 		t.Fatalf("OwnMiddleware() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+}
+
+func TestModule_Filters_StoresFiltersInRegistrationOrder(t *testing.T) {
+	first := filter.New(func(f *filter.Filter) {})
+	second := filter.New(func(f *filter.Filter) {})
+	m := New(func(m *Module) {
+		m.Filters(first, second)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnFilters()
+	if len(got) != 2 || got[0] != first || got[1] != second {
+		t.Fatalf("OwnFilters() = %v, want [first, second]", got)
+	}
+}
+
+func TestModule_OwnFilters_ReturnsCopyNotInternalSlice(t *testing.T) {
+	f := filter.New(func(f *filter.Filter) {})
+	m := New(func(m *Module) {
+		m.Filters(f)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnFilters()
+	got[0] = filter.New(func(f *filter.Filter) {})
+
+	got2 := m.OwnFilters()
+	if got2[0] != f {
+		t.Fatalf("OwnFilters() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
 
