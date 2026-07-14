@@ -155,8 +155,10 @@
 **OpenAPI Document Builder** - COMPLETE
 - `NewOpenApiDocument`/`OpenApiDocument` (`internal/openapi`, re-exportado na raiz), `Title`/`Description`/`Version`/`Contact`/`License`/`BearerAuth` -- builder mecânico, sem dependência de `internal/metadata`/`internal/route`
 
-**Schema Generation from Metadata** - PLANNED
-- Branches de metadata → schema type+format; `$ref` reuso pra Object/Array-de-Object
+**Schema Generation from Metadata** - COMPLETE
+- `App.Root()` (novo, expõe árvore de módulo pós-bootstrap) + `Metadata.Title` + `Controller.Tags`/`BearerAuth` + `Route`'s 10 métodos de documentação (`Summary`/`Description`/`OperationId`/`Tags`/`BearerAuth`/`RequestBody`/`Response`/`PathParams`/`QueryParams`/`ExcludeFromDocs`/`Deprecated`) -- mapeamento direto de `@nestjs/swagger`'s `@Api*` decorators pra builder methods
+- `internal/openapi.Generate(doc, root)` -- walker recursivo (módulos + controllers + rotas), gera `paths`+`components.schemas` a partir de TODA a superfície de leitura de `PropertyBuilder` resolvida em AD-012/AD-013 (`KindValue`/`MinValue`/`MaxValue`/`PatternValue`/`ItemBuilder`/`ItemRef`/`MetadataRef`/`IsAdditionalProperties`), dedup por identidade de ponteiro (`$ref` reuso), nullable `$ref` via `anyOf`
+- `gonest.GenerateOpenApiSchema(app, doc)` re-exportado na raiz; fechou débito antigo -- `gonest.Route` alias raiz nunca tinha sido adicionado
 
 **Swagger UI Setup** - PLANNED
 - `SetupSwagger`, `SwaggerOptions{JsonDocumentUrl, PersistAuth, DocExpansion}`
