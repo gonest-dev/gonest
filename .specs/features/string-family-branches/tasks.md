@@ -18,7 +18,7 @@ Sequencial.
 
 ## Task Breakdown
 
-### T1: `PropertyBuilder` estendido + `StringMetadata` novo
+### T1: `PropertyBuilder` estendido + `StringMetadata` novo ✅ DONE (evaluator: PASS, commit `604dbc2` — teste crítico de encadeamento comum→específico confirmado genuíno)
 
 **What**: estende `internal/metadata/metadata.go`'s `PropertyBuilder` existente (de "Metadata Registration Core", já commitado) com:
 - Novo campo não-exportado `format string`
@@ -34,13 +34,13 @@ Cria arquivo NOVO `internal/metadata/string.go` (MESMO pacote, não pacote novo 
 **Where**: `internal/metadata/metadata.go` (existente, estendido — só o campo `format`+`FormatValue()`+10 métodos de branch), `internal/metadata/string.go` (novo), `internal/metadata/string_test.go` (novo) ou testes de branch podem ir em `metadata_test.go` também — decisão do developer
 
 **Done when**:
-- [ ] Cada um dos 10 métodos de branch devolve `*StringMetadata` com `FormatValue()` correto (confirmado individualmente pros 10, não só uma amostra)
-- [ ] `Min`/`Max`/`Pattern` armazenam corretamente, cada um devolve o MESMO `*StringMetadata` (chain continua)
-- [ ] `Required`/`Nullable`/`Description`/`Examples` chamados em `*StringMetadata` mutam o `PropertyBuilder` COMPARTILHADO (confirme via `PropertyBuilder`'s próprios getters `IsRequired()`/etc, alcançados através do embedding) — E continuam devolvendo `*StringMetadata` (não `*PropertyBuilder`), provando que `.Min()` continua encadeável DEPOIS de `.Required()`
-- [ ] Chain completa reproduzindo INSIGHT.md: `m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("[EMAIL_ADDRESS]")` e `m.Property(&t.Zip).String().Required().Pattern(...).Description("CEP").Examples("01310-100")` — ambos funcionam ponta a ponta
-- [ ] Chamar `.String()` e depois `.Email()` no MESMO `*PropertyBuilder` (branch chamado duas vezes) não panica — `format` reflete a ÚLTIMA chamada (last-write-wins, determinístico)
-- [ ] Gate check passa
-- [ ] Test count: 15+ (10 branches individualmente + Min/Max/Pattern chain + 4 comuns através de StringMetadata + chain completo estilo INSIGHT.md + double-branch-call não panica)
+- [x] Cada um dos 10 métodos de branch devolve `*StringMetadata` com `FormatValue()` correto (confirmado individualmente pros 10, não só uma amostra)
+- [x] `Min`/`Max`/`Pattern` armazenam corretamente, cada um devolve o MESMO `*StringMetadata` (chain continua)
+- [x] `Required`/`Nullable`/`Description`/`Examples` chamados em `*StringMetadata` mutam o `PropertyBuilder` COMPARTILHADO (confirme via `PropertyBuilder`'s próprios getters `IsRequired()`/etc, alcançados através do embedding) — E continuam devolvendo `*StringMetadata` (não `*PropertyBuilder`), provando que `.Min()` continua encadeável DEPOIS de `.Required()`
+- [x] Chain completa reproduzindo INSIGHT.md: `m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("[EMAIL_ADDRESS]")` e `m.Property(&t.Zip).String().Required().Pattern(...).Description("CEP").Examples("01310-100")` — ambos funcionam ponta a ponta
+- [x] Chamar `.String()` e depois `.Email()` no MESMO `*PropertyBuilder` (branch chamado duas vezes) não panica — `format` reflete a ÚLTIMA chamada (last-write-wins, determinístico)
+- [x] Gate check passa
+- [x] Test count: 15+ (10 branches individualmente + Min/Max/Pattern chain + 4 comuns através de StringMetadata + chain completo estilo INSIGHT.md + double-branch-call não panica)
 
 **Tests**: unit
 **Gate**: quick
