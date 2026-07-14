@@ -134,8 +134,9 @@
 
 ### Features
 
-**JSON Body Validation** - PLANNED
-- `MustJsonBody[T]` valida contra `NewMetadata[T]`, panic `BadRequestException` com details por campo
+**JSON Body Validation** - COMPLETE
+- `MustJsonBody[T]` (`internal/validate`, re-exportado na raiz) valida contra `NewMetadata[T]` (via registro global auto-populado), panic `BadRequestException` com lista de `{field, message}` -- COLETA todas violações (não fail-fast), recursivo (Array valida item+quantidade, Object recursa via `ref`)
+- Prerequisito descoberto e resolvido nesta feature: storage de `Min`/`Max`/`Pattern`/`item`/`ref`/etc relocado dos wrappers descartáveis (`StringMetadata` etc) pro `PropertyBuilder` compartilhado, + campo `kind` novo (corrige colisão pré-existente `String()`/`Boolean()` ambos com `format==""`) -- ver AD-012 em STATE.md
 
 **Param/Query Validation** - PLANNED
 - `MustParam[T]` integra `Pipe` + coerção via metadata
