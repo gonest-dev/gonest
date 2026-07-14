@@ -23,6 +23,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/openapi"
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
@@ -498,3 +499,27 @@ func MustParams[T any](ctx *execution.Context) T {
 func MustQuery[T any](ctx *execution.Context) T {
 	return validate.MustQuery[T](ctx)
 }
+
+// ---------------------------------------------------------------------------
+// OpenAPI (OpenAPI Document Builder feature)
+// ---------------------------------------------------------------------------
+
+// OpenApiDocument holds every document-level field set via NewOpenApiDocument
+// (title, description, version, contact, license, bearer auth) --
+// INSIGHT.md's own bootstrap example (`# exemplo de bootstrap completo`):
+// `gonest.NewOpenApiDocument("3.1.0", func (b *gonest.OpenApiDocument) {
+// ... })`. See internal/openapi.OpenApiDocument's doc comment for the full
+// contract. Serving it (SetupSwagger/SwaggerOptions) and generating
+// paths/schemas from registered routes/Metadata are separate ROADMAP
+// features (spec.md's Out of Scope).
+type OpenApiDocument = openapi.OpenApiDocument
+
+// NewOpenApiDocument builds a *OpenApiDocument, storing specVersion (the
+// OpenAPI SPEC version, e.g. "3.1.0" -- distinct from the API's own
+// Version(s)) and running fn against it before returning it. Unlike
+// NewApp/NewMetadata elsewhere in this package, New here is not generic, so
+// Go allows aliasing the plain func directly via var -- no wrapper function
+// is needed (same precedent as NewHttpException/NewMiddleware/NewGuard, see
+// AD-004 in STATE.md). See internal/openapi.New's doc comment for the full
+// contract.
+var NewOpenApiDocument = openapi.New

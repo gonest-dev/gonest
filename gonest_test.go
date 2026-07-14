@@ -2277,3 +2277,76 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// OpenAPI (OpenAPI Document Builder feature)
+// ---------------------------------------------------------------------------
+
+// TestNewOpenApiDocument_RootAlias_InsightBootstrapExample reproduces
+// INSIGHT.md's own bootstrap example verbatim (the "# exemplo de bootstrap
+// completo" section's gonest.NewOpenApiDocument("3.1.0", func (b
+// *gonest.OpenApiDocument) {...}) call shape) through the root gonest
+// package's aliases, asserting every field round-trips correctly.
+func TestNewOpenApiDocument_RootAlias_InsightBootstrapExample(t *testing.T) {
+	type contactConfig struct {
+		Name  string
+		Url   string
+		Email string
+	}
+	type licenseConfig struct {
+		Name string
+		Url  string
+	}
+	config := struct {
+		OpenApi struct {
+			Title       string
+			Description string
+			Version     string
+			Contact     contactConfig
+			License     licenseConfig
+		}
+	}{}
+	config.OpenApi.Title = "Example API"
+	config.OpenApi.Description = "An example API"
+	config.OpenApi.Version = "1.2.3"
+	config.OpenApi.Contact = contactConfig{Name: "Support Team", Url: "https://example.com", Email: "support@example.com"}
+	config.OpenApi.License = licenseConfig{Name: "MIT", Url: "https://opensource.org/licenses/MIT"}
+
+	doc := NewOpenApiDocument("3.1.0", func(b *OpenApiDocument) {
+		b.Title(config.OpenApi.Title)
+		b.Description(config.OpenApi.Description)
+		b.Version(config.OpenApi.Version)
+		b.Contact(config.OpenApi.Contact.Name, config.OpenApi.Contact.Url, config.OpenApi.Contact.Email)
+		b.License(config.OpenApi.License.Name, config.OpenApi.License.Url)
+		b.BearerAuth()
+	})
+
+	if doc == nil {
+		t.Fatal("NewOpenApiDocument() returned nil")
+	}
+	if got := doc.SpecVersion(); got != "3.1.0" {
+		t.Fatalf("SpecVersion() = %q, want %q", got, "3.1.0")
+	}
+	if got := doc.TitleText(); got != config.OpenApi.Title {
+		t.Fatalf("TitleText() = %q, want %q", got, config.OpenApi.Title)
+	}
+	if got := doc.DescriptionText(); got != config.OpenApi.Description {
+		t.Fatalf("DescriptionText() = %q, want %q", got, config.OpenApi.Description)
+	}
+	if got := doc.VersionText(); got != config.OpenApi.Version {
+		t.Fatalf("VersionText() = %q, want %q", got, config.OpenApi.Version)
+	}
+	name, url, email := doc.ContactInfo()
+	if name != config.OpenApi.Contact.Name || url != config.OpenApi.Contact.Url || email != config.OpenApi.Contact.Email {
+		t.Fatalf("ContactInfo() = (%q, %q, %q), want (%q, %q, %q)",
+			name, url, email, config.OpenApi.Contact.Name, config.OpenApi.Contact.Url, config.OpenApi.Contact.Email)
+	}
+	licName, licUrl := doc.LicenseInfo()
+	if licName != config.OpenApi.License.Name || licUrl != config.OpenApi.License.Url {
+		t.Fatalf("LicenseInfo() = (%q, %q), want (%q, %q)",
+			licName, licUrl, config.OpenApi.License.Name, config.OpenApi.License.Url)
+	}
+	if !doc.HasBearerAuth() {
+		t.Fatal("HasBearerAuth() = false, want true")
+	}
+}
