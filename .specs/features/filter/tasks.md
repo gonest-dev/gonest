@@ -108,7 +108,7 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 
 ---
 
-### T4: Stage 2.5 `filteredHandler` in `internal/app`
+### T4: Stage 2.5 `filteredHandler` in `internal/app` ✅ DONE (evaluator: PASS, commit `e22e0d8`)
 
 **What**: `internal/app/app.go`'s `registerRoutes` gains a NEW OUTERMOST layer, `filteredHandler`, wrapping the ENTIRE existing per-route chain (`withRoute` → `composedHandler` → `gatedHandler` → `interceptedHandler` → route Handler, all UNCHANGED). `filteredHandler` installs its own `defer`/`recover()`: on a recovered `exception.Exception`, checks the route's controller-level filters first (via `reflect.TypeOf`, exact match), then the root module's global filters; if a match is found, runs that Filter's handler and returns; if NOT found (or the panic isn't an `exception.Exception` at all), re-panics — letting the EXISTING adapter-level recover wrapper (`internal/adapter/fiber`, unchanged) apply the default `{name,message,details}` formatting exactly as it does today. Extend `routableController` with `OwnFilters() []*filter.Filter` (already satisfied by `*controller.Controller` post-T2).
 **Where**: `internal/app/app.go` (existing, extended — new imports `internal/filter`, `reflect`), `internal/app/app_test.go` (existing — add tests)
@@ -121,15 +121,15 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 - Skill: NONE
 
 **Done when** (all require REAL `app.Test` dispatch):
-- [ ] A controller-level Filter's `Catch`-registered handler runs when a route Handler panics with a matching concrete exception type — custom response (status+body) genuinely reaches the client
-- [ ] An exception whose type does NOT match any registered `Catch` (controller or global) falls through to the EXISTING default `{name,message,details}` response, unchanged — explicit non-regression proof
-- [ ] A global (root module) Filter's handler applies to a route whose OWN controller has zero `Filters()` of its own
-- [ ] When BOTH a controller-level and a global Filter register `Catch` for the SAME exception type, the CONTROLLER-level handler wins (precedence proven — e.g. two distinguishable response bodies, confirm which one the client actually receives)
-- [ ] A Filter can `Catch` a panic that originated from ANYWHERE in the dispatch chain, not just the route Handler — test with a panic from inside a Guard or Middleware, confirm the Filter still catches it (proves `filteredHandler` is genuinely the outermost layer)
-- [ ] A non-`exception.Exception` panic (bare error, etc.) is NOT intercepted by any Filter (no `Catch` lookup even attempted) — still produces the existing generic 500, unchanged
-- [ ] A controller with ZERO `Filters()` (and no global filters either) behaves EXACTLY as it did before this feature — an EXISTING pre-feature test (e.g. "Guard"'s or "Interceptor"'s own tests, or T9's `UserController` end-to-end) still passes UNMODIFIED
-- [ ] Gate check passes
-- [ ] Test count: 10+ (controller-level catch works, uncaught falls through to default, global-applies-without-controller-opt-in, controller-overrides-global precedence, catches panic from any pipeline stage not just Handler, non-Exception panic unaffected, zero-regression)
+- [x] A controller-level Filter's `Catch`-registered handler runs when a route Handler panics with a matching concrete exception type — custom response (status+body) genuinely reaches the client
+- [x] An exception whose type does NOT match any registered `Catch` (controller or global) falls through to the EXISTING default `{name,message,details}` response, unchanged — explicit non-regression proof
+- [x] A global (root module) Filter's handler applies to a route whose OWN controller has zero `Filters()` of its own
+- [x] When BOTH a controller-level and a global Filter register `Catch` for the SAME exception type, the CONTROLLER-level handler wins (precedence proven — e.g. two distinguishable response bodies, confirm which one the client actually receives)
+- [x] A Filter can `Catch` a panic that originated from ANYWHERE in the dispatch chain, not just the route Handler — test with a panic from inside a Guard or Middleware, confirm the Filter still catches it (proves `filteredHandler` is genuinely the outermost layer)
+- [x] A non-`exception.Exception` panic (bare error, etc.) is NOT intercepted by any Filter (no `Catch` lookup even attempted) — still produces the existing generic 500, unchanged
+- [x] A controller with ZERO `Filters()` (and no global filters either) behaves EXACTLY as it did before this feature — an EXISTING pre-feature test (e.g. "Guard"'s or "Interceptor"'s own tests, or T9's `UserController` end-to-end) still passes UNMODIFIED
+- [x] Gate check passes
+- [x] Test count: 10+ (controller-level catch works, uncaught falls through to default, global-applies-without-controller-opt-in, controller-overrides-global precedence, catches panic from any pipeline stage not just Handler, non-Exception panic unaffected, zero-regression)
 
 **Tests**: integration (real Fiber dispatch via `app.Test`)
 **Gate**: full
