@@ -459,22 +459,38 @@ func init() {
     m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
     // Array() de tipo primitivo — Items() sem arg encadeia o branch igual Property faria.
-    m.Property(&t.Tags).Array().Items().String().Min(1).Max(50).
-      Required().Description("Tags do usuário").Examples("admin", "beta")
+    m.Property(&t.Tags).Array().Items(func(m *gonest.ArrayMetadata) {
+      m.String().Min(1).Max(50)
+      m.Required()
+      m.Description("Tags do usuário")
+      m.Examples("admin", "beta")
+    })
 
     // Array() de número — Min/Max aqui são do ITEM (0 a 100); array em si não tem Min/Max
     // de quantidade nesse caso (poderia mesclar com .Array(1, 10) se quantidade importasse).
-    m.Property(&t.Scores).Array().Items().Integer().Min(0).Max(100).
-      Required().Description("Notas do usuário").Examples(80, 95)
+    m.Property(&t.Scores).Array().Items(func(m *gonest.ArrayMetadata) {
+      m.Integer().Min(0).Max(100)
+      m.Required()
+      m.Description("Notas do usuário")
+      m.Examples(80, 95)
+    })
 
     // Array() de Object() — Items(addressMetadata) reusa a metadata já registrada acima
     // (mesmo objeto, sem duplicar Property; equivalente a $ref no OpenAPI).
-    m.Property(&t.Addresses).Array().Items(addressMetadata).Min(1).
-      Required().Description("Endereços do usuário")
+    m.Property(&t.Addresses).Array().Items(func(m *gonest.ArrayMetadata) {
+      m.Object(addressMetadata)
+      m.Required()
+      m.Min(1)
+      m.Description("Endereços do usuário")
+      m.Examples("admin", "beta")
+    })
 
     // Object() direto (não-array) — mesma reutilização via valor, sem reflect.
-    m.Property(&t.Address).Object(addressMetadata).
-      Required().Description("Endereço principal")
+    m.Property(&t.Address).Object(func(om *gonest.ObjectMetadata) {
+      om.Metadata(addressMetadata)
+      om.Required()
+      om.Description("Endereço principal")
+    })
 
     // Object() livre (schema aberto, tipo map[string]any) — sem struct Go aninhada pra
     // reusar, por isso recebe callback em vez de metadata já registrada.
