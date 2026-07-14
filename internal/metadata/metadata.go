@@ -37,11 +37,13 @@ func New(structType reflect.Type, baseAddr uintptr) *Metadata {
 	if structType.Kind() != reflect.Struct {
 		panic("gonest: NewMetadata requires a struct type, got " + structType.Kind().String())
 	}
-	return &Metadata{
+	m := &Metadata{
 		structType: structType,
 		baseAddr:   baseAddr,
 		properties: map[uintptr]*PropertyBuilder{},
 	}
+	Register(structType, m)
+	return m
 }
 
 // Description sets the whole-type description (the struct itself, not any
