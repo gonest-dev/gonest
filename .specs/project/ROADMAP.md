@@ -117,9 +117,9 @@
 
 ### Features
 
-**Array Builder** - PLANNED
-- `Array()`, `Items(...)` variádico (zero-arg encadeia branch primitivo / um-arg recebe metadata pra referência)
-- Semântica: `Min`/`Max` logo após `Items()` = item; `Min`/`Max` em `Array()` antes de `Items()` = quantidade
+**Array Builder** - COMPLETE
+- `Array()` (`internal/metadata/array.go`, re-exportado na raiz) devolve `*ArrayMetadata`, builder DUAL-STATE: `Items(fn func(m *ArrayMetadata))` (callback, não variádico -- revisão de INSIGHT.md nesta sessão) roteia `String`/`Integer`/etc pro ITEM sintético (reusa `StringMetadata`/`NumericMetadata` de graça) e `Required`/`Nullable`/`Description`/`Examples` sempre pro CAMPO container
+- `Min`/`Max` do `ArrayMetadata` direto (fora do callback, ex: `Items(fn).Min(1)`) = quantidade do array; `Min`/`Max` do item vive no wrapper devolvido dentro do callback (`m.String().Min(1).Max(50)`) -- duas storages separadas, sem colisão
 
 **Object Builder** - PLANNED
 - `Object(metadataValue)` reusa metadata registrada (equivalente `$ref`)
