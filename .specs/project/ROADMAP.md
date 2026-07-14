@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Request Pipeline (Milestone 3)
-**Status:** Milestones 1-2 COMPLETE — starting Milestone 3
+**Current Milestone:** Metadata Builder — Primitivos (Milestone 4)
+**Status:** Milestones 1-3 COMPLETE — starting Milestone 4
 
 ---
 
@@ -79,8 +79,11 @@
 - `Controller.Filters()` (real, era o último stub) + `Module.Filters()` (novo, global só-root) — captura seletiva de `exception.Exception` por tipo concreto, controller sobrepõe global, não-capturado cai no default `{name,message,details}` já existente
 - `filteredHandler` em Stage 2.5: camada mais externa de toda a chain (envolve middleware→guard→interceptor→handler), recover próprio que re-panica se nenhum Filter capturar
 
-**Pipeline Ordering** - PLANNED
-- Valida ordem Middleware → Guard → Interceptor → Pipe → Handler em cenário com todos combinados
+**Pipeline Ordering** - COMPLETE
+- Teste de integração único reproduz o `UserController` completo do INSIGHT.md (Middleware global+controller, Guard, Interceptor, Pipe customizado, Filter, todos na mesma rota) — ordem observada bate exatamente com o documentado: `global-middleware → controller-middleware → guard → interceptor-before → handler (roda Pipe via MustParam) → interceptor-after`
+- Nenhum bug de composição encontrado — cada peça já garantia sua própria ordem corretamente desde a feature que a construiu; esta feature só provou o cenário combinado nunca antes testado
+
+**Milestone 3 (Request Pipeline) COMPLETE.**
 
 ---
 

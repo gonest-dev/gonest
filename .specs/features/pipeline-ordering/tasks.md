@@ -1,7 +1,7 @@
 # Pipeline Ordering Tasks
 
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1, evaluator PASS) — **Milestone 3 (Request Pipeline) COMPLETE**
 
 Escopo pequeno o suficiente (validação, não construção — ver spec.md's Out of Scope) que não justifica um `design.md` formal. Toda decisão de composição já foi tomada e implementada nas features anteriores (Middleware/Guard/Interceptor/Pipe/Filter) — essa feature só prova, num cenário combinado único, que a ordem documentada em ROADMAP.md se sustenta.
 
@@ -19,7 +19,7 @@ Task única — não há paralelismo a planejar.
 
 ## Task Breakdown
 
-### T1: Teste combinado — reproduz o `UserController` completo do INSIGHT.md
+### T1: Teste combinado — reproduz o `UserController` completo do INSIGHT.md ✅ DONE (evaluator: PASS, commit `52cff89` — nenhum bug de código real achado, arquitetura já correta; evaluator reproduziu o experimento de inverter a ordem e confirmou falha genuína da asserção)
 
 **What**: em `internal/app/app_test.go` (ou arquivo novo `internal/app/pipeline_ordering_test.go` no mesmo pacote — decisão do developer, ambos válidos), escrever um teste (ou pequena tabela de subtestes) que reproduz o exemplo completo de pipeline do INSIGHT.md (seção "aplicando tudo no controller"): controller com `Use`/`Guards`/`Interceptors`/`Filters` TODOS registrados, módulo raiz com `Use`/`Filters` GLOBAIS também registrados, e uma rota usando `Route.Param` com um Pipe customizado. Dispatch via `app.Test` real, cobrindo os 3 cenários do spec.md (ORD-01/02/03):
 1. Caminho feliz completo — recorder de ordem prova a sequência exata: middleware global → middleware controller → guard → interceptor(before) → handler (que roda o Pipe via `MustParam[T]`) → interceptor(after)
@@ -38,12 +38,12 @@ Se a checagem revelar alguma lacuna real de ordem (comportamento atual não bate
 - Skill: NONE
 
 **Done when**:
-- [ ] Caminho feliz: ordem exata provada via recorder — `["global-mw","controller-mw","guard","interceptor-before","handler","interceptor-after"]` (ou equivalente, incluindo onde o Pipe roda dentro do handler)
-- [ ] Guard-rejeita: interceptor-before e handler NÃO aparecem no recorder, resposta 403 (ou exception custom do Guard, se aplicável)
-- [ ] Pipe panica dentro do handler: Filter registrado pra esse tipo captura (resposta customizada) OU cai no default `{name,message,details}` se não há Filter pra esse tipo — ambos os sub-cenários testados
-- [ ] Gate check passa
-- [ ] Test count: 3+ (um por cenário — pode ser 1 teste com 3 subtestes)
-- [ ] Se alguma lacuna real de ordem for achada: corrigida no código real, não só no teste, com relato claro
+- [x] Caminho feliz: ordem exata provada via recorder — `global-middleware → controller-middleware → guard → interceptor-before → handler-before-pipe → pipe → interceptor-after` (confere com ROADMAP.md)
+- [x] Guard-rejeita: interceptor-before e handler NÃO aparecem no recorder, resposta 403
+- [x] Pipe panica dentro do handler: ambos sub-cenários testados (Filter captura, e não-capturado cai no default)
+- [x] Gate check passa
+- [x] Test count: 3+ (4 subtestes via `t.Run`)
+- [x] Nenhuma lacuna de ordem encontrada — arquitetura já correta desde as features individuais; evaluator reproduziu experimento de ordem invertida e confirmou asserção genuína
 
 **Tests**: integration (dispatch real via `app.Test`)
 **Gate**: full
