@@ -152,8 +152,8 @@
 
 ### Features
 
-**OpenAPI Document Builder** - PLANNED
-- `NewOpenApiDocument`, `Title`/`Description`/`Version`/`Contact`/`License`/`BearerAuth`
+**OpenAPI Document Builder** - COMPLETE
+- `NewOpenApiDocument`/`OpenApiDocument` (`internal/openapi`, re-exportado na raiz), `Title`/`Description`/`Version`/`Contact`/`License`/`BearerAuth` -- builder mecânico, sem dependência de `internal/metadata`/`internal/route`
 
 **Schema Generation from Metadata** - PLANNED
 - Branches de metadata → schema type+format; `$ref` reuso pra Object/Array-de-Object
