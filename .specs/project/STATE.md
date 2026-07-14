@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-07-13
-**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 3 em progresso: "Middleware", "Guard" e "Interceptor" DONE. Feature "Interceptor" (T1-T4, commit `f357df0`) — `internal/interceptor` novo pacote (`Next` PRÓPRIO, não reusa `middleware.Next`; execução imediata, AD-008), `Controller.Interceptors` real (era stub) + composição em Stage 2.5: Interceptor envolve o Handler puro, Guard envolve o RESULTADO disso (Guard fica mais externo — ordem final Middleware → Guard → Interceptor → Handler). T3 teve correção pós-implementação: design original tinha a ordem Guard/Interceptor trocada, ver L-011. Próxima: "Pipe" (pipeline-stage, 4ª feature de Milestone 3, ver ROADMAP.md).
+**Current Work:** Milestones 1 e 2 **COMPLETE**. Milestone 3: todas as 5 features-tipo COMPLETE (Middleware, Guard, Interceptor, Pipe, Filter). Feature "Filter" (T1-T5, commit `df9b616`) — `internal/filter` novo pacote (`Catch` reflect-validado como `Pipe.Handler`), `Controller.Filters`/`Module.Filters` reais (último stub de `Controller` eliminado, placeholder `Middleware struct{}` deletado), `filteredHandler` em Stage 2.5 como camada MAIS EXTERNA de toda a chain (envolve middleware→guard→interceptor→handler), captura seletiva por tipo concreto de exception, controller sobrepõe global, re-panica pro recover default se nada capturar. Também: pacote raiz consolidado (AD-009), `internal/httpctx`→`internal/execution` e `internal/fiberapp`→`internal/adapter/fiber` renomeados (AD-010). Só falta "Pipeline Ordering" pra fechar Milestone 3 inteiro. Próxima: especificar "Pipeline Ordering" (ver ROADMAP.md).
 
 ---
 

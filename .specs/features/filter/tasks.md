@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/filter/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: Draft
+**Status**: ✅ COMPLETE (T1-T5, todos evaluator PASS)
 
 ---
 
@@ -138,7 +138,7 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 
 ---
 
-### T5: Root re-exports
+### T5: Root re-exports ✅ DONE (evaluator: PASS, commit `df9b616`)
 
 **What**: root `gonest` package gets `Filter` (type alias) and `NewFilter` (`var NewFilter = filter.New`, plain alias, `New` is not generic). ADD to the existing consolidated `gonest.go`/`gonest_test.go` (per AD-009 — do NOT create a new root-level file).
 **Where**: `gonest.go` (existing, add a new `// Filter (Filter feature)` section), `gonest_test.go` (existing, add tests)
@@ -151,10 +151,10 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 - Skill: NONE
 
 **Done when**:
-- [ ] `gonest.NewFilter(fn)`, `gonest.Filter` resolve and work at root
-- [ ] INSIGHT.md's `FooExampleFilter` example (adapted per spec.md's Edge Cases: plain `int` status literal `418`, not the nonexistent `gonest.HttpStatusTeapot`) reproduced through root aliases, attached via `controller.Filters(...)` through root `Controller`/`Module`/`NewApp` aliases, dispatched via real `app.Test`: caught type → custom response, uncaught type → default response
-- [ ] Gate check passes
-- [ ] Test count: 2+ (root-level smoke test for `NewFilter`/`Filter` resolving, the adapted `FooExampleFilter` reproduction end-to-end through root aliases)
+- [x] `gonest.NewFilter(fn)`, `gonest.Filter` resolve and work at root
+- [x] INSIGHT.md's `FooExampleFilter` example (adapted per spec.md's Edge Cases: plain `int` status literal `418`, not the nonexistent `gonest.HttpStatusTeapot`) reproduced through root aliases, attached via `controller.Filters(...)` through root `Controller`/`Module`/`NewApp` aliases, dispatched via real `app.Test`: caught type → custom response, uncaught type → default response
+- [x] Gate check passes
+- [x] Test count: 2+ (root-level smoke test for `NewFilter`/`Filter` resolving, the adapted `FooExampleFilter` reproduction end-to-end through root aliases)
 
 **Tests**: unit (integration-style dispatch, root-package convention)
 **Gate**: quick

@@ -74,8 +74,10 @@
 - `NewPipe`, transforma/valida param antes do handler, panic `BadRequestException` se inválido — implementação já existia desde "Controller & Route Registration" T3 (`internal/pipe`), só faltava re-export raiz
 - Corrigidos 2 bugs reais de integração achados ao adicionar o primeiro teste end-to-end via dispatch real: `Route.Param` não chamava `Pipe.Declare()`, e `ctx.WithRoute()` nunca era chamado em produção — Pipe customizado nunca funcionava fora de teste isolado. Ver L-012 em STATE.md.
 
-**Filter** - PLANNED
-- `NewFilter`, `Catch(exceptionType, handler)`, registro por controller/módulo/global
+**Filter** - COMPLETE
+- `NewFilter`, `Catch(exemplar, handler)` (`internal/filter`, re-exportado na raiz, reflect-validado como Pipe) — execução imediata, sem MustInject (AD-008)
+- `Controller.Filters()` (real, era o último stub) + `Module.Filters()` (novo, global só-root) — captura seletiva de `exception.Exception` por tipo concreto, controller sobrepõe global, não-capturado cai no default `{name,message,details}` já existente
+- `filteredHandler` em Stage 2.5: camada mais externa de toda a chain (envolve middleware→guard→interceptor→handler), recover próprio que re-panica se nenhum Filter capturar
 
 **Pipeline Ordering** - PLANNED
 - Valida ordem Middleware → Guard → Interceptor → Pipe → Handler em cenário com todos combinados
