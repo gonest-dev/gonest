@@ -17,8 +17,6 @@ package metadata
 // return value) mutate the exact same *PropertyBuilder either way.
 type ObjectMetadata struct {
 	*PropertyBuilder
-	ref                  *Metadata
-	additionalProperties bool
 }
 
 // Metadata reuses an already-registered *Metadata as om's schema

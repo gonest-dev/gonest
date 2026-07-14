@@ -34,10 +34,22 @@ package metadata
 // chain position.
 type ArrayMetadata struct {
 	*PropertyBuilder
-	item    *PropertyBuilder
-	itemRef *Metadata
-	min     *int
-	max     *int
+	// item is a construction-time SNAPSHOT of PropertyBuilder.item (the
+	// canonical, promoted-access copy every item-branch method below also
+	// mutates through this same pointer). Kept as ArrayMetadata's own field
+	// -- rather than relying purely on promoted access to
+	// PropertyBuilder.item -- so that an EARLIER *ArrayMetadata returned by
+	// a first Array() call keeps observing ITS OWN item builder even after
+	// a second Array() call on the same PropertyBuilder reassigns
+	// PropertyBuilder.item to a fresh instance (json-body-validation
+	// feature's P0 relocation, reconciled against the pre-existing
+	// TestArray_CalledTwice_ProducesIndependentItemState regression test:
+	// both *ArrayMetadata values still share the same embedded
+	// *PropertyBuilder -- required by TestArray_SetsFormatAndReturnsNewArrayMetadata
+	// -- but each captures its OWN item pointer at the moment Array() was
+	// called, exactly mirroring the pre-P0 behavior where item lived only
+	// on this wrapper).
+	item *PropertyBuilder
 }
 
 // Items invokes fn with am itself (pointer identity -- the SAME
@@ -61,6 +73,7 @@ func (am *ArrayMetadata) Items(fn func(m *ArrayMetadata)) *ArrayMetadata {
 // registered field.
 func (am *ArrayMetadata) String() *StringMetadata {
 	am.item.format = ""
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -68,6 +81,7 @@ func (am *ArrayMetadata) String() *StringMetadata {
 // doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Email() *StringMetadata {
 	am.item.format = "email"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -75,6 +89,7 @@ func (am *ArrayMetadata) Email() *StringMetadata {
 // comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Uuid() *StringMetadata {
 	am.item.format = "uuid"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -82,6 +97,7 @@ func (am *ArrayMetadata) Uuid() *StringMetadata {
 // comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Uri() *StringMetadata {
 	am.item.format = "uri"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -89,6 +105,7 @@ func (am *ArrayMetadata) Uri() *StringMetadata {
 // String's doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Hostname() *StringMetadata {
 	am.item.format = "hostname"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -96,6 +113,7 @@ func (am *ArrayMetadata) Hostname() *StringMetadata {
 // comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Ipv4() *StringMetadata {
 	am.item.format = "ipv4"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -103,6 +121,7 @@ func (am *ArrayMetadata) Ipv4() *StringMetadata {
 // comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Ipv6() *StringMetadata {
 	am.item.format = "ipv6"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -110,6 +129,7 @@ func (am *ArrayMetadata) Ipv6() *StringMetadata {
 // String's doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Password() *StringMetadata {
 	am.item.format = "password"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -117,6 +137,7 @@ func (am *ArrayMetadata) Password() *StringMetadata {
 // See String's doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Byte() *StringMetadata {
 	am.item.format = "byte"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -124,6 +145,7 @@ func (am *ArrayMetadata) Byte() *StringMetadata {
 // doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Binary() *StringMetadata {
 	am.item.format = "binary"
+	am.item.kind = "string"
 	return &StringMetadata{PropertyBuilder: am.item}
 }
 
@@ -133,6 +155,7 @@ func (am *ArrayMetadata) Binary() *StringMetadata {
 // shared branch-method behavior (last-call-wins, no panic).
 func (am *ArrayMetadata) Integer() *NumericMetadata {
 	am.item.format = "int64"
+	am.item.kind = "integer"
 	return &NumericMetadata{PropertyBuilder: am.item}
 }
 
@@ -140,6 +163,7 @@ func (am *ArrayMetadata) Integer() *NumericMetadata {
 // doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Int32() *NumericMetadata {
 	am.item.format = "int32"
+	am.item.kind = "integer"
 	return &NumericMetadata{PropertyBuilder: am.item}
 }
 
@@ -147,6 +171,7 @@ func (am *ArrayMetadata) Int32() *NumericMetadata {
 // doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Float() *NumericMetadata {
 	am.item.format = "float"
+	am.item.kind = "number"
 	return &NumericMetadata{PropertyBuilder: am.item}
 }
 
@@ -154,6 +179,7 @@ func (am *ArrayMetadata) Float() *NumericMetadata {
 // Integer's doc comment for the shared branch-method behavior.
 func (am *ArrayMetadata) Double() *NumericMetadata {
 	am.item.format = "double"
+	am.item.kind = "number"
 	return &NumericMetadata{PropertyBuilder: am.item}
 }
 
@@ -164,6 +190,7 @@ func (am *ArrayMetadata) Double() *NumericMetadata {
 // full rationale.
 func (am *ArrayMetadata) Boolean() *PropertyBuilder {
 	am.item.format = ""
+	am.item.kind = "boolean"
 	return am.item
 }
 
@@ -173,6 +200,7 @@ func (am *ArrayMetadata) Boolean() *PropertyBuilder {
 // body.
 func (am *ArrayMetadata) DateTime() *PropertyBuilder {
 	am.item.format = "date-time"
+	am.item.kind = "string"
 	return am.item
 }
 
@@ -180,6 +208,7 @@ func (am *ArrayMetadata) DateTime() *PropertyBuilder {
 // doc comment for why this returns the bare item *PropertyBuilder.
 func (am *ArrayMetadata) Date() *PropertyBuilder {
 	am.item.format = "date"
+	am.item.kind = "string"
 	return am.item
 }
 

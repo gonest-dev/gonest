@@ -33,8 +33,6 @@ package metadata
 // Boolean Branches) will repeat for its own branch-specific type(s).
 type StringMetadata struct {
 	*PropertyBuilder
-	min, max *int
-	pattern  string
 }
 
 // Min sets this field's own minimum length constraint and returns s so

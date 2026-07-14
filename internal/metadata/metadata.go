@@ -129,6 +129,22 @@ type PropertyBuilder struct {
 	description string
 	examples    []any
 	format      string
+
+	// P0 additions (json-body-validation feature) -- permanent home for
+	// every branch's own constraints, relocated off each disposable
+	// wrapper type (StringMetadata/NumericMetadata/ArrayMetadata/
+	// ObjectMetadata) so a future consumer can read them back through
+	// PropertyBuilder alone, without needing the original wrapper
+	// reference (see design.md's Components table). Reused across
+	// branch families since only ONE family is ever active per
+	// PropertyBuilder instance (format/kind determine which).
+	kind                 string           // OpenAPI "type": string/integer/number/boolean/array/object
+	min, max             *int             // String length / Numeric value / Array quantity
+	pattern              string           // String only
+	item                 *PropertyBuilder // Array's synthetic item builder
+	itemRef              *Metadata        // Array's Object(ref)-as-item
+	ref                  *Metadata        // Object's own Metadata(ref)
+	additionalProperties bool             // Object's own AdditionalProperties()
 }
 
 // Required marks this field as required and returns p so calls can chain.
@@ -215,6 +231,7 @@ func (p *PropertyBuilder) FormatValue() string {
 // double-registration panic.
 func (p *PropertyBuilder) String() *StringMetadata {
 	p.format = ""
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -222,6 +239,7 @@ func (p *PropertyBuilder) String() *StringMetadata {
 // for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Email() *StringMetadata {
 	p.format = "email"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -229,6 +247,7 @@ func (p *PropertyBuilder) Email() *StringMetadata {
 // the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Uuid() *StringMetadata {
 	p.format = "uuid"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -236,6 +255,7 @@ func (p *PropertyBuilder) Uuid() *StringMetadata {
 // the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Uri() *StringMetadata {
 	p.format = "uri"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -243,6 +263,7 @@ func (p *PropertyBuilder) Uri() *StringMetadata {
 // comment for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Hostname() *StringMetadata {
 	p.format = "hostname"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -250,6 +271,7 @@ func (p *PropertyBuilder) Hostname() *StringMetadata {
 // the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Ipv4() *StringMetadata {
 	p.format = "ipv4"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -257,6 +279,7 @@ func (p *PropertyBuilder) Ipv4() *StringMetadata {
 // the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Ipv6() *StringMetadata {
 	p.format = "ipv6"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -264,6 +287,7 @@ func (p *PropertyBuilder) Ipv6() *StringMetadata {
 // comment for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Password() *StringMetadata {
 	p.format = "password"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -272,6 +296,7 @@ func (p *PropertyBuilder) Password() *StringMetadata {
 // (last-call-wins, no panic).
 func (p *PropertyBuilder) Byte() *StringMetadata {
 	p.format = "byte"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -279,6 +304,7 @@ func (p *PropertyBuilder) Byte() *StringMetadata {
 // for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Binary() *StringMetadata {
 	p.format = "binary"
+	p.kind = "string"
 	return &StringMetadata{PropertyBuilder: p}
 }
 
@@ -291,6 +317,7 @@ func (p *PropertyBuilder) Binary() *StringMetadata {
 // already established for the string family.
 func (p *PropertyBuilder) Integer() *NumericMetadata {
 	p.format = "int64"
+	p.kind = "integer"
 	return &NumericMetadata{PropertyBuilder: p}
 }
 
@@ -298,6 +325,7 @@ func (p *PropertyBuilder) Integer() *NumericMetadata {
 // for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Int32() *NumericMetadata {
 	p.format = "int32"
+	p.kind = "integer"
 	return &NumericMetadata{PropertyBuilder: p}
 }
 
@@ -305,6 +333,7 @@ func (p *PropertyBuilder) Int32() *NumericMetadata {
 // for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Float() *NumericMetadata {
 	p.format = "float"
+	p.kind = "number"
 	return &NumericMetadata{PropertyBuilder: p}
 }
 
@@ -312,6 +341,7 @@ func (p *PropertyBuilder) Float() *NumericMetadata {
 // comment for the shared branch-method behavior (last-call-wins, no panic).
 func (p *PropertyBuilder) Double() *NumericMetadata {
 	p.format = "double"
+	p.kind = "number"
 	return &NumericMetadata{PropertyBuilder: p}
 }
 
@@ -334,6 +364,7 @@ func (p *PropertyBuilder) Double() *NumericMetadata {
 // numeric-boolean-branches).
 func (p *PropertyBuilder) Boolean() *PropertyBuilder {
 	p.format = ""
+	p.kind = "boolean"
 	return p
 }
 
@@ -346,6 +377,7 @@ func (p *PropertyBuilder) Boolean() *PropertyBuilder {
 // a disposable wrapper type -- same reasoning as Boolean's own doc comment.
 func (p *PropertyBuilder) DateTime() *PropertyBuilder {
 	p.format = "date-time"
+	p.kind = "string"
 	return p
 }
 
@@ -354,6 +386,7 @@ func (p *PropertyBuilder) DateTime() *PropertyBuilder {
 // *PropertyBuilder rather than a wrapper type.
 func (p *PropertyBuilder) Date() *PropertyBuilder {
 	p.format = "date"
+	p.kind = "string"
 	return p
 }
 
@@ -371,7 +404,21 @@ func (p *PropertyBuilder) Date() *PropertyBuilder {
 // rationale).
 func (p *PropertyBuilder) Array() *ArrayMetadata {
 	p.format = "array"
-	return &ArrayMetadata{PropertyBuilder: p, item: &PropertyBuilder{}}
+	p.kind = "array"
+	p.item = &PropertyBuilder{}
+	p.itemRef = nil
+	p.min = nil
+	p.max = nil
+	// NOTE (SPEC_DEVIATION from tasks.md T0 item 3's literal
+	// `return &ArrayMetadata{PropertyBuilder: p}`): also captures p.item
+	// into the returned ArrayMetadata's OWN item field (see array.go's
+	// ArrayMetadata.item doc comment) -- required to keep an EARLIER
+	// *ArrayMetadata's ItemBuilder() independent of a LATER Array() call on
+	// the same PropertyBuilder, per the pre-existing
+	// TestArray_CalledTwice_ProducesIndependentItemState regression test,
+	// which the literal task instruction (no item: in the literal) would
+	// otherwise break.
+	return &ArrayMetadata{PropertyBuilder: p, item: p.item}
 }
 
 // Object selects OpenAPI's "object" type and returns a brand new
@@ -388,7 +435,89 @@ func (p *PropertyBuilder) Array() *ArrayMetadata {
 // `Object(fn).Nullable().Description(...)` shape).
 func (p *PropertyBuilder) Object(fn func(om *ObjectMetadata)) *ObjectMetadata {
 	p.format = "object"
+	p.kind = "object"
+	p.ref = nil
+	p.additionalProperties = false
 	om := &ObjectMetadata{PropertyBuilder: p}
 	fn(om)
 	return om
+}
+
+// KindValue returns the OpenAPI "type" dimension set by whichever branch
+// method (String/.../Boolean/DateTime/.../Array/Object) was last called on
+// p, or "" if none was ever called. kind is orthogonal to format (see the
+// PropertyBuilder.kind field's own doc comment) -- this is what
+// distinguishes a String() field from a Boolean() field, both of which
+// leave FormatValue() == "" (json-body-validation feature's P0 fix for a
+// pre-existing collision).
+func (p *PropertyBuilder) KindValue() string {
+	return p.kind
+}
+
+// MinValue returns the minimum constraint set via a branch's own Min call
+// (String length / Numeric value / Array item count -- whichever family is
+// active on p), and whether Min was ever called -- the bool return
+// distinguishes "never called" from "called with 0", since 0 is itself a
+// valid minimum. Relocated here (json-body-validation's P0) so a future
+// consumer can read it back without needing the original StringMetadata/
+// NumericMetadata/ArrayMetadata wrapper reference.
+func (p *PropertyBuilder) MinValue() (int, bool) {
+	if p.min == nil {
+		return 0, false
+	}
+	return *p.min, true
+}
+
+// MaxValue returns the maximum constraint set via a branch's own Max call,
+// and whether Max was ever called -- same "never called" vs "called with 0"
+// distinction as MinValue. See MinValue's doc comment for why this lives on
+// PropertyBuilder now.
+func (p *PropertyBuilder) MaxValue() (int, bool) {
+	if p.max == nil {
+		return 0, false
+	}
+	return *p.max, true
+}
+
+// PatternValue returns the regex pattern set via a String-family branch's
+// own Pattern call, or "" if it was never called. See MinValue's doc
+// comment for why this lives on PropertyBuilder now.
+func (p *PropertyBuilder) PatternValue() string {
+	return p.pattern
+}
+
+// ItemBuilder returns p's synthetic item *PropertyBuilder (set by Array),
+// or nil if Array was never called. See MinValue's doc comment for why this
+// lives on PropertyBuilder now.
+func (p *PropertyBuilder) ItemBuilder() *PropertyBuilder {
+	return p.item
+}
+
+// ItemRef returns the *Metadata set via ArrayMetadata.Object(ref), and
+// whether it was ever called -- same "never called" distinction as
+// MinValue/MaxValue. See MinValue's doc comment for why this lives on
+// PropertyBuilder now.
+func (p *PropertyBuilder) ItemRef() (*Metadata, bool) {
+	if p.itemRef == nil {
+		return nil, false
+	}
+	return p.itemRef, true
+}
+
+// MetadataRef returns the *Metadata set via ObjectMetadata.Metadata(ref),
+// and whether it was ever called -- same "never called" distinction as
+// MinValue/MaxValue. See MinValue's doc comment for why this lives on
+// PropertyBuilder now.
+func (p *PropertyBuilder) MetadataRef() (*Metadata, bool) {
+	if p.ref == nil {
+		return nil, false
+	}
+	return p.ref, true
+}
+
+// IsAdditionalProperties reports whether ObjectMetadata.AdditionalProperties
+// was ever called. See MinValue's doc comment for why this lives on
+// PropertyBuilder now.
+func (p *PropertyBuilder) IsAdditionalProperties() bool {
+	return p.additionalProperties
 }

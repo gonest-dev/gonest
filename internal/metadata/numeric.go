@@ -29,7 +29,6 @@ package metadata
 // from the common method to a numeric-specific one.
 type NumericMetadata struct {
 	*PropertyBuilder
-	min, max *int
 }
 
 // Min sets this field's own minimum value constraint and returns n so calls
