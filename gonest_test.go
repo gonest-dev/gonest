@@ -1425,3 +1425,162 @@ func TestStringMetadata_RootAlias_RemainingSevenBranches(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// NumericMetadata (Numeric & Boolean Branches feature)
+// ---------------------------------------------------------------------------
+
+// TestNumericMetadata_RootAlias_TypeCheck proves gonest.NumericMetadata
+// resolves and type-checks at the root gonest package: PropertyBuilder.
+// Integer() returns a *NumericMetadata, and the base chain methods
+// (Required/Description/Examples) plus the numeric-specific ones (Min/Max)
+// all compile and mutate the SAME underlying PropertyBuilder (per
+// internal/metadata.NumericMetadata's own doc comment on embedding a
+// POINTER, not a copy).
+func TestNumericMetadata_RootAlias_TypeCheck(t *testing.T) {
+	type minimalEntity struct {
+		Age int64
+	}
+
+	var nm *NumericMetadata
+	m := NewMetadata[minimalEntity](func(t *minimalEntity, m *Metadata) {
+		nm = m.Property(&t.Age).Integer().Required().Min(0).Max(150).
+			Description("an age").Examples(int64(30))
+	})
+	if m == nil {
+		t.Fatal("NewMetadata() returned nil *Metadata")
+	}
+	if nm == nil {
+		t.Fatal("expected *NumericMetadata, got nil")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 1 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+	}
+	p := props[0]
+
+	if !p.IsRequired() {
+		t.Fatal("IsRequired() = false, want true")
+	}
+	if p.FormatValue() != "int64" {
+		t.Fatalf("FormatValue() = %q, want %q (Integer() sets format int64)", p.FormatValue(), "int64")
+	}
+	if min, ok := nm.MinValue(); !ok || min != 0 {
+		t.Fatalf("MinValue() = (%d, %v), want (0, true)", min, ok)
+	}
+	if max, ok := nm.MaxValue(); !ok || max != 150 {
+		t.Fatalf("MaxValue() = (%d, %v), want (150, true)", max, ok)
+	}
+	if p.DescriptionText() != "an age" {
+		t.Fatalf("DescriptionText() = %q, want %q", p.DescriptionText(), "an age")
+	}
+	examples := p.ExamplesList()
+	if len(examples) != 1 || examples[0] != int64(30) {
+		t.Fatalf("ExamplesList() = %v, want [30]", examples)
+	}
+}
+
+// TestNumericMetadata_RootAlias_UserEntityInsightCallShape reproduces
+// INSIGHT.md's UserEntity metadata example (lines ~393-401) verbatim for its
+// Id (.Integer()) and IsActive (.Boolean()) fields through the root gonest
+// package's PropertyBuilder.Integer()/Boolean()/NumericMetadata aliases,
+// confirmed field by field.
+func TestNumericMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+	type UserEntity struct {
+		Id       int64 `json:"id"`
+		IsActive bool  `json:"isActive"`
+	}
+
+	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Description("Entidade de usuário")
+		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+		m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
+	})
+
+	if m.DescriptionText() != "Entidade de usuário" {
+		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 2 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 2", len(props))
+	}
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range props {
+		byName[p.Field().Name] = p
+	}
+
+	id, ok := byName["Id"]
+	if !ok {
+		t.Fatal("field \"Id\" was not registered via Property")
+	}
+	if !id.IsRequired() {
+		t.Fatal("Id: IsRequired() = false, want true")
+	}
+	if id.FormatValue() != "int64" {
+		t.Fatalf("Id: FormatValue() = %q, want %q", id.FormatValue(), "int64")
+	}
+	if id.DescriptionText() != "ID do usuário" {
+		t.Fatalf("Id: DescriptionText() = %q, want %q", id.DescriptionText(), "ID do usuário")
+	}
+	if examples := id.ExamplesList(); len(examples) != 1 || examples[0] != int64(1) {
+		t.Fatalf("Id: ExamplesList() = %v, want [1]", examples)
+	}
+
+	isActive, ok := byName["IsActive"]
+	if !ok {
+		t.Fatal("field \"IsActive\" was not registered via Property")
+	}
+	if !isActive.IsRequired() {
+		t.Fatal("IsActive: IsRequired() = false, want true")
+	}
+	if isActive.FormatValue() != "" {
+		t.Fatalf("IsActive: FormatValue() = %q, want %q (Boolean() sets no format)", isActive.FormatValue(), "")
+	}
+	if isActive.DescriptionText() != "Status do usuário" {
+		t.Fatalf("IsActive: DescriptionText() = %q, want %q", isActive.DescriptionText(), "Status do usuário")
+	}
+	if examples := isActive.ExamplesList(); len(examples) != 1 || examples[0] != true {
+		t.Fatalf("IsActive: ExamplesList() = %v, want [true]", examples)
+	}
+}
+
+// TestNumericMetadata_RootAlias_RemainingThreeBranches exercises the 3
+// numeric-family branch methods not shown explicitly in INSIGHT.md's
+// examples (Int32/Float/Double -- Integer already covered above) through the
+// root gonest package's PropertyBuilder/NumericMetadata aliases, confirming
+// each sets its own distinct FormatValue().
+func TestNumericMetadata_RootAlias_RemainingThreeBranches(t *testing.T) {
+	type entity struct {
+		Int32Field  int32
+		FloatField  float32
+		DoubleField float64
+	}
+
+	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+		m.Property(&t.Int32Field).Int32()
+		m.Property(&t.FloatField).Float()
+		m.Property(&t.DoubleField).Double()
+	})
+
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range m.OwnProperties() {
+		byName[p.Field().Name] = p
+	}
+
+	wantFormats := map[string]string{
+		"Int32Field":  "int32",
+		"FloatField":  "float",
+		"DoubleField": "double",
+	}
+	for name, want := range wantFormats {
+		p, ok := byName[name]
+		if !ok {
+			t.Fatalf("field %q was not registered via Property", name)
+		}
+		if got := p.FormatValue(); got != want {
+			t.Fatalf("field %q: FormatValue() = %q, want %q", name, got, want)
+		}
+	}
+}

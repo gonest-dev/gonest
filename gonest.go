@@ -426,3 +426,23 @@ func NewMetadata[T any](fn func(t *T, m *Metadata)) *Metadata {
 	fn(&zero, m)
 	return m
 }
+
+// ---------------------------------------------------------------------------
+// NumericMetadata (Numeric & Boolean Branches feature)
+// ---------------------------------------------------------------------------
+
+// NumericMetadata is the branch-specific builder returned by all 4
+// numeric-family branch methods on PropertyBuilder (Integer/Int32/Float/
+// Double -- Numeric & Boolean Branches feature). It is a true Go type alias,
+// so its own methods (Min/Max) plus the manually re-declared chain methods
+// (Required/Nullable/Description/Examples) are automatically visible on
+// gonest.NumericMetadata with zero extra wrapper code, same as
+// gonest.StringMetadata above. Boolean() needs no re-export of its own here
+// -- it returns a plain *PropertyBuilder (already a root alias since
+// Metadata Registration Core), since OpenAPI's boolean type carries no
+// format-specific extra validators the way the numeric/string families do.
+// See internal/metadata.NumericMetadata's doc comment for why those 4 chain
+// methods are manually re-declared rather than promoted (AD-009 in
+// STATE.md: this section lives in this consolidated file rather than a
+// separate metadata.go).
+type NumericMetadata = metadata.NumericMetadata
