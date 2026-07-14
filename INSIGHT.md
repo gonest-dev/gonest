@@ -45,6 +45,18 @@ var UserProvider = gonest.NewProvider(func (provider *gonest.Provider) {
   })
 })
 
+// UserIdParam é o "whole-object" de um único path param -- mesmo mecanismo
+// de MustJsonBody, só que alimentado pelo segmento ":user_id" da rota em vez
+// do corpo JSON (ver "exemplo de Param/Query Validation" mais abaixo pro
+// detalhe completo, incluindo query string e Custom(fn)).
+type UserIdParam struct {
+  UserId int64 `param:"user_id"`
+}
+
+var _ = gonest.NewMetadata[UserIdParam](func (t *UserIdParam, m *gonest.Metadata) {
+  m.Property(&t.UserId).Integer().Min(1).Required()
+})
+
 var UserController = gonest.NewController(func (controller *gonest.Controller) {
   // descritivos relacionados ao controller
   controller.Path("/user")
@@ -62,8 +74,8 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
     route.Handler(func(ctx *gonest.Context) {
-      userId := gonest.MustParam[int64](ctx, "user_id")
-      ctx.Json(userService.Get(userId))
+      params := gonest.MustParams[*UserIdParam](ctx)
+      ctx.Json(userService.Get(params.UserId))
     })
   })
   controller.Route(gonest.HttpPost, "/", func (route *gonest.Route) {
@@ -76,16 +88,16 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   controller.Route(gonest.HttpPut, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
     route.Handler(func(ctx *gonest.Context) {
-      userId := gonest.MustParam[int64](ctx, "user_id")
+      params := gonest.MustParams[*UserIdParam](ctx)
       properties := gonest.MustJsonBody[*UserProperties](ctx)
-      ctx.Json(userService.Update(userId, properties))
+      ctx.Json(userService.Update(params.UserId, properties))
     })
   })
   controller.Route(gonest.HttpDelete, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
     route.Handler(func(ctx *gonest.Context) {
-      userId := gonest.MustParam[int64](ctx, "user_id")
-      ctx.Json(userService.Delete(userId))
+      params := gonest.MustParams[*UserIdParam](ctx)
+      ctx.Json(userService.Delete(params.UserId))
     })
   })
 })
@@ -150,13 +162,15 @@ func (t *FooService) ShouldThrow() { panic(NewFooExampleError(map[string]any{"in
 // como 500 genérico, sem vazar detalhe interno no body.
 ```
 
-# exemplo de Middleware, Guard, Interceptor, Filter e Pipe
+# exemplo de Middleware, Guard, Interceptor e Filter
 
 ```go
 package ex
 
 import (
+  "fmt"
   "strconv"
+  "strings"
   "time"
 
   "github.com/gonest-dev/gonest"
@@ -214,17 +228,29 @@ var FooExampleFilter = gonest.NewFilter(func (filter *gonest.Filter) {
   })
 })
 
-// ---------- Pipe ----------
-// transforma/valida um valor de entrada (param, query, body) antes do handler rodar.
-// panica com BadRequestException se a entrada for inválida.
-var ParseIntPipe = gonest.NewPipe(func (pipe *gonest.Pipe) {
-  pipe.Handler(func(ctx *gonest.Context, raw string) int64 {
-    value, err := strconv.ParseInt(raw, 10, 64)
-    if err != nil {
-      panic(gonest.NewBadRequestException(map[string]any{"raw": raw}))
+// ---------- PrefixedUserIdParam (Custom(fn)) ----------
+// Metadata's fixed vocabulary (Integer/String/Min/Max/Pattern etc) não
+// alcança formatos com prefixo próprio de domínio, tipo um ID exposto como
+// "usr_42" em vez de "42" cru -- Custom(fn) é a válvula de escape: recebe o
+// valor cru (aqui, a STRING do path param, sem nenhuma coerção prévia) e
+// devolve o valor Go já no formato final, ou um error que vira violation.
+type PrefixedUserIdParam struct {
+  UserId int64 `param:"user_id"`
+}
+
+var _ = gonest.NewMetadata[PrefixedUserIdParam](func (t *PrefixedUserIdParam, m *gonest.Metadata) {
+  m.Property(&t.UserId).Custom(func(raw any) (any, error) {
+    s, _ := raw.(string)
+    rest, ok := strings.CutPrefix(s, "usr_")
+    if !ok {
+      return nil, fmt.Errorf("expected a %q-prefixed id, got %q", "usr_", s)
     }
-    return value
-  })
+    id, err := strconv.ParseInt(rest, 10, 64)
+    if err != nil {
+      return nil, fmt.Errorf("expected a numeric suffix after %q, got %q", "usr_", s)
+    }
+    return id, nil
+  }).Required()
 })
 
 // ---------- aplicando tudo no controller ----------
@@ -237,12 +263,15 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 
   userService := gonest.MustInject[*UserService](controller)
 
+  // rota recebe o ID no formato prefixado "usr_42" (Custom(fn) acima
+  // decodifica pro int64 cru antes do handler rodar; violation -- prefixo
+  // errado ou sufixo não-numérico -- vira 400 automático igual qualquer
+  // outro campo de MustParams).
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Param("user_id", ParseIntPipe)
     route.Handler(func(ctx *gonest.Context) {
-      userId := gonest.MustParam[int64](ctx, "user_id")
-      ctx.Json(userService.Get(userId))
+      params := gonest.MustParams[*PrefixedUserIdParam](ctx)
+      ctx.Json(userService.Get(params.UserId))
     })
   })
 })
@@ -682,3 +711,90 @@ func main() {
   app.MustListen(":3000", nil)
 }
 ```
+
+# exemplo de Param/Query Validation
+
+Path params e query string seguem exatamente o mesmo mecanismo de `MustJsonBody`
+(exemplo acima): declara um struct pequeno, registra sua `Metadata` via
+`NewMetadata[T]` (tags `param:"..."`/`query:"..."` em vez de `json:"..."`), e
+o handler resolve o struct inteiro já validado de uma vez -- nunca campo a
+campo. Não existe (nem nunca existiu como API pública) um `MustParam[T](ctx, name)`
+avulso paralelo; `MustParams`/`MustQuery` são o único caminho pra path
+param/query string.
+
+```go
+package ex
+
+import (
+  "github.com/gonest-dev/gonest"
+)
+
+// path params: struct + tag `param:"..."`, um campo por segmento ":name" da rota.
+type UserIdParams struct {
+  UserId int64 `param:"user_id"`
+}
+
+var _ = gonest.NewMetadata[UserIdParams](func (t *UserIdParams, m *gonest.Metadata) {
+  m.Property(&t.UserId).Integer().Min(1).Required()
+})
+
+// query string: struct + tag `query:"..."`, mesmo mecanismo, um campo por
+// parâmetro esperado na query string (`?page=1&limit=20`).
+type ListUsersQuery struct {
+  Page  int `query:"page"`
+  Limit int `query:"limit"`
+}
+
+var _ = gonest.NewMetadata[ListUsersQuery](func (t *ListUsersQuery, m *gonest.Metadata) {
+  m.Property(&t.Page).Integer().Min(1).Required()
+  m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
+})
+
+var UserController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/user")
+  userService := gonest.MustInject[*UserService](controller)
+
+  controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
+    route.Handler(func(ctx *gonest.Context) {
+      // MustParams[T](ctx) -- igual MustJsonBody, mas lê os ":name" da rota
+      // atual em vez do corpo JSON. Path param ausente ou fora de Min/Max
+      // vira violation, coletada junto com qualquer outra (não fail-fast) --
+      // panica *BadRequestException se alguma sobrar.
+      params := gonest.MustParams[*UserIdParams](ctx)
+      ctx.Json(userService.Get(params.UserId))
+    })
+  })
+
+  controller.Route(gonest.HttpGet, "/", func (route *gonest.Route) {
+    route.Handler(func(ctx *gonest.Context) {
+      // MustQuery[T](ctx) -- mesmo mecanismo de MustParams, lendo da query
+      // string em vez dos ":name" da rota.
+      query := gonest.MustQuery[*ListUsersQuery](ctx)
+      ctx.Json(userService.List(query.Page, query.Limit))
+    })
+  })
+})
+
+// path param + query juntos na mesma rota: MustParams e MustQuery são
+// independentes entre si, dá pra chamar os dois no mesmo handler.
+var OrderController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/user")
+  userService := gonest.MustInject[*UserService](controller)
+
+  controller.Route(gonest.HttpGet, "/:user_id/orders", func (route *gonest.Route) {
+    route.Handler(func(ctx *gonest.Context) {
+      params := gonest.MustParams[*UserIdParams](ctx)
+      query := gonest.MustQuery[*ListUsersQuery](ctx)
+      ctx.Json(userService.ListOrders(params.UserId, query.Page, query.Limit))
+    })
+  })
+})
+```
+
+Quando o vocabulário fixo de `Metadata` (`Integer`/`String`/`Min`/`Max`/`Pattern`
+etc) não alcança um formato de domínio específico (ex: um ID exposto com
+prefixo, tipo `"usr_42"`), `PropertyBuilder.Custom(fn)` é a válvula de escape
+-- funciona igual em `MustParams`/`MustQuery`/`MustJsonBody`, sempre recebendo
+o valor CRU (string, no caso de param/query) e devolvendo o valor Go final ou
+um `error` que vira violation. Ver a seção "exemplo de Middleware, Guard,
+Interceptor e Filter" acima (`PrefixedUserIdParam`) pro exemplo completo.
