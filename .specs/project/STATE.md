@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-07-13
-**Current Work:** Milestones 1, 2 e 3 **COMPLETE**. Milestone 4 (Metadata Builder — Primitivos) em progresso: "Metadata Registration Core", "String-family Branches" e "Numeric & Boolean Branches" DONE. Feature "Numeric & Boolean Branches" (T1-T2, commit `3b32728`) — `NumericMetadata` (mesmo padrão embed+redeclare de `StringMetadata`, mas sem `Pattern`) pra `Integer`/`Int32`/`Float`/`Double`, mais `Boolean()` — PRIMEIRO branch que devolve o `*PropertyBuilder` BASE direto (sem wrapper novo), já que não tem format nem validador extra; identidade de ponteiro confirmada por teste (`got == p`). Só falta "Date/Time Branches" pra fechar Milestone 4 inteiro. Próxima: especificar "Date/Time Branches" (última feature de Milestone 4, ver ROADMAP.md).
+**Last Updated:** 2026-07-14
+**Current Work:** Milestones 1, 2, 3 e 4 **COMPLETE**. Milestone 4 (Metadata Builder — Primitivos) fechado: "Metadata Registration Core", "String-family Branches", "Numeric & Boolean Branches" e "Date/Time Branches" DONE. Feature "Date/Time Branches" (T1, commit `558e587`) — `DateTime()`/`Date()` em `internal/metadata/metadata.go`, mesmo padrão de `Boolean()`: devolvem `*PropertyBuilder` BASE direto (sem wrapper novo), já que família date/time não tem format extra nem validador tipo Min/Max/Pattern; identidade de ponteiro confirmada por teste. Reproduz `UserEntity.CreatedAt`/`UpdatedAt`/`DeletedAt` do INSIGHT.md verbatim. Próxima: especificar Milestone 5 (Array & Object — AD-002 já resolveu builder linear/`Items()` variádico, ver ROADMAP.md).
 
 ---
 

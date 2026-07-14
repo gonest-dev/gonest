@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Metadata Builder — Primitivos (Milestone 4)
-**Status:** Milestones 1-3 COMPLETE — starting Milestone 4
+**Current Milestone:** Metadata Builder — Array & Object (Milestone 5)
+**Status:** Milestones 1-4 COMPLETE — starting Milestone 5
 
 ---
 
@@ -106,8 +106,8 @@
 - `Integer`/`Int32`/`Float`/`Double` + `Min`/`Max` (`NumericMetadata`, mesmo padrão embed+redeclare de `StringMetadata`), `Boolean` (`internal/metadata/numeric.go`, re-exportado na raiz)
 - `Boolean()` é o primeiro branch sem wrapper próprio — devolve o `*PropertyBuilder` base direto (identidade de ponteiro confirmada por teste), já que não tem format nem validador extra
 
-**Date/Time Branches** - PLANNED
-- `DateTime`/`Date`
+**Date/Time Branches** - COMPLETE
+- `DateTime`/`Date`, ambos sem wrapper próprio (mesmo padrão de `Boolean()` — devolvem `*PropertyBuilder` base direto, `internal/metadata/metadata.go`, re-exportado na raiz)
 
 ---
 
