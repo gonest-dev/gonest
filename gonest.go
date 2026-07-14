@@ -393,6 +393,19 @@ type Metadata = metadata.Metadata
 // doc comment for the full contract.
 type PropertyBuilder = metadata.PropertyBuilder
 
+// StringMetadata is the branch-specific builder returned by all 10
+// string-family branch methods on PropertyBuilder (String/Email/Uuid/Uri/
+// Hostname/Ipv4/Ipv6/Password/Byte/Binary -- String-family Branches
+// feature). It is a true Go type alias, so its own methods (Min/Max/
+// Pattern) plus the manually re-declared chain methods (Required/Nullable/
+// Description/Examples) are automatically visible on gonest.StringMetadata
+// with zero extra wrapper code, same as App/Module/Provider/etc above. See
+// internal/metadata.StringMetadata's doc comment for why those 4 chain
+// methods are manually re-declared rather than promoted (AD-009 in
+// STATE.md: this section lives in this consolidated file rather than a
+// separate metadata.go).
+type StringMetadata = metadata.StringMetadata
+
 // NewMetadata builds a *Metadata for T, identifying fields purely by their
 // own pointer address within a zero value of T (INSIGHT.md's
 // `m.Property(&t.Id)` call shape) -- no struct tags required. Go cannot

@@ -1197,3 +1197,231 @@ func TestNewMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// StringMetadata (String-family Branches feature)
+// ---------------------------------------------------------------------------
+
+// TestStringMetadata_RootAlias_TypeCheck proves gonest.StringMetadata
+// resolves and type-checks at the root gonest package: PropertyBuilder.
+// String() returns a *StringMetadata, and the base chain methods
+// (Required/Description/Examples) plus the string-specific ones
+// (Min/Max/Pattern) all compile and mutate the SAME underlying
+// PropertyBuilder (per internal/metadata.StringMetadata's own doc comment on
+// embedding a POINTER, not a copy).
+func TestStringMetadata_RootAlias_TypeCheck(t *testing.T) {
+	type minimalEntity struct {
+		Name string
+	}
+
+	var sm *StringMetadata
+	m := NewMetadata[minimalEntity](func(t *minimalEntity, m *Metadata) {
+		sm = m.Property(&t.Name).String().Required().Min(1).Max(50).Pattern(`^\w+$`).
+			Description("a name").Examples("John")
+	})
+	if m == nil {
+		t.Fatal("NewMetadata() returned nil *Metadata")
+	}
+	if sm == nil {
+		t.Fatal("expected *StringMetadata, got nil")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 1 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+	}
+	p := props[0]
+
+	if !p.IsRequired() {
+		t.Fatal("IsRequired() = false, want true")
+	}
+	if p.FormatValue() != "" {
+		t.Fatalf("FormatValue() = %q, want %q (String() sets no format)", p.FormatValue(), "")
+	}
+	if min, ok := sm.MinValue(); !ok || min != 1 {
+		t.Fatalf("MinValue() = (%d, %v), want (1, true)", min, ok)
+	}
+	if max, ok := sm.MaxValue(); !ok || max != 50 {
+		t.Fatalf("MaxValue() = (%d, %v), want (50, true)", max, ok)
+	}
+	if sm.PatternValue() != `^\w+$` {
+		t.Fatalf("PatternValue() = %q, want %q", sm.PatternValue(), `^\w+$`)
+	}
+	if p.DescriptionText() != "a name" {
+		t.Fatalf("DescriptionText() = %q, want %q", p.DescriptionText(), "a name")
+	}
+	examples := p.ExamplesList()
+	if len(examples) != 1 || examples[0] != "John" {
+		t.Fatalf("ExamplesList() = %v, want [John]", examples)
+	}
+}
+
+// TestStringMetadata_RootAlias_AddressEntityInsightCallShape reproduces
+// INSIGHT.md's AddressEntity example (lines ~431-456, "exemplo de Array e
+// Object aninhados") verbatim for its String()/Pattern() field declarations
+// through the root gonest package's StringMetadata alias, adapted per this
+// feature's scope: only Street/City/Zip (all String()-branch fields) are
+// reproduced here -- the surrounding Array()/Object()/nested-metadata parts
+// of that example belong to a separate, not-yet-implemented feature (see
+// ROADMAP.md).
+func TestStringMetadata_RootAlias_AddressEntityInsightCallShape(t *testing.T) {
+	type AddressEntity struct {
+		Street string `json:"street"`
+		City   string `json:"city"`
+		Zip    string `json:"zip"`
+	}
+
+	m := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+		m.Description("Endereço")
+		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+	})
+
+	if m.DescriptionText() != "Endereço" {
+		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Endereço")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 3 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 3", len(props))
+	}
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range props {
+		byName[p.Field().Name] = p
+	}
+
+	street, ok := byName["Street"]
+	if !ok {
+		t.Fatal("field \"Street\" was not registered via Property")
+	}
+	if !street.IsRequired() {
+		t.Fatal("Street: IsRequired() = false, want true")
+	}
+	if street.FormatValue() != "" {
+		t.Fatalf("Street: FormatValue() = %q, want %q", street.FormatValue(), "")
+	}
+	if street.DescriptionText() != "Logradouro" {
+		t.Fatalf("Street: DescriptionText() = %q, want %q", street.DescriptionText(), "Logradouro")
+	}
+	if examples := street.ExamplesList(); len(examples) != 1 || examples[0] != "Rua A, 123" {
+		t.Fatalf("Street: ExamplesList() = %v, want [Rua A, 123]", examples)
+	}
+
+	city, ok := byName["City"]
+	if !ok {
+		t.Fatal("field \"City\" was not registered via Property")
+	}
+	if !city.IsRequired() {
+		t.Fatal("City: IsRequired() = false, want true")
+	}
+	if city.FormatValue() != "" {
+		t.Fatalf("City: FormatValue() = %q, want %q", city.FormatValue(), "")
+	}
+	if city.DescriptionText() != "Cidade" {
+		t.Fatalf("City: DescriptionText() = %q, want %q", city.DescriptionText(), "Cidade")
+	}
+	if examples := city.ExamplesList(); len(examples) != 1 || examples[0] != "São Paulo" {
+		t.Fatalf("City: ExamplesList() = %v, want [São Paulo]", examples)
+	}
+
+	zip, ok := byName["Zip"]
+	if !ok {
+		t.Fatal("field \"Zip\" was not registered via Property")
+	}
+	if !zip.IsRequired() {
+		t.Fatal("Zip: IsRequired() = false, want true")
+	}
+	if zip.FormatValue() != "" {
+		t.Fatalf("Zip: FormatValue() = %q, want %q (Pattern doesn't set format)", zip.FormatValue(), "")
+	}
+	if zip.DescriptionText() != "CEP" {
+		t.Fatalf("Zip: DescriptionText() = %q, want %q", zip.DescriptionText(), "CEP")
+	}
+	if examples := zip.ExamplesList(); len(examples) != 1 || examples[0] != "01310-100" {
+		t.Fatalf("Zip: ExamplesList() = %v, want [01310-100]", examples)
+	}
+}
+
+// TestPropertyBuilder_RootAlias_EmailInsightCallShape reproduces
+// INSIGHT.md's UserEntity.Email field (line ~397, "exemplo para definição de
+// metadados em estruturas") through the root gonest package's
+// PropertyBuilder.Email()/StringMetadata aliases, confirming
+// FormatValue()=="email".
+func TestPropertyBuilder_RootAlias_EmailInsightCallShape(t *testing.T) {
+	type UserEntity struct {
+		Email string `json:"email"`
+	}
+
+	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("john@example.com")
+	})
+
+	props := m.OwnProperties()
+	if len(props) != 1 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+	}
+	p := props[0]
+	if p.FormatValue() != "email" {
+		t.Fatalf("FormatValue() = %q, want %q", p.FormatValue(), "email")
+	}
+	if !p.IsRequired() {
+		t.Fatal("IsRequired() = false, want true")
+	}
+}
+
+// TestStringMetadata_RootAlias_RemainingSevenBranches exercises the 7
+// string-family branch methods not shown explicitly in INSIGHT.md's examples
+// (Uuid/Uri/Hostname/Ipv4/Ipv6/Password/Byte/Binary minus Email/String
+// already covered above) through the root gonest package's PropertyBuilder/
+// StringMetadata aliases, confirming each sets its own distinct
+// FormatValue().
+func TestStringMetadata_RootAlias_RemainingSevenBranches(t *testing.T) {
+	type entity struct {
+		Uuid     string
+		Uri      string
+		Hostname string
+		Ipv4     string
+		Ipv6     string
+		Password string
+		Byte     string
+		Binary   string
+	}
+
+	var m *Metadata
+	m = NewMetadata[entity](func(t *entity, m *Metadata) {
+		m.Property(&t.Uuid).Uuid()
+		m.Property(&t.Uri).Uri()
+		m.Property(&t.Hostname).Hostname()
+		m.Property(&t.Ipv4).Ipv4()
+		m.Property(&t.Ipv6).Ipv6()
+		m.Property(&t.Password).Password()
+		m.Property(&t.Byte).Byte()
+		m.Property(&t.Binary).Binary()
+	})
+
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range m.OwnProperties() {
+		byName[p.Field().Name] = p
+	}
+
+	wantFormats := map[string]string{
+		"Uuid":     "uuid",
+		"Uri":      "uri",
+		"Hostname": "hostname",
+		"Ipv4":     "ipv4",
+		"Ipv6":     "ipv6",
+		"Password": "password",
+		"Byte":     "byte",
+		"Binary":   "binary",
+	}
+	for name, want := range wantFormats {
+		p, ok := byName[name]
+		if !ok {
+			t.Fatalf("field %q was not registered via Property", name)
+		}
+		if got := p.FormatValue(); got != want {
+			t.Fatalf("field %q: FormatValue() = %q, want %q", name, got, want)
+		}
+	}
+}
