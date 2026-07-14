@@ -56,7 +56,7 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 
 ---
 
-### T2: `Controller.Filters` real type + `OwnFilters`, delete placeholder [P]
+### T2: `Controller.Filters` real type + `OwnFilters`, delete placeholder [P] ✅ DONE (evaluator: PASS, commit `dd5ad1b` — `TestPipelineStubs_DoNotAffectObservableState` deletado, sem lacuna real de cobertura)
 
 **What**: `internal/controller/controller.go`'s `Filters(items ...Middleware)` (the LAST remaining stub using the T6 placeholder) changes to `Filters(items ...*filter.Filter)` (real type from T1). Field type changes accordingly. Add `OwnFilters() []*filter.Filter` accessor (defensive copy, mirror `OwnGuards`/`OwnInterceptors`/`OwnMiddleware`). Since `Use`/`Guards`/`Interceptors`/`Filters` ALL now use real types, the placeholder `type Middleware struct{}` declared in this file since T6 has ZERO remaining consumers — DELETE it (dead code, per design.md's Tech Decisions, not kept as a shim).
 **Where**: `internal/controller/controller.go` (existing, extend + delete dead type), `internal/controller/controller_test.go` (existing — migrate `TestPipelineStubs_DoNotAffectObservableState`'s LAST remaining `Middleware{}` usages for `Filters`, confirm the test still compiles/passes with the placeholder type gone entirely)
@@ -69,12 +69,12 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 - Skill: NONE
 
 **Done when**:
-- [ ] `Controller.Filters(f1, f2, ...)` stores real `*filter.Filter` values in registration order
-- [ ] `OwnFilters()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (mirror `TestOwnInterceptors_ReturnsCopyNotInternalSlice`)
-- [ ] The placeholder `type Middleware struct{}` is COMPLETELY REMOVED from `controller.go` — confirm via grep/compile that nothing references it anymore anywhere in the file or its tests
-- [ ] `TestPipelineStubs_DoNotAffectObservableState` (or whatever it's renamed to, since "pipeline stubs" no longer accurately describes a test where all 4 (`Use`/`Guards`/`Interceptors`/`Filters`) are now real, non-stub types) is updated/renamed appropriately — this test's ORIGINAL purpose (proving no-op stubs don't affect observable state) no longer applies to any of the 4 methods it used to cover; consider whether it should be deleted entirely (if it no longer tests anything meaningful) or repurposed — use judgment, document the choice in your report
-- [ ] Gate check passes
-- [ ] Test count: 3+ (Filters stores in order, OwnFilters defensive copy, placeholder-type-removal doesn't break compilation)
+- [x] `Controller.Filters(f1, f2, ...)` stores real `*filter.Filter` values in registration order
+- [x] `OwnFilters()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (mirror `TestOwnInterceptors_ReturnsCopyNotInternalSlice`)
+- [x] The placeholder `type Middleware struct{}` is COMPLETELY REMOVED from `controller.go` — confirm via grep/compile that nothing references it anymore anywhere in the file or its tests
+- [x] `TestPipelineStubs_DoNotAffectObservableState` deleted (no unique multi-method interaction assertion lost — original proof premise no longer exists now that all 4 fields are real)
+- [x] Gate check passes
+- [x] Test count: 3+ (Filters stores in order, OwnFilters defensive copy, placeholder-type-removal doesn't break compilation)
 
 **Tests**: unit
 **Gate**: quick
@@ -83,7 +83,7 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 
 ---
 
-### T3: `Module.Filters` (new) + `OwnFilters` [P]
+### T3: `Module.Filters` (new) + `OwnFilters` [P] ✅ DONE (evaluator: PASS, commit `c65909d`)
 
 **What**: `internal/module/module.go` gains a BRAND NEW method (does not exist yet): `func (m *Module) Filters(items ...*filter.Filter)`, storing into a new `filters []*filter.Filter` field. `func (m *Module) OwnFilters() []*filter.Filter` — defensive copy. Per design.md: ANY `*Module` can call `Filters` (Go can't restrict to root), but only the ROOT module's filters are actually consulted (T4's concern, not this task's) — mirrors `Module.Use`'s exact precedent from "Middleware".
 **Where**: `internal/module/module.go` (existing, extend), `internal/module/module_test.go` (existing — add tests)
@@ -96,10 +96,10 @@ T1 (internal/filter: Filter/New/Catch/HandlerFor)
 - Skill: NONE
 
 **Done when**:
-- [ ] `Module.Filters(f1, f2, ...)` stores real `*filter.Filter` values in registration order (new method)
-- [ ] `OwnFilters()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (mirror `TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice`)
-- [ ] Gate check passes
-- [ ] Test count: 2+ (Filters stores in order, OwnFilters defensive copy)
+- [x] `Module.Filters(f1, f2, ...)` stores real `*filter.Filter` values in registration order (new method)
+- [x] `OwnFilters()` returns a defensive copy — test proves mutating the returned slice does not affect internal state (mirror `TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice`)
+- [x] Gate check passes
+- [x] Test count: 2+ (Filters stores in order, OwnFilters defensive copy)
 
 **Tests**: unit
 **Gate**: quick
