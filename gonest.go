@@ -25,6 +25,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/openapi"
 	"github.com/gonest-dev/gonest/internal/provider"
+	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
 )
@@ -523,3 +524,35 @@ type OpenApiDocument = openapi.OpenApiDocument
 // AD-004 in STATE.md). See internal/openapi.New's doc comment for the full
 // contract.
 var NewOpenApiDocument = openapi.New
+
+// Route holds one HTTP method+path registration (see Controller.Route)
+// plus the documentation builder methods a caller uses to describe it for
+// schema generation (Summary/Description/OperationId/Tags/BearerAuth/
+// RequestBody/Response/PathParams/QueryParams/ExcludeFromDocs/Deprecated).
+// It is a true Go type alias, so every one of those methods is automatically
+// visible on gonest.Route with zero extra wrapper code, same as
+// App/Module/Metadata/etc above. See internal/route.Route's doc comment for
+// the full contract.
+type Route = route.Route
+
+// GenerateOpenApiSchema walks app's assembled module tree (via app.Root(),
+// recursing into every imported module -- see internal/app.App.Root's doc
+// comment) and populates doc's paths/components.schemas from every
+// registered Controller/Route's documentation (Controller.Tags/BearerAuth,
+// Route.Summary/RequestBody/Response/PathParams/QueryParams/
+// ExcludeFromDocs/etc, plus every *Metadata those routes reference,
+// recursively deduplicated by pointer identity). Call it after NewApp (so
+// the module tree is assembled) and before serving doc.Document() (e.g. via
+// a future SetupSwagger -- out of scope here, see ROADMAP.md's "Swagger UI
+// Setup" feature). Takes *App directly (not *Module) so callers never need
+// to reach for app.Root() themselves -- this wrapper does that internally.
+// Unlike NewApp/NewMetadata elsewhere in this package, internal/openapi.Generate
+// is not generic, but it takes *module.Module (an internal-only concept
+// gonest.go otherwise never exposes as a caller-facing parameter), so this
+// is a real wrapper rather than a plain var alias -- it accepts *App and
+// forwards app.Root() to internal/openapi.Generate. See
+// internal/openapi.Generate's doc comment for the full walking/dedup
+// contract.
+func GenerateOpenApiSchema(app *App, doc *OpenApiDocument) {
+	openapi.Generate(doc, app.Root())
+}

@@ -2350,3 +2350,154 @@ func TestNewOpenApiDocument_RootAlias_InsightBootstrapExample(t *testing.T) {
 		t.Fatal("HasBearerAuth() = false, want true")
 	}
 }
+
+// TestGenerateOpenApiSchema_RootAlias_InsightExample reproduces INSIGHT.md's
+// settled "Schema Generation from Metadata" example (UserEntity/AddressEntity,
+// Controller.Tags/BearerAuth, Route.Summary/RequestBody/Response/PathParams/
+// ExcludeFromDocs) entirely through root gonest aliases, then confirms
+// GenerateOpenApiSchema(app, doc) produces the expected paths/
+// components.schemas shape: the excluded route is absent, a documented
+// route has the right method/summary, and the nested AddressEntity schema
+// (reused by both UserEntity.Address and the array field) appears exactly
+// once.
+func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
+	type AddressEntity struct {
+		City string
+		Zip  string
+	}
+	type UserIdParams struct {
+		UserId string
+	}
+	type UserEntity struct {
+		Id        string
+		Name      string
+		Address   AddressEntity
+		Addresses []AddressEntity
+	}
+
+	addressMetadata := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+		m.Property(&t.City).String().Required()
+		m.Property(&t.Zip).String().Required()
+	})
+
+	userIdParamsMetadata := NewMetadata[UserIdParams](func(t *UserIdParams, m *Metadata) {
+		m.Property(&t.UserId).String().Required()
+	})
+
+	userEntityMetadata := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Title("UserEntity")
+		m.Property(&t.Id).String().Required()
+		m.Property(&t.Name).String().Required()
+		m.Property(&t.Address).Object(func(om *ObjectMetadata) {
+			om.Metadata(addressMetadata)
+		}).Required()
+		m.Property(&t.Addresses).Array().Items(func(am *ArrayMetadata) {
+			am.Object(addressMetadata)
+		})
+	})
+
+	userController := NewController(func(c *Controller) {
+		c.Path("/user")
+		c.Tags("users")
+		c.BearerAuth()
+
+		c.Route(route.HttpGet, "/:user_id", func(r *Route) {
+			r.Summary("Busca um usuario por ID")
+			r.PathParams(userIdParamsMetadata)
+			r.Response(http.StatusOK, userEntityMetadata)
+			r.Response(http.StatusNotFound)
+			r.HttpCode(http.StatusOK)
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Json(map[string]any{"ok": true})
+			})
+		})
+
+		c.Route(route.HttpGet, "/_internal/debug", func(r *Route) {
+			r.ExcludeFromDocs()
+			r.HttpCode(http.StatusOK)
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Json(map[string]any{"ok": true})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(userController)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	doc := NewOpenApiDocument("3.1.0", func(b *OpenApiDocument) {
+		b.Title("Example API")
+		b.Version("1.0.0")
+	})
+
+	GenerateOpenApiSchema(app, doc)
+
+	document := doc.Document()
+
+	paths, ok := document["paths"].(map[string]any)
+	if !ok {
+		t.Fatalf("Document()[\"paths\"] type = %T, want map[string]any", document["paths"])
+	}
+
+	if _, excluded := paths["/user/_internal/debug"]; excluded {
+		t.Fatalf("paths contains excluded route %q, want absent", "/user/_internal/debug")
+	}
+
+	item, ok := paths["/user/:user_id"].(map[string]any)
+	if !ok {
+		t.Fatalf("paths[\"/user/:user_id\"] type = %T, want map[string]any", paths["/user/:user_id"])
+	}
+	opAny, ok := item["get"]
+	if !ok {
+		t.Fatalf("paths[\"/user/:user_id\"] missing \"get\" method, got keys %v", item)
+	}
+	op, ok := opAny.(map[string]any)
+	if !ok {
+		t.Fatalf("paths[\"/user/:user_id\"][\"get\"] type = %T, want map[string]any", opAny)
+	}
+	if got := op["summary"]; got != "Busca um usuario por ID" {
+		t.Fatalf("summary = %v, want %q", got, "Busca um usuario por ID")
+	}
+	tags, ok := op["tags"].([]string)
+	if !ok || len(tags) != 1 || tags[0] != "users" {
+		t.Fatalf("tags = %v, want [\"users\"] (inherited from Controller.Tags)", op["tags"])
+	}
+	if _, ok := op["security"]; !ok {
+		t.Fatalf("operation missing security, want inherited Controller.BearerAuth()")
+	}
+
+	components, ok := document["components"].(map[string]any)
+	if !ok {
+		t.Fatalf("Document()[\"components\"] type = %T, want map[string]any", document["components"])
+	}
+	schemas, ok := components["schemas"].(map[string]any)
+	if !ok {
+		t.Fatalf("components[\"schemas\"] type = %T, want map[string]any", components["schemas"])
+	}
+
+	if _, ok := schemas["UserEntity"]; !ok {
+		t.Fatalf("schemas missing %q, got keys %v", "UserEntity", mapKeys(schemas))
+	}
+	addressCount := 0
+	for name := range schemas {
+		if name == "AddressEntity" {
+			addressCount++
+		}
+	}
+	if addressCount != 1 {
+		t.Fatalf("schemas contains %d entries named %q, want exactly 1 (dedup via $ref reuse)", addressCount, "AddressEntity")
+	}
+}
+
+func mapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
