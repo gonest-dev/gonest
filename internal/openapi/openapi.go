@@ -12,6 +12,8 @@
 // routes/Metadata are separate ROADMAP features (spec.md's Out of Scope).
 package openapi
 
+import "github.com/gonest-dev/gonest/internal/metadata"
+
 // OpenApiDocument holds every document-level field INSIGHT.md's bootstrap
 // example sets. specVersion is the OpenAPI SPEC version passed to New (e.g.
 // "3.1.0") -- distinct from version, which is the API's OWN version set via
@@ -31,6 +33,19 @@ type OpenApiDocument struct {
 	licenseUrl  string
 
 	bearerAuth bool
+
+	// paths/schemas/schemaNames (schema-generation feature, P2) are
+	// populated ONLY by Generate, never by hand-written builder calls --
+	// Title/Contact/etc above stay exactly as they are. paths: outer key is
+	// the full path string (Controller.PathPrefix()+Route.Path()), inner key
+	// is the lowercase HTTP method, value is one OpenAPI Path Item Object.
+	// schemas: components.schemas, keyed by schema name. schemaNames is the
+	// dedup cache (design.md's Data Models) -- pointer-keyed so the SAME
+	// *metadata.Metadata, referenced from multiple places, is walked and
+	// registered exactly once.
+	paths       map[string]map[string]any
+	schemas     map[string]any
+	schemaNames map[*metadata.Metadata]string
 }
 
 // New constructs a zero-value *OpenApiDocument, stores specVersion, runs fn

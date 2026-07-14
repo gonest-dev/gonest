@@ -65,6 +65,19 @@ func (m *Metadata) TitleText() string {
 	return m.title
 }
 
+// StructType returns the reflect.Type m was constructed for (New's
+// structType argument). SPEC_DEVIATION (schema-generation feature, T2):
+// design.md's registerSchema component needs a default components.schemas
+// name (the Go type's own name) when TitleText() is "" -- Metadata had no
+// existing accessor exposing structType, only using it internally
+// (Property's findFieldByOffset). Adding this minimal read-only getter
+// (same defensive shape as every other Metadata accessor) is the smallest
+// change that unblocks that requirement, rather than deriving the type name
+// indirectly through a PropertyBuilder's Field().
+func (m *Metadata) StructType() reflect.Type {
+	return m.structType
+}
+
 // Description sets the whole-type description (the struct itself, not any
 // individual field -- see PropertyBuilder.Description for the field-level
 // equivalent) and returns m so calls can chain.
