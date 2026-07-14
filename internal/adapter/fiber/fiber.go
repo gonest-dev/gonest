@@ -254,3 +254,13 @@ func (r *fiberResponder) Queries() map[string]string {
 	}
 	return out
 }
+
+// HTML sets the response Content-Type to text/html (via Fiber's own
+// Ctx.Type, mirroring the extension-based convention Fiber's own static/
+// render paths use internally) and writes s as the raw response body via
+// Ctx.SendString -- SetupSwagger's (internal/openapi) HTML endpoint is the
+// only caller today.
+func (r *fiberResponder) HTML(s string) error {
+	r.c.Type("html")
+	return r.c.SendString(s)
+}

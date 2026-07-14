@@ -12,6 +12,8 @@ type fakeResponder struct {
 	params     map[string]string
 	body       []byte
 	queries    map[string]string
+	htmlValue  string
+	htmlErr    error
 }
 
 func newFakeResponder() *fakeResponder {
@@ -48,6 +50,11 @@ func (f *fakeResponder) Body() []byte {
 
 func (f *fakeResponder) Queries() map[string]string {
 	return f.queries
+}
+
+func (f *fakeResponder) HTML(s string) error {
+	f.htmlValue = s
+	return f.htmlErr
 }
 
 func TestContext_Json_DelegatesToResponder(t *testing.T) {
@@ -189,6 +196,22 @@ func TestContext_Route_NilByDefault(t *testing.T) {
 
 	if got := ctx.Route(); got != nil {
 		t.Fatalf("expected Route() to be nil by default, got %v", got)
+	}
+}
+
+// TestContext_HTML_DelegatesToResponder proves HTML(s) is a one-line
+// delegation to the underlying Responder's own HTML method -- same pattern
+// as Json/Body/Queries above.
+func TestContext_HTML_DelegatesToResponder(t *testing.T) {
+	fake := newFakeResponder()
+	ctx := New(fake)
+
+	if err := ctx.HTML("<h1>hello</h1>"); err != nil {
+		t.Fatalf("HTML() returned error: %v", err)
+	}
+
+	if fake.htmlValue != "<h1>hello</h1>" {
+		t.Fatalf("expected responder.HTML to receive %q, got %q", "<h1>hello</h1>", fake.htmlValue)
 	}
 }
 

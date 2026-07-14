@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -270,6 +271,7 @@ func (f *paramFakeResponder) SetHeaderValue(name, value string) {}
 func (f *paramFakeResponder) GetParam(name string) string       { return f.params[name] }
 func (f *paramFakeResponder) Body() []byte                      { return nil }
 func (f *paramFakeResponder) Queries() map[string]string        { return nil }
+func (f *paramFakeResponder) HTML(s string) error               { return nil }
 
 // TestMustParams_RootPackage_RealHTTPDispatch proves the replacement for the
 // old TestParseIntPipe_RootAlias_InsightCallShape: a route param round-trips
@@ -2500,4 +2502,98 @@ func mapKeys(m map[string]any) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// ---------------------------------------------------------------------------
+// SetupSwagger (Swagger UI Setup feature)
+// ---------------------------------------------------------------------------
+
+// TestSetupSwagger_RootAlias_InsightBootstrapCallShape reproduces INSIGHT.md's
+// own bootstrap example verbatim (the "# exemplo de bootstrap completo"
+// section's gonest.SetupSwagger(app, config.OpenApi.UiPath, doc,
+// gonest.SwaggerOptions{JsonDocumentUrl, PersistAuth, DocExpansion}) call
+// shape) through the root gonest package, dispatched via REAL app.Test HTTP
+// requests to both routes it registers.
+func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
+	root := NewModule(func(m *Module) {})
+
+	appInstance, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := appInstance.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("appInstance.Adapter() is not a *fiber.FiberApp: %T", appInstance.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	doc := NewOpenApiDocument("3.1.0", func(b *OpenApiDocument) {
+		b.Title("Example API")
+		b.Version("1.0.0")
+	})
+
+	if err := SetupSwagger(appInstance, "/docs", doc, SwaggerOptions{
+		JsonDocumentUrl: "/openapi.json",
+		PersistAuth:     true,
+		DocExpansion:    "none",
+	}); err != nil {
+		t.Fatalf("SetupSwagger() error = %v", err)
+	}
+
+	t.Run("GET /openapi.json returns doc.Document() as JSON", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode error = %v", err)
+		}
+		info, ok := body["info"].(map[string]any)
+		if !ok {
+			t.Fatalf("body[info] is not a map: %v", body["info"])
+		}
+		if info["title"] != "Example API" {
+			t.Fatalf("body[info][title] = %v, want %q", info["title"], "Example API")
+		}
+	})
+
+	t.Run("GET /docs returns Swagger UI HTML", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+			t.Fatalf("Content-Type = %q, want prefix %q", ct, "text/html")
+		}
+
+		buf := new(bytes.Buffer)
+		if _, err := buf.ReadFrom(resp.Body); err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		html := buf.String()
+
+		if !strings.Contains(html, "/openapi.json") {
+			t.Fatalf("expected HTML body to reference JsonDocumentUrl %q, got:\n%s", "/openapi.json", html)
+		}
+		if !strings.Contains(html, "none") {
+			t.Fatalf("expected HTML body to reference configured docExpansion %q, got:\n%s", "none", html)
+		}
+	})
 }

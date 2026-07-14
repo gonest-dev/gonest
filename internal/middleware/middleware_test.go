@@ -25,6 +25,7 @@ func (f *fakeResponder) SetHeaderValue(name, value string) {}
 func (f *fakeResponder) GetParam(name string) string       { return f.params[name] }
 func (f *fakeResponder) Body() []byte                      { return nil }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
+func (f *fakeResponder) HTML(s string) error               { return nil }
 
 // TestNew_RunsFnImmediately proves middleware.New(fn) runs fn synchronously
 // at call time -- unlike Provider/Module/Controller/Pipe, which all defer fn

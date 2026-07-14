@@ -100,6 +100,7 @@ func (f *paramFakeResponder) SetHeaderValue(name, value string) {}
 func (f *paramFakeResponder) GetParam(name string) string       { return f.params[name] }
 func (f *paramFakeResponder) Body() []byte                      { return nil }
 func (f *paramFakeResponder) Queries() map[string]string        { return nil }
+func (f *paramFakeResponder) HTML(s string) error               { return nil }
 
 // newParamCtx builds a *execution.Context carrying params and attached to a
 // *route.Route built from pathPattern (e.g. "/user/:user_id/order/:order_id"),

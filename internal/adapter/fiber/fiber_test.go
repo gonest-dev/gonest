@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -179,6 +180,43 @@ func TestRegisterRoute_StatusLandsInRealResponse(t *testing.T) {
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d", resp.StatusCode)
+	}
+}
+
+// TestRegisterRoute_HtmlLandsInRealResponse proves ctx.HTML(s) sets a real
+// text/html Content-Type response header and writes s verbatim as the
+// response body, as observed by app.Test -- the fiberResponder.HTML
+// implementation actually bridges to fiber.Ctx's Type/SendString, not just a
+// fake in a unit test.
+func TestRegisterRoute_HtmlLandsInRealResponse(t *testing.T) {
+	app := New()
+
+	if err := app.RegisterRoute(route.HttpGet, "/page", func(ctx *execution.Context) {
+		ctx.HTML("<h1>hello</h1>")
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/page", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("expected Content-Type to start with %q, got %q", "text/html", ct)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	if string(body) != "<h1>hello</h1>" {
+		t.Fatalf("expected body %q, got %q", "<h1>hello</h1>", string(body))
 	}
 }
 

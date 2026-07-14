@@ -22,6 +22,7 @@ type Responder interface {
 	GetParam(name string) string
 	Body() []byte
 	Queries() map[string]string
+	HTML(s string) error
 }
 
 // Context encapsulates the HTTP request/response for a single route Handler.
@@ -110,4 +111,11 @@ func (ctx *Context) Body() []byte {
 // Context.Param instead.
 func (ctx *Context) Queries() map[string]string {
 	return ctx.res.Queries()
+}
+
+// HTML writes s as a raw text/html response body -- one-line delegation,
+// same pattern as Json/Body/Queries above. Used by SetupSwagger
+// (internal/openapi) to serve the Swagger UI's HTML page.
+func (ctx *Context) HTML(s string) error {
+	return ctx.res.HTML(s)
 }

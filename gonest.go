@@ -556,3 +556,26 @@ type Route = route.Route
 func GenerateOpenApiSchema(app *App, doc *OpenApiDocument) {
 	openapi.Generate(doc, app.Root())
 }
+
+// SwaggerOptions is INSIGHT.md's exact field set for SetupSwagger's options
+// argument (JsonDocumentUrl/PersistAuth/DocExpansion). It is a true Go type
+// alias, so it round-trips through internal/openapi.SwaggerOptions with zero
+// extra wrapper code, same as OpenApiDocument above. See
+// internal/openapi.SwaggerOptions's doc comment for the full contract.
+type SwaggerOptions = openapi.SwaggerOptions
+
+// SetupSwagger registers two routes directly on app's adapter (post-
+// bootstrap, no DI/Module involvement): a JSON endpoint serving
+// doc.Document() at options.JsonDocumentUrl, and an HTML endpoint at uiPath
+// serving a Swagger UI page (CDN-loaded, no vendored assets) configured from
+// options -- INSIGHT.md's own bootstrap example
+// (gonest.SetupSwagger(app, config.OpenApi.UiPath, doc, gonest.SwaggerOptions{...})).
+// Unlike NewOpenApiDocument elsewhere in this package, internal/openapi.SetupSwagger
+// takes *app.App (an internal-only concept gonest.go otherwise never exposes
+// as a caller-facing parameter type), so this is a real wrapper rather than a
+// plain var alias -- it forwards app straight through. See
+// internal/openapi.SetupSwagger's doc comment for the full registration
+// contract.
+func SetupSwagger(app *App, uiPath string, doc *OpenApiDocument, options SwaggerOptions) error {
+	return openapi.SetupSwagger(app, uiPath, doc, options)
+}

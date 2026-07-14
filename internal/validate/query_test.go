@@ -81,6 +81,7 @@ func (f *queryFakeResponder) SetHeaderValue(name, value string) {}
 func (f *queryFakeResponder) GetParam(name string) string       { return "" }
 func (f *queryFakeResponder) Body() []byte                      { return nil }
 func (f *queryFakeResponder) Queries() map[string]string        { return f.queries }
+func (f *queryFakeResponder) HTML(s string) error               { return nil }
 
 // newQueryCtx builds a *execution.Context carrying the given query map,
 // mirroring how a real dispatched request would look.
