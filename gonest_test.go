@@ -1,6 +1,7 @@
 package gonest
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -2021,4 +2022,258 @@ func TestObjectMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	if meta.DescriptionText() != "Metadados abertos do usuário" {
 		t.Fatalf("Metadata: DescriptionText() = %q, want %q", meta.DescriptionText(), "Metadados abertos do usuário")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Validation (JSON Body Validation feature)
+// ---------------------------------------------------------------------------
+
+// jsonBodyAddressEntity mirrors INSIGHT.md's AddressEntity ("exemplo de
+// Array e Object aninhados").
+type jsonBodyAddressEntity struct {
+	Street string `json:"street"`
+	City   string `json:"city"`
+	Zip    string `json:"zip"`
+}
+
+// jsonBodyUserEntity mirrors INSIGHT.md's UserEntity, merging BOTH
+// "exemplo para definição de metadados em estruturas" (Id/Name/Email/
+// IsActive/CreatedAt/UpdatedAt/DeletedAt) and "exemplo de Array e Object
+// aninhados" (Tags/Scores/Addresses/Address/Metadata) into a single struct,
+// as this task's T4 Done-when explicitly asks for ("incluindo Tags/
+// Addresses/Address aninhados").
+type jsonBodyUserEntity struct {
+	Id        int64                   `json:"id"`
+	Name      string                  `json:"name"`
+	Email     string                  `json:"email"`
+	IsActive  bool                    `json:"isActive"`
+	CreatedAt time.Time               `json:"createdAt"`
+	UpdatedAt time.Time               `json:"updatedAt"`
+	DeletedAt *time.Time              `json:"deletedAt"`
+	Tags      []string                `json:"tags"`
+	Scores    []int                   `json:"scores"`
+	Addresses []jsonBodyAddressEntity `json:"addresses"`
+	Address   jsonBodyAddressEntity   `json:"address"`
+	Metadata  map[string]any          `json:"metadata"`
+}
+
+// jsonBodyAddressMetadata/jsonBodyUserMetadata register jsonBodyUserEntity's
+// full metadata exactly once (the registry panics on duplicate
+// registration for the same reflect.Type -- T1), via a package-level init
+// mirroring INSIGHT.md's own top-level `var _ = gonest.NewMetadata[...]`
+// call shape.
+var jsonBodyAddressMetadata = NewMetadata[jsonBodyAddressEntity](func(t *jsonBodyAddressEntity, m *Metadata) {
+	m.Description("Endereço")
+	m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+	m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+	m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+})
+
+var jsonBodyUserMetadata = NewMetadata[jsonBodyUserEntity](func(t *jsonBodyUserEntity, m *Metadata) {
+	m.Description("Entidade de usuário com campos aninhados")
+	m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+	m.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
+	m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("user@example.com")
+	m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
+	m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(time.Now())
+	m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
+	m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
+
+	m.Property(&t.Tags).Array().Items(func(m *ArrayMetadata) {
+		m.String().Min(1).Max(50)
+		m.Required()
+		m.Description("Tags do usuário")
+		m.Examples("admin", "beta")
+	})
+
+	m.Property(&t.Scores).Array().Items(func(m *ArrayMetadata) {
+		m.Integer().Min(0).Max(100)
+		m.Required()
+		m.Description("Notas do usuário")
+		m.Examples(80, 95)
+	})
+
+	m.Property(&t.Addresses).Array().Items(func(m *ArrayMetadata) {
+		m.Object(jsonBodyAddressMetadata)
+		m.Required()
+		m.Min(1)
+		m.Description("Endereços do usuário")
+	})
+
+	m.Property(&t.Address).Object(func(om *ObjectMetadata) {
+		om.Metadata(jsonBodyAddressMetadata)
+		om.Required()
+		om.Description("Endereço principal")
+	})
+
+	m.Property(&t.Metadata).Object(func(om *ObjectMetadata) {
+		om.AdditionalProperties()
+	}).Nullable().Description("Metadados abertos do usuário")
+})
+
+// TestMustJsonBody_RootAlias_UserEntityInsightCallShape proves
+// gonest.MustJsonBody[*jsonBodyUserEntity] resolves and works end-to-end
+// through the root gonest package, reproducing INSIGHT.md's full UserEntity
+// shape (both metadata-definition sections combined) via REAL HTTP dispatch
+// (app.Test, same pattern as every other *_RootAlias_InsightCallShape test
+// in this file): one happy-path case (fully valid body, handler receives a
+// correctly populated value, response reflects it) and one multi-violation
+// case (a bad array-item AND a bad nested-object field in the SAME
+// request, response is 400 with BOTH violations present in the body).
+func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+	var gotUser *jsonBodyUserEntity
+
+	controller := NewController(func(c *Controller) {
+		c.Route(route.HttpPost, "/users", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				gotUser = MustJsonBody[*jsonBodyUserEntity](ctx)
+				ctx.Json(gotUser)
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	t.Run("happy path -> 200, handler receives populated value", func(t *testing.T) {
+		gotUser = nil
+		payload := map[string]any{
+			"id":        int64(1),
+			"name":      "John Doe",
+			"email":     "john.doe@example.com",
+			"isActive":  true,
+			"createdAt": time.Now().Format(time.RFC3339),
+			"updatedAt": time.Now().Format(time.RFC3339),
+			"deletedAt": nil,
+			"tags":      []string{"admin", "beta"},
+			"scores":    []int{80, 95},
+			"addresses": []map[string]any{
+				{"street": "Rua B, 456", "city": "Rio de Janeiro", "zip": "22000-000"},
+			},
+			"address": map[string]any{
+				"street": "Rua A, 123", "city": "São Paulo", "zip": "01310-100",
+			},
+			"metadata": map[string]any{"source": "insight"},
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("json.Marshal() error = %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+		}
+		if gotUser == nil {
+			t.Fatal("handler did not receive a populated *jsonBodyUserEntity")
+		}
+		if gotUser.Name != "John Doe" || gotUser.Email != "john.doe@example.com" {
+			t.Fatalf("gotUser = %+v, want Name=John Doe Email=john.doe@example.com", gotUser)
+		}
+		if len(gotUser.Addresses) != 1 || gotUser.Addresses[0].Zip != "22000-000" {
+			t.Fatalf("gotUser.Addresses = %+v, want 1 address with Zip=22000-000", gotUser.Addresses)
+		}
+		if gotUser.Address.City != "São Paulo" {
+			t.Fatalf("gotUser.Address.City = %q, want %q", gotUser.Address.City, "São Paulo")
+		}
+
+		var respBody map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
+			t.Fatalf("decode response body error = %v", err)
+		}
+		if respBody["name"] != "John Doe" {
+			t.Fatalf("response body = %v, want name=John Doe", respBody)
+		}
+	})
+
+	t.Run("multi-violation: bad array item AND bad nested object -> 400 with BOTH violations", func(t *testing.T) {
+		gotUser = nil
+		payload := map[string]any{
+			"id":        int64(2),
+			"name":      "Jane Doe",
+			"email":     "jane.doe@example.com",
+			"isActive":  true,
+			"createdAt": time.Now().Format(time.RFC3339),
+			"updatedAt": time.Now().Format(time.RFC3339),
+			"tags":      []string{""}, // violates item Min(1) -> "tags[0]"
+			"scores":    []int{80},
+			"addresses": []map[string]any{
+				{"street": "Rua B, 456", "city": "Rio de Janeiro", "zip": "22000-000"},
+			},
+			"address": map[string]any{
+				// bad Zip pattern -> "address.zip"
+				"street": "Rua A, 123", "city": "São Paulo", "zip": "not-a-zip",
+			},
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("json.Marshal() error = %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := fiberAdapter.FiberApp().Test(req)
+		if err != nil {
+			t.Fatalf("app.Test error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+		}
+		if gotUser != nil {
+			t.Fatal("handler ran past MustJsonBody, want it to panic before assigning gotUser")
+		}
+
+		var respBody struct {
+			Name    string `json:"name"`
+			Details []struct {
+				Field   string `json:"field"`
+				Message string `json:"message"`
+			} `json:"details"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
+			t.Fatalf("decode response body error = %v", err)
+		}
+		if respBody.Name != "BadRequestException" {
+			t.Fatalf("response name = %q, want %q", respBody.Name, "BadRequestException")
+		}
+
+		var hasArrayItemViolation, hasNestedObjectViolation bool
+		for _, v := range respBody.Details {
+			if v.Field == "tags[0]" {
+				hasArrayItemViolation = true
+			}
+			if v.Field == "address.zip" {
+				hasNestedObjectViolation = true
+			}
+		}
+		if !hasArrayItemViolation {
+			t.Fatalf("response details = %+v, want a violation for field %q", respBody.Details, "tags[0]")
+		}
+		if !hasNestedObjectViolation {
+			t.Fatalf("response details = %+v, want a violation for field %q", respBody.Details, "address.zip")
+		}
+	})
 }

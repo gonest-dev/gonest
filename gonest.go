@@ -27,6 +27,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/scope"
+	"github.com/gonest-dev/gonest/internal/validate"
 )
 
 // ---------------------------------------------------------------------------
@@ -488,3 +489,23 @@ type ArrayMetadata = metadata.ArrayMetadata
 // contract (AD-009 in STATE.md: this section lives in this consolidated
 // file rather than a separate metadata.go).
 type ObjectMetadata = metadata.ObjectMetadata
+
+// ---------------------------------------------------------------------------
+// Validation (JSON Body Validation feature)
+// ---------------------------------------------------------------------------
+
+// MustJsonBody reads ctx's raw request body, validates it against T's
+// (dereferenced) registered *Metadata (built via NewMetadata[T] beforehand,
+// e.g. INSIGHT.md's UserEntity example), and returns a populated T. It
+// panics *BadRequestException (collecting EVERY violation found, not just
+// the first) if the body fails to parse as JSON or any field/array-item/
+// nested-object constraint is violated, and panics with a plain string if T
+// was never registered via NewMetadata[T]. Go cannot re-export a generic
+// function via var, so this is a real wrapper calling the internal one
+// (same pattern as MustInject/NewApp/MustParam, see AD-004 in STATE.md).
+// Like MustParam, ctx is *execution.Context directly -- no root Context
+// alias exists yet (a pre-existing gap from an earlier feature, same one
+// MustParam's own doc comment does not paper over).
+func MustJsonBody[T any](ctx *execution.Context) T {
+	return validate.MustJsonBody[T](ctx)
+}
