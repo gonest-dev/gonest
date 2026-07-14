@@ -93,8 +93,10 @@
 
 ### Features
 
-**Metadata Registration Core** - PLANNED
-- `NewMetadata[T]`, `Property(&t.X)`, base comum: `Description`/`Required`/`Nullable`/`Examples`
+**Metadata Registration Core** - COMPLETE
+- `NewMetadata[T]`, `Property(&t.X)`, base comum: `Description`/`Required`/`Nullable`/`Examples` (`internal/metadata`, re-exportado na raiz)
+- Identificação de campo via offset de ponteiro (`unsafe.Pointer`/`reflect.VisibleFields`) — confirmada empiricamente pros 7 tipos de campo do exemplo `UserEntity` do INSIGHT.md, incluindo `time.Time`/`*time.Time`, sem ajuste necessário
+- Branches de tipo+format (`String`/`Integer`/`Boolean`/etc) ficam pra próximas features desta milestone — `Property(&t.X)` hoje só devolve o builder base comum
 
 **String-family Branches** - PLANNED
 - `String`/`Email`/`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byte`/`Binary` + `Min`/`Max`/`Pattern`
