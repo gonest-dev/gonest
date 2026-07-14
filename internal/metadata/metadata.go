@@ -147,6 +147,13 @@ type PropertyBuilder struct {
 	itemRef              *Metadata        // Array's Object(ref)-as-item
 	ref                  *Metadata        // Object's own Metadata(ref)
 	additionalProperties bool             // Object's own AdditionalProperties()
+
+	// custom is the param-query-validation feature's P0 escape hatch (see
+	// that feature's context.md Decision 4): when set via Custom, it fully
+	// REPLACES the built-in kind/format/Min/Max/Pattern checks for this
+	// field, and its returned value (not the raw decoded value) is what
+	// ultimately populates T's field.
+	custom func(raw any) (any, error)
 }
 
 // Required marks this field as required and returns p so calls can chain.
@@ -522,4 +529,34 @@ func (p *PropertyBuilder) MetadataRef() (*Metadata, bool) {
 // PropertyBuilder now.
 func (p *PropertyBuilder) IsAdditionalProperties() bool {
 	return p.additionalProperties
+}
+
+// Custom sets fn as this field's escape hatch, replacing every built-in
+// kind/format/Min/Max/Pattern check the validator would otherwise run for
+// this field (param-query-validation feature, context.md's Decision 4 --
+// the direct replacement for the removed Pipe mechanism). Returns p bare, no
+// wrapper type -- same precedent as Boolean()/DateTime(): Custom has no
+// format-specific extra validators of its own to chain off of.
+//
+// fn may be called MORE THAN ONCE per request for the same field (once
+// during validation, once during population -- see internal/validate's
+// design doc for why this isn't cached) and must therefore be idempotent:
+// calling it twice with the same raw input must produce the same result.
+//
+// Last-call-wins, no panic, same as every other branch method on
+// PropertyBuilder -- calling Custom a second time simply overwrites the
+// first fn.
+func (p *PropertyBuilder) Custom(fn func(raw any) (any, error)) *PropertyBuilder {
+	p.custom = fn
+	return p
+}
+
+// CustomFunc returns the function set via Custom, and whether Custom was
+// ever called -- same "never called" bool-return shape as MinValue/MaxValue/
+// ItemRef/MetadataRef.
+func (p *PropertyBuilder) CustomFunc() (func(raw any) (any, error), bool) {
+	if p.custom == nil {
+		return nil, false
+	}
+	return p.custom, true
 }

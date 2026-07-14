@@ -64,8 +64,11 @@ type violation struct {
 //     at the first).
 //  4. If any violations were collected: panic
 //     exception.NewBadRequestException(violations).
-//  5. Otherwise: unmarshal the body a SECOND time, this time into a fresh
-//     *structType, and return it as T.
+//  5. Otherwise: populate a fresh *structType field-by-field via the shared
+//     populate core (param-query-validation feature's P0 -- see that
+//     feature's context.md Decision 5) instead of a second opaque
+//     json.Unmarshal call, so Custom(fn)'s transformed value can actually
+//     reach the final result.
 func MustJsonBody[T any](ctx *execution.Context) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
@@ -95,8 +98,8 @@ func MustJsonBody[T any](ctx *execution.Context) T {
 		panic(exception.NewBadRequestException(violations))
 	}
 
-	out := reflect.New(structType).Interface()
-	if err := json.Unmarshal(body, out); err != nil {
+	out := reflect.New(structType)
+	if err := populate(out.Elem(), presence, m, "json"); err != nil {
 		// Should be unreachable in practice: pass 1 already proved body is
 		// valid JSON, and validation already proved every field's shape
 		// matches what T expects. Panicking here (rather than silently
@@ -107,34 +110,55 @@ func MustJsonBody[T any](ctx *execution.Context) T {
 		}))
 	}
 
-	return out.(T)
+	return out.Interface().(T)
 }
 
-// jsonKey returns the JSON key p's field would be (un)marshaled under by
-// encoding/json itself, and whether the field can ever appear in JSON at
-// all (false for a `json:"-"` tag, which encoding/json always skips).
+// tagKey returns the key p's field would be (un)marshaled under for the
+// given struct tag name, and whether the field can ever appear at all
+// (false for a `<tag>:"-"` value, which encoding/json always skips -- kept
+// for every tag this is used with, "json"/"param"/"query", for consistent
+// behavior even though only "json" gives that convention any real meaning
+// today).
+//
+// Generalizes what used to be this package's own jsonKey helper (P0 of
+// "JSON Body Validation") to take the tag name as a parameter, so
+// MustParams/MustQuery (param-query-validation feature's P2/P3) can reuse
+// the exact same resolution logic against "param"/"query" tags instead of
+// duplicating it. tag="json" produces IDENTICAL results to the old jsonKey
+// for every existing call site (zero regression requirement).
 //
 // Mirrors encoding/json's own tag-parsing rules just enough for this
 // package's needs: split on the first comma (dropping options like
 // `,omitempty`), fall back to the Go field name if no tag or an empty tag
 // name is present.
-func jsonKey(f reflect.StructField) (string, bool) {
-	tag := f.Tag.Get("json")
-	if tag == "-" {
+func tagKey(field reflect.StructField, tag string) string {
+	key, _ := tagKeyVisible(field, tag)
+	return key
+}
+
+// tagKeyVisible is tagKey's full form, also reporting whether the field is
+// visible under this tag at all (false for a `<tag>:"-"` value). Kept
+// separate from tagKey (which validateStruct doesn't need the bool for --
+// see below) purely so tagKey's own signature stays a plain string return,
+// matching design.md's Data Models declaration literally
+// (`func tagKey(field reflect.StructField, tag string) string`).
+func tagKeyVisible(field reflect.StructField, tag string) (string, bool) {
+	raw := field.Tag.Get(tag)
+	if raw == "-" {
 		return "", false
 	}
-	if tag == "" {
-		return f.Name, true
+	if raw == "" {
+		return field.Name, true
 	}
-	name := tag
-	for i, c := range tag {
+	name := raw
+	for i, c := range raw {
 		if c == ',' {
-			name = tag[:i]
+			name = raw[:i]
 			break
 		}
 	}
 	if name == "" {
-		name = f.Name
+		name = field.Name
 	}
 	return name, true
 }
@@ -150,7 +174,7 @@ func validateStruct(presence map[string]any, m *metadata.Metadata, pathPrefix st
 	var violations []violation
 
 	for _, p := range m.OwnProperties() {
-		key, visible := jsonKey(p.Field())
+		key, visible := tagKeyVisible(p.Field(), "json")
 		if !visible {
 			continue
 		}
@@ -170,10 +194,23 @@ func validateStruct(presence map[string]any, m *metadata.Metadata, pathPrefix st
 	return violations
 }
 
-// validateValue handles the one concern shared by every kind (null
-// handling), then dispatches on p.KindValue() to the kind-specific
-// validator.
+// validateValue's FIRST check is Custom(fn) (param-query-validation
+// feature's P0 -- context.md's Decision 4): when set, fn(raw) FULLY
+// REPLACES every built-in kind/format/Min/Max/Pattern check below for this
+// field -- a non-nil error becomes this field's one violation, a nil error
+// means Custom succeeded and validateValue returns immediately, NEVER
+// falling through to the null/kind dispatch that follows. Only when Custom
+// was never set does validateValue handle the one concern shared by every
+// kind (null handling), then dispatch on p.KindValue() to the
+// kind-specific validator.
 func validateValue(raw any, p *metadata.PropertyBuilder, path string) []violation {
+	if fn, ok := p.CustomFunc(); ok {
+		if _, err := fn(raw); err != nil {
+			return []violation{{Field: path, Message: err.Error()}}
+		}
+		return nil
+	}
+
 	if raw == nil {
 		if p.IsNullable() {
 			return nil
@@ -345,4 +382,242 @@ func validateObject(raw any, p *metadata.PropertyBuilder, path string) []violati
 	}
 
 	return validateStruct(objMap, ref, path+".")
+}
+
+// populate is the shared reflect-based "build T" core used by ALL public
+// entry points (MustJsonBody today; MustParams/MustQuery in later tasks of
+// this feature -- param-query-validation's context.md Decision 5). It walks
+// m's own registered properties, resolves each field's key via tagKey(...,
+// tag), and writes that field's final value into dest via setField.
+//
+// Called ONLY after the caller's own validate pass already confirmed zero
+// violations (mirrors the two-step "validate everything, THEN build" order
+// MustJsonBody already had before this refactor) -- populate itself does
+// NOT re-validate, it trusts presence's values are already known-good
+// (or, for Custom fields, known to succeed when called again -- see below).
+//
+// If a field's key is absent from presence, it is skipped entirely: either
+// it was optional and legitimately missing (nothing to populate, dest
+// field stays its Go zero value), or it was Required and missing, in which
+// case validateStruct already recorded a violation earlier and the caller
+// would have panicked before ever reaching populate.
+//
+// If p.CustomFunc() is set, fn(raw) is called AGAIN here (it already ran
+// once inside validateValue during the validate pass) and its returned
+// value is what gets written -- deliberately not cached/deduplicated (see
+// design.md's Tech Decisions: fn must be idempotent, called up to 2x per
+// field per request, documented on PropertyBuilder.Custom's own doc
+// comment). Since a failing Custom already short-circuited validateValue
+// with a violation earlier, and MustJsonBody/MustParams/MustQuery all check
+// violations BEFORE calling populate, fn is guaranteed to succeed here too
+// (same raw input, same idempotent fn).
+func populate(dest reflect.Value, presence map[string]any, m *metadata.Metadata, tag string) error {
+	for _, p := range m.OwnProperties() {
+		key, visible := tagKeyVisible(p.Field(), tag)
+		if !visible {
+			continue
+		}
+
+		raw, ok := presence[key]
+		if !ok {
+			continue
+		}
+
+		value := raw
+		if fn, isCustom := p.CustomFunc(); isCustom {
+			v, err := fn(raw)
+			if err != nil {
+				// Unreachable in practice (see doc comment above), but
+				// treated as a structured error rather than silently
+				// skipping the field, consistent with this package's "never
+				// crash, always structured error" stance.
+				return fmt.Errorf("field %q: Custom(fn) failed on population pass: %w", key, err)
+			}
+			value = v
+		}
+
+		fieldVal := dest.FieldByIndex(p.Field().Index)
+		if err := setField(fieldVal, value); err != nil {
+			return fmt.Errorf("field %q: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+// setField converts raw into fieldVal's own Go type and Sets it, returning
+// an error instead of letting reflect panic when the types are
+// incompatible (spec.md's Edge Cases: "never panic a raw reflect error").
+//
+// raw is either: (a) a value already in the shape encoding/json's own
+// generic decode produces (string/float64/bool/nil/map[string]any/[]any --
+// the same shape validateValue/validatePrimitive already consume), or (b)
+// whatever a Custom(fn) call returned, which can be ANY Go value including
+// one that already matches fieldVal's type exactly (e.g. Custom parsing
+// "v1:42" into a plain int).
+//
+// Strategy: if raw is already directly assignable/convertible to fieldVal's
+// type via reflect (covers Custom's common case of returning the exact
+// target type, plus simple numeric/string/bool coercions), do that
+// directly. Otherwise -- covering the JSON-decoded generic shapes for
+// nested struct/slice/map fields, where a naive reflect assignment can
+// never work since `map[string]any` is never assignable to e.g.
+// AddressEntity -- fall back to a JSON round-trip (marshal raw back to
+// bytes, unmarshal into fieldVal's address), reusing encoding/json's own
+// well-tested conversion rules rather than reimplementing them by hand.
+func setField(fieldVal reflect.Value, raw any) error {
+	if !fieldVal.CanSet() {
+		return fmt.Errorf("field is not settable")
+	}
+
+	fieldType := fieldVal.Type()
+
+	if raw == nil {
+		switch fieldType.Kind() {
+		case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice:
+			fieldVal.Set(reflect.Zero(fieldType))
+			return nil
+		default:
+			// A nil raw value reaching setField for a non-nilable Go type
+			// (e.g. plain string/int) should already have been rejected by
+			// the validate pass (Nullable check) before populate ever runs
+			// -- but treat as a no-op (leave the Go zero value) rather than
+			// panicking, matching this package's "never crash" stance.
+			return nil
+		}
+	}
+
+	rawVal := reflect.ValueOf(raw)
+
+	// Pointer/nilable destination (e.g. *string for a Nullable field with a
+	// non-nil value present): allocate the pointee and recurse into it.
+	if fieldType.Kind() == reflect.Ptr {
+		ptr := reflect.New(fieldType.Elem())
+		if err := setField(ptr.Elem(), raw); err != nil {
+			return err
+		}
+		fieldVal.Set(ptr)
+		return nil
+	}
+
+	// Directly assignable (identical types, e.g. Custom returning exactly
+	// the field's own type, or an interface{}/any-typed field).
+	if rawVal.Type().AssignableTo(fieldType) {
+		fieldVal.Set(rawVal)
+		return nil
+	}
+
+	// Numeric family: JSON numbers decode to float64; Custom(fn) may also
+	// return any numeric Go type. Convert via the appropriate reflect
+	// Set*, rather than a blanket Convert (which would silently succeed for
+	// nonsensical combinations reflect itself considers "convertible",
+	// e.g. string->int would panic at Convert time for non-numeric
+	// strings -- restricting this branch to KNOWN numeric kinds keeps that
+	// panic surface closed).
+	if isNumericKind(fieldType.Kind()) {
+		f, ok := toFloat64(raw)
+		if !ok {
+			return fmt.Errorf("cannot convert %T to %s", raw, fieldType)
+		}
+		switch {
+		case fieldType.Kind() >= reflect.Int && fieldType.Kind() <= reflect.Int64:
+			fieldVal.SetInt(int64(f))
+		case fieldType.Kind() >= reflect.Uint && fieldType.Kind() <= reflect.Uintptr:
+			fieldVal.SetUint(uint64(f))
+		case fieldType.Kind() == reflect.Float32 || fieldType.Kind() == reflect.Float64:
+			fieldVal.SetFloat(f)
+		}
+		return nil
+	}
+
+	if fieldType.Kind() == reflect.String {
+		s, ok := raw.(string)
+		if !ok {
+			return fmt.Errorf("cannot convert %T to string", raw)
+		}
+		fieldVal.SetString(s)
+		return nil
+	}
+
+	if fieldType.Kind() == reflect.Bool {
+		b, ok := raw.(bool)
+		if !ok {
+			return fmt.Errorf("cannot convert %T to bool", raw)
+		}
+		fieldVal.SetBool(b)
+		return nil
+	}
+
+	// Struct/slice/map/array destinations that aren't directly assignable
+	// from raw's own Go type (e.g. raw is a JSON-decoded map[string]any but
+	// fieldVal is a concrete AddressEntity struct, or raw is []any but
+	// fieldVal is []AddressEntity) -- reuse encoding/json's own conversion
+	// rules via a round-trip rather than hand-rolling nested reflect
+	// construction, since MustJsonBody's validate pass already proved raw's
+	// SHAPE matches what T expects.
+	switch fieldType.Kind() {
+	case reflect.Struct, reflect.Slice, reflect.Array, reflect.Map, reflect.Interface:
+		encoded, err := json.Marshal(raw)
+		if err != nil {
+			return fmt.Errorf("cannot convert %T to %s: %w", raw, fieldType, err)
+		}
+		target := reflect.New(fieldType)
+		if err := json.Unmarshal(encoded, target.Interface()); err != nil {
+			return fmt.Errorf("cannot convert %T to %s: %w", raw, fieldType, err)
+		}
+		fieldVal.Set(target.Elem())
+		return nil
+	}
+
+	return fmt.Errorf("cannot convert %T to %s", raw, fieldType)
+}
+
+// isNumericKind reports whether k is any of Go's integer/unsigned/float
+// kinds -- the set setField's numeric branch handles uniformly via
+// SetInt/SetUint/SetFloat.
+func isNumericKind(k reflect.Kind) bool {
+	switch k {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64:
+		return true
+	default:
+		return false
+	}
+}
+
+// toFloat64 extracts a float64 from raw regardless of its concrete Go
+// numeric type -- JSON numbers always decode to float64, but Custom(fn) may
+// return any numeric type (int, int64, float32, ...), so this normalizes
+// before handing off to SetInt/SetUint/SetFloat's own int64/uint64/float64
+// parameter types.
+func toFloat64(raw any) (float64, bool) {
+	switch v := raw.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int8:
+		return float64(v), true
+	case int16:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint8:
+		return float64(v), true
+	case uint16:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	default:
+		return 0, false
+	}
 }
