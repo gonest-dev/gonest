@@ -9,6 +9,9 @@
 package gonest
 
 import (
+	"reflect"
+	"unsafe"
+
 	"github.com/gonest-dev/gonest/internal/app"
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/exception"
@@ -17,6 +20,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/pipe"
@@ -370,3 +374,42 @@ type Filter = filter.Filter
 // in this consolidated file rather than a separate filter.go). See
 // internal/filter.New's doc comment for the full contract.
 var NewFilter = filter.New
+
+// ---------------------------------------------------------------------------
+// Metadata (Metadata Registration Core feature)
+// ---------------------------------------------------------------------------
+
+// Metadata holds the whole-type description plus every field registered via
+// Property, for a single NewMetadata[T] call (e.g. INSIGHT.md's
+// `gonest.NewMetadata[UserEntity](func(t *UserEntity, m *gonest.Metadata) {
+// ... })`). See internal/metadata.Metadata's doc comment for the full
+// contract.
+type Metadata = metadata.Metadata
+
+// PropertyBuilder holds one field's own constraints -- Required/Nullable/
+// Description/Examples in this feature; future type+format branch features
+// (String(), Integer(), etc. -- see ROADMAP.md, explicitly out of scope
+// here) add their own methods on top. See internal/metadata.PropertyBuilder's
+// doc comment for the full contract.
+type PropertyBuilder = metadata.PropertyBuilder
+
+// NewMetadata builds a *Metadata for T, identifying fields purely by their
+// own pointer address within a zero value of T (INSIGHT.md's
+// `m.Property(&t.Id)` call shape) -- no struct tags required. Go cannot
+// re-export a generic function via var, so this is a real wrapper calling
+// the internal one (same pattern as MustInject/NewApp/MustParam, see AD-004
+// in STATE.md; see also AD-009 in STATE.md for why this section lives in
+// this consolidated file rather than a separate metadata.go).
+//
+// Internally: a zero value of T is allocated, its address is passed to
+// internal/metadata.New as the base address every later Property(&t.Field)
+// call's offset is measured against, then fn runs against that zero value
+// and the freshly built *Metadata (see internal/metadata.Metadata's doc
+// comment for the full field-identification algorithm, empirically
+// confirmed working by T1's own test suite).
+func NewMetadata[T any](fn func(t *T, m *Metadata)) *Metadata {
+	var zero T
+	m := metadata.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
+	fn(&zero, m)
+	return m
+}

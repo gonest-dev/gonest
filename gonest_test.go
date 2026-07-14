@@ -1072,3 +1072,128 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Metadata (Metadata Registration Core feature)
+// ---------------------------------------------------------------------------
+
+// TestNewMetadata_RootAlias_TypeCheck proves NewMetadata/Metadata/
+// PropertyBuilder resolve and type-check at the root gonest package:
+// NewMetadata[T] builds a *Metadata, m.Property(&t.Field) returns a
+// *PropertyBuilder, and the whole call shape compiles and runs without
+// panicking for a minimal one-field struct.
+func TestNewMetadata_RootAlias_TypeCheck(t *testing.T) {
+	type minimalEntity struct {
+		Id int64
+	}
+
+	m := NewMetadata[minimalEntity](func(t *minimalEntity, m *Metadata) {
+		var _ *PropertyBuilder = m.Property(&t.Id)
+	})
+	if m == nil {
+		t.Fatal("NewMetadata() returned nil *Metadata")
+	}
+}
+
+// TestNewMetadata_RootAlias_UserEntityInsightCallShape reproduces INSIGHT.md's
+// UserEntity metadata example (lines ~379-402) verbatim through the root
+// gonest package's NewMetadata/Metadata/PropertyBuilder aliases, adapted per
+// this feature's Out of Scope (spec.md/design.md): the type+format branch
+// calls (.Integer()/.String()/.Email()/.Boolean()/.DateTime()) do not exist
+// yet (future features), so only the base PropertyBuilder methods --
+// Required/Nullable/Description/Examples -- are used here, confirmed field
+// by field.
+func TestNewMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+	type UserEntity struct {
+		Id        int64      `json:"id"`
+		Name      string     `json:"name"`
+		Email     string     `json:"email"`
+		IsActive  bool       `json:"isActive"`
+		CreatedAt time.Time  `json:"createdAt"`
+		UpdatedAt time.Time  `json:"updatedAt"`
+		DeletedAt *time.Time `json:"deletedAt"`
+	}
+
+	now := time.Now()
+
+	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+		m.Description("Entidade de usuário")
+		m.Property(&t.Id).Required().Description("ID do usuário").Examples(int64(1))
+		m.Property(&t.Name).Required().Description("Nome do usuário").Examples("John Doe")
+		m.Property(&t.Email).Required().Description("Email do usuário").Examples("john@example.com")
+		m.Property(&t.IsActive).Required().Description("Status do usuário").Examples(true)
+		m.Property(&t.CreatedAt).Required().Description("Data de criação do usuário").Examples(now)
+		m.Property(&t.UpdatedAt).Required().Description("Data de atualização do usuário").Examples(now)
+		m.Property(&t.DeletedAt).Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
+	})
+
+	if m == nil {
+		t.Fatal("NewMetadata() returned nil *Metadata")
+	}
+	if m.DescriptionText() != "Entidade de usuário" {
+		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 7 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 7", len(props))
+	}
+
+	byName := map[string]*PropertyBuilder{}
+	for _, p := range props {
+		byName[p.Field().Name] = p
+	}
+
+	checkBase := func(name string, wantRequired, wantNullable bool, wantDescription string, wantExamples []any) {
+		t.Helper()
+		p, ok := byName[name]
+		if !ok {
+			t.Fatalf("field %q was not registered via Property", name)
+		}
+		if p.IsRequired() != wantRequired {
+			t.Fatalf("field %q: IsRequired() = %v, want %v", name, p.IsRequired(), wantRequired)
+		}
+		if p.IsNullable() != wantNullable {
+			t.Fatalf("field %q: IsNullable() = %v, want %v", name, p.IsNullable(), wantNullable)
+		}
+		if p.DescriptionText() != wantDescription {
+			t.Fatalf("field %q: DescriptionText() = %q, want %q", name, p.DescriptionText(), wantDescription)
+		}
+		gotExamples := p.ExamplesList()
+		if len(gotExamples) != len(wantExamples) {
+			t.Fatalf("field %q: ExamplesList() = %v, want %v", name, gotExamples, wantExamples)
+		}
+		for i := range wantExamples {
+			if gotExamples[i] != wantExamples[i] {
+				t.Fatalf("field %q: ExamplesList()[%d] = %v, want %v", name, i, gotExamples[i], wantExamples[i])
+			}
+		}
+	}
+
+	checkBase("Id", true, false, "ID do usuário", []any{int64(1)})
+	checkBase("Name", true, false, "Nome do usuário", []any{"John Doe"})
+	checkBase("Email", true, false, "Email do usuário", []any{"john@example.com"})
+	checkBase("IsActive", true, false, "Status do usuário", []any{true})
+	checkBase("CreatedAt", true, false, "Data de criação do usuário", []any{now})
+	checkBase("UpdatedAt", true, false, "Data de atualização do usuário", []any{now})
+	checkBase("DeletedAt", false, true, "Data de exclusão do usuário", []any{nil, now})
+
+	// Confirm the field-identification-via-pointer technique (T1's core
+	// mechanism) genuinely distinguishes each of the 7 fields by their own
+	// Go type, not just by registration order.
+	wantTypes := map[string]string{
+		"Id":        "int64",
+		"Name":      "string",
+		"Email":     "string",
+		"IsActive":  "bool",
+		"CreatedAt": "time.Time",
+		"UpdatedAt": "time.Time",
+		"DeletedAt": "*time.Time",
+	}
+	for name, wantType := range wantTypes {
+		p := byName[name]
+		if got := p.Field().Type.String(); got != wantType {
+			t.Fatalf("field %q: Field().Type.String() = %q, want %q", name, got, wantType)
+		}
+	}
+}
