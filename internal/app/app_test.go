@@ -2462,7 +2462,7 @@ type fooFilterException struct {
 }
 
 func newFooFilterException() *fooFilterException {
-	return &fooFilterException{HttpException: exception.NewHttpException(499, "FooFilterException", "foo", nil)}
+	return &fooFilterException{HttpException: exception.NewHttpException().SetStatus(499).SetName("FooFilterException").SetMessage("foo")}
 }
 
 type barFilterException struct {
@@ -2470,7 +2470,7 @@ type barFilterException struct {
 }
 
 func newBarFilterException() *barFilterException {
-	return &barFilterException{HttpException: exception.NewHttpException(498, "BarFilterException", "bar", nil)}
+	return &barFilterException{HttpException: exception.NewHttpException().SetStatus(498).SetName("BarFilterException").SetMessage("bar")}
 }
 
 // TestNewApp_ControllerFilter_CatchesMatchingExceptionType proves a

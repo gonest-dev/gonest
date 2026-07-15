@@ -19,7 +19,7 @@ type NotFoundException struct {
 // constructor, so message always defaults to "".
 func NewNotFoundException(details any) *NotFoundException {
 	return &NotFoundException{
-		HttpException: NewHttpException(http.StatusNotFound, "NotFoundException", "", details),
+		HttpException: NewHttpException().SetStatus(http.StatusNotFound).SetName("NotFoundException").SetDetails(details),
 	}
 }
 
@@ -35,7 +35,7 @@ type BadRequestException struct {
 // empty-message rationale, which applies identically here.
 func NewBadRequestException(details any) *BadRequestException {
 	return &BadRequestException{
-		HttpException: NewHttpException(http.StatusBadRequest, "BadRequestException", "", details),
+		HttpException: NewHttpException().SetStatus(http.StatusBadRequest).SetName("BadRequestException").SetDetails(details),
 	}
 }
 
@@ -51,7 +51,7 @@ type ConflictException struct {
 // empty-message rationale, which applies identically here.
 func NewConflictException(details any) *ConflictException {
 	return &ConflictException{
-		HttpException: NewHttpException(http.StatusConflict, "ConflictException", "", details),
+		HttpException: NewHttpException().SetStatus(http.StatusConflict).SetName("ConflictException").SetDetails(details),
 	}
 }
 
@@ -67,7 +67,7 @@ type UnauthorizedException struct {
 // empty-message rationale, which applies identically here.
 func NewUnauthorizedException(details any) *UnauthorizedException {
 	return &UnauthorizedException{
-		HttpException: NewHttpException(http.StatusUnauthorized, "UnauthorizedException", "", details),
+		HttpException: NewHttpException().SetStatus(http.StatusUnauthorized).SetName("UnauthorizedException").SetDetails(details),
 	}
 }
 
@@ -83,6 +83,6 @@ type ForbiddenException struct {
 // empty-message rationale, which applies identically here.
 func NewForbiddenException(details any) *ForbiddenException {
 	return &ForbiddenException{
-		HttpException: NewHttpException(http.StatusForbidden, "ForbiddenException", "", details),
+		HttpException: NewHttpException().SetStatus(http.StatusForbidden).SetName("ForbiddenException").SetDetails(details),
 	}
 }

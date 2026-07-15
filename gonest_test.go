@@ -478,7 +478,7 @@ type FooExampleError struct {
 // the root-aliased HttpException/NewHttpException.
 func NewFooExampleError(details any) *FooExampleError {
 	return &FooExampleError{
-		HttpException: NewHttpException(http.StatusBadRequest, "FooExampleError", "lorem ipsum dolor met", details),
+		HttpException: NewHttpException().SetStatus(http.StatusBadRequest).SetName("FooExampleError").SetMessage("lorem ipsum dolor met").SetDetails(details),
 	}
 }
 

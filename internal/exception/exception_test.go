@@ -1,6 +1,7 @@
 package exception
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -51,7 +52,7 @@ func TestNewHttpException_AccessorsReturnWhatWasPassed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := NewHttpException(tt.status, tt.excName, tt.message, tt.details)
+			e := NewHttpException().SetStatus(tt.status).SetName(tt.excName).SetMessage(tt.message).SetDetails(tt.details)
 
 			if got := e.Status(); got != tt.status {
 				t.Errorf("Status() = %v, want %v", got, tt.status)
@@ -96,7 +97,7 @@ func TestFooExampleError_SatisfiesException(t *testing.T) {
 	var _ Exception = fooExampleError{}
 
 	v := fooExampleError{
-		HttpException: NewHttpException(404, "FooExampleError", "example", nil),
+		HttpException: NewHttpException().SetStatus(404).SetName("FooExampleError").SetMessage("example"),
 	}
 
 	got, ok := any(v).(Exception)
@@ -132,5 +133,89 @@ func TestNonExceptionValues_DoNotSatisfyException(t *testing.T) {
 				t.Errorf("%#v unexpectedly satisfies Exception", tt.v)
 			}
 		})
+	}
+}
+
+func TestNewHttpException_DefaultsStatusTo500(t *testing.T) {
+	e := NewHttpException()
+	if got := e.Status(); got != 500 {
+		t.Fatalf("Status() = %d, want 500 (default)", got)
+	}
+	if got := e.Name(); got != "" {
+		t.Fatalf("Name() = %q, want empty", got)
+	}
+	if got := e.Message(); got != "" {
+		t.Fatalf("Message() = %q, want empty", got)
+	}
+	if got := e.Details(); got != nil {
+		t.Fatalf("Details() = %v, want nil", got)
+	}
+}
+
+func TestHttpException_SetMethods_ChainAndReturnIndependentCopies(t *testing.T) {
+	base := NewHttpException()
+	withStatus := base.SetStatus(404)
+	withName := withStatus.SetName("Foo")
+
+	if base.Status() != 500 {
+		t.Fatalf("base.Status() = %d, want 500 (SetStatus must not mutate receiver)", base.Status())
+	}
+	if withStatus.Name() != "" {
+		t.Fatalf("withStatus.Name() = %q, want empty (SetName on a different copy must not affect this one)", withStatus.Name())
+	}
+	if withName.Status() != 404 || withName.Name() != "Foo" {
+		t.Fatalf("withName = {status:%d, name:%q}, want {404, Foo}", withName.Status(), withName.Name())
+	}
+}
+
+func TestHttpException_MarshalJSON_OmitsStatusIncludesRest(t *testing.T) {
+	e := NewHttpException().SetStatus(409).SetName("Foo").SetMessage("bar").SetDetails(map[string]string{"k": "v"})
+
+	b, err := json.Marshal(e)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(b, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if _, ok := decoded["status"]; ok {
+		t.Fatalf("decoded body contains \"status\", want it omitted: %s", b)
+	}
+	if decoded["name"] != "Foo" || decoded["message"] != "bar" {
+		t.Fatalf("decoded = %v, want name=Foo message=bar", decoded)
+	}
+}
+
+func TestHttpException_MarshalJSON_PromotedThroughEmbedding(t *testing.T) {
+	v := fooExampleError{HttpException: NewHttpException().SetName("FooExampleError").SetMessage("boom")}
+
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("json.Marshal(fooExampleError) error = %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(b, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if decoded["name"] != "FooExampleError" {
+		t.Fatalf("decoded[name] = %v, want FooExampleError (MarshalJSON must be promoted through embedding)", decoded["name"])
+	}
+}
+
+func TestEffectiveName_ReturnsSetNameWhenNonEmpty(t *testing.T) {
+	e := fooExampleError{HttpException: NewHttpException().SetName("ExplicitName")}
+	if got := EffectiveName(e); got != "ExplicitName" {
+		t.Fatalf("EffectiveName() = %q, want ExplicitName", got)
+	}
+}
+
+func TestEffectiveName_FallsBackToConcreteTypeName_WhenNameUnset(t *testing.T) {
+	v := &fooExampleError{HttpException: NewHttpException()} // SetName never called
+	if got := EffectiveName(v); got != "fooExampleError" {
+		t.Fatalf("EffectiveName() = %q, want fooExampleName type name \"fooExampleError\"", got)
 	}
 }

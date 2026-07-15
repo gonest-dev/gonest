@@ -285,14 +285,25 @@ type Exception = exception.Exception
 // internal/exception.HttpException's doc comment for the full contract.
 type HttpException = exception.HttpException
 
-// NewHttpException builds an HttpException from its four parts, returning a
-// VALUE (not a pointer) for embedding into a struct literal, e.g.
-// `HttpException: gonest.NewHttpException(status, name, message, details)`.
+// NewHttpException builds a zero-arg HttpException (status defaults to
+// 500), returning a VALUE (not a pointer) for embedding into a struct
+// literal via the chainable SetStatus/SetName/SetMessage/SetDetails
+// methods, e.g.
+// `HttpException: gonest.NewHttpException().SetStatus(http.StatusConflict).SetName("DuplicateEmailException")`.
 // Unlike NewApp elsewhere in this package, NewHttpException is not
 // generic, so Go allows aliasing the plain func directly via var -- no
 // wrapper function is needed. See internal/exception.NewHttpException's doc
 // comment for the full contract.
 var NewHttpException = exception.NewHttpException
+
+// ExceptionName returns exc.Name() if non-empty, otherwise a reflect-based
+// default derived from exc's own concrete type (e.g. a dev-defined
+// *FooError that never called SetName still gets "FooError" instead of "")
+// -- used by the framework's own default (unhandled) exception formatting;
+// exposed here so a dev-defined Filter can apply the same fallback. See
+// internal/exception.EffectiveName's doc comment for why this can't live
+// inside HttpException.Name()/MarshalJSON() itself.
+var ExceptionName = exception.EffectiveName
 
 // NotFoundException is the framework's built-in exception for a missing
 // resource.

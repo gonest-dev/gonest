@@ -127,7 +127,7 @@ func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(ct
 			if r := recover(); r != nil {
 				if exc, ok := r.(exception.Exception); ok {
 					ctx.Status(exc.Status()).Json(map[string]any{ //nolint:errcheck // best-effort write on an already-failed request
-						"name":    exc.Name(),
+						"name":    exception.EffectiveName(exc),
 						"message": exc.Message(),
 						"details": exc.Details(),
 					})

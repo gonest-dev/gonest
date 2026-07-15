@@ -505,9 +505,7 @@ func TestRegisterRoute_HandlerPanicsWithException_RespondsWithStructuredBody(t *
 		{
 			name: "dev-defined exception via embedding",
 			panicValue: customTestException{
-				HttpException: exception.NewHttpException(
-					http.StatusTeapot, "customTestException", "I am a teapot", "extra",
-				),
+				HttpException: exception.NewHttpException().SetStatus(http.StatusTeapot).SetName("customTestException").SetMessage("I am a teapot").SetDetails("extra"),
 			},
 			wantStatus:  http.StatusTeapot,
 			wantName:    "customTestException",
