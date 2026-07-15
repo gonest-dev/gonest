@@ -180,11 +180,51 @@
 
 ---
 
+## Milestone 9: Emitter (event-emitter)
+
+**Goal:** equivalente `@nestjs/event-emitter` -- evento tipado por struct, emissão assíncrona fire-and-forget, listener registrado via `Module.Listeners()`.
+**Status:** PLANNED -- spec.md escrito (2026-07-14), execução não iniciada. DEPENDE de "Test App Bootstrap" (Milestone 8) estar implementado primeiro -- `Listener` é mais um tipo `New*` com `MustInject`/`MustOn` no builder, precisa do bootstrap de 3 fases (AD-015) pra funcionar corretamente.
+
+### Features
+
+**Emitter & Listener** - PLANNED
+- `gonest.Emitter` -- singleton do framework, SEMPRE disponível via `MustInject[*gonest.Emitter]` em qualquer módulo, sem registro explícito
+- `NewListener`, `MustOn[EventType](listener, handler)` (função livre, não método -- Go não permite parâmetro de tipo em método, L-001 em STATE.md)
+- `Module.Listeners(...)` -- registro no bootstrap junto com providers
+- `Emitter.Emit(event)` -- assíncrono (1 goroutine por listener registrado pro tipo), fire-and-forget, panic/erro de listener nunca propaga pro chamador (cai só no logger interno)
+
+---
+
+## Milestone 10: Scheduler (Cron/Interval/Timeout)
+
+**Goal:** equivalente `@nestjs/schedule` -- jobs agendados, cada execução isolada (recover próprio, não derruba o processo).
+**Status:** PLANNED -- spec.md escrito (2026-07-14), execução não iniciada. Mesma dependência de "Test App Bootstrap" que Emitter (`Scheduler` é `New*` com `MustInject`).
+
+### Features
+
+**Scheduler** - PLANNED
+- `NewScheduler`, `Module.Schedulers(...)`
+- `scheduler.Cron(name, expr, fn)` / `scheduler.Interval(name, dur, fn)` / `scheduler.Timeout(name, dur, fn)`
+- Cada execução roda isolada (recover próprio), panic/erro só vai pro logger, não derruba o processo
+
+---
+
+## Milestone 11: Terminus/health checks
+
+**Goal:** equivalente `@nestjs/terminus` -- endpoint `/health` automático a partir de `HealthCheck`s registrados.
+**Status:** PLANNED -- spec.md escrito (2026-07-14), execução não iniciada. Mesma dependência de "Test App Bootstrap" que Emitter/Scheduler (`HealthCheck` é `New*` com `MustInject`).
+
+### Features
+
+**Health Check** - PLANNED
+- `NewHealthCheck`, `Module.HealthChecks(...)`
+- `health.Check(name, func(ctx) error)` -- 1+ checagens nomeadas
+- `App.UseHealthCheck(path)` -- monta rota GET automaticamente; 200 + `{status:"ok", checks:{...}}` se tudo passar, 503 + detalhe do check que falhou senão
+
+---
+
 ## Future Considerations
 
 - Abstração multi-adapter HTTP (net/http, Echo, Gin) — v1 é só Fiber
-- Emitter (event-emitter, equivalente `@nestjs/event-emitter`)
-- Scheduler (Cron/Interval/Timeout, equivalente `@nestjs/schedule`)
-- Terminus/health checks (equivalente `@nestjs/terminus`)
 - CLI de scaffolding (equivalente `nest new`/`nest generate`)
 - Microservices/transport layer (equivalente `@nestjs/microservices`)

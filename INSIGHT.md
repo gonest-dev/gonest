@@ -699,9 +699,15 @@ var UserCreatedListener = gonest.NewListener(func (listener *gonest.Listener) {
   })
 })
 
-// emissão: resolve o Emitter global (singleton do framework) e emite valor tipado.
-var UserService_Create_Emits = gonest.NewProvider(func (provider *gonest.Provider) {
-  provider.Constructor(func(emitter *gonest.Emitter) *UserService {
+// emissão: resolve o Emitter global (singleton do framework, SEMPRE disponível
+// em qualquer módulo sem registro explícito) via MustInject DENTRO do builder
+// do Provider (padrão real de dependência Provider-a-Provider -- Constructor
+// em si só aceita func()/func()(T,error)/func(ctx)T/func(ctx)(T,error), NUNCA
+// parâmetro de dependência direto; a dependência é capturada por closure ANTES
+// de Constructor ser chamado, mesmo padrão de Guard/Scheduler/HealthCheck).
+var UserProvider = gonest.NewProvider(func (provider *gonest.Provider) {
+  emitter := gonest.MustInject[*gonest.Emitter](provider)
+  provider.Constructor(func() *UserService {
     return &UserService{emitter: emitter}
   })
 })
