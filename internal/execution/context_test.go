@@ -1,6 +1,9 @@
 package execution
 
-import "testing"
+import (
+	"io"
+	"testing"
+)
 
 // fakeResponder is a test-only implementation of Responder, standing in for
 // the real Fiber-backed implementation that arrives in a later task (T7).
@@ -59,6 +62,10 @@ func (f *fakeResponder) HTML(s string) error {
 
 func (f *fakeResponder) SendString(s string) error {
 	return nil
+}
+
+func (f *fakeResponder) BodyStream() (io.Reader, string, bool) {
+	return nil, "", false
 }
 
 func TestContext_Json_DelegatesToResponder(t *testing.T) {

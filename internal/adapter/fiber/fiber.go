@@ -7,6 +7,8 @@
 package fiber
 
 import (
+	"io"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -300,4 +302,32 @@ func (r *fiberResponder) HTML(s string) error {
 // deliberately sets text/html first.
 func (r *fiberResponder) SendString(s string) error {
 	return r.c.SendString(s)
+}
+
+// BodyStream returns the raw request body stream plus its multipart
+// boundary, when BOTH are true: (1) the request's own Content-Type is
+// multipart/form-data with a boundary, and (2) this app was built with
+// AppOptions.EnableFormStreaming (which sets fasthttp's StreamRequestBody +
+// DisablePreParseMultipartForm together, see FiberApp.Init) -- without (2),
+// fasthttp has already fully parsed/buffered the multipart form before this
+// method is ever called, so RequestBodyStream() returns nil (confirmed via
+// fasthttp@v1.72.0 source: Request.bodyStream is only populated by
+// ContinueReadBodyStream, which readBodyStream/StreamRequestBody's dispatch
+// path calls -- see design.md's Tech Decisions).
+func (r *fiberResponder) BodyStream() (io.Reader, string, bool) {
+	contentType := r.c.Get(fiber.HeaderContentType)
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, "", false
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		return nil, "", false
+	}
+
+	stream := r.c.RequestCtx().RequestBodyStream()
+	if stream == nil {
+		return nil, "", false
+	}
+	return stream, boundary, true
 }

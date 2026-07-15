@@ -3,6 +3,7 @@ package validate
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -94,15 +95,16 @@ type paramFakeResponder struct {
 	params map[string]string
 }
 
-func (f *paramFakeResponder) JSON(v any) error                  { return nil }
-func (f *paramFakeResponder) SetStatus(code int)                {}
-func (f *paramFakeResponder) GetHeader(name string) string      { return "" }
-func (f *paramFakeResponder) SetHeaderValue(name, value string) {}
-func (f *paramFakeResponder) GetParam(name string) string       { return f.params[name] }
-func (f *paramFakeResponder) Body() []byte                      { return nil }
-func (f *paramFakeResponder) Queries() map[string]string        { return nil }
-func (f *paramFakeResponder) HTML(s string) error               { return nil }
-func (f *paramFakeResponder) SendString(s string) error         { return nil }
+func (f *paramFakeResponder) JSON(v any) error                      { return nil }
+func (f *paramFakeResponder) SetStatus(code int)                    {}
+func (f *paramFakeResponder) GetHeader(name string) string          { return "" }
+func (f *paramFakeResponder) SetHeaderValue(name, value string)     {}
+func (f *paramFakeResponder) GetParam(name string) string           { return f.params[name] }
+func (f *paramFakeResponder) Body() []byte                          { return nil }
+func (f *paramFakeResponder) Queries() map[string]string            { return nil }
+func (f *paramFakeResponder) HTML(s string) error                   { return nil }
+func (f *paramFakeResponder) SendString(s string) error             { return nil }
+func (f *paramFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
 // newParamCtx builds a *execution.Context carrying params and attached to a
 // *route.Route built from pathPattern (e.g. "/user/:user_id/order/:order_id"),

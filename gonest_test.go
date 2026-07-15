@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -307,15 +308,16 @@ func newParamFakeResponder() *paramFakeResponder {
 	return &paramFakeResponder{params: map[string]string{}}
 }
 
-func (f *paramFakeResponder) JSON(v any) error                  { return nil }
-func (f *paramFakeResponder) SetStatus(code int)                {}
-func (f *paramFakeResponder) GetHeader(name string) string      { return "" }
-func (f *paramFakeResponder) SetHeaderValue(name, value string) {}
-func (f *paramFakeResponder) GetParam(name string) string       { return f.params[name] }
-func (f *paramFakeResponder) Body() []byte                      { return nil }
-func (f *paramFakeResponder) Queries() map[string]string        { return nil }
-func (f *paramFakeResponder) HTML(s string) error               { return nil }
-func (f *paramFakeResponder) SendString(s string) error         { return nil }
+func (f *paramFakeResponder) JSON(v any) error                      { return nil }
+func (f *paramFakeResponder) SetStatus(code int)                    {}
+func (f *paramFakeResponder) GetHeader(name string) string          { return "" }
+func (f *paramFakeResponder) SetHeaderValue(name, value string)     {}
+func (f *paramFakeResponder) GetParam(name string) string           { return f.params[name] }
+func (f *paramFakeResponder) Body() []byte                          { return nil }
+func (f *paramFakeResponder) Queries() map[string]string            { return nil }
+func (f *paramFakeResponder) HTML(s string) error                   { return nil }
+func (f *paramFakeResponder) SendString(s string) error             { return nil }
+func (f *paramFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
 // TestMustParams_RootPackage_RealHTTPDispatch proves the replacement for the
 // old TestParseIntPipe_RootAlias_InsightCallShape: a route param round-trips

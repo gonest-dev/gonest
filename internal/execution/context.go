@@ -5,6 +5,8 @@
 // API or these tests.
 package execution
 
+import "io"
+
 // Responder is the minimal surface Context needs to serve its request/response
 // methods. A fake implementation is used in tests; a Fiber-backed
 // implementation is added in a later task.
@@ -24,6 +26,17 @@ type Responder interface {
 	Queries() map[string]string
 	HTML(s string) error
 	SendString(s string) error
+	// BodyStream returns the raw request body as a stream, plus the
+	// multipart boundary parsed from Content-Type, for
+	// ParseRestFormBody/MustParseRestFormBody (internal/validate,
+	// Multipart Form Streaming feature, AD-022 in STATE.md). ok is false
+	// when streaming was never enabled for this app
+	// (AppOptions.EnableFormStreaming) OR the current request's
+	// Content-Type isn't multipart/form-data at all -- 2 different non-
+	// error conditions covered by one bool, same (value, bool) convention
+	// internal/schema.Lookup already uses for "not applicable" rather
+	// than inventing a sentinel error.
+	BodyStream() (stream io.Reader, boundary string, ok bool)
 }
 
 // Context encapsulates the HTTP request/response for a single route Handler.
@@ -128,4 +141,13 @@ func (ctx *Context) HTML(s string) error {
 // "OK".
 func (ctx *Context) SendString(s string) error {
 	return ctx.res.SendString(s)
+}
+
+// FormStream returns the raw request body as a stream plus its multipart
+// boundary, for ParseRestFormBody/MustParseRestFormBody (internal/validate)
+// -- one-line delegation, same pattern as Body()/Queries(). ok is false when
+// form streaming isn't available for this request (see Responder.BodyStream's
+// own doc comment for the 2 reasons that can be true).
+func (ctx *Context) FormStream() (stream io.Reader, boundary string, ok bool) {
+	return ctx.res.BodyStream()
 }

@@ -3,6 +3,7 @@ package validate
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -75,15 +76,16 @@ type queryFakeResponder struct {
 	queries map[string]string
 }
 
-func (f *queryFakeResponder) JSON(v any) error                  { return nil }
-func (f *queryFakeResponder) SetStatus(code int)                {}
-func (f *queryFakeResponder) GetHeader(name string) string      { return "" }
-func (f *queryFakeResponder) SetHeaderValue(name, value string) {}
-func (f *queryFakeResponder) GetParam(name string) string       { return "" }
-func (f *queryFakeResponder) Body() []byte                      { return nil }
-func (f *queryFakeResponder) Queries() map[string]string        { return f.queries }
-func (f *queryFakeResponder) HTML(s string) error               { return nil }
-func (f *queryFakeResponder) SendString(s string) error         { return nil }
+func (f *queryFakeResponder) JSON(v any) error                      { return nil }
+func (f *queryFakeResponder) SetStatus(code int)                    {}
+func (f *queryFakeResponder) GetHeader(name string) string          { return "" }
+func (f *queryFakeResponder) SetHeaderValue(name, value string)     {}
+func (f *queryFakeResponder) GetParam(name string) string           { return "" }
+func (f *queryFakeResponder) Body() []byte                          { return nil }
+func (f *queryFakeResponder) Queries() map[string]string            { return f.queries }
+func (f *queryFakeResponder) HTML(s string) error                   { return nil }
+func (f *queryFakeResponder) SendString(s string) error             { return nil }
+func (f *queryFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
 // newQueryCtx builds a *execution.Context carrying the given query map,
 // mirroring how a real dispatched request would look.

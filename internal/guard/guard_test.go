@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"io"
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/execution"
@@ -18,15 +19,16 @@ func newFakeResponder() *fakeResponder {
 	return &fakeResponder{params: map[string]string{}}
 }
 
-func (f *fakeResponder) JSON(v any) error                  { return nil }
-func (f *fakeResponder) SetStatus(code int)                {}
-func (f *fakeResponder) GetHeader(name string) string      { return "" }
-func (f *fakeResponder) SetHeaderValue(name, value string) {}
-func (f *fakeResponder) GetParam(name string) string       { return f.params[name] }
-func (f *fakeResponder) Body() []byte                      { return nil }
-func (f *fakeResponder) Queries() map[string]string        { return nil }
-func (f *fakeResponder) HTML(s string) error               { return nil }
-func (f *fakeResponder) SendString(s string) error         { return nil }
+func (f *fakeResponder) JSON(v any) error                      { return nil }
+func (f *fakeResponder) SetStatus(code int)                    {}
+func (f *fakeResponder) GetHeader(name string) string          { return "" }
+func (f *fakeResponder) SetHeaderValue(name, value string)     {}
+func (f *fakeResponder) GetParam(name string) string           { return f.params[name] }
+func (f *fakeResponder) Body() []byte                          { return nil }
+func (f *fakeResponder) Queries() map[string]string            { return nil }
+func (f *fakeResponder) HTML(s string) error                   { return nil }
+func (f *fakeResponder) SendString(s string) error             { return nil }
+func (f *fakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
 // TestNew_DoesNotExecuteFnOnCall proves guard.New(fn) defers fn until
 // Declare(scope) runs it -- AD-008 reversed (see
