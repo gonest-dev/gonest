@@ -2601,3 +2601,151 @@ func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// MustInjectAll (multi-binding por interface)
+// ---------------------------------------------------------------------------
+
+// insightConnectable/insightPostgres/insightRedis/insightConnectableService/
+// insightSystemController/insightSystemModule reproduce INSIGHT.md's
+// "exemplo de MustInjectAll (multi-binding por interface)" section
+// verbatim: two distinct Providers (Postgres, Redis) both satisfying the
+// same Connectable interface, injected as a whole slice via MustInjectAll,
+// resolved ONCE inside the Controller's own builder closure (phase 2, not
+// per-request).
+type insightConnectable interface{ Ping() bool }
+
+type insightPostgres struct{}
+
+var _ insightConnectable = (*insightPostgres)(nil)
+
+func (c *insightPostgres) Ping() bool { return true }
+
+var insightPostgresProvider = NewProvider(func(provider *Provider) {
+	provider.Constructor(func() *insightPostgres { return &insightPostgres{} })
+})
+
+type insightRedis struct{}
+
+var _ insightConnectable = (*insightRedis)(nil)
+
+func (d *insightRedis) Ping() bool { return true }
+
+var insightRedisProvider = NewProvider(func(provider *Provider) {
+	provider.Constructor(func() *insightRedis { return &insightRedis{} })
+})
+
+type insightConnectableService struct {
+	connectables []insightConnectable
+}
+
+func (t *insightConnectableService) PingAll() []bool {
+	out := make([]bool, 0, len(t.connectables))
+	for _, a := range t.connectables {
+		out = append(out, a.Ping())
+	}
+	return out
+}
+
+// TestMustInjectAll_RootAlias_InsightConnectableExample reproduces
+// INSIGHT.md's Postgres/Redis/Connectable example end to end via a REAL
+// app.Test HTTP dispatch: MustInjectAll[Connectable] resolves both
+// registered providers as a []Connectable, and the route handler (closing
+// over the already-built ConnectableService, no per-request resolution)
+// returns both Ping() results.
+func TestMustInjectAll_RootAlias_InsightConnectableExample(t *testing.T) {
+	systemController := NewController(func(controller *Controller) {
+		controller.Path("/health")
+
+		connectables := MustInjectAll[insightConnectable](controller)
+		service := &insightConnectableService{connectables: connectables}
+
+		controller.Route(route.HttpGet, "/ping", func(r *Route) {
+			r.HttpCode(http.StatusOK)
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Json(service.PingAll())
+			})
+		})
+	})
+
+	systemModule := NewModule(func(module *Module) {
+		module.Providers(insightPostgresProvider, insightRedisProvider)
+		module.Controllers(systemController)
+	})
+
+	app, err := NewApp[fiber.FiberApp](systemModule, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health/ping", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	var got []bool
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+	if len(got) != 2 || !got[0] || !got[1] {
+		t.Fatalf("body = %v, want [true, true] (2 Connectable providers, both Ping()==true)", got)
+	}
+}
+
+// TestMustInjectAll_ZeroMatches_ReturnsEmptySlice proves MustInjectAll[T]
+// returns an empty (not nil-panicking) slice, never panics, when zero
+// providers implement T -- spec.md P2 AC2.
+func TestMustInjectAll_ZeroMatches_ReturnsEmptySlice(t *testing.T) {
+	var got []insightConnectable
+
+	c := NewController(func(controller *Controller) {
+		got = MustInjectAll[insightConnectable](controller)
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(c)
+	})
+
+	if _, err := NewApp[fiber.FiberApp](root, AppOptions{}); err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	if len(got) != 0 {
+		t.Fatalf("MustInjectAll() = %v, want empty slice", got)
+	}
+}
+
+// TestMustInjectAll_PointerType_RootAlias_Panics proves the root re-export
+// preserves MustInjectAll's pointer-type panic (spec.md P2 AC3).
+func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected MustInjectAll[*insightPostgres] to panic (pointer type, not interface)")
+		}
+	}()
+
+	c := NewController(func(controller *Controller) {
+		MustInjectAll[*insightPostgres](controller)
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Providers(insightPostgresProvider)
+		m.Controllers(c)
+	})
+
+	MustNewApp[fiber.FiberApp](root, AppOptions{})
+}

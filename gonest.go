@@ -76,14 +76,39 @@ type Controller = controller.Controller
 // it.
 var NewController = controller.New
 
-// MustInject declares a dependency on type T (which must be a pointer
-// type, e.g. *Foo) from owner's builder fn -- used inside a Provider's or
-// Controller's deferred builder fn. It allocates and returns a placeholder
-// value; the real module-scoped search happens in a later bootstrap stage.
-// It panics if T is not a pointer type. Go cannot re-export a generic
-// function via var, so this is a real wrapper calling the internal one.
-func MustInject[T any](owner module.Owner) T {
+// MustInject declares a dependency on type T from owner's builder fn --
+// used inside a Provider's, Controller's, Middleware's, Guard's,
+// Interceptor's, or Filter's deferred builder fn. owner is typed any (not
+// module.Owner) because Middleware/Guard/Interceptor/Filter have no single
+// owning Module (see internal/inject.MustInject's own doc comment) -- only
+// Provider/Controller happen to also implement module.Owner.
+//
+// For an interface T, resolves to the one registered provider whose
+// concrete type implements T (exact match or reflect.Type.Implements()),
+// panicking on zero or 2+ matches (ambiguous -- use MustInjectAll). For a
+// pointer T, resolves via exact type match, panicking if not found. Called
+// from a Controller/Middleware/Guard/Interceptor/Filter builder fn, this is
+// a DIRECT lookup against the already-resolved provider graph (no
+// placeholder); called from a Provider's own builder fn (Provider-to-
+// Provider dependency), T must be a pointer type and resolution is
+// deferred via the existing placeholder+topological mechanism. Go cannot
+// re-export a generic function via var, so this is a real wrapper calling
+// the internal one.
+func MustInject[T any](owner any) T {
 	return inject.MustInject[T](owner)
+}
+
+// MustInjectAll returns every provider whose resolved concrete type
+// satisfies interface T, as []T -- for a plugin/strategy pattern where the
+// exact count is intentionally open-ended (see INSIGHT.md's "exemplo de
+// MustInjectAll" section). T must be an interface kind (panics otherwise --
+// multi-binding only makes sense for interfaces, see MustInject's single-
+// match contract for the pointer case). owner must be a Controller,
+// Middleware, Guard, Interceptor, or Filter (panics otherwise -- Provider-
+// to-Provider dependencies stay single-value via MustInject). Returns an
+// empty slice, never panics, if zero providers match.
+func MustInjectAll[T any](owner any) []T {
+	return inject.MustInjectAll[T](owner)
 }
 
 // ---------------------------------------------------------------------------
