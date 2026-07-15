@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Testing Helpers (Milestone 8)
-**Status:** Milestones 1-7 COMPLETE — starting Milestone 8
+**Current Milestone:** Emitter (Milestone 9), unblocked
+**Status:** Milestones 1-8 COMPLETE
 
 ---
 
@@ -172,8 +172,11 @@
 
 ### Features
 
-**Test App Bootstrap** - PLANNED
-- `MustNewTestApp`, `TestBuilder`, `MustOverride[Interface]`
+**Test App Bootstrap** - COMPLETE
+- Bootstrap de `NewApp` reordenado em 3 fases (Provider → Controller → Middleware/Guard/Interceptor/Filter) -- AD-008 revertido, os 4 tipos de pipeline-stage agora deferem `New(fn)` via `Declare(scope)`, igual Provider/Controller já faziam
+- `MustInject[T]`/`MustInjectAll[T]` ganham suporte a interface (exact-match + `Implements()` fallback), resolução DIRETA (sem placeholder) a partir de Controller/Middleware/Guard/Interceptor/Filter -- Provider-a-Provider continua via placeholder+PendingEdge, inalterado
+- `MustNewTestApp`, `TestBuilder`, `MustOverride[T]` (`internal/app/testapp.go`, reusa o mesmo bootstrap de 3 fases via `resolver.ResolveWithOverrides`) -- reproduz INSIGHT.md's `TestUserController_Get`/`TestUserService_Get_NotFound` verbatim
+- Ver `.specs/features/test-app-bootstrap/tasks.md` pra SPEC_DEVIATIONs encontrados na execução (owner de `MustInject`/`MustInjectAll` widened pra `any`; `module.MiddlewareRef`/`FilterRef` novo pra quebrar ciclo de import; `TestApp` mora em `internal/app`, não `internal/testapp`)
 
 **HTTP Test Client** - PLANNED
 - `MustRequest`, `AssertStatus`, `AssertJsonPath`

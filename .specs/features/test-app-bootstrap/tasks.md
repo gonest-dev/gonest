@@ -26,7 +26,7 @@ Sequencial estrito, sem exceção. T0 é maior/mais arriscado que qualquer task 
 
 ## Task Breakdown
 
-### T0: Bootstrap de 3 fases + reversão de AD-008 (HIGHEST RISK)
+### T0: Bootstrap de 3 fases + reversão de AD-008 (HIGHEST RISK) -- COMPLETE (commit `450656a`)
 
 **What**: implementa TUDO que design.md's Architecture Overview descreve -- ver design.md's Components pra assinatura completa de cada peça. Sub-passos sugeridos (a sessão executora decide se cada um vira task própria):
 
@@ -70,9 +70,11 @@ Sequencial estrito, sem exceção. T0 é maior/mais arriscado que qualquer task 
 
 **Commit**: `refactor(app)!: three-phase bootstrap, reverse AD-008 for Middleware/Guard/Interceptor/Filter`
 
+**SPEC_DEVIATION (found during execution, not anticipated by design.md):** `MustInject[T]`/`MustInjectAll[T]`'s `owner` parameter was `module.Owner` (an interface requiring `OwnerModule() *Module`) before this task -- but `*middleware.Middleware`/`*guard.Guard`/`*interceptor.Interceptor`/`*filter.Filter` genuinely have NO single owning Module (their ownership is the union of every referencing module, only known post-Controller-phase -- context.md's Decision 4), so they cannot implement `OwnerModule()` at all. Widened `owner`'s type to `any` in both functions (Provider's fallback path asserts `owner.(module.Owner)` internally, since Provider is the only remaining caller needing it for `PendingEdge.Owner`). Also required widening `internal/module`'s `Module.Use`/`Filters`/`OwnMiddleware`/`OwnFilters` from concrete `*middleware.Middleware`/`*filter.Filter` to new marker interfaces `MiddlewareRef`/`FilterRef` (same `IsProvider`/`IsController` pattern as `ProviderRef`/`ControllerRef`) -- `internal/middleware`/`internal/filter` now import `internal/module` (for `Declare(scope []*module.Module)`), so `internal/module` importing them back would cycle. `internal/app` type-asserts back to the concrete types at its 2 read sites (`asMiddleware`/`asFilters` helpers). Zero observable API change for any existing caller (both were widenings, not narrowings) -- confirmed via full suite, zero assertion changes.
+
 ---
 
-### T1: `MustInject[T]` com suporte a interface
+### T1: `MustInject[T]` com suporte a interface -- COMPLETE (merged em T0.c, commit `450656a`)
 
 **What**: (já implementado em T0.c como PARTE do dispatch -- esta task pode ser MERGED em T0, ou mantida separada se T0 focar só na reordenação e deixar o dispatch de interface pra depois -- decisão da sessão executora). Cobre especificamente: exact match, fallback `Implements()`, panic em 0 ou 2+ matches, mensagens claras.
 
@@ -102,7 +104,7 @@ Sequencial estrito, sem exceção. T0 é maior/mais arriscado que qualquer task 
 
 ---
 
-### T2: `MustInjectAll[T]`
+### T2: `MustInjectAll[T]` -- COMPLETE (commit `94ceb9f`)
 
 **What**: novo, `T` deve ser interface (panica senão), devolve `[]T` com todo match, slice vazio (não panic) se zero matches.
 
@@ -132,7 +134,7 @@ Sequencial estrito, sem exceção. T0 é maior/mais arriscado que qualquer task 
 
 ---
 
-### T3: `MustNewTestApp` / `TestBuilder` / `MustOverride[T]`
+### T3: `MustNewTestApp` / `TestBuilder` / `MustOverride[T]` -- COMPLETE (commit `81f781e`)
 
 **What**: reusa TODA a sequência de 9 passos de `NewApp` (design.md's Architecture Overview), com UM ponto de injeção novo: registro de overrides (`map[reflect.Type]reflect.Value`) consultado durante a fase 1 (resolução de Provider) -- se um Provider real bate com um override registrado, usa o valor do override em vez de rodar o Constructor real. Sem `Listen` no final (rotas registradas no adapter, mas nenhuma porta de rede aberta).
 
@@ -159,9 +161,11 @@ Sequencial estrito, sem exceção. T0 é maior/mais arriscado que qualquer task 
 
 **Commit**: `feat(testapp): add MustNewTestApp/TestBuilder/MustOverride[T]`
 
+**SPEC_DEVIATION (found during execution):** lives in `internal/app/testapp.go`, NOT a new `internal/testapp` package (design.md's Open Question flagged this as genuinely undecided). `NewApp`'s own bootstrap steps (`declareProviders`/`declareControllers`/`discoverPipelineStageOwnership`/`declarePipelineStageTypes`/`registerRoutes`/`newAdapter`) are all UNEXPORTED -- a separate package could not reuse them without exporting internal orchestration surface never meant to be public. `internal/resolver.Resolve` was refactored into `Resolve`/`ResolveWithOverrides` (both delegating to an unexported `resolveGraph`), and `Provider.ResolvedType()`-keyed exact-or-`Implements()` override lookup added directly to `invokeAndCopy`/`invokeAndCopyEdge` (guarded by a `real.Type() == placeholder.Type()` check before copying into any PRE-EXISTING placeholder, since an override's concrete type may legitimately differ from the provider's own declared type -- not a scenario this feature's spec exercises, so skip rather than panic).
+
 ---
 
-### T4: Root re-exports + verificação final do INSIGHT.md
+### T4: Root re-exports + verificação final do INSIGHT.md -- COMPLETE (re-exports feitos incrementalmente em T2/T3, INSIGHT.md's exemplos MustInjectAll+Testing reproduzidos verbatim via dispatch HTTP real nos testes de T2/T3)
 
 **What**: confirma toda API nova resolve na raiz (`gonest.MustInjectAll`, `gonest.MustNewTestApp`, `gonest.TestBuilder`, `gonest.MustOverride`). Roda TODOS os exemplos do INSIGHT.md que usam `MustInject`/`MustInjectAll`/Testing como teste real, confirma que o arquivo já reflete a API final construída (`MustInjectAll` já foi adicionado nesta sessão -- conferir se o exemplo compila/roda contra o código de verdade, ajustar texto se algo mudou durante a implementação).
 
