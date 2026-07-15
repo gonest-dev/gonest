@@ -763,8 +763,20 @@ func TestGenerate_UserEntityAddressEntity_FullReproduction(t *testing.T) {
 	if !ok {
 		t.Fatalf("responses missing 400, got %v", responses)
 	}
-	if _, ok := resp400["content"]; ok {
-		t.Fatalf("bodyless 400 response should not have content, got %v", resp400)
+	if resp400["description"] != "Bad Request" {
+		t.Fatalf("bodyless 400 response description = %v, want %q", resp400["description"], "Bad Request")
+	}
+	resp400Content, ok := resp400["content"].(map[string]any)
+	if !ok {
+		t.Fatalf("bodyless 400 response should default to an HttpException content, got %v", resp400)
+	}
+	resp400Body, ok := resp400Content["application/json"].(map[string]any)
+	if !ok {
+		t.Fatalf("bodyless 400 response content missing application/json, got %v", resp400Content)
+	}
+	resp400Schema, ok := resp400Body["schema"].(map[string]any)
+	if !ok || resp400Schema["$ref"] != "#/components/schemas/HttpException" {
+		t.Fatalf("bodyless 400 response schema = %v, want $ref to HttpException", resp400Body["schema"])
 	}
 }
 
@@ -790,7 +802,7 @@ func TestDocument_ProducesValidJSONMarshalableOutput(t *testing.T) {
 		t.Fatalf("Assemble failed: %v", err)
 	}
 
-	doc := New("3.1.0", func(b *OpenApiDocument) {
+	doc := New("3.1.0", func(b *OpenAPI) {
 		b.Title("Test API").Version("1.0.0")
 	})
 	Generate(doc, root)

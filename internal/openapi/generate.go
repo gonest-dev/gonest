@@ -1,9 +1,12 @@
 package openapi
 
 import (
+	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 
+	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/schema"
@@ -176,7 +179,12 @@ func resolveBearerAuth(c routableController, r *route.Route) bool {
 // value meaning "documented, no body") into the OpenAPI responses map, plus
 // a synthesized default status (via r.Code()) when Response was never called
 // at all (spec.md's Decision 4 -- undocumented routes still appear, using
-// whatever is inferable).
+// whatever is inferable). A 4xx/5xx status documented with no explicit
+// schema (e.g. `r.Response(http.StatusNotFound)`) defaults to
+// exception.Schema instead of a bare empty description -- HttpException is
+// the framework's single default carrier for every built-in and dev-defined
+// exception, so it is always a truthful (if generic) description of what
+// that status actually returns.
 func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	responses := r.Responses()
 	out := map[string]any{}
@@ -188,6 +196,11 @@ func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bo
 
 	for status, m := range responses {
 		key := strconv.Itoa(status)
+		if m == nil && status >= http.StatusBadRequest {
+			out[key] = defaultErrorResponse(status, doc, visiting)
+			continue
+		}
+
 		entry := map[string]any{"description": ""}
 		if m != nil {
 			entry["content"] = map[string]any{
@@ -200,6 +213,60 @@ func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bo
 	}
 
 	return out
+}
+
+// defaultErrorResponse builds the default Response Object for an
+// undocumented 4xx/5xx status: description = http.StatusText(status),
+// content = exception.Schema plus an example value shaped after that
+// status's own built-in exception name where one exists (NotFoundException,
+// BadRequestException, etc. -- see internal/exception/builtin.go), falling
+// back to a name derived from the status text itself (e.g. 500 ->
+// "InternalServerErrorException") for every other status.
+func defaultErrorResponse(status int, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
+	return map[string]any{
+		"description": http.StatusText(status),
+		"content": map[string]any{
+			"application/json": map[string]any{
+				"schema": refSchema(exception.Schema, doc, visiting),
+				"example": map[string]any{
+					"name":    defaultExceptionName(status),
+					"message": http.StatusText(status),
+					"details": nil,
+				},
+			},
+		},
+	}
+}
+
+// defaultExceptionName returns the framework's own built-in exception name
+// for status, if one exists, else a name synthesized from
+// http.StatusText(status) (e.g. "Internal Server Error" ->
+// "InternalServerErrorException").
+func defaultExceptionName(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return "BadRequestException"
+	case http.StatusUnauthorized:
+		return "UnauthorizedException"
+	case http.StatusForbidden:
+		return "ForbiddenException"
+	case http.StatusNotFound:
+		return "NotFoundException"
+	case http.StatusConflict:
+		return "ConflictException"
+	default:
+		return pascalCase(http.StatusText(status)) + "Exception"
+	}
+}
+
+// pascalCase joins s's whitespace-separated words together, capitalizing
+// each (e.g. "Internal Server Error" -> "InternalServerError").
+func pascalCase(s string) string {
+	fields := strings.Fields(s)
+	for i, f := range fields {
+		fields[i] = strings.ToUpper(f[:1]) + strings.ToLower(f[1:])
+	}
+	return strings.Join(fields, "")
 }
 
 // paramsToParameters converts every OwnProperties() entry of m into one
