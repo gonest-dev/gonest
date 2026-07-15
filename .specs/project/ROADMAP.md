@@ -230,6 +230,18 @@
 
 ---
 
+## Milestone 12: Multipart Form Streaming
+
+**Goal:** `gonest.ParseRestFormBody`/`MustParseRestFormBody` -- multipart/form-data com upload de arquivo, streaming de verdade (sem bufferizar o arquivo inteiro localmente antes de repassar pra storage tipo S3), confirmado tecnicamente viável com as dependências já vendorizadas (`gofiber/fiber/v3@v3.4.0`+`valyala/fasthttp@v1.72.0`, ver spec.md's Problem Statement).
+**Status:** SPECIFIED (spec.md pronto, design.md ainda não escrito)
+
+### Features
+
+**Multipart Form Streaming** - SPECIFIED
+- `.specs/features/multipart-form-streaming/spec.md`
+
+---
+
 ## Future Considerations
 
 - Abstração multi-adapter HTTP (net/http, Echo, Gin) — v1 é só Fiber
