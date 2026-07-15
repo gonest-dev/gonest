@@ -1,6 +1,6 @@
 // Package openapi is Milestone 7's first, self-contained piece: a
 // standalone document-LEVEL builder (title, description, version, contact,
-// license, bearer auth) with zero dependency on internal/metadata or
+// license, bearer auth) with zero dependency on internal/schema or
 // internal/route -- see .specs/features/openapi-document-builder/spec.md's
 // Problem Statement. It reproduces INSIGHT.md's own bootstrap example
 // verbatim (the "# exemplo de bootstrap completo" section's
@@ -9,10 +9,10 @@
 //
 // This package only builds the in-memory *OpenApiDocument -- serving it
 // (SetupSwagger/SwaggerOptions) and generating paths/schemas from registered
-// routes/Metadata are separate ROADMAP features (spec.md's Out of Scope).
+// routes/Schema are separate ROADMAP features (spec.md's Out of Scope).
 package openapi
 
-import "github.com/gonest-dev/gonest/internal/metadata"
+import "github.com/gonest-dev/gonest/internal/schema"
 
 // OpenApiDocument holds every document-level field INSIGHT.md's bootstrap
 // example sets. specVersion is the OpenAPI SPEC version passed to New (e.g.
@@ -41,11 +41,11 @@ type OpenApiDocument struct {
 	// is the lowercase HTTP method, value is one OpenAPI Path Item Object.
 	// schemas: components.schemas, keyed by schema name. schemaNames is the
 	// dedup cache (design.md's Data Models) -- pointer-keyed so the SAME
-	// *metadata.Metadata, referenced from multiple places, is walked and
+	// *schema.Schema, referenced from multiple places, is walked and
 	// registered exactly once.
 	paths       map[string]map[string]any
 	schemas     map[string]any
-	schemaNames map[*metadata.Metadata]string
+	schemaNames map[*schema.Schema]string
 }
 
 // New constructs a zero-value *OpenApiDocument, stores specVersion, runs fn
@@ -69,7 +69,7 @@ func (b *OpenApiDocument) SpecVersion() string {
 
 // Title sets the document's title and returns b so calls can chain.
 // Last-write-wins on repeat calls, same precedent as every branch method
-// throughout internal/metadata.
+// throughout internal/schema.
 func (b *OpenApiDocument) Title(s string) *OpenApiDocument {
 	b.title = s
 	return b
@@ -77,7 +77,7 @@ func (b *OpenApiDocument) Title(s string) *OpenApiDocument {
 
 // TitleText returns the title set via Title, or "" if it was never called.
 // Named differently from the setter because Go has no method overloading --
-// same setter/getter split established by internal/metadata.Metadata's
+// same setter/getter split established by internal/schema.Schema's
 // Description/DescriptionText.
 func (b *OpenApiDocument) TitleText() string {
 	return b.title

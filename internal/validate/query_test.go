@@ -13,7 +13,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // --- P3 fixtures ---------------------------------------------------------
@@ -28,9 +28,9 @@ type ListUsersQuery struct {
 	Page int64  `query:"page"`
 }
 
-var listUsersQueryMetadata = func() *metadata.Metadata {
+var listUsersQuerySchema = func() *schema.Schema {
 	f := &ListUsersQuery{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Term).String().Required()
 	m.Property(&f.Page).Integer().Required().Min(1)
 	return m
@@ -53,14 +53,14 @@ func decodeQueryCode(raw any) (any, error) {
 	return "CODE:" + s, nil
 }
 
-var customQueryFixtureMetadata = func() *metadata.Metadata {
+var customQueryFixtureSchema = func() *schema.Schema {
 	f := &CustomQueryFixture{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Code).Custom(decodeQueryCode)
 	return m
 }()
 
-// UnregisteredQuery is deliberately never passed to metadata.New/Register
+// UnregisteredQuery is deliberately never passed to schema.New/Register
 // -- used to prove MustQuery panics BEFORE reading any query value.
 type UnregisteredQuery struct {
 	Id int64 `query:"id"`

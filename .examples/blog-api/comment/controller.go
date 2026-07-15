@@ -14,9 +14,9 @@ type createBody struct {
 	Body   string `json:"body"`
 }
 
-var createBodyMetadata = gonest.NewMetadata[createBody](func(t *createBody, m *gonest.Metadata) {
+var createBodySchema = gonest.NewSchema[createBody](func(t *createBody, m *gonest.Schema) {
 	// Title distinguishes this from user/post's own "createBody" local
-	// type -- see user.createBodyMetadata's own comment for why this is
+	// type -- see user.createBodySchema's own comment for why this is
 	// required, not optional, once 2+ controllers each have a same-named
 	// unexported request-body type.
 	m.Title("CreateCommentRequest")
@@ -30,7 +30,7 @@ type listQuery struct {
 	UserID int64 `query:"user_id"`
 }
 
-var listQueryMetadata = gonest.NewMetadata[listQuery](func(t *listQuery, m *gonest.Metadata) {
+var listQuerySchema = gonest.NewSchema[listQuery](func(t *listQuery, m *gonest.Schema) {
 	m.Property(&t.PostID).Integer()
 	m.Property(&t.UserID).Integer()
 })
@@ -45,8 +45,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
-		r.QueryParams(listQueryMetadata)
-		r.Response(http.StatusOK, EntityMetadata)
+		r.QueryParams(listQuerySchema)
+		r.Response(http.StatusOK, EntitySchema)
 		r.Handler(func(ctx *gonest.Context) {
 			q := gonest.MustQuery[*listQuery](ctx)
 			ctx.Json(service.List(q.PostID, q.UserID))
@@ -56,8 +56,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.Summary("Create a comment")
 		r.HttpCode(http.StatusCreated)
-		r.RequestBody(createBodyMetadata)
-		r.Response(http.StatusCreated, EntityMetadata)
+		r.RequestBody(createBodySchema)
+		r.Response(http.StatusCreated, EntitySchema)
 		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.Context) {
 			body := gonest.MustJsonBody[*createBody](ctx)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // MustParams is the real implementation behind the public root
@@ -18,7 +18,7 @@ import (
 //
 // Unlike MustJsonBody (which validates a single JSON object payload),
 // MustParams validates every path param declared on T's registered
-// *metadata.Metadata (via a `param:"name"` struct tag, same tag-resolution
+// *schema.Schema (via a `param:"name"` struct tag, same tag-resolution
 // convention MustJsonBody uses for `json:"..."`) against the CURRENT
 // route's actual ":name" segments -- reusing validateValue/populate
 // UNCHANGED once each param's raw string is coerced into the same any-shape
@@ -26,9 +26,9 @@ import (
 // Decisions: "coerce-then-reuse, not a parallel validation path").
 //
 // Steps (design.md's Architecture Overview, "MustParams" section):
-//  1. Look up T's (dereferenced) registered *metadata.Metadata via the
+//  1. Look up T's (dereferenced) registered *schema.Schema via the
 //     global registry -- panics immediately, BEFORE reading any param at
-//     all, if T was never registered via NewMetadata[T] (spec.md's Edge
+//     all, if T was never registered via NewSchema[T] (spec.md's Edge
 //     Cases, same precedent as MustJsonBody).
 //  2. Resolve ctx's currently-attached *route.Route (via ctx.Route(), an
 //     `any` type-asserted back to *route.Route -- see execution.Context's
@@ -60,9 +60,9 @@ func MustParams[T any](ctx *execution.Context) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
 
-	m, ok := metadata.Lookup(structType)
+	m, ok := schema.Lookup(structType)
 	if !ok {
-		panic(fmt.Sprintf("gonest: no metadata registered for type %s (call NewMetadata[%s] first)", structType, structType))
+		panic(fmt.Sprintf("gonest: no schema registered for type %s (call NewSchema[%s] first)", structType, structType))
 	}
 
 	r, hasRoute := ctx.Route().(*route.Route)

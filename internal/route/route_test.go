@@ -6,7 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // fakeResponder is a minimal test-only execution.Responder, mirroring the one
@@ -142,27 +142,27 @@ func TestPath_ReturnsConstructedPath(t *testing.T) {
 	}
 }
 
-// newTestMetadataFor builds a throwaway *metadata.Metadata for zero's own
+// newTestSchemaFor builds a throwaway *schema.Schema for zero's own
 // type, suitable for use as RequestBody/Response/PathParams/QueryParams
 // payloads in route documentation-builder tests -- Route only needs a
-// *metadata.Metadata pointer identity, never inspects its contents. The
-// registry (internal/metadata/registry.go) keys registration by Go type and
-// panics on a duplicate, so callers needing MULTIPLE distinct *Metadata
+// *schema.Schema pointer identity, never inspects its contents. The
+// registry (internal/schema/registry.go) keys registration by Go type and
+// panics on a duplicate, so callers needing MULTIPLE distinct *Schema
 // values within one test must pass distinctly-typed zero values (see
 // dummyA/dummyB below).
-func newTestMetadataFor(t *testing.T, zero any) *metadata.Metadata {
+func newTestSchemaFor(t *testing.T, zero any) *schema.Schema {
 	t.Helper()
 	typ := reflect.TypeOf(zero).Elem()
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	return metadata.New(typ, uintptr(unsafe.Pointer(reflect.ValueOf(zero).Pointer())))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	return schema.New(typ, uintptr(unsafe.Pointer(reflect.ValueOf(zero).Pointer())))
 }
 
-// newTestMetadataForRoute is a convenience wrapper over newTestMetadataFor
-// for tests that only ever need ONE *metadata.Metadata value.
-func newTestMetadataForRoute(t *testing.T) *metadata.Metadata {
+// newTestSchemaForRoute is a convenience wrapper over newTestSchemaFor
+// for tests that only ever need ONE *schema.Schema value.
+func newTestSchemaForRoute(t *testing.T) *schema.Schema {
 	t.Helper()
 	type dummy struct{ X int }
-	return newTestMetadataFor(t, &dummy{})
+	return newTestSchemaFor(t, &dummy{})
 }
 
 // TestSummary_StoresAndReturnsSelf proves Summary sets the value returned by
@@ -318,10 +318,10 @@ func TestBearerAuth_Called_ReportsSetTrue(t *testing.T) {
 }
 
 // TestRequestBody_StoresAndReportsSet proves RequestBody stores the
-// *metadata.Metadata retrievable via RequestBodyMetadata, and returns r so
+// *schema.Schema retrievable via RequestBodySchema, and returns r so
 // calls can chain.
 func TestRequestBody_StoresAndReportsSet(t *testing.T) {
-	m := newTestMetadataForRoute(t)
+	m := newTestSchemaForRoute(t)
 
 	var got *Route
 	r := New(HttpPost, "/users", func(r *Route) {
@@ -332,31 +332,31 @@ func TestRequestBody_StoresAndReportsSet(t *testing.T) {
 		t.Fatal("Route.RequestBody did not return the same *Route for chaining")
 	}
 
-	gotMeta, set := r.RequestBodyMetadata()
+	gotMeta, set := r.RequestBodySchema()
 	if !set {
-		t.Fatal("RequestBodyMetadata() set = false, want true after RequestBody() was called")
+		t.Fatal("RequestBodySchema() set = false, want true after RequestBody() was called")
 	}
 	if gotMeta != m {
-		t.Fatalf("RequestBodyMetadata() = %v, want %v", gotMeta, m)
+		t.Fatalf("RequestBodySchema() = %v, want %v", gotMeta, m)
 	}
 }
 
-// TestRequestBody_NeverCalled_ReportsUnset proves RequestBodyMetadata
+// TestRequestBody_NeverCalled_ReportsUnset proves RequestBodySchema
 // returns (nil, false) before RequestBody is ever called.
 func TestRequestBody_NeverCalled_ReportsUnset(t *testing.T) {
 	r := New(HttpPost, "/users", func(r *Route) {})
 
-	gotMeta, set := r.RequestBodyMetadata()
+	gotMeta, set := r.RequestBodySchema()
 	if set {
-		t.Fatal("RequestBodyMetadata() set = true, want false before RequestBody() was ever called")
+		t.Fatal("RequestBodySchema() set = true, want false before RequestBody() was ever called")
 	}
 	if gotMeta != nil {
-		t.Fatalf("RequestBodyMetadata() = %v, want nil before RequestBody() was ever called", gotMeta)
+		t.Fatalf("RequestBodySchema() = %v, want nil before RequestBody() was ever called", gotMeta)
 	}
 }
 
 // TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey proves Response
-// called with zero metadata args documents status with no body -- but the
+// called with zero schema args documents status with no body -- but the
 // STATUS KEY itself exists in the returned map (nil value), distinguishing
 // "documented, no body" from "never documented at all" (spec.md AC3).
 func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
@@ -384,10 +384,10 @@ func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
 	}
 }
 
-// TestResponse_OneArg_StoresBody proves Response called with one metadata
+// TestResponse_OneArg_StoresBody proves Response called with one schema
 // arg stores that body schema for the given status.
 func TestResponse_OneArg_StoresBody(t *testing.T) {
-	m := newTestMetadataForRoute(t)
+	m := newTestSchemaForRoute(t)
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, m)
@@ -409,8 +409,8 @@ func TestResponse_OneArg_StoresBody(t *testing.T) {
 func TestResponse_DifferentStatuses_Accumulates(t *testing.T) {
 	type okBody struct{ X int }
 	type errBody struct{ Y int }
-	okMeta := newTestMetadataFor(t, &okBody{})
-	errMeta := newTestMetadataFor(t, &errBody{})
+	okMeta := newTestSchemaFor(t, &okBody{})
+	errMeta := newTestSchemaFor(t, &errBody{})
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, okMeta)
@@ -435,8 +435,8 @@ func TestResponse_DifferentStatuses_Accumulates(t *testing.T) {
 func TestResponse_SameStatusTwice_Overwrites(t *testing.T) {
 	type firstBody struct{ X int }
 	type secondBody struct{ Y int }
-	firstMeta := newTestMetadataFor(t, &firstBody{})
-	secondMeta := newTestMetadataFor(t, &secondBody{})
+	firstMeta := newTestSchemaFor(t, &firstBody{})
+	secondMeta := newTestSchemaFor(t, &secondBody{})
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, firstMeta)
@@ -455,7 +455,7 @@ func TestResponse_SameStatusTwice_Overwrites(t *testing.T) {
 // TestResponses_ReturnsCopyNotInternalMap proves Responses is a defensive
 // copy -- mutating the returned map must not affect the Route's own state.
 func TestResponses_ReturnsCopyNotInternalMap(t *testing.T) {
-	m := newTestMetadataForRoute(t)
+	m := newTestSchemaForRoute(t)
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, m)
@@ -475,10 +475,10 @@ func TestResponses_ReturnsCopyNotInternalMap(t *testing.T) {
 }
 
 // TestPathParams_StoresAndReportsSet proves PathParams stores the
-// *metadata.Metadata retrievable via PathParamsMetadata, and returns r so
+// *schema.Schema retrievable via PathParamsSchema, and returns r so
 // calls can chain.
 func TestPathParams_StoresAndReportsSet(t *testing.T) {
-	m := newTestMetadataForRoute(t)
+	m := newTestSchemaForRoute(t)
 
 	var got *Route
 	r := New(HttpGet, "/users/:id", func(r *Route) {
@@ -489,34 +489,34 @@ func TestPathParams_StoresAndReportsSet(t *testing.T) {
 		t.Fatal("Route.PathParams did not return the same *Route for chaining")
 	}
 
-	gotMeta, set := r.PathParamsMetadata()
+	gotMeta, set := r.PathParamsSchema()
 	if !set {
-		t.Fatal("PathParamsMetadata() set = false, want true after PathParams() was called")
+		t.Fatal("PathParamsSchema() set = false, want true after PathParams() was called")
 	}
 	if gotMeta != m {
-		t.Fatalf("PathParamsMetadata() = %v, want %v", gotMeta, m)
+		t.Fatalf("PathParamsSchema() = %v, want %v", gotMeta, m)
 	}
 }
 
-// TestPathParams_NeverCalled_ReportsUnset proves PathParamsMetadata returns
+// TestPathParams_NeverCalled_ReportsUnset proves PathParamsSchema returns
 // (nil, false) before PathParams is ever called.
 func TestPathParams_NeverCalled_ReportsUnset(t *testing.T) {
 	r := New(HttpGet, "/users/:id", func(r *Route) {})
 
-	gotMeta, set := r.PathParamsMetadata()
+	gotMeta, set := r.PathParamsSchema()
 	if set {
-		t.Fatal("PathParamsMetadata() set = true, want false before PathParams() was ever called")
+		t.Fatal("PathParamsSchema() set = true, want false before PathParams() was ever called")
 	}
 	if gotMeta != nil {
-		t.Fatalf("PathParamsMetadata() = %v, want nil", gotMeta)
+		t.Fatalf("PathParamsSchema() = %v, want nil", gotMeta)
 	}
 }
 
 // TestQueryParams_StoresAndReportsSet proves QueryParams stores the
-// *metadata.Metadata retrievable via QueryParamsMetadata, and returns r so
+// *schema.Schema retrievable via QueryParamsSchema, and returns r so
 // calls can chain.
 func TestQueryParams_StoresAndReportsSet(t *testing.T) {
-	m := newTestMetadataForRoute(t)
+	m := newTestSchemaForRoute(t)
 
 	var got *Route
 	r := New(HttpGet, "/users", func(r *Route) {
@@ -527,26 +527,26 @@ func TestQueryParams_StoresAndReportsSet(t *testing.T) {
 		t.Fatal("Route.QueryParams did not return the same *Route for chaining")
 	}
 
-	gotMeta, set := r.QueryParamsMetadata()
+	gotMeta, set := r.QueryParamsSchema()
 	if !set {
-		t.Fatal("QueryParamsMetadata() set = false, want true after QueryParams() was called")
+		t.Fatal("QueryParamsSchema() set = false, want true after QueryParams() was called")
 	}
 	if gotMeta != m {
-		t.Fatalf("QueryParamsMetadata() = %v, want %v", gotMeta, m)
+		t.Fatalf("QueryParamsSchema() = %v, want %v", gotMeta, m)
 	}
 }
 
-// TestQueryParams_NeverCalled_ReportsUnset proves QueryParamsMetadata
+// TestQueryParams_NeverCalled_ReportsUnset proves QueryParamsSchema
 // returns (nil, false) before QueryParams is ever called.
 func TestQueryParams_NeverCalled_ReportsUnset(t *testing.T) {
 	r := New(HttpGet, "/users", func(r *Route) {})
 
-	gotMeta, set := r.QueryParamsMetadata()
+	gotMeta, set := r.QueryParamsSchema()
 	if set {
-		t.Fatal("QueryParamsMetadata() set = true, want false before QueryParams() was ever called")
+		t.Fatal("QueryParamsSchema() set = true, want false before QueryParams() was ever called")
 	}
 	if gotMeta != nil {
-		t.Fatalf("QueryParamsMetadata() = %v, want nil", gotMeta)
+		t.Fatalf("QueryParamsSchema() = %v, want nil", gotMeta)
 	}
 }
 

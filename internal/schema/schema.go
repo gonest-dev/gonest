@@ -1,5 +1,5 @@
-// Package metadata is the first package of an entirely new domain
-// introduced by Milestone 4 (Metadata Builder -- Primitivos): schema/
+// Package schema is the first package of an entirely new domain
+// introduced by Milestone 4 (Schema Builder -- Primitivos): schema/
 // reflection-shaped declaration, distinct from every package before it in
 // this codebase (Milestones 1-3, all DI graph or HTTP dispatch). It holds
 // the foundation every later type+format branch feature (String(),
@@ -8,21 +8,21 @@
 // constraints WITHOUT struct tags, identified purely by the field's own
 // pointer address (INSIGHT.md's `m.Property(&t.Id)` call shape).
 //
-// This package only builds the REGISTRATION side (a *Metadata value that
+// This package only builds the REGISTRATION side (a *Schema value that
 // HOLDS what was declared, inspectable via accessors) -- it does nothing
 // with the registered data yet (no OpenAPI generation, no runtime
 // validation; those are Milestones 6-7, see spec.md's Out of Scope).
-package metadata
+package schema
 
 import "reflect"
 
-// Metadata holds the whole-type description plus every field registered via
-// Property, for a single NewMetadata[T] call (root package, out of scope
+// Schema holds the whole-type description plus every field registered via
+// Property, for a single NewSchema[T] call (root package, out of scope
 // here -- see design.md's "Architecture Overview": the generic wrapper
 // lives at gonest.go, since Go disallows type parameters on methods -- L-001
 // in STATE.md -- so this internal type is type-erased, built from a plain
 // reflect.Type/uintptr pair rather than a generic T).
-type Metadata struct {
+type Schema struct {
 	structType  reflect.Type
 	baseAddr    uintptr
 	title       string
@@ -30,15 +30,15 @@ type Metadata struct {
 	properties  map[uintptr]*PropertyBuilder // keyed by field offset from baseAddr
 }
 
-// New constructs a *Metadata for structType, whose zero value's address is
+// New constructs a *Schema for structType, whose zero value's address is
 // baseAddr. Panics if structType is not a struct Kind -- Property
 // fundamentally requires addressable struct fields (spec.md's Edge Cases),
 // so a non-struct T can never be usefully registered against.
-func New(structType reflect.Type, baseAddr uintptr) *Metadata {
+func New(structType reflect.Type, baseAddr uintptr) *Schema {
 	if structType.Kind() != reflect.Struct {
-		panic("gonest: NewMetadata requires a struct type, got " + structType.Kind().String())
+		panic("gonest: NewSchema requires a struct type, got " + structType.Kind().String())
 	}
-	m := &Metadata{
+	m := &Schema{
 		structType: structType,
 		baseAddr:   baseAddr,
 		properties: map[uintptr]*PropertyBuilder{},
@@ -52,8 +52,8 @@ func New(structType reflect.Type, baseAddr uintptr) *Metadata {
 // as the components.schemas key + schema "title" field by the OpenAPI
 // generator; when never called, TitleText returns "" and the generator falls
 // back to the Go type's own name (spec.md AC1 -- that fallback is the
-// generator's job, not Metadata's).
-func (m *Metadata) Title(s string) *Metadata {
+// generator's job, not Schema's).
+func (m *Schema) Title(s string) *Schema {
 	m.title = s
 	return m
 }
@@ -61,27 +61,27 @@ func (m *Metadata) Title(s string) *Metadata {
 // TitleText returns the whole-type title set via Title, or "" if it was
 // never called. Named differently from the setter for the same reason as
 // Description/DescriptionText -- Go has no method overloading.
-func (m *Metadata) TitleText() string {
+func (m *Schema) TitleText() string {
 	return m.title
 }
 
 // StructType returns the reflect.Type m was constructed for (New's
 // structType argument). SPEC_DEVIATION (schema-generation feature, T2):
 // design.md's registerSchema component needs a default components.schemas
-// name (the Go type's own name) when TitleText() is "" -- Metadata had no
+// name (the Go type's own name) when TitleText() is "" -- Schema had no
 // existing accessor exposing structType, only using it internally
 // (Property's findFieldByOffset). Adding this minimal read-only getter
-// (same defensive shape as every other Metadata accessor) is the smallest
+// (same defensive shape as every other Schema accessor) is the smallest
 // change that unblocks that requirement, rather than deriving the type name
 // indirectly through a PropertyBuilder's Field().
-func (m *Metadata) StructType() reflect.Type {
+func (m *Schema) StructType() reflect.Type {
 	return m.structType
 }
 
 // Description sets the whole-type description (the struct itself, not any
 // individual field -- see PropertyBuilder.Description for the field-level
 // equivalent) and returns m so calls can chain.
-func (m *Metadata) Description(s string) *Metadata {
+func (m *Schema) Description(s string) *Schema {
 	m.description = s
 	return m
 }
@@ -90,7 +90,7 @@ func (m *Metadata) Description(s string) *Metadata {
 // or "" if it was never called. Named differently from the setter because
 // Go has no method overloading -- same setter/getter split already
 // established by internal/route/route.go's HttpCode(status)/Code().
-func (m *Metadata) DescriptionText() string {
+func (m *Schema) DescriptionText() string {
 	return m.description
 }
 
@@ -109,7 +109,7 @@ func (m *Metadata) DescriptionText() string {
 // semantics -- does a second Required() call OVERRIDE or ADD to the
 // first's -- are genuinely ambiguous and INSIGHT.md never demonstrates
 // this case).
-func (m *Metadata) Property(fieldPtr any) *PropertyBuilder {
+func (m *Schema) Property(fieldPtr any) *PropertyBuilder {
 	fieldAddr := reflect.ValueOf(fieldPtr).Pointer()
 	offset := fieldAddr - m.baseAddr
 
@@ -119,7 +119,7 @@ func (m *Metadata) Property(fieldPtr any) *PropertyBuilder {
 
 	field, ok := findFieldByOffset(m.structType, offset)
 	if !ok {
-		panic("gonest: Property(...) pointer does not belong to the type passed to NewMetadata")
+		panic("gonest: Property(...) pointer does not belong to the type passed to NewSchema")
 	}
 
 	pb := &PropertyBuilder{field: field}
@@ -141,9 +141,9 @@ func findFieldByOffset(t reflect.Type, offset uintptr) (reflect.StructField, boo
 
 // OwnProperties returns a copy of every PropertyBuilder registered so far
 // via Property. Read-only: mutating the returned slice does not affect this
-// Metadata's internal state (same defensive-copy pattern as
+// Schema's internal state (same defensive-copy pattern as
 // Controller.OwnMiddleware/Module.OwnProviders).
-func (m *Metadata) OwnProperties() []*PropertyBuilder {
+func (m *Schema) OwnProperties() []*PropertyBuilder {
 	out := make([]*PropertyBuilder, 0, len(m.properties))
 	for _, pb := range m.properties {
 		out = append(out, pb)
@@ -166,8 +166,8 @@ type PropertyBuilder struct {
 
 	// P0 additions (json-body-validation feature) -- permanent home for
 	// every branch's own constraints, relocated off each disposable
-	// wrapper type (StringMetadata/NumericMetadata/ArrayMetadata/
-	// ObjectMetadata) so a future consumer can read them back through
+	// wrapper type (StringSchema/NumericSchema/ArraySchema/
+	// ObjectSchema) so a future consumer can read them back through
 	// PropertyBuilder alone, without needing the original wrapper
 	// reference (see design.md's Components table). Reused across
 	// branch families since only ONE family is ever active per
@@ -176,8 +176,8 @@ type PropertyBuilder struct {
 	min, max             *int             // String length / Numeric value / Array quantity
 	pattern              string           // String only
 	item                 *PropertyBuilder // Array's synthetic item builder
-	itemRef              *Metadata        // Array's Object(ref)-as-item
-	ref                  *Metadata        // Object's own Metadata(ref)
+	itemRef              *Schema          // Array's Object(ref)-as-item
+	ref                  *Schema          // Object's own Schema(ref)
 	additionalProperties bool             // Object's own AdditionalProperties()
 
 	// custom is the param-query-validation feature's P0 escape hatch (see
@@ -211,7 +211,7 @@ func (p *PropertyBuilder) IsNullable() bool {
 }
 
 // Description sets this field's own description (distinct from
-// Metadata.Description, which sets the whole-type description) and returns
+// Schema.Description, which sets the whole-type description) and returns
 // p so calls can chain.
 func (p *PropertyBuilder) Description(s string) *PropertyBuilder {
 	p.description = s
@@ -220,7 +220,7 @@ func (p *PropertyBuilder) Description(s string) *PropertyBuilder {
 
 // DescriptionText returns the field description set via Description, or ""
 // if it was never called. Named differently from the setter for the same
-// reason as Metadata.Description/DescriptionText -- Go has no method
+// reason as Schema.Description/DescriptionText -- Go has no method
 // overloading.
 func (p *PropertyBuilder) DescriptionText() string {
 	return p.description
@@ -250,11 +250,11 @@ func (p *PropertyBuilder) Field() reflect.StructField {
 // FormatValue returns the OpenAPI 3.1 format string set by whichever
 // type+format branch method (String/Email/Uuid/... below) was last called on
 // p, or "" if none was ever called. format is stored HERE, on the SHARED
-// PropertyBuilder that Metadata.properties[offset] already holds -- not on
-// the disposable *StringMetadata wrapper each branch method constructs
+// PropertyBuilder that Schema.properties[offset] already holds -- not on
+// the disposable *StringSchema wrapper each branch method constructs
 // fresh -- because that wrapper is discarded the instant a dev doesn't keep
 // chaining off it, while p itself is the one object a future consumer
-// (Metadata.OwnProperties(), Milestone 7's OpenAPI generator) actually has
+// (Schema.OwnProperties(), Milestone 7's OpenAPI generator) actually has
 // access to (string-family-branches feature's design.md, Tech Decisions:
 // "storing format on the shared object is the ONLY way the choice survives
 // past the branch call itself").
@@ -263,127 +263,127 @@ func (p *PropertyBuilder) FormatValue() string {
 }
 
 // String selects the bare "string" OpenAPI type with no format (empty
-// format string) and returns a *StringMetadata view onto p -- the first of
+// format string) and returns a *StringSchema view onto p -- the first of
 // the 10 string-family branch methods (string-family-branches feature).
 // Calling String()/Email()/etc a second time on the same p simply overwrites
 // p.format (last call wins, no panic) -- see this method group's package
 // doc / design.md's Error Handling Strategy: branch selection isn't field
 // registration, so it isn't held to Property's own stricter
 // double-registration panic.
-func (p *PropertyBuilder) String() *StringMetadata {
+func (p *PropertyBuilder) String() *StringSchema {
 	p.format = ""
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Email selects OpenAPI's "email" string format. See String's doc comment
 // for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Email() *StringMetadata {
+func (p *PropertyBuilder) Email() *StringSchema {
 	p.format = "email"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Uuid selects OpenAPI's "uuid" string format. See String's doc comment for
 // the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Uuid() *StringMetadata {
+func (p *PropertyBuilder) Uuid() *StringSchema {
 	p.format = "uuid"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Uri selects OpenAPI's "uri" string format. See String's doc comment for
 // the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Uri() *StringMetadata {
+func (p *PropertyBuilder) Uri() *StringSchema {
 	p.format = "uri"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Hostname selects OpenAPI's "hostname" string format. See String's doc
 // comment for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Hostname() *StringMetadata {
+func (p *PropertyBuilder) Hostname() *StringSchema {
 	p.format = "hostname"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Ipv4 selects OpenAPI's "ipv4" string format. See String's doc comment for
 // the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Ipv4() *StringMetadata {
+func (p *PropertyBuilder) Ipv4() *StringSchema {
 	p.format = "ipv4"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Ipv6 selects OpenAPI's "ipv6" string format. See String's doc comment for
 // the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Ipv6() *StringMetadata {
+func (p *PropertyBuilder) Ipv6() *StringSchema {
 	p.format = "ipv6"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Password selects OpenAPI's "password" string format. See String's doc
 // comment for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Password() *StringMetadata {
+func (p *PropertyBuilder) Password() *StringSchema {
 	p.format = "password"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Byte selects OpenAPI's "byte" string format (base64-encoded). See
 // String's doc comment for the shared branch-method behavior
 // (last-call-wins, no panic).
-func (p *PropertyBuilder) Byte() *StringMetadata {
+func (p *PropertyBuilder) Byte() *StringSchema {
 	p.format = "byte"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Binary selects OpenAPI's "binary" string format. See String's doc comment
 // for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Binary() *StringMetadata {
+func (p *PropertyBuilder) Binary() *StringSchema {
 	p.format = "binary"
 	p.kind = "string"
-	return &StringMetadata{PropertyBuilder: p}
+	return &StringSchema{PropertyBuilder: p}
 }
 
 // Integer selects OpenAPI's "int64" numeric format (the default width for a
 // bare "integer" per INSIGHT.md's own comment: "format: int64 default") and
-// returns a *NumericMetadata view onto p -- the first of the 4
+// returns a *NumericSchema view onto p -- the first of the 4
 // numeric-family branch methods (numeric-boolean-branches feature). Calling
 // Integer()/Int32()/etc a second time on the same p simply overwrites
 // p.format (last call wins, no panic), same precedent String's doc comment
 // already established for the string family.
-func (p *PropertyBuilder) Integer() *NumericMetadata {
+func (p *PropertyBuilder) Integer() *NumericSchema {
 	p.format = "int64"
 	p.kind = "integer"
-	return &NumericMetadata{PropertyBuilder: p}
+	return &NumericSchema{PropertyBuilder: p}
 }
 
 // Int32 selects OpenAPI's "int32" numeric format. See Integer's doc comment
 // for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Int32() *NumericMetadata {
+func (p *PropertyBuilder) Int32() *NumericSchema {
 	p.format = "int32"
 	p.kind = "integer"
-	return &NumericMetadata{PropertyBuilder: p}
+	return &NumericSchema{PropertyBuilder: p}
 }
 
 // Float selects OpenAPI's "float" numeric format. See Integer's doc comment
 // for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Float() *NumericMetadata {
+func (p *PropertyBuilder) Float() *NumericSchema {
 	p.format = "float"
 	p.kind = "number"
-	return &NumericMetadata{PropertyBuilder: p}
+	return &NumericSchema{PropertyBuilder: p}
 }
 
 // Double selects OpenAPI's "double" numeric format. See Integer's doc
 // comment for the shared branch-method behavior (last-call-wins, no panic).
-func (p *PropertyBuilder) Double() *NumericMetadata {
+func (p *PropertyBuilder) Double() *NumericSchema {
 	p.format = "double"
 	p.kind = "number"
-	return &NumericMetadata{PropertyBuilder: p}
+	return &NumericSchema{PropertyBuilder: p}
 }
 
 // Boolean selects OpenAPI's "boolean" type, which per INSIGHT.md's own
@@ -393,7 +393,7 @@ func (p *PropertyBuilder) Double() *NumericMetadata {
 // branch-specific wrapper type. Every other branch method above (String,
 // Email, ..., Integer, Int32, ...) exists to carry a format string plus
 // extra validators (Min/Max/Pattern) that PropertyBuilder itself doesn't
-// have -- Boolean has neither, so a "BooleanMetadata" wrapper with zero
+// have -- Boolean has neither, so a "BooleanSchema" wrapper with zero
 // extra fields or methods would add a type purely for consistency's own
 // sake, not because it does anything a caller couldn't already do through
 // PropertyBuilder directly. Boolean still explicitly sets p.format = ""
@@ -432,7 +432,7 @@ func (p *PropertyBuilder) Date() *PropertyBuilder {
 }
 
 // Array selects OpenAPI's "array" type and returns a brand new
-// *ArrayMetadata (array.go, array-builder feature) -- the first branch
+// *ArraySchema (array.go, array-builder feature) -- the first branch
 // method whose extra state can't be captured by simply wrapping p itself
 // (see String/Integer/Boolean above): an array needs a SEPARATE builder for
 // its own items (Tags []string's element is itself a string with its own
@@ -441,9 +441,9 @@ func (p *PropertyBuilder) Date() *PropertyBuilder {
 // last-call-wins precedent as every other branch method), and a fresh
 // SYNTHETIC item *PropertyBuilder is allocated every call -- calling
 // Array() twice on the same p discards whatever item state the first
-// *ArrayMetadata had (see array.go's own doc comment for the full
+// *ArraySchema had (see array.go's own doc comment for the full
 // rationale).
-func (p *PropertyBuilder) Array() *ArrayMetadata {
+func (p *PropertyBuilder) Array() *ArraySchema {
 	p.format = "array"
 	p.kind = "array"
 	p.item = &PropertyBuilder{}
@@ -451,35 +451,35 @@ func (p *PropertyBuilder) Array() *ArrayMetadata {
 	p.min = nil
 	p.max = nil
 	// NOTE (SPEC_DEVIATION from tasks.md T0 item 3's literal
-	// `return &ArrayMetadata{PropertyBuilder: p}`): also captures p.item
-	// into the returned ArrayMetadata's OWN item field (see array.go's
-	// ArrayMetadata.item doc comment) -- required to keep an EARLIER
-	// *ArrayMetadata's ItemBuilder() independent of a LATER Array() call on
+	// `return &ArraySchema{PropertyBuilder: p}`): also captures p.item
+	// into the returned ArraySchema's OWN item field (see array.go's
+	// ArraySchema.item doc comment) -- required to keep an EARLIER
+	// *ArraySchema's ItemBuilder() independent of a LATER Array() call on
 	// the same PropertyBuilder, per the pre-existing
 	// TestArray_CalledTwice_ProducesIndependentItemState regression test,
 	// which the literal task instruction (no item: in the literal) would
 	// otherwise break.
-	return &ArrayMetadata{PropertyBuilder: p, item: p.item}
+	return &ArraySchema{PropertyBuilder: p, item: p.item}
 }
 
 // Object selects OpenAPI's "object" type and returns a brand new
-// *ObjectMetadata wrapping p itself (object.go, object-builder feature) --
+// *ObjectSchema wrapping p itself (object.go, object-builder feature) --
 // unlike Array, Object has no separate "item" concept: the field itself IS
 // the nested object (e.g. `Address AddressEntity`), so there is no second
 // synthetic *PropertyBuilder to allocate here, just p.format = "object" and
-// a fresh *ObjectMetadata view onto the SAME p (see object.go's own doc
+// a fresh *ObjectSchema view onto the SAME p (see object.go's own doc
 // comment for the full rationale). fn is invoked with that same
-// *ObjectMetadata (pointer identity, same callback shape as
-// ArrayMetadata.Items(fn) for API-surface consistency per INSIGHT.md), and
+// *ObjectSchema (pointer identity, same callback shape as
+// ArraySchema.Items(fn) for API-surface consistency per INSIGHT.md), and
 // Object returns it so the caller can keep chaining Required()/Nullable()/
 // etc after the callback returns (INSIGHT.md's
 // `Object(fn).Nullable().Description(...)` shape).
-func (p *PropertyBuilder) Object(fn func(om *ObjectMetadata)) *ObjectMetadata {
+func (p *PropertyBuilder) Object(fn func(om *ObjectSchema)) *ObjectSchema {
 	p.format = "object"
 	p.kind = "object"
 	p.ref = nil
 	p.additionalProperties = false
-	om := &ObjectMetadata{PropertyBuilder: p}
+	om := &ObjectSchema{PropertyBuilder: p}
 	fn(om)
 	return om
 }
@@ -500,8 +500,8 @@ func (p *PropertyBuilder) KindValue() string {
 // active on p), and whether Min was ever called -- the bool return
 // distinguishes "never called" from "called with 0", since 0 is itself a
 // valid minimum. Relocated here (json-body-validation's P0) so a future
-// consumer can read it back without needing the original StringMetadata/
-// NumericMetadata/ArrayMetadata wrapper reference.
+// consumer can read it back without needing the original StringSchema/
+// NumericSchema/ArraySchema wrapper reference.
 func (p *PropertyBuilder) MinValue() (int, bool) {
 	if p.min == nil {
 		return 0, false
@@ -534,29 +534,29 @@ func (p *PropertyBuilder) ItemBuilder() *PropertyBuilder {
 	return p.item
 }
 
-// ItemRef returns the *Metadata set via ArrayMetadata.Object(ref), and
+// ItemRef returns the *Schema set via ArraySchema.Object(ref), and
 // whether it was ever called -- same "never called" distinction as
 // MinValue/MaxValue. See MinValue's doc comment for why this lives on
 // PropertyBuilder now.
-func (p *PropertyBuilder) ItemRef() (*Metadata, bool) {
+func (p *PropertyBuilder) ItemRef() (*Schema, bool) {
 	if p.itemRef == nil {
 		return nil, false
 	}
 	return p.itemRef, true
 }
 
-// MetadataRef returns the *Metadata set via ObjectMetadata.Metadata(ref),
+// SchemaRef returns the *Schema set via ObjectSchema.Schema(ref),
 // and whether it was ever called -- same "never called" distinction as
 // MinValue/MaxValue. See MinValue's doc comment for why this lives on
 // PropertyBuilder now.
-func (p *PropertyBuilder) MetadataRef() (*Metadata, bool) {
+func (p *PropertyBuilder) SchemaRef() (*Schema, bool) {
 	if p.ref == nil {
 		return nil, false
 	}
 	return p.ref, true
 }
 
-// IsAdditionalProperties reports whether ObjectMetadata.AdditionalProperties
+// IsAdditionalProperties reports whether ObjectSchema.AdditionalProperties
 // was ever called. See MinValue's doc comment for why this lives on
 // PropertyBuilder now.
 func (p *PropertyBuilder) IsAdditionalProperties() bool {
@@ -585,7 +585,7 @@ func (p *PropertyBuilder) Custom(fn func(raw any) (any, error)) *PropertyBuilder
 
 // CustomFunc returns the function set via Custom, and whether Custom was
 // ever called -- same "never called" bool-return shape as MinValue/MaxValue/
-// ItemRef/MetadataRef.
+// ItemRef/SchemaRef.
 func (p *PropertyBuilder) CustomFunc() (func(raw any) (any, error), bool) {
 	if p.custom == nil {
 		return nil, false

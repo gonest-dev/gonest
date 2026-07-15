@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gonest-dev/gonest/internal/controller"
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // --- fixtures -------------------------------------------------------------
@@ -26,55 +26,55 @@ type userEntity struct {
 	Scores    []int           `json:"scores"`
 	Addresses []addressEntity `json:"addresses"`
 	Address   addressEntity   `json:"address"`
-	Metadata  map[string]any  `json:"metadata"`
+	Schema    map[string]any  `json:"schema"`
 }
 
-// newUserMetadata reproduces INSIGHT.md's "exemplo de Array e Object
+// newUserSchema reproduces INSIGHT.md's "exemplo de Array e Object
 // aninhados" UserEntity/AddressEntity shape using the CURRENT
-// Array()/Items(fn)/Object(fn) builder API (metadata.go, array.go,
+// Array()/Items(fn)/Object(fn) builder API (schema.go, array.go,
 // object.go) -- INSIGHT.md's own code block in that section predates T0/T1
 // and uses an older API shape; this reproduces the same STRUCTURE (nested
-// Array/Object, addressMetadata reused across Addresses and Address) against
+// Array/Object, addressSchema reused across Addresses and Address) against
 // the API that actually exists today.
-func newUserMetadata(tst *testing.T) (*metadata.Metadata, *metadata.Metadata) {
+func newUserSchema(tst *testing.T) (*schema.Schema, *schema.Schema) {
 	var t userEntity
 	base := reflect.ValueOf(&t).Pointer()
-	m := metadata.New(reflect.TypeOf(t), base)
-	tst.Cleanup(func() { metadata.Deregister(reflect.TypeOf(t)) })
+	m := schema.New(reflect.TypeOf(t), base)
+	tst.Cleanup(func() { schema.Deregister(reflect.TypeOf(t)) })
 
 	var addr addressEntity
 	addrBase := reflect.ValueOf(&addr).Pointer()
-	addressMetadata := metadata.New(reflect.TypeOf(addr), addrBase)
-	tst.Cleanup(func() { metadata.Deregister(reflect.TypeOf(addr)) })
-	addressMetadata.Description("Endereco")
-	addressMetadata.Property(&addr.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
-	addressMetadata.Property(&addr.City).String().Required().Description("Cidade")
-	addressMetadata.Property(&addr.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP")
+	addressSchema := schema.New(reflect.TypeOf(addr), addrBase)
+	tst.Cleanup(func() { schema.Deregister(reflect.TypeOf(addr)) })
+	addressSchema.Description("Endereco")
+	addressSchema.Property(&addr.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+	addressSchema.Property(&addr.City).String().Required().Description("Cidade")
+	addressSchema.Property(&addr.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP")
 
 	m.Description("Entidade de usuario com campos aninhados")
 	m.Property(&t.Id).Integer().Required().Description("ID do usuario").Examples(int64(1))
 
-	m.Property(&t.Tags).Array().Items(func(am *metadata.ArrayMetadata) {
+	m.Property(&t.Tags).Array().Items(func(am *schema.ArraySchema) {
 		am.String().Min(1).Max(50)
 	}).Required().Description("Tags do usuario").Examples("admin", "beta")
 
-	m.Property(&t.Scores).Array().Items(func(am *metadata.ArrayMetadata) {
+	m.Property(&t.Scores).Array().Items(func(am *schema.ArraySchema) {
 		am.Integer().Min(0).Max(100)
 	}).Required().Description("Notas do usuario")
 
-	m.Property(&t.Addresses).Array().Items(func(am *metadata.ArrayMetadata) {
-		am.Object(addressMetadata)
+	m.Property(&t.Addresses).Array().Items(func(am *schema.ArraySchema) {
+		am.Object(addressSchema)
 	}).Required().Min(1).Description("Enderecos do usuario")
 
-	m.Property(&t.Address).Object(func(om *metadata.ObjectMetadata) {
-		om.Metadata(addressMetadata)
+	m.Property(&t.Address).Object(func(om *schema.ObjectSchema) {
+		om.Schema(addressSchema)
 	}).Required().Description("Endereco principal")
 
-	m.Property(&t.Metadata).Object(func(om *metadata.ObjectMetadata) {
+	m.Property(&t.Schema).Object(func(om *schema.ObjectSchema) {
 		om.AdditionalProperties()
 	}).Nullable().Description("Metadados abertos do usuario")
 
-	return m, addressMetadata
+	return m, addressSchema
 }
 
 // --- SG-04: every route appears in paths -----------------------------------
@@ -195,8 +195,8 @@ func TestGenerate_UndocumentedRoute_StillAppearsWithInferredState(t *testing.T) 
 
 // --- SG-05: dedup by pointer identity ---------------------------------------
 
-func TestGenerate_SharedMetadata_RegisteredExactlyOnce(t *testing.T) {
-	userMeta, addressMeta := newUserMetadata(t)
+func TestGenerate_SharedSchema_RegisteredExactlyOnce(t *testing.T) {
+	userMeta, addressMeta := newUserSchema(t)
 
 	c := controller.New(func(c *controller.Controller) {
 		c.Path("/users")
@@ -260,12 +260,12 @@ type stringBranchEntity struct {
 func TestSchemaFor_String_MinMaxPattern(t *testing.T) {
 	var t1 stringBranchEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
+	m := schema.New(reflect.TypeOf(t1), base)
 	m.Property(&t1.Name).String().Min(2).Max(10).Pattern(`^[a-z]+$`).Required()
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	if schema["type"] != "string" {
 		t.Fatalf("type = %v, want string", schema["type"])
@@ -288,12 +288,12 @@ type numericBranchEntity struct {
 func TestSchemaFor_Integer_MinMaxFormat(t *testing.T) {
 	var t1 numericBranchEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
+	m := schema.New(reflect.TypeOf(t1), base)
 	m.Property(&t1.Age).Integer().Min(0).Max(150)
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	if schema["type"] != "integer" {
 		t.Fatalf("type = %v, want integer", schema["type"])
@@ -316,12 +316,12 @@ type boolBranchEntity struct {
 func TestSchemaFor_Boolean(t *testing.T) {
 	var t1 boolBranchEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
+	m := schema.New(reflect.TypeOf(t1), base)
 	m.Property(&t1.Active).Boolean()
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	if schema["type"] != "boolean" {
 		t.Fatalf("type = %v, want boolean", schema["type"])
@@ -339,13 +339,13 @@ type dateBranchEntity struct {
 func TestSchemaFor_DateTime_And_Date(t *testing.T) {
 	var t1 dateBranchEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
+	m := schema.New(reflect.TypeOf(t1), base)
 	m.Property(&t1.CreatedAt).DateTime()
 	m.Property(&t1.BirthDate).Date()
 
 	doc := New("3.1.0", nil)
 	for _, pb := range m.OwnProperties() {
-		schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+		schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 		if schema["type"] != "string" {
 			t.Fatalf("type = %v, want string", schema["type"])
 		}
@@ -359,15 +359,15 @@ func TestSchemaFor_DateTime_And_Date(t *testing.T) {
 func TestSchemaFor_Array_InlineItem(t *testing.T) {
 	var t1 userEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
-	t.Cleanup(func() { metadata.Deregister(reflect.TypeOf(t1)) })
-	m.Property(&t1.Tags).Array().Items(func(am *metadata.ArrayMetadata) {
+	m := schema.New(reflect.TypeOf(t1), base)
+	t.Cleanup(func() { schema.Deregister(reflect.TypeOf(t1)) })
+	m.Property(&t1.Tags).Array().Items(func(am *schema.ArraySchema) {
 		am.String().Min(1).Max(50)
 	}).Min(1).Max(5)
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	if schema["type"] != "array" {
 		t.Fatalf("type = %v, want array", schema["type"])
@@ -388,10 +388,10 @@ func TestSchemaFor_Array_InlineItem(t *testing.T) {
 }
 
 func TestSchemaFor_Array_RefItem(t *testing.T) {
-	userMeta, _ := newUserMetadata(t)
+	userMeta, _ := newUserSchema(t)
 	doc := New("3.1.0", nil)
 
-	var addressesPB *metadata.PropertyBuilder
+	var addressesPB *schema.PropertyBuilder
 	for _, pb := range userMeta.OwnProperties() {
 		if pb.Field().Name == "Addresses" {
 			addressesPB = pb
@@ -401,7 +401,7 @@ func TestSchemaFor_Array_RefItem(t *testing.T) {
 		t.Fatal("could not find Addresses property")
 	}
 
-	schema := schemaFor(addressesPB, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(addressesPB, doc, map[*schema.Schema]bool{})
 	if schema["type"] != "array" {
 		t.Fatalf("type = %v, want array", schema["type"])
 	}
@@ -419,10 +419,10 @@ func TestSchemaFor_Array_RefItem(t *testing.T) {
 }
 
 func TestSchemaFor_Object_Ref(t *testing.T) {
-	userMeta, _ := newUserMetadata(t)
+	userMeta, _ := newUserSchema(t)
 	doc := New("3.1.0", nil)
 
-	var addressPB *metadata.PropertyBuilder
+	var addressPB *schema.PropertyBuilder
 	for _, pb := range userMeta.OwnProperties() {
 		if pb.Field().Name == "Address" {
 			addressPB = pb
@@ -432,7 +432,7 @@ func TestSchemaFor_Object_Ref(t *testing.T) {
 		t.Fatal("could not find Address property")
 	}
 
-	schema := schemaFor(addressPB, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(addressPB, doc, map[*schema.Schema]bool{})
 	ref, ok := schema["$ref"].(string)
 	if !ok || ref == "" {
 		t.Fatalf("expected bare $ref schema, got %v", schema)
@@ -444,32 +444,32 @@ func TestSchemaFor_Object_Ref(t *testing.T) {
 
 // TestSchemaFor_Object_Ref_Nullable covers the gap left by
 // TestSchemaFor_Object_Ref (Required, not Nullable) and
-// TestSchemaFor_Object_AdditionalProperties (Nullable, but no MetadataRef):
-// a field that is BOTH Object(...).Metadata(ref) (MetadataRef set) AND
+// TestSchemaFor_Object_AdditionalProperties (Nullable, but no SchemaRef):
+// a field that is BOTH Object(...).Schema(ref) (SchemaRef set) AND
 // Nullable(). schemaFor's "object" case (generate.go) special-cases this
 // combination -- since a bare "$ref" cannot carry a sibling "nullable"/type
 // marker, it wraps the ref in "anyOf": [{"$ref": ...}, {"type": "null"}]
 // instead of returning the bare $ref schema that TestSchemaFor_Object_Ref
 // asserts for the non-nullable case.
 func TestSchemaFor_Object_Ref_Nullable(t *testing.T) {
-	_, addressMetadata := newUserMetadata(t)
+	_, addressSchema := newUserSchema(t)
 
 	type ownerEntity struct {
 		Address addressEntity `json:"address"`
 	}
 	var owner ownerEntity
 	ownerBase := reflect.ValueOf(&owner).Pointer()
-	m := metadata.New(reflect.TypeOf(owner), ownerBase)
-	t.Cleanup(func() { metadata.Deregister(reflect.TypeOf(owner)) })
+	m := schema.New(reflect.TypeOf(owner), ownerBase)
+	t.Cleanup(func() { schema.Deregister(reflect.TypeOf(owner)) })
 
-	m.Property(&owner.Address).Object(func(om *metadata.ObjectMetadata) {
-		om.Metadata(addressMetadata)
+	m.Property(&owner.Address).Object(func(om *schema.ObjectSchema) {
+		om.Schema(addressSchema)
 	}).Nullable().Description("Endereco opcional")
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
 
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	want := map[string]any{
 		"anyOf": []any{
@@ -483,20 +483,20 @@ func TestSchemaFor_Object_Ref_Nullable(t *testing.T) {
 }
 
 func TestSchemaFor_Object_AdditionalProperties(t *testing.T) {
-	userMeta, _ := newUserMetadata(t)
+	userMeta, _ := newUserSchema(t)
 	doc := New("3.1.0", nil)
 
-	var metaPB *metadata.PropertyBuilder
+	var metaPB *schema.PropertyBuilder
 	for _, pb := range userMeta.OwnProperties() {
-		if pb.Field().Name == "Metadata" {
+		if pb.Field().Name == "Schema" {
 			metaPB = pb
 		}
 	}
 	if metaPB == nil {
-		t.Fatal("could not find Metadata property")
+		t.Fatal("could not find Schema property")
 	}
 
-	schema := schemaFor(metaPB, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(metaPB, doc, map[*schema.Schema]bool{})
 	if schema["type"] != "object" && !containsNull(schema["type"], "object") {
 		t.Fatalf("type = %v, want object (possibly nullable)", schema["type"])
 	}
@@ -529,12 +529,12 @@ type reqNullableEntity struct {
 func TestSchemaFor_Nullable_WrapsTypeArray(t *testing.T) {
 	var t1 reqNullableEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
+	m := schema.New(reflect.TypeOf(t1), base)
 	m.Property(&t1.Nullable).String().Nullable()
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	arr, ok := schema["type"].([]string)
 	if !ok {
@@ -546,7 +546,7 @@ func TestSchemaFor_Nullable_WrapsTypeArray(t *testing.T) {
 }
 
 func TestGenerate_Required_ReflectedInSchemaRequiredArray(t *testing.T) {
-	userMeta, _ := newUserMetadata(t)
+	userMeta, _ := newUserSchema(t)
 
 	c := controller.New(func(c *controller.Controller) {
 		c.Path("/users")
@@ -588,12 +588,12 @@ type customEntity struct {
 func TestSchemaFor_Custom_NoTypeOrFormat(t *testing.T) {
 	var t1 customEntity
 	base := reflect.ValueOf(&t1).Pointer()
-	m := metadata.New(reflect.TypeOf(t1), base)
+	m := schema.New(reflect.TypeOf(t1), base)
 	m.Property(&t1.Weird).Custom(func(raw any) (any, error) { return raw, nil }).Description("weird field").Required()
 
 	doc := New("3.1.0", nil)
 	pb := m.OwnProperties()[0]
-	schema := schemaFor(pb, doc, map[*metadata.Metadata]bool{})
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
 
 	if _, ok := schema["type"]; ok {
 		t.Fatalf("Custom field should have no type, got %v", schema)
@@ -694,7 +694,7 @@ func TestGenerate_BearerAuth_NoAuth_OmitsSecurityKey(t *testing.T) {
 // --- full INSIGHT.md UserEntity/AddressEntity reproduction ------------------
 
 func TestGenerate_UserEntityAddressEntity_FullReproduction(t *testing.T) {
-	userMeta, addressMeta := newUserMetadata(t)
+	userMeta, addressMeta := newUserSchema(t)
 
 	c := controller.New(func(c *controller.Controller) {
 		c.Path("/users")
@@ -771,7 +771,7 @@ func TestGenerate_UserEntityAddressEntity_FullReproduction(t *testing.T) {
 // --- Document() --------------------------------------------------------------
 
 func TestDocument_ProducesValidJSONMarshalableOutput(t *testing.T) {
-	userMeta, _ := newUserMetadata(t)
+	userMeta, _ := newUserSchema(t)
 
 	c := controller.New(func(c *controller.Controller) {
 		c.Path("/users")

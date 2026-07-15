@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // MustQuery is the real implementation behind the public root
@@ -22,9 +22,9 @@ import (
 // "coerce-then-reuse, not a parallel validation path".
 //
 // Steps (design.md's Architecture Overview, "MustQuery" section):
-//  1. Look up T's (dereferenced) registered *metadata.Metadata via the
+//  1. Look up T's (dereferenced) registered *schema.Schema via the
 //     global registry -- panics immediately, BEFORE reading any query value
-//     at all, if T was never registered via NewMetadata[T] (spec.md's Edge
+//     at all, if T was never registered via NewSchema[T] (spec.md's Edge
 //     Cases, same precedent as MustJsonBody/MustParams).
 //  2. Read ctx.Queries() once (a plain map[string]string).
 //  3. For each of T's own registered properties: resolve its key via
@@ -50,9 +50,9 @@ func MustQuery[T any](ctx *execution.Context) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
 
-	m, ok := metadata.Lookup(structType)
+	m, ok := schema.Lookup(structType)
 	if !ok {
-		panic(fmt.Sprintf("gonest: no metadata registered for type %s (call NewMetadata[%s] first)", structType, structType))
+		panic(fmt.Sprintf("gonest: no schema registered for type %s (call NewSchema[%s] first)", structType, structType))
 	}
 
 	queries := ctx.Queries()

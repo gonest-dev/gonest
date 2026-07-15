@@ -3,9 +3,9 @@ package openapi
 import (
 	"strconv"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // routableController is a locally-declared interface used to type-assert
@@ -38,7 +38,7 @@ func Generate(doc *OpenApiDocument, root *module.Module) {
 		doc.schemas = map[string]any{}
 	}
 	if doc.schemaNames == nil {
-		doc.schemaNames = map[*metadata.Metadata]string{}
+		doc.schemaNames = map[*schema.Schema]string{}
 	}
 
 	visitedModules := map[*module.Module]bool{}
@@ -120,20 +120,20 @@ func walkRoute(c routableController, r *route.Route, doc *OpenApiDocument) {
 		}
 	}
 
-	visiting := map[*metadata.Metadata]bool{}
+	visiting := map[*schema.Schema]bool{}
 
 	var parameters []any
-	if pathParams, ok := r.PathParamsMetadata(); ok {
+	if pathParams, ok := r.PathParamsSchema(); ok {
 		parameters = append(parameters, paramsToParameters(pathParams, "path", doc, visiting)...)
 	}
-	if queryParams, ok := r.QueryParamsMetadata(); ok {
+	if queryParams, ok := r.QueryParamsSchema(); ok {
 		parameters = append(parameters, paramsToParameters(queryParams, "query", doc, visiting)...)
 	}
 	if len(parameters) > 0 {
 		op["parameters"] = parameters
 	}
 
-	if reqBody, ok := r.RequestBodyMetadata(); ok {
+	if reqBody, ok := r.RequestBodySchema(); ok {
 		op["requestBody"] = map[string]any{
 			"content": map[string]any{
 				"application/json": map[string]any{
@@ -171,12 +171,12 @@ func resolveBearerAuth(c routableController, r *route.Route) bool {
 	return c.HasBearerAuth()
 }
 
-// buildResponses converts r.Responses() (status -> *metadata.Metadata, nil
+// buildResponses converts r.Responses() (status -> *schema.Schema, nil
 // value meaning "documented, no body") into the OpenAPI responses map, plus
 // a synthesized default status (via r.Code()) when Response was never called
 // at all (spec.md's Decision 4 -- undocumented routes still appear, using
 // whatever is inferable).
-func buildResponses(r *route.Route, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) map[string]any {
+func buildResponses(r *route.Route, doc *OpenApiDocument, visiting map[*schema.Schema]bool) map[string]any {
 	responses := r.Responses()
 	out := map[string]any{}
 
@@ -203,8 +203,8 @@ func buildResponses(r *route.Route, doc *OpenApiDocument, visiting map[*metadata
 
 // paramsToParameters converts every OwnProperties() entry of m into one
 // OpenAPI Parameter Object, keyed by json tag name (design.md's Components:
-// "each property in that Metadata becomes one parameter object").
-func paramsToParameters(m *metadata.Metadata, in string, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) []any {
+// "each property in that Schema becomes one parameter object").
+func paramsToParameters(m *schema.Schema, in string, doc *OpenApiDocument, visiting map[*schema.Schema]bool) []any {
 	var out []any
 	for _, p := range m.OwnProperties() {
 		name := tagName(p)
@@ -224,7 +224,7 @@ func paramsToParameters(m *metadata.Metadata, in string, doc *OpenApiDocument, v
 // parameter/schema naming purposes -- Generate does not need the "-"
 // (hidden) skip behavior validate's tagKeyVisible has, since a field that
 // reaches OwnProperties() was deliberately registered via Property.
-func tagName(p *metadata.PropertyBuilder) string {
+func tagName(p *schema.PropertyBuilder) string {
 	field := p.Field()
 	raw := field.Tag.Get("json")
 	if raw == "" || raw == "-" {
@@ -243,24 +243,24 @@ func tagName(p *metadata.PropertyBuilder) string {
 	return name
 }
 
-// refSchema builds the schema for a whole *metadata.Metadata used as a
+// refSchema builds the schema for a whole *schema.Schema used as a
 // requestBody/response body (NOT a *PropertyBuilder) -- always a top-level
 // object schema, registered/deduped via registerSchema and referenced by
 // $ref (a request/response body is always the FULL registered shape, never
-// inlined, matching how ItemRef()/MetadataRef() are handled by schemaFor for
+// inlined, matching how ItemRef()/SchemaRef() are handled by schemaFor for
 // nested fields).
-func refSchema(m *metadata.Metadata, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) map[string]any {
+func refSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema.Schema]bool) map[string]any {
 	name := registerSchema(m, doc, visiting)
 	return map[string]any{"$ref": "#/components/schemas/" + name}
 }
 
-// schemaFor is the recursive core: one *metadata.PropertyBuilder -> one
+// schemaFor is the recursive core: one *schema.PropertyBuilder -> one
 // OpenAPI Schema Object (as map[string]any), dispatching on p.KindValue()
 // exactly like internal/validate's own validateValue does (same source of
 // truth, different destination -- schema instead of violation). Custom(fn)
 // is checked FIRST, before the kind dispatch, mirroring validateValue's own
 // short-circuit (validate.go).
-func schemaFor(p *metadata.PropertyBuilder, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) map[string]any {
+func schemaFor(p *schema.PropertyBuilder, doc *OpenApiDocument, visiting map[*schema.Schema]bool) map[string]any {
 	schema := map[string]any{}
 
 	if _, isCustom := p.CustomFunc(); isCustom {
@@ -322,7 +322,7 @@ func schemaFor(p *metadata.PropertyBuilder, doc *OpenApiDocument, visiting map[*
 		applyNullable(schema, p, true)
 
 	case "object":
-		if ref, ok := p.MetadataRef(); ok {
+		if ref, ok := p.SchemaRef(); ok {
 			// The WHOLE schema is just a $ref, not wrapped in more object
 			// structure (design.md's Data Models: "Object-with-ref example").
 			//
@@ -372,7 +372,7 @@ func schemaFor(p *metadata.PropertyBuilder, doc *OpenApiDocument, visiting map[*
 // at all -- Nullable on a Custom field is documented via its absence from
 // the schema entirely (design.md/spec.md do not ask for a synthetic
 // "nullable" marker on a field with no inferable shape).
-func applyNullable(schema map[string]any, p *metadata.PropertyBuilder, hasType bool) {
+func applyNullable(schema map[string]any, p *schema.PropertyBuilder, hasType bool) {
 	if !hasType || !p.IsNullable() {
 		return
 	}
@@ -386,7 +386,7 @@ func applyNullable(schema map[string]any, p *metadata.PropertyBuilder, hasType b
 // addDescriptionAndExamples adds description/examples to schema, if set --
 // applies to EVERY kind's output, including Custom fields (design.md's Data
 // Models: "Add description/examples ... to every kind's output, if set").
-func addDescriptionAndExamples(schema map[string]any, p *metadata.PropertyBuilder) {
+func addDescriptionAndExamples(schema map[string]any, p *schema.PropertyBuilder) {
 	if desc := p.DescriptionText(); desc != "" {
 		schema["description"] = desc
 	}
@@ -402,15 +402,15 @@ func addDescriptionAndExamples(schema map[string]any, p *metadata.PropertyBuilde
 // and the name is RESERVED in doc.schemaNames BEFORE recursing into m's
 // properties -- both orderings are critical: checking first is what makes a
 // diamond-shaped reference graph (two different routes both referencing the
-// same *Metadata) resolve to a single walk, and reserving before recursing
+// same *Schema) resolve to a single walk, and reserving before recursing
 // is what prevents infinite recursion if m indirectly references itself
 // (e.g. a self-referential tree-shaped struct).
-func registerSchema(m *metadata.Metadata, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) string {
+func registerSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema.Schema]bool) string {
 	if doc.schemas == nil {
 		doc.schemas = map[string]any{}
 	}
 	if doc.schemaNames == nil {
-		doc.schemaNames = map[*metadata.Metadata]string{}
+		doc.schemaNames = map[*schema.Schema]string{}
 	}
 
 	if name, ok := doc.schemaNames[m]; ok {

@@ -13,8 +13,8 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // --- P2 fixtures ---------------------------------------------------------
@@ -29,9 +29,9 @@ type UserOrderParams struct {
 	OrderId int64 `param:"order_id"`
 }
 
-var userOrderParamsMetadata = func() *metadata.Metadata {
+var userOrderParamsSchema = func() *schema.Schema {
 	f := &UserOrderParams{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.UserId).Integer().Required().Min(1)
 	m.Property(&f.OrderId).Integer().Required().Min(1)
 	return m
@@ -40,14 +40,14 @@ var userOrderParamsMetadata = func() *metadata.Metadata {
 // UserOnlyParams declares a SINGLE param field, used for the "field with no
 // matching :name on the route at all" absence scenario -- distinct type so
 // its route (which deliberately does NOT declare :user_id) doesn't collide
-// with userOrderParamsMetadata's own route expectations.
+// with userOrderParamsSchema's own route expectations.
 type UserOnlyParams struct {
 	UserId int64 `param:"user_id"`
 }
 
-var userOnlyParamsMetadata = func() *metadata.Metadata {
+var userOnlyParamsSchema = func() *schema.Schema {
 	f := &UserOnlyParams{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.UserId).Integer().Required()
 	return m
 }()
@@ -72,14 +72,14 @@ func decodeParamCode(raw any) (any, error) {
 	return "CODE:" + s, nil
 }
 
-var customParamFixtureMetadata = func() *metadata.Metadata {
+var customParamFixtureSchema = func() *schema.Schema {
 	f := &CustomParamFixture{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Code).Custom(decodeParamCode)
 	return m
 }()
 
-// UnregisteredParams is deliberately never passed to metadata.New/Register --
+// UnregisteredParams is deliberately never passed to schema.New/Register --
 // used to prove MustParams panics BEFORE reading any param.
 type UnregisteredParams struct {
 	Id int64 `param:"id"`
@@ -134,7 +134,7 @@ func TestMustParams_HappyPath_TwoParams(t *testing.T) {
 }
 
 // TestMustParams_FieldWithNoRouteMatch_ProducesViolation proves that when
-// T's metadata declares a param field with no corresponding ":name" segment
+// T's schema declares a param field with no corresponding ":name" segment
 // on the CURRENT route's pattern at all (Route.HasParam false), a violation
 // is recorded rather than silently treating it as present-but-empty.
 func TestMustParams_FieldWithNoRouteMatch_ProducesViolation(t *testing.T) {
@@ -247,7 +247,7 @@ func TestMustParams_UnregisteredType_PanicsBeforeReadingAnyParam(t *testing.T) {
 	// consulted (nil map is safe to read in Go, so instead assert directly
 	// that a panic happens BEFORE returning any value -- if MustParams tried
 	// to read params first, this would still technically be reachable, so
-	// the real proof is the panic message mentioning "no metadata
+	// the real proof is the panic message mentioning "no schema
 	// registered", not GetParam side effects).
 	ctx := newParamCtx("/x/:id", map[string]string{"id": "5"})
 

@@ -16,7 +16,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // --- P0 fixtures ------------------------------------------------------
@@ -24,7 +24,7 @@ import (
 // CustomFixture exercises Custom(fn) in isolation, distinct from
 // UserProperties (validate_test.go's own fixture) so these new tests don't
 // perturb the pre-existing suite's own registration in any way (each test
-// file's init/package-level var runs once per package, and metadata.New
+// file's init/package-level var runs once per package, and schema.New
 // panics on duplicate registration for the same Go type -- a fresh
 // anonymous-shaped type here keeps this file fully independent).
 
@@ -52,9 +52,9 @@ type CustomCodeFixture struct {
 	Name string `json:"name"`
 }
 
-var customCodeFixtureMetadata = func() *metadata.Metadata {
+var customCodeFixtureSchema = func() *schema.Schema {
 	f := &CustomCodeFixture{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Code).Custom(decodeV1Code)
 	m.Property(&f.Name).String().Required()
 	return m
@@ -148,9 +148,9 @@ type CustomWrongTypeFixture struct {
 	Code int `json:"code"`
 }
 
-var customWrongTypeFixtureMetadata = func() *metadata.Metadata {
+var customWrongTypeFixtureSchema = func() *schema.Schema {
 	f := &CustomWrongTypeFixture{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	// Custom succeeds (no error) but returns a string for an int field --
 	// setField must reject this as a violation, never panic a raw reflect
 	// error (spec.md's Edge Cases).

@@ -14,10 +14,10 @@ import (
 	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/schema"
 	"github.com/gonest-dev/gonest/internal/validate"
 )
 
@@ -53,9 +53,9 @@ type pipelineIDParams struct {
 	ID int `param:"id"`
 }
 
-var pipelineIDParamsMetadata = func() *metadata.Metadata {
+var pipelineIDParamsSchema = func() *schema.Schema {
 	f := &pipelineIDParams{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.ID).Custom(func(raw any) (any, error) {
 		s, _ := raw.(string)
 		if s == "bad" {

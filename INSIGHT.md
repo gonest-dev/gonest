@@ -53,7 +53,7 @@ type UserIdParam struct {
   UserId int64 `param:"user_id"`
 }
 
-var _ = gonest.NewMetadata[UserIdParam](func (t *UserIdParam, m *gonest.Metadata) {
+var _ = gonest.NewSchema[UserIdParam](func (t *UserIdParam, m *gonest.Schema) {
   m.Property(&t.UserId).Integer().Min(1).Required()
 })
 
@@ -229,7 +229,7 @@ var FooExampleFilter = gonest.NewFilter(func (filter *gonest.Filter) {
 })
 
 // ---------- PrefixedUserIdParam (Custom(fn)) ----------
-// Metadata's fixed vocabulary (Integer/String/Min/Max/Pattern etc) não
+// Schema's fixed vocabulary (Integer/String/Min/Max/Pattern etc) não
 // alcança formatos com prefixo próprio de domínio, tipo um ID exposto como
 // "usr_42" em vez de "42" cru -- Custom(fn) é a válvula de escape: recebe o
 // valor cru (aqui, a STRING do path param, sem nenhuma coerção prévia) e
@@ -238,7 +238,7 @@ type PrefixedUserIdParam struct {
   UserId int64 `param:"user_id"`
 }
 
-var _ = gonest.NewMetadata[PrefixedUserIdParam](func (t *PrefixedUserIdParam, m *gonest.Metadata) {
+var _ = gonest.NewSchema[PrefixedUserIdParam](func (t *PrefixedUserIdParam, m *gonest.Schema) {
   m.Property(&t.UserId).Custom(func(raw any) (any, error) {
     s, _ := raw.(string)
     rest, ok := strings.CutPrefix(s, "usr_")
@@ -396,7 +396,7 @@ Pontos que vieram direto dos exemplos reais e precisam existir na API:
   `await app.listen()` do Nest que retorna assim que o bind funciona. `gonest.OnListen(fn)`
   resolve isso: callback roda assim que o bind der certo, antes do bloqueio definitivo.
 
-# exemplo para definição de metadados em estruturas
+# exemplo para definição de schemas em estruturas
 
 ```go
 package ex
@@ -419,7 +419,7 @@ type UserEntity struct {
 // tipo Number().Integer() — direto Integer(), Float(), Double(), Email(), Uuid() etc).
 // Required/Nullable/Description/Examples ficam na base, comuns a qualquer branch.
 // mesma declaração alimenta: schema OpenAPI (oas) + validação runtime (MustJsonBody/MustInject).
-var _ = gonest.NewMetadata[UserEntity](func (t *UserEntity, m *gonest.Metadata) {
+var _ = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
   m.Description("Entidade de usuário")
   m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
   m.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
@@ -444,8 +444,8 @@ var _ = gonest.NewMetadata[UserEntity](func (t *UserEntity, m *gonest.Metadata) 
 // Float()    -> (format: float) / Double() -> (format: double) -> Min/Max
 // Boolean()  -> sem format
 // DateTime() -> (format: date-time) / Date() -> (format: date)
-// Array(func(m *gonest.ArrayMetadata)...) -> Min/Max(items), Unique
-// Object(func(m *gonest.ObjectMetadata)...) -> aninhado, reusa NewMetadata do tipo aninhado se já existir
+// Array(func(m *gonest.ArraySchema)...) -> Min/Max(items), Unique
+// Object(func(m *gonest.ObjectSchema)...) -> aninhado, reusa NewSchema do tipo aninhado se já existir
 ```
 
 ## exemplo de Array e Object aninhados
@@ -469,15 +469,15 @@ type UserEntity struct {
   Scores    []int          `json:"scores"`
   Addresses []AddressEntity `json:"addresses"`
   Address   AddressEntity  `json:"address"`
-  Metadata  map[string]any `json:"metadata"`
+  Schema  map[string]any `json:"schema"`
 }
 
 func init() {
-  gonest.NewMetadata[UserEntity](func (t *UserEntity, m *gonest.Metadata) {
-    // metadata aninhada declarada dentro do mesmo closure e capturada em variável —
+  gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
+    // schema aninhada declarada dentro do mesmo closure e capturada em variável —
     // sem reflect, sem [T] em método (Go não permite parâmetro de tipo em método).
     // reusada abaixo tanto em Array (Items) quanto em Object direto.
-    addressMetadata := gonest.NewMetadata[AddressEntity](func (t *AddressEntity, m *gonest.Metadata) {
+    addressSchema := gonest.NewSchema[AddressEntity](func (t *AddressEntity, m *gonest.Schema) {
       m.Description("Endereço")
       m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
       m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
@@ -488,7 +488,7 @@ func init() {
     m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
     // Array() de tipo primitivo — Items() sem arg encadeia o branch igual Property faria.
-    m.Property(&t.Tags).Array().Items(func(m *gonest.ArrayMetadata) {
+    m.Property(&t.Tags).Array().Items(func(m *gonest.ArraySchema) {
       m.String().Min(1).Max(50)
       m.Required()
       m.Description("Tags do usuário")
@@ -497,17 +497,17 @@ func init() {
 
     // Array() de número — Min/Max aqui são do ITEM (0 a 100); array em si não tem Min/Max
     // de quantidade nesse caso (poderia mesclar com .Array(1, 10) se quantidade importasse).
-    m.Property(&t.Scores).Array().Items(func(m *gonest.ArrayMetadata) {
+    m.Property(&t.Scores).Array().Items(func(m *gonest.ArraySchema) {
       m.Integer().Min(0).Max(100)
       m.Required()
       m.Description("Notas do usuário")
       m.Examples(80, 95)
     })
 
-    // Array() de Object() — Items(addressMetadata) reusa a metadata já registrada acima
+    // Array() de Object() — Items(addressSchema) reusa a schema já registrada acima
     // (mesmo objeto, sem duplicar Property; equivalente a $ref no OpenAPI).
-    m.Property(&t.Addresses).Array().Items(func(m *gonest.ArrayMetadata) {
-      m.Object(addressMetadata)
+    m.Property(&t.Addresses).Array().Items(func(m *gonest.ArraySchema) {
+      m.Object(addressSchema)
       m.Required()
       m.Min(1)
       m.Description("Endereços do usuário")
@@ -515,23 +515,23 @@ func init() {
     })
 
     // Object() direto (não-array) — mesma reutilização via valor, sem reflect.
-    m.Property(&t.Address).Object(func(om *gonest.ObjectMetadata) {
-      om.Metadata(addressMetadata)
+    m.Property(&t.Address).Object(func(om *gonest.ObjectSchema) {
+      om.Schema(addressSchema)
       om.Required()
       om.Description("Endereço principal")
     })
 
     // Object() livre (schema aberto, tipo map[string]any) — sem struct Go aninhada pra
-    // reusar, por isso recebe callback em vez de metadata já registrada.
-    m.Property(&t.Metadata).Object(func (om *gonest.ObjectMetadata) {
+    // reusar, por isso recebe callback em vez de schema já registrada.
+    m.Property(&t.Schema).Object(func (om *gonest.ObjectSchema) {
       om.AdditionalProperties()
     }).Nullable().Description("Metadados abertos do usuário")
   })
 }
 
-// Items(ref ...*gonest.MetadataDefinition) é variádico — mesmo método resolve os dois casos
+// Items(ref ...*gonest.SchemaDefinition) é variádico — mesmo método resolve os dois casos
 // acima: Items() sem arg (item primitivo, encadeia branch tipo .String()/.Integer()) e
-// Items(addressMetadata) com arg (item referencia metadata já registrada). Sem overload —
+// Items(addressSchema) com arg (item referencia schema já registrada). Sem overload —
 // Go não permite dois métodos com o mesmo nome, então é 1 método só variádico.
 //
 // por ser builder linear (não callback com escopo próprio), dá pra mesclar validação de
@@ -835,8 +835,8 @@ func main() {
 # exemplo de Param/Query Validation
 
 Path params e query string seguem exatamente o mesmo mecanismo de `MustJsonBody`
-(exemplo acima): declara um struct pequeno, registra sua `Metadata` via
-`NewMetadata[T]` (tags `param:"..."`/`query:"..."` em vez de `json:"..."`), e
+(exemplo acima): declara um struct pequeno, registra sua `Schema` via
+`NewSchema[T]` (tags `param:"..."`/`query:"..."` em vez de `json:"..."`), e
 o handler resolve o struct inteiro já validado de uma vez -- nunca campo a
 campo. Não existe (nem nunca existiu como API pública) um `MustParam[T](ctx, name)`
 avulso paralelo; `MustParams`/`MustQuery` são o único caminho pra path
@@ -854,7 +854,7 @@ type UserIdParams struct {
   UserId int64 `param:"user_id"`
 }
 
-var _ = gonest.NewMetadata[UserIdParams](func (t *UserIdParams, m *gonest.Metadata) {
+var _ = gonest.NewSchema[UserIdParams](func (t *UserIdParams, m *gonest.Schema) {
   m.Property(&t.UserId).Integer().Min(1).Required()
 })
 
@@ -865,7 +865,7 @@ type ListUsersQuery struct {
   Limit int `query:"limit"`
 }
 
-var _ = gonest.NewMetadata[ListUsersQuery](func (t *ListUsersQuery, m *gonest.Metadata) {
+var _ = gonest.NewSchema[ListUsersQuery](func (t *ListUsersQuery, m *gonest.Schema) {
   m.Property(&t.Page).Integer().Min(1).Required()
   m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
 })
@@ -911,7 +911,7 @@ var OrderController = gonest.NewController(func (controller *gonest.Controller) 
 })
 ```
 
-Quando o vocabulário fixo de `Metadata` (`Integer`/`String`/`Min`/`Max`/`Pattern`
+Quando o vocabulário fixo de `Schema` (`Integer`/`String`/`Min`/`Max`/`Pattern`
 etc) não alcança um formato de domínio específico (ex: um ID exposto com
 prefixo, tipo `"usr_42"`), `PropertyBuilder.Custom(fn)` é a válvula de escape
 -- funciona igual em `MustParams`/`MustQuery`/`MustJsonBody`, sempre recebendo
@@ -919,7 +919,7 @@ o valor CRU (string, no caso de param/query) e devolvendo o valor Go final ou
 um `error` que vira violation. Ver a seção "exemplo de Middleware, Guard,
 Interceptor e Filter" acima (`PrefixedUserIdParam`) pro exemplo completo.
 
-# exemplo de Schema Generation from Metadata
+# exemplo de Schema Generation from Schema
 
 Mapeamento NestJS `@nestjs/swagger` -> gonest (decorator -> builder method, já
 que Go não tem decorator):
@@ -930,21 +930,21 @@ que Go não tem decorator):
   Nest)
 - `@ApiOperation` -> `Route.Summary(s)` / `Route.Description(s)` /
   `Route.OperationId(s)`
-- `@ApiBody` -> `Route.RequestBody(metadata)`
+- `@ApiBody` -> `Route.RequestBody(schema)`
 - `@ApiResponse`/`@ApiOkResponse`/`@ApiCreatedResponse`/etc ->
-  `Route.Response(status, metadata ...*gonest.Metadata)` -- o `*Metadata` é
+  `Route.Response(status, schema ...*gonest.Schema)` -- o `*Schema` é
   opcional (variádico): zero args documenta o status sem body, um arg
   documenta com body. Chamar de novo pro MESMO status sobrescreve; pra status
   DIFERENTES acumula.
-- `@ApiParam` -> `Route.PathParams(metadata)`
-- `@ApiQuery` -> `Route.QueryParams(metadata)`
+- `@ApiParam` -> `Route.PathParams(schema)`
+- `@ApiQuery` -> `Route.QueryParams(schema)`
 - `@ApiBearerAuth`/`@ApiBasicAuth` -> `Controller.BearerAuth()` (herda) /
   `Route.BearerAuth()` (override, mesma prioridade "rota vence" de Tags)
 - `@ApiExcludeEndpoint` -> `Route.ExcludeFromDocs()`
 - `@ApiDeprecated` -> `Route.Deprecated()`
 - `@ApiProperty` -> já coberto, é `Property()`/`Description()`/`Examples()`/
-  `Required()` da própria `Metadata` (ver "exemplo para definição de
-  metadados em estruturas" acima)
+  `Required()` da própria `Schema` (ver "exemplo para definição de
+  schemas em estruturas" acima)
 
 ```go
 package ex
@@ -970,31 +970,31 @@ type UserIdParams struct {
   UserId int64 `param:"user_id"`
 }
 
-var addressMetadata = gonest.NewMetadata[AddressEntity](func (t *AddressEntity, m *gonest.Metadata) {
+var addressSchema = gonest.NewSchema[AddressEntity](func (t *AddressEntity, m *gonest.Schema) {
   m.Property(&t.Street).String().Required()
   m.Property(&t.City).String().Required()
   m.Property(&t.Zip).String().Required()
 })
 
-// Object(func(om *gonest.ObjectMetadata){ om.Metadata(ref) }) e
-// Array().Items(func(am *gonest.ArrayMetadata){ am.Object(ref) }) reusam a
-// MESMA addressMetadata declarada acima -- Schema Generation dedup automático
+// Object(func(om *gonest.ObjectSchema){ om.Schema(ref) }) e
+// Array().Items(func(am *gonest.ArraySchema){ am.Object(ref) }) reusam a
+// MESMA addressSchema declarada acima -- Schema Generation dedup automático
 // por identidade de ponteiro, não por nome (ver abaixo).
-var userEntityMetadata = gonest.NewMetadata[UserEntity](func (t *UserEntity, m *gonest.Metadata) {
+var userEntitySchema = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
   m.Title("UserEntity") // nome do schema em components.schemas -- default é
                          // o nome do tipo Go (reflect.Type.Name()), Title()
                          // sobrescreve.
   m.Property(&t.Id).Integer().Required()
   m.Property(&t.Name).String().Required()
-  m.Property(&t.Address).Object(func (om *gonest.ObjectMetadata) {
-    om.Metadata(addressMetadata)
+  m.Property(&t.Address).Object(func (om *gonest.ObjectSchema) {
+    om.Schema(addressSchema)
   }).Required()
-  m.Property(&t.Addresses).Array().Items(func (am *gonest.ArrayMetadata) {
-    am.Object(addressMetadata)
+  m.Property(&t.Addresses).Array().Items(func (am *gonest.ArraySchema) {
+    am.Object(addressSchema)
   })
 })
 
-var userIdParamsMetadata = gonest.NewMetadata[UserIdParams](func (t *UserIdParams, m *gonest.Metadata) {
+var userIdParamsSchema = gonest.NewSchema[UserIdParams](func (t *UserIdParams, m *gonest.Schema) {
   m.Property(&t.UserId).Integer().Min(1).Required()
 })
 
@@ -1009,16 +1009,16 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     // OpenAPI. Tags/BearerAuth herdados do controller acima, sem repetir.
     route.Summary("Cria um novo usuário")
 
-    // liga o corpo esperado a um *Metadata JÁ registrado (mesmo valor que
+    // liga o corpo esperado a um *Schema JÁ registrado (mesmo valor que
     // MustJsonBody[*UserProperties] vai usar dentro do Handler -- reusa a
     // MESMA declaração, não duplica). Schema Generation lê isso pra montar
     // requestBody no OpenAPI; MustJsonBody continua sendo quem VALIDA em
     // runtime -- RequestBody() aqui é só DECLARATIVO/documental.
-    route.RequestBody(userEntityMetadata)
+    route.RequestBody(userEntitySchema)
 
-    // liga status HTTP -> *Metadata da resposta. Múltiplas chamadas = múltiplos
-    // status documentados (ex: 201 sucesso, 409 conflito reusando outra Metadata).
-    route.Response(201, userEntityMetadata)
+    // liga status HTTP -> *Schema da resposta. Múltiplas chamadas = múltiplos
+    // status documentados (ex: 201 sucesso, 409 conflito reusando outra Schema).
+    route.Response(201, userEntitySchema)
     route.Response(409) // sem body -- só documenta o status
 
     route.HttpCode(201)
@@ -1030,11 +1030,11 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.Summary("Busca um usuário por ID")
-    // path params TAMBÉM documentados via Metadata já registrada (mesma
+    // path params TAMBÉM documentados via Schema já registrada (mesma
     // UserIdParams de MustParams) -- Schema Generation vira "parameters"
     // (in: path) no OpenAPI a partir dela, sem redeclarar nada.
-    route.PathParams(userIdParamsMetadata)
-    route.Response(200, userEntityMetadata)
+    route.PathParams(userIdParamsSchema)
+    route.Response(200, userEntitySchema)
     route.Response(404) // sem body
 
     route.HttpCode(200)
@@ -1082,13 +1082,13 @@ json := doc.Document()
 ```
 
 Array/Object aninhado (Milestone 5): ao gerar schema de um campo `Object(ref)`
-ou `Array().Items(ref)`, Schema Generation usa `ItemRef()`/`MetadataRef()`
+ou `Array().Items(ref)`, Schema Generation usa `ItemRef()`/`SchemaRef()`
 (já existem, AD-012) pra emitir `"$ref": "#/components/schemas/AddressEntity"`
-em vez de inline -- MESMA `*Metadata` nomeada uma vez em `components.schemas`
+em vez de inline -- MESMA `*Schema` nomeada uma vez em `components.schemas`
 (dedup por identidade de ponteiro, não por nome), reusada por todo campo/rota
 que apontar pra ela.
 
-Quando o vocabulário fixo de `Metadata` (`Integer`/`String`/`Min`/`Max`/`Pattern`
+Quando o vocabulário fixo de `Schema` (`Integer`/`String`/`Min`/`Max`/`Pattern`
 etc) não alcança um formato de domínio específico, `PropertyBuilder.Custom(fn)`
 ainda funciona em Schema Generation: o campo aparece no schema SEM
 type/format (só `description`/`examples`/`nullable`/`required` se setados) --

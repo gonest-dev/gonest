@@ -1,11 +1,11 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // stringBranchEntity exercises all 10 string-family branches on distinct
@@ -27,15 +27,15 @@ type stringBranchEntity struct {
 	Zip      string
 }
 
-// newStringTestMetadata mirrors metadata_test.go's own newTestMetadata
+// newStringTestSchema mirrors schema_test.go's own newTestSchema
 // helper (same pattern: construct a zero value, keep it alive via the
-// returned pointer, build *Metadata from its address).
-func newStringTestMetadata(t *testing.T) (*stringBranchEntity, *metadata.Metadata) {
+// returned pointer, build *Schema from its address).
+func newStringTestSchema(t *testing.T) (*stringBranchEntity, *schema.Schema) {
 	t.Helper()
 	zero := &stringBranchEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
@@ -43,7 +43,7 @@ func newStringTestMetadata(t *testing.T) (*stringBranchEntity, *metadata.Metadat
 // (before any branch method is called) reports "" from FormatValue, not some
 // hidden default.
 func TestPropertyBuilder_FormatValueDefaultsEmpty(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+	zero, m := newStringTestSchema(t)
 
 	pb := m.Property(&zero.Str)
 
@@ -53,35 +53,35 @@ func TestPropertyBuilder_FormatValueDefaultsEmpty(t *testing.T) {
 }
 
 // TestStringFamilyBranches_SetsCorrectFormat proves EACH of the 10 branch
-// methods returns a *StringMetadata carrying its own correct OpenAPI format
+// methods returns a *StringSchema carrying its own correct OpenAPI format
 // string (spec.md AC1 / STR-01) -- individually verified, not sampled.
 func TestStringFamilyBranches_SetsCorrectFormat(t *testing.T) {
 	tests := []struct {
 		name       string
 		fieldPtr   func(*stringBranchEntity) *string
-		call       func(*metadata.PropertyBuilder) *metadata.StringMetadata
+		call       func(*schema.PropertyBuilder) *schema.StringSchema
 		wantFormat string
 	}{
-		{"String", func(e *stringBranchEntity) *string { return &e.Str }, (*metadata.PropertyBuilder).String, ""},
-		{"Email", func(e *stringBranchEntity) *string { return &e.Email }, (*metadata.PropertyBuilder).Email, "email"},
-		{"Uuid", func(e *stringBranchEntity) *string { return &e.Uuid }, (*metadata.PropertyBuilder).Uuid, "uuid"},
-		{"Uri", func(e *stringBranchEntity) *string { return &e.Uri }, (*metadata.PropertyBuilder).Uri, "uri"},
-		{"Hostname", func(e *stringBranchEntity) *string { return &e.Hostname }, (*metadata.PropertyBuilder).Hostname, "hostname"},
-		{"Ipv4", func(e *stringBranchEntity) *string { return &e.Ipv4 }, (*metadata.PropertyBuilder).Ipv4, "ipv4"},
-		{"Ipv6", func(e *stringBranchEntity) *string { return &e.Ipv6 }, (*metadata.PropertyBuilder).Ipv6, "ipv6"},
-		{"Password", func(e *stringBranchEntity) *string { return &e.Password }, (*metadata.PropertyBuilder).Password, "password"},
-		{"Byte", func(e *stringBranchEntity) *string { return &e.Byte }, (*metadata.PropertyBuilder).Byte, "byte"},
-		{"Binary", func(e *stringBranchEntity) *string { return &e.Binary }, (*metadata.PropertyBuilder).Binary, "binary"},
+		{"String", func(e *stringBranchEntity) *string { return &e.Str }, (*schema.PropertyBuilder).String, ""},
+		{"Email", func(e *stringBranchEntity) *string { return &e.Email }, (*schema.PropertyBuilder).Email, "email"},
+		{"Uuid", func(e *stringBranchEntity) *string { return &e.Uuid }, (*schema.PropertyBuilder).Uuid, "uuid"},
+		{"Uri", func(e *stringBranchEntity) *string { return &e.Uri }, (*schema.PropertyBuilder).Uri, "uri"},
+		{"Hostname", func(e *stringBranchEntity) *string { return &e.Hostname }, (*schema.PropertyBuilder).Hostname, "hostname"},
+		{"Ipv4", func(e *stringBranchEntity) *string { return &e.Ipv4 }, (*schema.PropertyBuilder).Ipv4, "ipv4"},
+		{"Ipv6", func(e *stringBranchEntity) *string { return &e.Ipv6 }, (*schema.PropertyBuilder).Ipv6, "ipv6"},
+		{"Password", func(e *stringBranchEntity) *string { return &e.Password }, (*schema.PropertyBuilder).Password, "password"},
+		{"Byte", func(e *stringBranchEntity) *string { return &e.Byte }, (*schema.PropertyBuilder).Byte, "byte"},
+		{"Binary", func(e *stringBranchEntity) *string { return &e.Binary }, (*schema.PropertyBuilder).Binary, "binary"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zero, m := newStringTestMetadata(t)
+			zero, m := newStringTestSchema(t)
 			pb := m.Property(tt.fieldPtr(zero))
 
 			sm := tt.call(pb)
 			if sm == nil {
-				t.Fatalf("%s() returned nil *StringMetadata", tt.name)
+				t.Fatalf("%s() returned nil *StringSchema", tt.name)
 			}
 			if sm.FormatValue() != tt.wantFormat {
 				t.Errorf("%s().FormatValue() = %q, want %q", tt.name, sm.FormatValue(), tt.wantFormat)
@@ -95,17 +95,17 @@ func TestStringFamilyBranches_SetsCorrectFormat(t *testing.T) {
 	}
 }
 
-// TestStringMetadata_MinMaxPatternChainAndStoreCorrectly proves Min/Max/
-// Pattern each store their value and each returns the SAME *StringMetadata,
+// TestStringSchema_MinMaxPatternChainAndStoreCorrectly proves Min/Max/
+// Pattern each store their value and each returns the SAME *StringSchema,
 // exercised as a genuine single-expression chain (spec.md AC2 / STR-02).
-func TestStringMetadata_MinMaxPatternChainAndStoreCorrectly(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+func TestStringSchema_MinMaxPatternChainAndStoreCorrectly(t *testing.T) {
+	zero, m := newStringTestSchema(t)
 
 	sm := m.Property(&zero.Zip).String()
 	got := sm.Min(1).Max(50).Pattern(`^[a-z]+$`)
 
 	if got != sm {
-		t.Fatal("Min/Max/Pattern chain did not return the same *StringMetadata")
+		t.Fatal("Min/Max/Pattern chain did not return the same *StringSchema")
 	}
 
 	minVal, minOk := sm.MinValue()
@@ -121,11 +121,11 @@ func TestStringMetadata_MinMaxPatternChainAndStoreCorrectly(t *testing.T) {
 	}
 }
 
-// TestStringMetadata_MinMaxDefaultUnset proves MinValue/MaxValue report
+// TestStringSchema_MinMaxDefaultUnset proves MinValue/MaxValue report
 // (0, false) when never called, distinguishing "never set" from "set to 0"
 // (design.md's Interfaces: "bool reports whether it was ever set").
-func TestStringMetadata_MinMaxDefaultUnset(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+func TestStringSchema_MinMaxDefaultUnset(t *testing.T) {
+	zero, m := newStringTestSchema(t)
 
 	sm := m.Property(&zero.Str).String()
 
@@ -140,35 +140,35 @@ func TestStringMetadata_MinMaxDefaultUnset(t *testing.T) {
 	}
 }
 
-// TestStringMetadata_CommonConstraintsMutateSharedBuilderAndStayChainable is
+// TestStringSchema_CommonConstraintsMutateSharedBuilderAndStayChainable is
 // the MOST CRITICAL test (per the task's own instructions): proves Required/
-// Nullable/Description/Examples called ON *StringMetadata (a) mutate the
+// Nullable/Description/Examples called ON *StringSchema (a) mutate the
 // SAME shared PropertyBuilder (visible via ITS OWN getters, inherited via
-// embedding) and (b) still return *StringMetadata, not *PropertyBuilder --
+// embedding) and (b) still return *StringSchema, not *PropertyBuilder --
 // proven by chaining .Required().Min(5) in a SINGLE expression. If Required()
 // returned *PropertyBuilder, this line would fail to COMPILE (no Min method
 // on PropertyBuilder), so a successful compile+pass IS the proof (spec.md
 // AC3 / STR-03).
-func TestStringMetadata_CommonConstraintsMutateSharedBuilderAndStayChainable(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+func TestStringSchema_CommonConstraintsMutateSharedBuilderAndStayChainable(t *testing.T) {
+	zero, m := newStringTestSchema(t)
 
 	sm := m.Property(&zero.Zip).String()
 
-	// The critical line: .Required() must return *StringMetadata so .Min()
+	// The critical line: .Required() must return *StringSchema so .Min()
 	// can chain immediately after in the SAME expression.
 	got := sm.Required().Min(5).Nullable().Description("CEP").Examples("01310-100")
 
 	if got != sm {
-		t.Fatal("Required().Min(5)... chain did not return the same *StringMetadata")
+		t.Fatal("Required().Min(5)... chain did not return the same *StringSchema")
 	}
 
 	// Base-4 constraints are visible via PropertyBuilder's OWN getters
 	// (inherited through embedding), proving shared-storage, not a copy.
 	if !sm.IsRequired() {
-		t.Error("IsRequired() = false, want true after StringMetadata.Required()")
+		t.Error("IsRequired() = false, want true after StringSchema.Required()")
 	}
 	if !sm.IsNullable() {
-		t.Error("IsNullable() = false, want true after StringMetadata.Nullable()")
+		t.Error("IsNullable() = false, want true after StringSchema.Nullable()")
 	}
 	if sm.DescriptionText() != "CEP" {
 		t.Errorf("DescriptionText() = %q, want %q", sm.DescriptionText(), "CEP")
@@ -185,10 +185,10 @@ func TestStringMetadata_CommonConstraintsMutateSharedBuilderAndStayChainable(t *
 	}
 }
 
-// TestStringMetadata_InsightEmailChain verifies INSIGHT.md's Email chain
+// TestStringSchema_InsightEmailChain verifies INSIGHT.md's Email chain
 // end-to-end, all values checked.
-func TestStringMetadata_InsightEmailChain(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+func TestStringSchema_InsightEmailChain(t *testing.T) {
+	zero, m := newStringTestSchema(t)
 
 	sm := m.Property(&zero.Email).Email().Required().Description("Email do usuário").Examples("[EMAIL_ADDRESS]")
 
@@ -207,10 +207,10 @@ func TestStringMetadata_InsightEmailChain(t *testing.T) {
 	}
 }
 
-// TestStringMetadata_InsightZipChain verifies INSIGHT.md's Zip chain
+// TestStringSchema_InsightZipChain verifies INSIGHT.md's Zip chain
 // end-to-end, all values checked.
-func TestStringMetadata_InsightZipChain(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+func TestStringSchema_InsightZipChain(t *testing.T) {
+	zero, m := newStringTestSchema(t)
 
 	sm := m.Property(&zero.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 
@@ -237,7 +237,7 @@ func TestStringMetadata_InsightZipChain(t *testing.T) {
 // FormatValue reflects the LAST call (design.md's Error Handling Strategy:
 // "last-write-wins, no panic, deterministic").
 func TestStringFamilyBranches_CalledTwiceLastWins(t *testing.T) {
-	zero, m := newStringTestMetadata(t)
+	zero, m := newStringTestSchema(t)
 
 	pb := m.Property(&zero.Str)
 

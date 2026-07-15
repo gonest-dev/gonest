@@ -1,11 +1,11 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // arrayEntity exercises Array() against real slice-typed fields, plus a
@@ -24,108 +24,108 @@ type addressEntity struct {
 	Zip    string
 }
 
-// newArrayTestMetadata mirrors numeric_test.go's newNumericTestMetadata /
-// string_test.go's newStringTestMetadata helper (same pattern: construct a
-// zero value, keep it alive via the returned pointer, build *Metadata from
+// newArrayTestSchema mirrors numeric_test.go's newNumericTestSchema /
+// string_test.go's newStringTestSchema helper (same pattern: construct a
+// zero value, keep it alive via the returned pointer, build *Schema from
 // its address).
-func newArrayTestMetadata(t *testing.T) (*arrayEntity, *metadata.Metadata) {
+func newArrayTestSchema(t *testing.T) (*arrayEntity, *schema.Schema) {
 	t.Helper()
 	zero := &arrayEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
-// newAddressTestMetadata builds a standalone *Metadata for addressEntity,
-// standing in for INSIGHT.md's `addressMetadata := gonest.NewMetadata[AddressEntity](...)`
+// newAddressTestSchema builds a standalone *Schema for addressEntity,
+// standing in for INSIGHT.md's `addressSchema := gonest.NewSchema[AddressEntity](...)`
 // -- reused below as the itemRef passed to Object(ref).
-func newAddressTestMetadata(t *testing.T) *metadata.Metadata {
+func newAddressTestSchema(t *testing.T) *schema.Schema {
 	t.Helper()
 	zero := &addressEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	return metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	return schema.New(typ, uintptr(unsafe.Pointer(zero)))
 }
 
-// TestArray_SetsFormatAndReturnsNewArrayMetadata proves AR-01: Array()
+// TestArray_SetsFormatAndReturnsNewArraySchema proves AR-01: Array()
 // sets format="array" on the field's own PropertyBuilder and returns a
-// brand new *ArrayMetadata whose embedded PropertyBuilder is the SAME
+// brand new *ArraySchema whose embedded PropertyBuilder is the SAME
 // pointer as the field (pointer-identity, same precedent as prior branches).
-func TestArray_SetsFormatAndReturnsNewArrayMetadata(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+func TestArray_SetsFormatAndReturnsNewArraySchema(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	pb := m.Property(&zero.Tags)
 
 	am := pb.Array()
 
 	if am == nil {
-		t.Fatal("Array() returned nil *ArrayMetadata")
+		t.Fatal("Array() returned nil *ArraySchema")
 	}
 	if pb.FormatValue() != "array" {
 		t.Fatalf("FormatValue() = %q, want %q", pb.FormatValue(), "array")
 	}
 	if am.PropertyBuilder != pb {
-		t.Fatal("ArrayMetadata.PropertyBuilder is not the same pointer as the field's PropertyBuilder")
+		t.Fatal("ArraySchema.PropertyBuilder is not the same pointer as the field's PropertyBuilder")
 	}
 }
 
 // TestArray_CalledTwice_ProducesIndependentItemState proves the Edge Case /
 // Done-when: calling Array() twice on the same PropertyBuilder does not
-// panic, and the second *ArrayMetadata's item state is independent of the
+// panic, and the second *ArraySchema's item state is independent of the
 // first (fresh synthetic item builder every call).
 func TestArray_CalledTwice_ProducesIndependentItemState(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+	zero, m := newArrayTestSchema(t)
 	pb := m.Property(&zero.Tags)
 
 	am1 := pb.Array()
-	am1.Items(func(item *metadata.ArrayMetadata) {
+	am1.Items(func(item *schema.ArraySchema) {
 		item.String()
 	})
 
 	am2 := pb.Array()
 
 	if am1 == am2 {
-		t.Fatal("second Array() call returned the same *ArrayMetadata as the first")
+		t.Fatal("second Array() call returned the same *ArraySchema as the first")
 	}
 	if am2.ItemBuilder() == am1.ItemBuilder() {
 		t.Fatal("second Array() call reused the first call's item builder")
 	}
 	if am2.ItemBuilder().FormatValue() != "" {
-		t.Fatalf("second ArrayMetadata's item format = %q, want empty (fresh item)", am2.ItemBuilder().FormatValue())
+		t.Fatalf("second ArraySchema's item format = %q, want empty (fresh item)", am2.ItemBuilder().FormatValue())
 	}
 }
 
-// TestItems_PassesSameArrayMetadataAndReturnsIt proves AR-02: Items(fn)
-// invokes fn with the SAME *ArrayMetadata (pointer identity), and Items
+// TestItems_PassesSameArraySchemaAndReturnsIt proves AR-02: Items(fn)
+// invokes fn with the SAME *ArraySchema (pointer identity), and Items
 // itself returns that same pointer so callers can chain quantity Min/Max
 // after the callback.
-func TestItems_PassesSameArrayMetadataAndReturnsIt(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+func TestItems_PassesSameArraySchemaAndReturnsIt(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
-	var received *metadata.ArrayMetadata
-	got := am.Items(func(inner *metadata.ArrayMetadata) {
+	var received *schema.ArraySchema
+	got := am.Items(func(inner *schema.ArraySchema) {
 		received = inner
 	})
 
 	if received != am {
-		t.Fatal("Items(fn) did not pass the same *ArrayMetadata to the callback")
+		t.Fatal("Items(fn) did not pass the same *ArraySchema to the callback")
 	}
 	if got != am {
-		t.Fatal("Items(fn) did not return the same *ArrayMetadata")
+		t.Fatal("Items(fn) did not return the same *ArraySchema")
 	}
 }
 
 // TestItems_StringItem_SetsItemFormatAndMinMax proves AR-03 for the String
 // item branch: m.String().Min(1).Max(50) inside the callback configures the
 // synthetic item builder, not the field, and Min/Max are retrievable via the
-// returned *StringMetadata.
+// returned *StringSchema.
 func TestItems_StringItem_SetsItemFormatAndMinMax(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
-	var sm *metadata.StringMetadata
-	am.Items(func(inner *metadata.ArrayMetadata) {
+	var sm *schema.StringSchema
+	am.Items(func(inner *schema.ArraySchema) {
 		sm = inner.String().Min(1).Max(50)
 	})
 
@@ -146,11 +146,11 @@ func TestItems_StringItem_SetsItemFormatAndMinMax(t *testing.T) {
 // Integer item branch: m.Integer().Min(0).Max(100) inside the callback
 // configures the synthetic item builder with format "int64" plus Min/Max.
 func TestItems_IntegerItem_SetsItemFormatAndMinMax(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Scores).Array()
 
-	var nm *metadata.NumericMetadata
-	am.Items(func(inner *metadata.ArrayMetadata) {
+	var nm *schema.NumericSchema
+	am.Items(func(inner *schema.ArraySchema) {
 		nm = inner.Integer().Min(0).Max(100)
 	})
 
@@ -167,15 +167,15 @@ func TestItems_IntegerItem_SetsItemFormatAndMinMax(t *testing.T) {
 	}
 }
 
-// TestArrayMetadata_FieldMethods_NeverMutateItem proves AR-04: Required/
-// Nullable/Description/Examples called on the *ArrayMetadata (inside or
+// TestArraySchema_FieldMethods_NeverMutateItem proves AR-04: Required/
+// Nullable/Description/Examples called on the *ArraySchema (inside or
 // outside the callback) always mutate the FIELD container, never the item --
 // explicit proof the item's corresponding fields stay zero-value.
-func TestArrayMetadata_FieldMethods_NeverMutateItem(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+func TestArraySchema_FieldMethods_NeverMutateItem(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
-	am.Items(func(inner *metadata.ArrayMetadata) {
+	am.Items(func(inner *schema.ArraySchema) {
 		inner.String().Min(1).Max(50)
 		inner.Required()
 		inner.Nullable()
@@ -213,16 +213,16 @@ func TestArrayMetadata_FieldMethods_NeverMutateItem(t *testing.T) {
 	}
 }
 
-// TestArrayMetadata_Object_SetsItemRefWithPointerIdentity proves AR-06:
+// TestArraySchema_Object_SetsItemRefWithPointerIdentity proves AR-06:
 // Object(ref) inside the callback stores ref as itemRef, retrievable via
-// ItemRef() with pointer identity to the already-registered *Metadata.
-func TestArrayMetadata_Object_SetsItemRefWithPointerIdentity(t *testing.T) {
-	addressMetadata := newAddressTestMetadata(t)
-	zero, m := newArrayTestMetadata(t)
+// ItemRef() with pointer identity to the already-registered *Schema.
+func TestArraySchema_Object_SetsItemRefWithPointerIdentity(t *testing.T) {
+	addressSchema := newAddressTestSchema(t)
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Addresses).Array()
 
-	am.Items(func(inner *metadata.ArrayMetadata) {
-		inner.Object(addressMetadata)
+	am.Items(func(inner *schema.ArraySchema) {
+		inner.Object(addressSchema)
 		inner.Required()
 		inner.Description("Endereços do usuário")
 	})
@@ -232,22 +232,22 @@ func TestArrayMetadata_Object_SetsItemRefWithPointerIdentity(t *testing.T) {
 	if !ok {
 		t.Fatal("ItemRef() ok = false, want true")
 	}
-	if ref != addressMetadata {
-		t.Fatal("ItemRef() did not return the same *Metadata pointer passed to Object()")
+	if ref != addressSchema {
+		t.Fatal("ItemRef() did not return the same *Schema pointer passed to Object()")
 	}
 }
 
-// TestArrayMetadata_QuantityMinMax_DoesNotCollideWithItemMinMax proves AR-05:
-// Min/Max called directly on *ArrayMetadata (chained after Items(fn)
+// TestArraySchema_QuantityMinMax_DoesNotCollideWithItemMinMax proves AR-05:
+// Min/Max called directly on *ArraySchema (chained after Items(fn)
 // returns) stores ARRAY quantity, distinct and non-colliding with the item's
-// own Min/Max set inside the callback via the *StringMetadata/*NumericMetadata
+// own Min/Max set inside the callback via the *StringSchema/*NumericSchema
 // wrapper.
-func TestArrayMetadata_QuantityMinMax_DoesNotCollideWithItemMinMax(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+func TestArraySchema_QuantityMinMax_DoesNotCollideWithItemMinMax(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
-	var sm *metadata.StringMetadata
-	am.Items(func(inner *metadata.ArrayMetadata) {
+	var sm *schema.StringSchema
+	am.Items(func(inner *schema.ArraySchema) {
 		sm = inner.String().Min(1).Max(50)
 	}).Min(2).Max(10)
 
@@ -261,7 +261,7 @@ func TestArrayMetadata_QuantityMinMax_DoesNotCollideWithItemMinMax(t *testing.T)
 	}
 
 	// Item's own Min/Max (1..50) must remain independently readable (via the
-	// *StringMetadata wrapper captured inside the callback) and unaffected
+	// *StringSchema wrapper captured inside the callback) and unaffected
 	// by the array's quantity Min/Max (2..10).
 	itemMin, ok := sm.MinValue()
 	if !ok || itemMin != 1 {
@@ -273,11 +273,11 @@ func TestArrayMetadata_QuantityMinMax_DoesNotCollideWithItemMinMax(t *testing.T)
 	}
 }
 
-// TestArrayMetadata_MinValue_NeverCalled_ReturnsFalse proves the getter's
+// TestArraySchema_MinValue_NeverCalled_ReturnsFalse proves the getter's
 // "never called" vs "called with 0" distinction, same precedent as
-// StringMetadata/NumericMetadata's own MinValue/MaxValue.
-func TestArrayMetadata_MinValue_NeverCalled_ReturnsFalse(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+// StringSchema/NumericSchema's own MinValue/MaxValue.
+func TestArraySchema_MinValue_NeverCalled_ReturnsFalse(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
 	if _, ok := am.MinValue(); ok {
@@ -288,10 +288,10 @@ func TestArrayMetadata_MinValue_NeverCalled_ReturnsFalse(t *testing.T) {
 	}
 }
 
-// TestArrayMetadata_ItemRef_NeverCalled_ReturnsFalse proves ItemRef()'s
+// TestArraySchema_ItemRef_NeverCalled_ReturnsFalse proves ItemRef()'s
 // "never called" distinction, mirroring MinValue/MaxValue's own shape.
-func TestArrayMetadata_ItemRef_NeverCalled_ReturnsFalse(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+func TestArraySchema_ItemRef_NeverCalled_ReturnsFalse(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
 	if _, ok := am.ItemRef(); ok {
@@ -299,10 +299,10 @@ func TestArrayMetadata_ItemRef_NeverCalled_ReturnsFalse(t *testing.T) {
 	}
 }
 
-// TestArrayMetadata_ItemsNeverCalled_ItemStaysZeroValue proves the Edge
+// TestArraySchema_ItemsNeverCalled_ItemStaysZeroValue proves the Edge
 // Case: Array() alone (no Items(fn)) leaves the item unformatted, no panic.
-func TestArrayMetadata_ItemsNeverCalled_ItemStaysZeroValue(t *testing.T) {
-	zero, m := newArrayTestMetadata(t)
+func TestArraySchema_ItemsNeverCalled_ItemStaysZeroValue(t *testing.T) {
+	zero, m := newArrayTestSchema(t)
 	am := m.Property(&zero.Tags).Array()
 
 	if am.ItemBuilder().FormatValue() != "" {
@@ -318,12 +318,12 @@ func TestArrayMetadata_ItemsNeverCalled_ItemStaysZeroValue(t *testing.T) {
 // end to end, asserting the field-level format, item-level format/Min/Max,
 // and the container's own Required/Description/Examples/quantity.
 func TestInsightMd_TagsScoresAddresses_Verbatim(t *testing.T) {
-	addressMetadata := newAddressTestMetadata(t)
-	zero, m := newArrayTestMetadata(t)
+	addressSchema := newAddressTestSchema(t)
+	zero, m := newArrayTestSchema(t)
 
 	// Tags []string
 	tagsPB := m.Property(&zero.Tags)
-	tagsPB.Array().Items(func(mm *metadata.ArrayMetadata) {
+	tagsPB.Array().Items(func(mm *schema.ArraySchema) {
 		mm.String().Min(1).Max(50)
 		mm.Required()
 		mm.Description("Tags do usuário")
@@ -342,7 +342,7 @@ func TestInsightMd_TagsScoresAddresses_Verbatim(t *testing.T) {
 	// Scores []int
 	scoresPB := m.Property(&zero.Scores)
 	scoresAM := scoresPB.Array()
-	scoresAM.Items(func(mm *metadata.ArrayMetadata) {
+	scoresAM.Items(func(mm *schema.ArraySchema) {
 		mm.Integer().Min(0).Max(100)
 		mm.Required()
 		mm.Description("Notas do usuário")
@@ -358,8 +358,8 @@ func TestInsightMd_TagsScoresAddresses_Verbatim(t *testing.T) {
 	// Addresses []AddressEntity
 	addrPB := m.Property(&zero.Addresses)
 	addrAM := addrPB.Array()
-	addrAM.Items(func(mm *metadata.ArrayMetadata) {
-		mm.Object(addressMetadata)
+	addrAM.Items(func(mm *schema.ArraySchema) {
+		mm.Object(addressSchema)
 		mm.Required()
 		mm.Description("Endereços do usuário")
 	}).Min(1)
@@ -368,8 +368,8 @@ func TestInsightMd_TagsScoresAddresses_Verbatim(t *testing.T) {
 		t.Fatalf("Addresses field FormatValue() = %q, want %q", addrPB.FormatValue(), "array")
 	}
 	ref, ok := addrAM.ItemRef()
-	if !ok || ref != addressMetadata {
-		t.Fatalf("Addresses ItemRef() = (%v, %v), want (addressMetadata, true)", ref, ok)
+	if !ok || ref != addressSchema {
+		t.Fatalf("Addresses ItemRef() = (%v, %v), want (addressSchema, true)", ref, ok)
 	}
 	minV, ok := addrAM.MinValue()
 	if !ok || minV != 1 {

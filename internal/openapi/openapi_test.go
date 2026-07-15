@@ -7,7 +7,7 @@ import "testing"
 // spec.md's Edge Cases: "WHEN BearerAuth() is never called THEN
 // HasBearerAuth() SHALL report false -- no auth scheme by default", extended
 // here to every other field per the same "no setter called yet" precedent
-// established throughout internal/metadata's own tests.
+// established throughout internal/schema's own tests.
 func TestNew_DefaultValues(t *testing.T) {
 	doc := New("3.1.0", nil)
 
@@ -69,7 +69,7 @@ func TestNew_NilFn_DoesNotPanic(t *testing.T) {
 // TestTitle_SetsAndOverwrites proves Title stores its argument, retrievable
 // via TitleText, and that a second call overwrites the first (spec.md's
 // Edge Cases: "last-write-wins, same precedent as every branch method
-// throughout internal/metadata").
+// throughout internal/schema").
 func TestTitle_SetsAndOverwrites(t *testing.T) {
 	doc := New("3.1.0", nil)
 

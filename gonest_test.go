@@ -188,7 +188,7 @@ type idParams struct {
 	ID int `param:"id"`
 }
 
-var idParamsMetadata = NewMetadata[idParams](func(t *idParams, m *Metadata) {
+var idParamsSchema = NewSchema[idParams](func(t *idParams, m *Schema) {
 	m.Property(&t.ID).Integer().Required()
 })
 
@@ -358,7 +358,7 @@ type insightUserIdParams struct {
 	UserId int64 `param:"user_id"`
 }
 
-var insightUserIdParamsMetadata = NewMetadata[insightUserIdParams](func(t *insightUserIdParams, m *Metadata) {
+var insightUserIdParamsSchema = NewSchema[insightUserIdParams](func(t *insightUserIdParams, m *Schema) {
 	m.Property(&t.UserId).Integer().Min(1).Required()
 })
 
@@ -369,7 +369,7 @@ type insightListUsersQuery struct {
 	Limit int `query:"limit"`
 }
 
-var insightListUsersQueryMetadata = NewMetadata[insightListUsersQuery](func(t *insightListUsersQuery, m *Metadata) {
+var insightListUsersQuerySchema = NewSchema[insightListUsersQuery](func(t *insightListUsersQuery, m *Schema) {
 	m.Property(&t.Page).Integer().Min(1).Required()
 	m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
 })
@@ -1085,36 +1085,36 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Metadata (Metadata Registration Core feature)
+// Schema (Schema Registration Core feature)
 // ---------------------------------------------------------------------------
 
-// TestNewMetadata_RootAlias_TypeCheck proves NewMetadata/Metadata/
+// TestNewSchema_RootAlias_TypeCheck proves NewSchema/Schema/
 // PropertyBuilder resolve and type-check at the root gonest package:
-// NewMetadata[T] builds a *Metadata, m.Property(&t.Field) returns a
+// NewSchema[T] builds a *Schema, m.Property(&t.Field) returns a
 // *PropertyBuilder, and the whole call shape compiles and runs without
 // panicking for a minimal one-field struct.
-func TestNewMetadata_RootAlias_TypeCheck(t *testing.T) {
+func TestNewSchema_RootAlias_TypeCheck(t *testing.T) {
 	type minimalEntity struct {
 		Id int64
 	}
 
-	m := NewMetadata[minimalEntity](func(t *minimalEntity, m *Metadata) {
+	m := NewSchema[minimalEntity](func(t *minimalEntity, m *Schema) {
 		var _ *PropertyBuilder = m.Property(&t.Id)
 	})
 	if m == nil {
-		t.Fatal("NewMetadata() returned nil *Metadata")
+		t.Fatal("NewSchema() returned nil *Schema")
 	}
 }
 
-// TestNewMetadata_RootAlias_UserEntityInsightCallShape reproduces INSIGHT.md's
-// UserEntity metadata example (lines ~379-402) verbatim through the root
-// gonest package's NewMetadata/Metadata/PropertyBuilder aliases, adapted per
+// TestNewSchema_RootAlias_UserEntityInsightCallShape reproduces INSIGHT.md's
+// UserEntity schema example (lines ~379-402) verbatim through the root
+// gonest package's NewSchema/Schema/PropertyBuilder aliases, adapted per
 // this feature's Out of Scope (spec.md/design.md): the type+format branch
 // calls (.Integer()/.String()/.Email()/.Boolean()/.DateTime()) do not exist
 // yet (future features), so only the base PropertyBuilder methods --
 // Required/Nullable/Description/Examples -- are used here, confirmed field
 // by field.
-func TestNewMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+func TestNewSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	type UserEntity struct {
 		Id        int64      `json:"id"`
 		Name      string     `json:"name"`
@@ -1127,7 +1127,7 @@ func TestNewMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	now := time.Now()
 
-	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário")
 		m.Property(&t.Id).Required().Description("ID do usuário").Examples(int64(1))
 		m.Property(&t.Name).Required().Description("Nome do usuário").Examples("John Doe")
@@ -1139,7 +1139,7 @@ func TestNewMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	})
 
 	if m == nil {
-		t.Fatal("NewMetadata() returned nil *Metadata")
+		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if m.DescriptionText() != "Entidade de usuário" {
 		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
@@ -1210,31 +1210,31 @@ func TestNewMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// StringMetadata (String-family Branches feature)
+// StringSchema (String-family Branches feature)
 // ---------------------------------------------------------------------------
 
-// TestStringMetadata_RootAlias_TypeCheck proves gonest.StringMetadata
+// TestStringSchema_RootAlias_TypeCheck proves gonest.StringSchema
 // resolves and type-checks at the root gonest package: PropertyBuilder.
-// String() returns a *StringMetadata, and the base chain methods
+// String() returns a *StringSchema, and the base chain methods
 // (Required/Description/Examples) plus the string-specific ones
 // (Min/Max/Pattern) all compile and mutate the SAME underlying
-// PropertyBuilder (per internal/metadata.StringMetadata's own doc comment on
+// PropertyBuilder (per internal/schema.StringSchema's own doc comment on
 // embedding a POINTER, not a copy).
-func TestStringMetadata_RootAlias_TypeCheck(t *testing.T) {
+func TestStringSchema_RootAlias_TypeCheck(t *testing.T) {
 	type minimalEntity struct {
 		Name string
 	}
 
-	var sm *StringMetadata
-	m := NewMetadata[minimalEntity](func(t *minimalEntity, m *Metadata) {
+	var sm *StringSchema
+	m := NewSchema[minimalEntity](func(t *minimalEntity, m *Schema) {
 		sm = m.Property(&t.Name).String().Required().Min(1).Max(50).Pattern(`^\w+$`).
 			Description("a name").Examples("John")
 	})
 	if m == nil {
-		t.Fatal("NewMetadata() returned nil *Metadata")
+		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if sm == nil {
-		t.Fatal("expected *StringMetadata, got nil")
+		t.Fatal("expected *StringSchema, got nil")
 	}
 
 	props := m.OwnProperties()
@@ -1267,22 +1267,22 @@ func TestStringMetadata_RootAlias_TypeCheck(t *testing.T) {
 	}
 }
 
-// TestStringMetadata_RootAlias_AddressEntityInsightCallShape reproduces
+// TestStringSchema_RootAlias_AddressEntityInsightCallShape reproduces
 // INSIGHT.md's AddressEntity example (lines ~431-456, "exemplo de Array e
 // Object aninhados") verbatim for its String()/Pattern() field declarations
-// through the root gonest package's StringMetadata alias, adapted per this
+// through the root gonest package's StringSchema alias, adapted per this
 // feature's scope: only Street/City/Zip (all String()-branch fields) are
-// reproduced here -- the surrounding Array()/Object()/nested-metadata parts
+// reproduced here -- the surrounding Array()/Object()/nested-schema parts
 // of that example belong to a separate, not-yet-implemented feature (see
 // ROADMAP.md).
-func TestStringMetadata_RootAlias_AddressEntityInsightCallShape(t *testing.T) {
+func TestStringSchema_RootAlias_AddressEntityInsightCallShape(t *testing.T) {
 	type AddressEntity struct {
 		Street string `json:"street"`
 		City   string `json:"city"`
 		Zip    string `json:"zip"`
 	}
 
-	m := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+	m := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
 		m.Description("Endereço")
 		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
@@ -1357,14 +1357,14 @@ func TestStringMetadata_RootAlias_AddressEntityInsightCallShape(t *testing.T) {
 // TestPropertyBuilder_RootAlias_EmailInsightCallShape reproduces
 // INSIGHT.md's UserEntity.Email field (line ~397, "exemplo para definição de
 // metadados em estruturas") through the root gonest package's
-// PropertyBuilder.Email()/StringMetadata aliases, confirming
+// PropertyBuilder.Email()/StringSchema aliases, confirming
 // FormatValue()=="email".
 func TestPropertyBuilder_RootAlias_EmailInsightCallShape(t *testing.T) {
 	type UserEntity struct {
 		Email string `json:"email"`
 	}
 
-	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("john@example.com")
 	})
 
@@ -1381,13 +1381,13 @@ func TestPropertyBuilder_RootAlias_EmailInsightCallShape(t *testing.T) {
 	}
 }
 
-// TestStringMetadata_RootAlias_RemainingSevenBranches exercises the 7
+// TestStringSchema_RootAlias_RemainingSevenBranches exercises the 7
 // string-family branch methods not shown explicitly in INSIGHT.md's examples
 // (Uuid/Uri/Hostname/Ipv4/Ipv6/Password/Byte/Binary minus Email/String
 // already covered above) through the root gonest package's PropertyBuilder/
-// StringMetadata aliases, confirming each sets its own distinct
+// StringSchema aliases, confirming each sets its own distinct
 // FormatValue().
-func TestStringMetadata_RootAlias_RemainingSevenBranches(t *testing.T) {
+func TestStringSchema_RootAlias_RemainingSevenBranches(t *testing.T) {
 	type entity struct {
 		Uuid     string
 		Uri      string
@@ -1399,8 +1399,8 @@ func TestStringMetadata_RootAlias_RemainingSevenBranches(t *testing.T) {
 		Binary   string
 	}
 
-	var m *Metadata
-	m = NewMetadata[entity](func(t *entity, m *Metadata) {
+	var m *Schema
+	m = NewSchema[entity](func(t *entity, m *Schema) {
 		m.Property(&t.Uuid).Uuid()
 		m.Property(&t.Uri).Uri()
 		m.Property(&t.Hostname).Hostname()
@@ -1438,31 +1438,31 @@ func TestStringMetadata_RootAlias_RemainingSevenBranches(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// NumericMetadata (Numeric & Boolean Branches feature)
+// NumericSchema (Numeric & Boolean Branches feature)
 // ---------------------------------------------------------------------------
 
-// TestNumericMetadata_RootAlias_TypeCheck proves gonest.NumericMetadata
+// TestNumericSchema_RootAlias_TypeCheck proves gonest.NumericSchema
 // resolves and type-checks at the root gonest package: PropertyBuilder.
-// Integer() returns a *NumericMetadata, and the base chain methods
+// Integer() returns a *NumericSchema, and the base chain methods
 // (Required/Description/Examples) plus the numeric-specific ones (Min/Max)
 // all compile and mutate the SAME underlying PropertyBuilder (per
-// internal/metadata.NumericMetadata's own doc comment on embedding a
+// internal/schema.NumericSchema's own doc comment on embedding a
 // POINTER, not a copy).
-func TestNumericMetadata_RootAlias_TypeCheck(t *testing.T) {
+func TestNumericSchema_RootAlias_TypeCheck(t *testing.T) {
 	type minimalEntity struct {
 		Age int64
 	}
 
-	var nm *NumericMetadata
-	m := NewMetadata[minimalEntity](func(t *minimalEntity, m *Metadata) {
+	var nm *NumericSchema
+	m := NewSchema[minimalEntity](func(t *minimalEntity, m *Schema) {
 		nm = m.Property(&t.Age).Integer().Required().Min(0).Max(150).
 			Description("an age").Examples(int64(30))
 	})
 	if m == nil {
-		t.Fatal("NewMetadata() returned nil *Metadata")
+		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if nm == nil {
-		t.Fatal("expected *NumericMetadata, got nil")
+		t.Fatal("expected *NumericSchema, got nil")
 	}
 
 	props := m.OwnProperties()
@@ -1492,18 +1492,18 @@ func TestNumericMetadata_RootAlias_TypeCheck(t *testing.T) {
 	}
 }
 
-// TestNumericMetadata_RootAlias_UserEntityInsightCallShape reproduces
-// INSIGHT.md's UserEntity metadata example (lines ~393-401) verbatim for its
+// TestNumericSchema_RootAlias_UserEntityInsightCallShape reproduces
+// INSIGHT.md's UserEntity schema example (lines ~393-401) verbatim for its
 // Id (.Integer()) and IsActive (.Boolean()) fields through the root gonest
-// package's PropertyBuilder.Integer()/Boolean()/NumericMetadata aliases,
+// package's PropertyBuilder.Integer()/Boolean()/NumericSchema aliases,
 // confirmed field by field.
-func TestNumericMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+func TestNumericSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	type UserEntity struct {
 		Id       int64 `json:"id"`
 		IsActive bool  `json:"isActive"`
 	}
 
-	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário")
 		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 		m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
@@ -1557,19 +1557,19 @@ func TestNumericMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	}
 }
 
-// TestNumericMetadata_RootAlias_RemainingThreeBranches exercises the 3
+// TestNumericSchema_RootAlias_RemainingThreeBranches exercises the 3
 // numeric-family branch methods not shown explicitly in INSIGHT.md's
 // examples (Int32/Float/Double -- Integer already covered above) through the
-// root gonest package's PropertyBuilder/NumericMetadata aliases, confirming
+// root gonest package's PropertyBuilder/NumericSchema aliases, confirming
 // each sets its own distinct FormatValue().
-func TestNumericMetadata_RootAlias_RemainingThreeBranches(t *testing.T) {
+func TestNumericSchema_RootAlias_RemainingThreeBranches(t *testing.T) {
 	type entity struct {
 		Int32Field  int32
 		FloatField  float32
 		DoubleField float64
 	}
 
-	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+	m := NewSchema[entity](func(t *entity, m *Schema) {
 		m.Property(&t.Int32Field).Int32()
 		m.Property(&t.FloatField).Float()
 		m.Property(&t.DoubleField).Double()
@@ -1602,10 +1602,10 @@ func TestNumericMetadata_RootAlias_RemainingThreeBranches(t *testing.T) {
 
 // TestDateTime_RootAlias_UserEntityInsightCallShape reproduces INSIGHT.md's
 // UserEntity CreatedAt/UpdatedAt/DeletedAt chains (lines ~399-401) verbatim
-// through the root gonest package's NewMetadata/Metadata/PropertyBuilder
+// through the root gonest package's NewSchema/Schema/PropertyBuilder
 // aliases, confirming DateTime()/Date() need no alias of their own -- they
-// return the bare *PropertyBuilder, already re-exported since Metadata
-// Registration Core (same reasoning gonest.go's NumericMetadata doc comment
+// return the bare *PropertyBuilder, already re-exported since Schema
+// Registration Core (same reasoning gonest.go's NumericSchema doc comment
 // already spells out for Boolean()).
 func TestDateTime_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	type UserEntity struct {
@@ -1616,7 +1616,7 @@ func TestDateTime_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	now := time.Now()
 
-	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(now)
 		m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(now)
 		m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
@@ -1663,7 +1663,7 @@ func TestDate_RootAlias_TypeCheck(t *testing.T) {
 		BirthDate time.Time
 	}
 
-	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+	m := NewSchema[entity](func(t *entity, m *Schema) {
 		m.Property(&t.BirthDate).Date().Required()
 	})
 
@@ -1680,27 +1680,27 @@ func TestDate_RootAlias_TypeCheck(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ArrayMetadata (Array Builder feature)
+// ArraySchema (Array Builder feature)
 // ---------------------------------------------------------------------------
 
-// TestArrayMetadata_RootAlias_TypeCheck proves gonest.ArrayMetadata resolves
+// TestArraySchema_RootAlias_TypeCheck proves gonest.ArraySchema resolves
 // and type-checks at the root gonest package: PropertyBuilder.Array()
-// returns a *ArrayMetadata, Items(fn) hands the same *ArrayMetadata into the
+// returns a *ArraySchema, Items(fn) hands the same *ArraySchema into the
 // callback (pointer identity), the item-branch methods
 // (String/Integer/Object/etc) mutate the synthetic item builder, and
 // Required/Nullable/Description/Examples plus the array's own Min/Max mutate
 // the field itself -- all reachable purely through root aliases, no
-// internal/metadata import.
-func TestArrayMetadata_RootAlias_TypeCheck(t *testing.T) {
+// internal/schema import.
+func TestArraySchema_RootAlias_TypeCheck(t *testing.T) {
 	type entity struct {
 		Tags []string
 	}
 
-	var identity *ArrayMetadata
-	m := NewMetadata[entity](func(t *entity, m *Metadata) {
+	var identity *ArraySchema
+	m := NewSchema[entity](func(t *entity, m *Schema) {
 		am := m.Property(&t.Tags).Array()
-		var _ *ArrayMetadata = am
-		am.Items(func(m *ArrayMetadata) {
+		var _ *ArraySchema = am
+		am.Items(func(m *ArraySchema) {
 			identity = m
 			m.String().Min(1).Max(50)
 			m.Required()
@@ -1709,7 +1709,7 @@ func TestArrayMetadata_RootAlias_TypeCheck(t *testing.T) {
 		}).Min(1).Max(10)
 	})
 	if m == nil {
-		t.Fatal("NewMetadata() returned nil *Metadata")
+		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if identity == nil {
 		t.Fatal("Items(fn) callback never invoked")
@@ -1746,15 +1746,15 @@ func TestArrayMetadata_RootAlias_TypeCheck(t *testing.T) {
 	}
 }
 
-// TestArrayMetadata_RootAlias_UserEntityInsightCallShape reproduces
+// TestArraySchema_RootAlias_UserEntityInsightCallShape reproduces
 // INSIGHT.md's UserEntity.Tags/Scores/Addresses example (lines ~437-486,
 // "exemplo de Array e Object aninhados") verbatim through the root gonest
-// package's NewMetadata/Metadata/PropertyBuilder/ArrayMetadata aliases --
+// package's NewSchema/Schema/PropertyBuilder/ArraySchema aliases --
 // confirms the 3 array shapes (string item, int item, and Object() item
-// referencing an already-registered gonest.NewMetadata[AddressEntity])
+// referencing an already-registered gonest.NewSchema[AddressEntity])
 // all resolve and behave correctly at the root package, no
-// internal/metadata import required.
-func TestArrayMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+// internal/schema import required.
+func TestArraySchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	type AddressEntity struct {
 		Street string `json:"street"`
 		City   string `json:"city"`
@@ -1768,33 +1768,33 @@ func TestArrayMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		Addresses []AddressEntity `json:"addresses"`
 	}
 
-	addressMetadata := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+	addressSchema := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
 		m.Description("Endereço")
 		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
 		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário com campos aninhados")
 		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
-		m.Property(&t.Tags).Array().Items(func(m *ArrayMetadata) {
+		m.Property(&t.Tags).Array().Items(func(m *ArraySchema) {
 			m.String().Min(1).Max(50)
 			m.Required()
 			m.Description("Tags do usuário")
 			m.Examples("admin", "beta")
 		})
 
-		m.Property(&t.Scores).Array().Items(func(m *ArrayMetadata) {
+		m.Property(&t.Scores).Array().Items(func(m *ArraySchema) {
 			m.Integer().Min(0).Max(100)
 			m.Required()
 			m.Description("Notas do usuário")
 			m.Examples(80, 95)
 		})
 
-		m.Property(&t.Addresses).Array().Items(func(m *ArrayMetadata) {
-			m.Object(addressMetadata)
+		m.Property(&t.Addresses).Array().Items(func(m *ArraySchema) {
+			m.Object(addressSchema)
 			m.Required()
 			m.Min(1)
 			m.Description("Endereços do usuário")
@@ -1842,7 +1842,7 @@ func TestArrayMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		t.Fatalf("Scores: ExamplesList() = %v, want [80 95]", examples)
 	}
 
-	// Addresses: array of Object(addressMetadata) item, Min(1) on the ARRAY
+	// Addresses: array of Object(addressSchema) item, Min(1) on the ARRAY
 	// itself (item count, not item constraints).
 	addresses, ok := byName["Addresses"]
 	if !ok {
@@ -1859,37 +1859,37 @@ func TestArrayMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	}
 }
 
-// TestObjectMetadata_RootAlias_TypeCheck proves gonest.ObjectMetadata
+// TestObjectSchema_RootAlias_TypeCheck proves gonest.ObjectSchema
 // resolves and type-checks at the root gonest package: PropertyBuilder.
-// Object() returns a *ObjectMetadata, Object(fn) hands the same
-// *ObjectMetadata into the callback (pointer identity), and
+// Object() returns a *ObjectSchema, Object(fn) hands the same
+// *ObjectSchema into the callback (pointer identity), and
 // Required/Nullable/Description/Examples called INSIDE the callback vs.
 // chained OUTSIDE it (on Object(fn)'s own return value) mutate the exact
 // same *PropertyBuilder either way -- all reachable purely through root
-// aliases, no internal/metadata import.
-func TestObjectMetadata_RootAlias_TypeCheck(t *testing.T) {
+// aliases, no internal/schema import.
+func TestObjectSchema_RootAlias_TypeCheck(t *testing.T) {
 	type entity struct {
 		Inside  map[string]any
 		Outside map[string]any
 	}
 
-	var insideIdentity *ObjectMetadata
-	m := NewMetadata[entity](func(t *entity, m *Metadata) {
-		om := m.Property(&t.Inside).Object(func(m *ObjectMetadata) {
+	var insideIdentity *ObjectSchema
+	m := NewSchema[entity](func(t *entity, m *Schema) {
+		om := m.Property(&t.Inside).Object(func(m *ObjectSchema) {
 			insideIdentity = m
 			m.AdditionalProperties()
 			m.Required()
 			m.Description("Inside")
 			m.Examples("a", "b")
 		})
-		var _ *ObjectMetadata = om
+		var _ *ObjectSchema = om
 
-		m.Property(&t.Outside).Object(func(m *ObjectMetadata) {
+		m.Property(&t.Outside).Object(func(m *ObjectSchema) {
 			m.AdditionalProperties()
 		}).Required().Description("Outside").Examples("c", "d")
 	})
 	if m == nil {
-		t.Fatal("NewMetadata() returned nil *Metadata")
+		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if insideIdentity == nil {
 		t.Fatal("Object(fn) callback never invoked")
@@ -1919,7 +1919,7 @@ func TestObjectMetadata_RootAlias_TypeCheck(t *testing.T) {
 	// Both fields must produce IDENTICAL results regardless of whether
 	// Required/Description/Examples were called inside the callback or
 	// chained outside it -- proving there is no dual-scope distinction
-	// the way there is for ArrayMetadata.
+	// the way there is for ArraySchema.
 	for name, p := range map[string]*PropertyBuilder{"Inside": inside, "Outside": outside} {
 		if p.FormatValue() != "object" {
 			t.Fatalf("%s: FormatValue() = %q, want %q", name, p.FormatValue(), "object")
@@ -1944,16 +1944,16 @@ func TestObjectMetadata_RootAlias_TypeCheck(t *testing.T) {
 	}
 }
 
-// TestObjectMetadata_RootAlias_UserEntityInsightCallShape reproduces
-// INSIGHT.md's UserEntity.Address/Metadata example (lines ~488-499,
+// TestObjectSchema_RootAlias_UserEntityInsightCallShape reproduces
+// INSIGHT.md's UserEntity.Address/Schema example (lines ~488-499,
 // "exemplo de Array e Object aninhados") verbatim through the root gonest
-// package's NewMetadata/Metadata/PropertyBuilder/ObjectMetadata aliases --
+// package's NewSchema/Schema/PropertyBuilder/ObjectSchema aliases --
 // confirms both object shapes (a $ref-like reuse of an already-registered
-// gonest.NewMetadata[AddressEntity] via om.Metadata(ref), and a free-form
+// gonest.NewSchema[AddressEntity] via om.Schema(ref), and a free-form
 // open schema via om.AdditionalProperties() with Nullable/Description
 // chained outside the callback) resolve and behave correctly at the root
-// package, no internal/metadata import required.
-func TestObjectMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
+// package, no internal/schema import required.
+func TestObjectSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	type AddressEntity struct {
 		Street string `json:"street"`
 		City   string `json:"city"`
@@ -1961,32 +1961,32 @@ func TestObjectMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	}
 
 	type UserEntity struct {
-		Id       int64          `json:"id"`
-		Address  AddressEntity  `json:"address"`
-		Metadata map[string]any `json:"metadata"`
+		Id      int64          `json:"id"`
+		Address AddressEntity  `json:"address"`
+		Schema  map[string]any `json:"schema"`
 	}
 
-	addressMetadata := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+	addressSchema := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
 		m.Description("Endereço")
 		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
 		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	m := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário com campos aninhados")
 		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
 		// Object() direto (não-array) -- mesma reutilização via valor, sem reflect.
-		m.Property(&t.Address).Object(func(om *ObjectMetadata) {
-			om.Metadata(addressMetadata)
+		m.Property(&t.Address).Object(func(om *ObjectSchema) {
+			om.Schema(addressSchema)
 			om.Required()
 			om.Description("Endereço principal")
 		})
 
 		// Object() livre (schema aberto, tipo map[string]any) -- sem struct Go aninhada
-		// pra reusar, por isso recebe callback em vez de metadata já registrada.
-		m.Property(&t.Metadata).Object(func(om *ObjectMetadata) {
+		// pra reusar, por isso recebe callback em vez de schema já registrada.
+		m.Property(&t.Schema).Object(func(om *ObjectSchema) {
 			om.AdditionalProperties()
 		}).Nullable().Description("Metadados abertos do usuário")
 	})
@@ -2000,7 +2000,7 @@ func TestObjectMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		byName[p.Field().Name] = p
 	}
 
-	// Address: object referencing addressMetadata via Metadata(ref), same
+	// Address: object referencing addressSchema via Schema(ref), same
 	// pointer identity preserved, Required/Description set inside the callback.
 	address, ok := byName["Address"]
 	if !ok {
@@ -2016,20 +2016,20 @@ func TestObjectMetadata_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		t.Fatalf("Address: DescriptionText() = %q, want %q", address.DescriptionText(), "Endereço principal")
 	}
 
-	// Metadata: free-form object via AdditionalProperties() inside the
+	// Schema: free-form object via AdditionalProperties() inside the
 	// callback, Nullable/Description chained OUTSIDE on Object(fn)'s return.
-	meta, ok := byName["Metadata"]
+	meta, ok := byName["Schema"]
 	if !ok {
-		t.Fatal("Metadata was not registered via Property")
+		t.Fatal("Schema was not registered via Property")
 	}
 	if meta.FormatValue() != "object" {
-		t.Fatalf("Metadata: FormatValue() = %q, want %q", meta.FormatValue(), "object")
+		t.Fatalf("Schema: FormatValue() = %q, want %q", meta.FormatValue(), "object")
 	}
 	if !meta.IsNullable() {
-		t.Fatal("Metadata: IsNullable() = false, want true")
+		t.Fatal("Schema: IsNullable() = false, want true")
 	}
 	if meta.DescriptionText() != "Metadados abertos do usuário" {
-		t.Fatalf("Metadata: DescriptionText() = %q, want %q", meta.DescriptionText(), "Metadados abertos do usuário")
+		t.Fatalf("Schema: DescriptionText() = %q, want %q", meta.DescriptionText(), "Metadados abertos do usuário")
 	}
 }
 
@@ -2048,7 +2048,7 @@ type jsonBodyAddressEntity struct {
 // jsonBodyUserEntity mirrors INSIGHT.md's UserEntity, merging BOTH
 // "exemplo para definição de metadados em estruturas" (Id/Name/Email/
 // IsActive/CreatedAt/UpdatedAt/DeletedAt) and "exemplo de Array e Object
-// aninhados" (Tags/Scores/Addresses/Address/Metadata) into a single struct,
+// aninhados" (Tags/Scores/Addresses/Address/Schema) into a single struct,
 // as this task's T4 Done-when explicitly asks for ("incluindo Tags/
 // Addresses/Address aninhados").
 type jsonBodyUserEntity struct {
@@ -2063,22 +2063,22 @@ type jsonBodyUserEntity struct {
 	Scores    []int                   `json:"scores"`
 	Addresses []jsonBodyAddressEntity `json:"addresses"`
 	Address   jsonBodyAddressEntity   `json:"address"`
-	Metadata  map[string]any          `json:"metadata"`
+	Schema    map[string]any          `json:"schema"`
 }
 
-// jsonBodyAddressMetadata/jsonBodyUserMetadata register jsonBodyUserEntity's
-// full metadata exactly once (the registry panics on duplicate
+// jsonBodyAddressSchema/jsonBodyUserSchema register jsonBodyUserEntity's
+// full schema exactly once (the registry panics on duplicate
 // registration for the same reflect.Type -- T1), via a package-level init
-// mirroring INSIGHT.md's own top-level `var _ = gonest.NewMetadata[...]`
+// mirroring INSIGHT.md's own top-level `var _ = gonest.NewSchema[...]`
 // call shape.
-var jsonBodyAddressMetadata = NewMetadata[jsonBodyAddressEntity](func(t *jsonBodyAddressEntity, m *Metadata) {
+var jsonBodyAddressSchema = NewSchema[jsonBodyAddressEntity](func(t *jsonBodyAddressEntity, m *Schema) {
 	m.Description("Endereço")
 	m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 	m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
 	m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 })
 
-var jsonBodyUserMetadata = NewMetadata[jsonBodyUserEntity](func(t *jsonBodyUserEntity, m *Metadata) {
+var jsonBodyUserSchema = NewSchema[jsonBodyUserEntity](func(t *jsonBodyUserEntity, m *Schema) {
 	m.Description("Entidade de usuário com campos aninhados")
 	m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 	m.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
@@ -2088,34 +2088,34 @@ var jsonBodyUserMetadata = NewMetadata[jsonBodyUserEntity](func(t *jsonBodyUserE
 	m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
 	m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
 
-	m.Property(&t.Tags).Array().Items(func(m *ArrayMetadata) {
+	m.Property(&t.Tags).Array().Items(func(m *ArraySchema) {
 		m.String().Min(1).Max(50)
 		m.Required()
 		m.Description("Tags do usuário")
 		m.Examples("admin", "beta")
 	})
 
-	m.Property(&t.Scores).Array().Items(func(m *ArrayMetadata) {
+	m.Property(&t.Scores).Array().Items(func(m *ArraySchema) {
 		m.Integer().Min(0).Max(100)
 		m.Required()
 		m.Description("Notas do usuário")
 		m.Examples(80, 95)
 	})
 
-	m.Property(&t.Addresses).Array().Items(func(m *ArrayMetadata) {
-		m.Object(jsonBodyAddressMetadata)
+	m.Property(&t.Addresses).Array().Items(func(m *ArraySchema) {
+		m.Object(jsonBodyAddressSchema)
 		m.Required()
 		m.Min(1)
 		m.Description("Endereços do usuário")
 	})
 
-	m.Property(&t.Address).Object(func(om *ObjectMetadata) {
-		om.Metadata(jsonBodyAddressMetadata)
+	m.Property(&t.Address).Object(func(om *ObjectSchema) {
+		om.Schema(jsonBodyAddressSchema)
 		om.Required()
 		om.Description("Endereço principal")
 	})
 
-	m.Property(&t.Metadata).Object(func(om *ObjectMetadata) {
+	m.Property(&t.Schema).Object(func(om *ObjectSchema) {
 		om.AdditionalProperties()
 	}).Nullable().Description("Metadados abertos do usuário")
 })
@@ -2123,7 +2123,7 @@ var jsonBodyUserMetadata = NewMetadata[jsonBodyUserEntity](func(t *jsonBodyUserE
 // TestMustJsonBody_RootAlias_UserEntityInsightCallShape proves
 // gonest.MustJsonBody[*jsonBodyUserEntity] resolves and works end-to-end
 // through the root gonest package, reproducing INSIGHT.md's full UserEntity
-// shape (both metadata-definition sections combined) via REAL HTTP dispatch
+// shape (both schema-definition sections combined) via REAL HTTP dispatch
 // (app.Test, same pattern as every other *_RootAlias_InsightCallShape test
 // in this file): one happy-path case (fully valid body, handler receives a
 // correctly populated value, response reflects it) and one multi-violation
@@ -2176,7 +2176,7 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 			"address": map[string]any{
 				"street": "Rua A, 123", "city": "São Paulo", "zip": "01310-100",
 			},
-			"metadata": map[string]any{"source": "insight"},
+			"schema": map[string]any{"source": "insight"},
 		}
 		raw, err := json.Marshal(payload)
 		if err != nil {
@@ -2361,7 +2361,7 @@ func TestNewOpenApiDocument_RootAlias_InsightBootstrapExample(t *testing.T) {
 }
 
 // TestGenerateOpenApiSchema_RootAlias_InsightExample reproduces INSIGHT.md's
-// settled "Schema Generation from Metadata" example (UserEntity/AddressEntity,
+// settled "Schema Generation from Schema" example (UserEntity/AddressEntity,
 // Controller.Tags/BearerAuth, Route.Summary/RequestBody/Response/PathParams/
 // ExcludeFromDocs) entirely through root gonest aliases, then confirms
 // GenerateOpenApiSchema(app, doc) produces the expected paths/
@@ -2384,24 +2384,24 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		Addresses []AddressEntity
 	}
 
-	addressMetadata := NewMetadata[AddressEntity](func(t *AddressEntity, m *Metadata) {
+	addressSchema := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
 		m.Property(&t.City).String().Required()
 		m.Property(&t.Zip).String().Required()
 	})
 
-	userIdParamsMetadata := NewMetadata[UserIdParams](func(t *UserIdParams, m *Metadata) {
+	userIdParamsSchema := NewSchema[UserIdParams](func(t *UserIdParams, m *Schema) {
 		m.Property(&t.UserId).String().Required()
 	})
 
-	userEntityMetadata := NewMetadata[UserEntity](func(t *UserEntity, m *Metadata) {
+	userEntitySchema := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
 		m.Title("UserEntity")
 		m.Property(&t.Id).String().Required()
 		m.Property(&t.Name).String().Required()
-		m.Property(&t.Address).Object(func(om *ObjectMetadata) {
-			om.Metadata(addressMetadata)
+		m.Property(&t.Address).Object(func(om *ObjectSchema) {
+			om.Schema(addressSchema)
 		}).Required()
-		m.Property(&t.Addresses).Array().Items(func(am *ArrayMetadata) {
-			am.Object(addressMetadata)
+		m.Property(&t.Addresses).Array().Items(func(am *ArraySchema) {
+			am.Object(addressSchema)
 		})
 	})
 
@@ -2412,8 +2412,8 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 
 		c.Route(route.HttpGet, "/:user_id", func(r *Route) {
 			r.Summary("Busca um usuario por ID")
-			r.PathParams(userIdParamsMetadata)
-			r.Response(http.StatusOK, userEntityMetadata)
+			r.PathParams(userIdParamsSchema)
+			r.Response(http.StatusOK, userEntitySchema)
 			r.Response(http.StatusNotFound)
 			r.HttpCode(http.StatusOK)
 			r.Handler(func(ctx *execution.Context) {
@@ -2798,7 +2798,7 @@ type insightTestUserIDParam struct {
 	ID int64 `param:"id"`
 }
 
-var insightTestUserIDParamMetadata = NewMetadata[insightTestUserIDParam](func(t *insightTestUserIDParam, m *Metadata) {
+var insightTestUserIDParamSchema = NewSchema[insightTestUserIDParam](func(t *insightTestUserIDParam, m *Schema) {
 	m.Property(&t.ID).Integer().Required()
 })
 

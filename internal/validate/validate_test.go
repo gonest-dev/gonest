@@ -13,7 +13,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // --- fixtures -----------------------------------------------------------
@@ -23,7 +23,7 @@ import (
 // full reproduction (that's T4's job), but enough to cover: a Required
 // string, a Required numeric with Min/Max, a Boolean, an Array of strings
 // with item Min/Max, an Array quantity Min, an Object via a nested
-// *Metadata ref, and an AdditionalProperties open object.
+// *Schema ref, and an AdditionalProperties open object.
 
 // AddressEntity mirrors INSIGHT.md's AddressEntity.
 type AddressEntity struct {
@@ -33,7 +33,7 @@ type AddressEntity struct {
 }
 
 // UserProperties mirrors INSIGHT.md's UserEntity (trimmed) -- used across
-// most tests in this file. Each test that needs its OWN metadata
+// most tests in this file. Each test that needs its OWN schema
 // registration builds a fresh anonymous struct type instead (registry
 // panics on duplicate registration for the same type), so UserProperties
 // itself is registered exactly ONCE, in TestMain-equivalent init below.
@@ -46,42 +46,42 @@ type UserProperties struct {
 	Tags      []string        `json:"tags"`
 	Addresses []AddressEntity `json:"addresses"`
 	Address   AddressEntity   `json:"address"`
-	Metadata  map[string]any  `json:"metadata"`
+	Schema    map[string]any  `json:"schema"`
 }
 
-var addressMetadata *metadata.Metadata
+var addressSchema *schema.Schema
 
 func init() {
-	// addressMetadata built via metadata.New directly (not through the
-	// generic NewMetadata[T] root wrapper, which lives in gonest.go and
+	// addressSchema built via schema.New directly (not through the
+	// generic NewSchema[T] root wrapper, which lives in gonest.go and
 	// would create an import cycle from this internal package back to the
-	// root) -- same low-level construction internal/metadata's own tests use
-	// (see registry_test.go's own metadata.New(typ, uintptr(unsafe.Pointer(zero))) pattern).
+	// root) -- same low-level construction internal/schema's own tests use
+	// (see registry_test.go's own schema.New(typ, uintptr(unsafe.Pointer(zero))) pattern).
 	addr := &AddressEntity{}
-	addressMetadata = metadata.New(reflect.TypeOf(*addr), uintptr(unsafe.Pointer(addr)))
-	addressMetadata.Property(&addr.Street).String().Required()
-	addressMetadata.Property(&addr.City).String().Required()
-	addressMetadata.Property(&addr.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`)
+	addressSchema = schema.New(reflect.TypeOf(*addr), uintptr(unsafe.Pointer(addr)))
+	addressSchema.Property(&addr.Street).String().Required()
+	addressSchema.Property(&addr.City).String().Required()
+	addressSchema.Property(&addr.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`)
 
 	u := &UserProperties{}
-	userMetadata := metadata.New(reflect.TypeOf(*u), uintptr(unsafe.Pointer(u)))
-	userMetadata.Property(&u.Id).Integer().Required()
-	userMetadata.Property(&u.Name).String().Required().Min(1).Max(50)
-	userMetadata.Property(&u.Age).Integer().Required().Min(0).Max(130)
-	userMetadata.Property(&u.IsActive).Boolean().Required()
-	userMetadata.Property(&u.Nickname).String().Nullable()
-	userMetadata.Property(&u.Tags).Array().Items(func(m *metadata.ArrayMetadata) {
+	userSchema := schema.New(reflect.TypeOf(*u), uintptr(unsafe.Pointer(u)))
+	userSchema.Property(&u.Id).Integer().Required()
+	userSchema.Property(&u.Name).String().Required().Min(1).Max(50)
+	userSchema.Property(&u.Age).Integer().Required().Min(0).Max(130)
+	userSchema.Property(&u.IsActive).Boolean().Required()
+	userSchema.Property(&u.Nickname).String().Nullable()
+	userSchema.Property(&u.Tags).Array().Items(func(m *schema.ArraySchema) {
 		m.String().Min(1).Max(50)
 	})
-	userMetadata.Property(&u.Addresses).Array().Items(func(m *metadata.ArrayMetadata) {
-		m.Object(addressMetadata)
+	userSchema.Property(&u.Addresses).Array().Items(func(m *schema.ArraySchema) {
+		m.Object(addressSchema)
 		m.Min(1)
 	})
-	userMetadata.Property(&u.Address).Object(func(om *metadata.ObjectMetadata) {
-		om.Metadata(addressMetadata)
+	userSchema.Property(&u.Address).Object(func(om *schema.ObjectSchema) {
+		om.Schema(addressSchema)
 		om.Required()
 	})
-	userMetadata.Property(&u.Metadata).Object(func(om *metadata.ObjectMetadata) {
+	userSchema.Property(&u.Schema).Object(func(om *schema.ObjectSchema) {
 		om.AdditionalProperties()
 	}).Nullable()
 }
@@ -149,7 +149,7 @@ func validBody() []byte {
 		"address": map[string]any{
 			"street": "Rua B, 456", "city": "Rio de Janeiro", "zip": "22000-000",
 		},
-		"metadata": map[string]any{"any": "thing"},
+		"schema": map[string]any{"any": "thing"},
 	})
 	return b
 }
@@ -358,9 +358,9 @@ type NullableRequiredFixture struct {
 	Nickname *string `json:"nickname"`
 }
 
-var nullableRequiredFixtureMetadata = func() *metadata.Metadata {
+var nullableRequiredFixtureSchema = func() *schema.Schema {
 	f := &NullableRequiredFixture{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Nickname).String().Required().Nullable()
 	return m
 }()
@@ -393,9 +393,9 @@ type RequiredNotNullableFixture struct {
 	Name string `json:"name"`
 }
 
-var requiredNotNullableFixtureMetadata = func() *metadata.Metadata {
+var requiredNotNullableFixtureSchema = func() *schema.Schema {
 	f := &RequiredNotNullableFixture{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Name).String().Required()
 	return m
 }()
@@ -499,7 +499,7 @@ func TestMustJsonBody_AdditionalProperties_NoStructuralValidation(t *testing.T) 
 		"address": map[string]any{
 			"street": "Rua B, 456", "city": "Rio de Janeiro", "zip": "22000-000",
 		},
-		"metadata": map[string]any{"whatever": 123, "nested": map[string]any{"x": true}},
+		"schema": map[string]any{"whatever": 123, "nested": map[string]any{"x": true}},
 	})
 	ctx := newCtx(body)
 
@@ -555,7 +555,7 @@ func TestMustJsonBody_UnregisteredType_PanicsBeforeTouchingBody(t *testing.T) {
 			t.Fatal("expected panic, got none")
 		}
 		if _, ok := r.(*exception.BadRequestException); ok {
-			t.Fatal("expected a plain string panic about missing metadata, not a BadRequestException (proves body was never touched)")
+			t.Fatal("expected a plain string panic about missing schema, not a BadRequestException (proves body was never touched)")
 		}
 	}()
 

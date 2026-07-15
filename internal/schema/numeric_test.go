@@ -1,11 +1,11 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // numericBoolEntity exercises all 4 numeric-family branches plus Boolean on
@@ -21,43 +21,43 @@ type numericBoolEntity struct {
 	IsActive bool
 }
 
-// newNumericTestMetadata mirrors metadata_test.go's own newTestMetadata /
-// string_test.go's newStringTestMetadata helper (same pattern: construct a
-// zero value, keep it alive via the returned pointer, build *Metadata from
+// newNumericTestSchema mirrors schema_test.go's own newTestSchema /
+// string_test.go's newStringTestSchema helper (same pattern: construct a
+// zero value, keep it alive via the returned pointer, build *Schema from
 // its address).
-func newNumericTestMetadata(t *testing.T) (*numericBoolEntity, *metadata.Metadata) {
+func newNumericTestSchema(t *testing.T) (*numericBoolEntity, *schema.Schema) {
 	t.Helper()
 	zero := &numericBoolEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
 // TestNumericFamilyBranches_SetsCorrectFormat proves EACH of the 4 numeric
-// branch methods returns a *NumericMetadata carrying its own correct OpenAPI
+// branch methods returns a *NumericSchema carrying its own correct OpenAPI
 // format string (spec.md AC1 / NUM-01) -- individually verified, not
 // sampled.
 func TestNumericFamilyBranches_SetsCorrectFormat(t *testing.T) {
 	tests := []struct {
 		name       string
-		call       func(*metadata.PropertyBuilder) *metadata.NumericMetadata
+		call       func(*schema.PropertyBuilder) *schema.NumericSchema
 		wantFormat string
 	}{
-		{"Integer", (*metadata.PropertyBuilder).Integer, "int64"},
-		{"Int32", (*metadata.PropertyBuilder).Int32, "int32"},
-		{"Float", (*metadata.PropertyBuilder).Float, "float"},
-		{"Double", (*metadata.PropertyBuilder).Double, "double"},
+		{"Integer", (*schema.PropertyBuilder).Integer, "int64"},
+		{"Int32", (*schema.PropertyBuilder).Int32, "int32"},
+		{"Float", (*schema.PropertyBuilder).Float, "float"},
+		{"Double", (*schema.PropertyBuilder).Double, "double"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zero, m := newNumericTestMetadata(t)
+			zero, m := newNumericTestSchema(t)
 			pb := m.Property(&zero.Id)
 
 			nm := tt.call(pb)
 			if nm == nil {
-				t.Fatalf("%s() returned nil *NumericMetadata", tt.name)
+				t.Fatalf("%s() returned nil *NumericSchema", tt.name)
 			}
 			if nm.FormatValue() != tt.wantFormat {
 				t.Errorf("%s().FormatValue() = %q, want %q", tt.name, nm.FormatValue(), tt.wantFormat)
@@ -71,17 +71,17 @@ func TestNumericFamilyBranches_SetsCorrectFormat(t *testing.T) {
 	}
 }
 
-// TestNumericMetadata_MinMaxChainAndStoreCorrectly proves Min/Max each store
-// their value and each returns the SAME *NumericMetadata, exercised as a
+// TestNumericSchema_MinMaxChainAndStoreCorrectly proves Min/Max each store
+// their value and each returns the SAME *NumericSchema, exercised as a
 // genuine single-expression chain (spec.md AC2 / NUM-02).
-func TestNumericMetadata_MinMaxChainAndStoreCorrectly(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+func TestNumericSchema_MinMaxChainAndStoreCorrectly(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
 
 	nm := m.Property(&zero.Id).Integer()
 	got := nm.Min(0).Max(100)
 
 	if got != nm {
-		t.Fatal("Min/Max chain did not return the same *NumericMetadata")
+		t.Fatal("Min/Max chain did not return the same *NumericSchema")
 	}
 
 	minVal, minOk := nm.MinValue()
@@ -94,10 +94,10 @@ func TestNumericMetadata_MinMaxChainAndStoreCorrectly(t *testing.T) {
 	}
 }
 
-// TestNumericMetadata_MinMaxDefaultUnset proves MinValue/MaxValue report
+// TestNumericSchema_MinMaxDefaultUnset proves MinValue/MaxValue report
 // (0, false) when never called, distinguishing "never set" from "set to 0".
-func TestNumericMetadata_MinMaxDefaultUnset(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+func TestNumericSchema_MinMaxDefaultUnset(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
 
 	nm := m.Property(&zero.Id).Integer()
 
@@ -109,35 +109,35 @@ func TestNumericMetadata_MinMaxDefaultUnset(t *testing.T) {
 	}
 }
 
-// TestNumericMetadata_CommonConstraintsMutateSharedBuilderAndStayChainable is
+// TestNumericSchema_CommonConstraintsMutateSharedBuilderAndStayChainable is
 // the MOST CRITICAL test (per the task's own instructions): proves Required/
-// Nullable/Description/Examples called ON *NumericMetadata (a) mutate the
+// Nullable/Description/Examples called ON *NumericSchema (a) mutate the
 // SAME shared PropertyBuilder (visible via ITS OWN getters, inherited via
-// embedding) and (b) still return *NumericMetadata, not *PropertyBuilder --
+// embedding) and (b) still return *NumericSchema, not *PropertyBuilder --
 // proven by chaining .Required().Min(5) in a SINGLE expression. If Required()
 // returned *PropertyBuilder, this line would fail to COMPILE (no Min method
 // on PropertyBuilder), so a successful compile+pass IS the proof (spec.md
 // AC3 / NUM-03).
-func TestNumericMetadata_CommonConstraintsMutateSharedBuilderAndStayChainable(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+func TestNumericSchema_CommonConstraintsMutateSharedBuilderAndStayChainable(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
 
 	nm := m.Property(&zero.Id).Integer()
 
-	// The critical line: .Required() must return *NumericMetadata so .Min()
+	// The critical line: .Required() must return *NumericSchema so .Min()
 	// can chain immediately after in the SAME expression.
 	got := nm.Required().Min(5).Nullable().Description("ID do usuário").Examples(int64(1))
 
 	if got != nm {
-		t.Fatal("Required().Min(5)... chain did not return the same *NumericMetadata")
+		t.Fatal("Required().Min(5)... chain did not return the same *NumericSchema")
 	}
 
 	// Base-4 constraints are visible via PropertyBuilder's OWN getters
 	// (inherited through embedding), proving shared-storage, not a copy.
 	if !nm.IsRequired() {
-		t.Error("IsRequired() = false, want true after NumericMetadata.Required()")
+		t.Error("IsRequired() = false, want true after NumericSchema.Required()")
 	}
 	if !nm.IsNullable() {
-		t.Error("IsNullable() = false, want true after NumericMetadata.Nullable()")
+		t.Error("IsNullable() = false, want true after NumericSchema.Nullable()")
 	}
 	if nm.DescriptionText() != "ID do usuário" {
 		t.Errorf("DescriptionText() = %q, want %q", nm.DescriptionText(), "ID do usuário")
@@ -154,10 +154,10 @@ func TestNumericMetadata_CommonConstraintsMutateSharedBuilderAndStayChainable(t 
 	}
 }
 
-// TestNumericMetadata_InsightIdChain verifies INSIGHT.md's Id chain
+// TestNumericSchema_InsightIdChain verifies INSIGHT.md's Id chain
 // end-to-end, all values checked.
-func TestNumericMetadata_InsightIdChain(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+func TestNumericSchema_InsightIdChain(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
 
 	nm := m.Property(&zero.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
@@ -180,7 +180,7 @@ func TestNumericMetadata_InsightIdChain(t *testing.T) {
 // *PropertyBuilder value (identity, not a copy or a new wrapper type) --
 // spec.md AC4 / NUM-04, the feature's genuinely new architectural claim.
 func TestBoolean_ReturnsSamePropertyBuilder(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+	zero, m := newNumericTestSchema(t)
 
 	pb := m.Property(&zero.IsActive)
 	got := pb.Boolean()
@@ -198,7 +198,7 @@ func TestBoolean_ReturnsSamePropertyBuilder(t *testing.T) {
 // it IS *PropertyBuilder, but spec.md's Independent Test demands this be
 // proven explicitly, not just assumed, as the FIRST branch with no wrapper.
 func TestBoolean_CommonConstraintsWork(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+	zero, m := newNumericTestSchema(t)
 
 	pb := m.Property(&zero.IsActive).Boolean().Required().Nullable().Description("Status do usuário").Examples(true)
 
@@ -217,11 +217,11 @@ func TestBoolean_CommonConstraintsWork(t *testing.T) {
 	}
 }
 
-// TestNumericMetadata_InsightIsActiveChain verifies INSIGHT.md's IsActive
+// TestNumericSchema_InsightIsActiveChain verifies INSIGHT.md's IsActive
 // chain end-to-end, all values checked, using Boolean() directly (mirrors
-// TestNumericMetadata_InsightIdChain's Integer() equivalent).
-func TestNumericMetadata_InsightIsActiveChain(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+// TestNumericSchema_InsightIdChain's Integer() equivalent).
+func TestNumericSchema_InsightIsActiveChain(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
 
 	pb := m.Property(&zero.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
 
@@ -245,7 +245,7 @@ func TestNumericMetadata_InsightIsActiveChain(t *testing.T) {
 // FormatValue reflects the LAST call (design.md's Error Handling Strategy:
 // "last-write-wins, no panic").
 func TestNumericFamilyBranches_CalledTwiceLastWins(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+	zero, m := newNumericTestSchema(t)
 
 	pb := m.Property(&zero.Id)
 
@@ -274,7 +274,7 @@ func TestNumericFamilyBranches_CalledTwiceLastWins(t *testing.T) {
 // FormatValue reflects the LAST call -- spec.md's Edge Cases: "no
 // cross-branch-family special-casing".
 func TestIntegerThenBoolean_NoPanicLastWins(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+	zero, m := newNumericTestSchema(t)
 
 	pb := m.Property(&zero.Id)
 
@@ -296,7 +296,7 @@ func TestIntegerThenBoolean_NoPanicLastWins(t *testing.T) {
 // TestIntegerThenBoolean_NoPanicLastWins: Boolean() first, then Integer(),
 // proving FormatValue ends up "int64", no panic either direction.
 func TestBooleanThenInteger_NoPanicLastWins(t *testing.T) {
-	zero, m := newNumericTestMetadata(t)
+	zero, m := newNumericTestSchema(t)
 
 	pb := m.Property(&zero.Id)
 

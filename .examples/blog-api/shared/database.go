@@ -56,15 +56,15 @@ func openDB() *sql.DB {
 	return db
 }
 
-// DBProvider resolves the single shared *sql.DB every domain module's own
+// DatabaseProvider resolves the single shared *sql.DB every domain module's own
 // Provider depends on.
-var DBProvider = gonest.NewProvider(func(provider *gonest.Provider) {
+var DatabaseProvider = gonest.NewProvider(func(provider *gonest.Provider) {
 	provider.Constructor(func() *sql.DB { return openDB() })
 })
 
-// DBModule owns DBProvider and exports it so user/post/comment's own
+// DatabaseModule owns DBProvider and exports it so user/post/comment's own
 // modules can import it.
-var DBModule = gonest.NewModule(func(module *gonest.Module) {
-	module.Providers(DBProvider)
-	module.Exports(DBProvider)
+var DatabaseModule = gonest.NewModule(func(module *gonest.Module) {
+	module.Providers(DatabaseProvider)
+	module.Exports(DatabaseProvider)
 })

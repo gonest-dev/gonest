@@ -1,4 +1,4 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
@@ -6,11 +6,11 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // registryUserEntity is a type PRIVATE to this test file (distinct
-// reflect.Type from userEntity in metadata_test.go and every other type
+// reflect.Type from userEntity in schema_test.go and every other type
 // used elsewhere in this package's test suite) -- necessary because
 // Register panics on duplicate registration of the SAME type, and this
 // file's own tests each register their own single-use types to stay
@@ -21,7 +21,7 @@ type registryUserEntity struct {
 }
 
 // TestRegister_RecoverableViaLookup proves the core round-trip: a type
-// registered via New (NewMetadata[T]'s internal call) is recoverable via
+// registered via New (NewSchema[T]'s internal call) is recoverable via
 // Lookup, keyed by reflect.Type (spec.md JV-01/AC1).
 func TestRegister_RecoverableViaLookup(t *testing.T) {
 	type localEntity struct {
@@ -29,24 +29,24 @@ func TestRegister_RecoverableViaLookup(t *testing.T) {
 	}
 	zero := &localEntity{}
 	typ := reflect.TypeOf(*zero)
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 
-	got, ok := metadata.Lookup(typ)
+	got, ok := schema.Lookup(typ)
 	if !ok {
 		t.Fatalf("Lookup(%v) ok = false, want true", typ)
 	}
 	if got != m {
-		t.Fatalf("Lookup(%v) = %p, want %p (same *Metadata New returned)", typ, got, m)
+		t.Fatalf("Lookup(%v) = %p, want %p (same *Schema New returned)", typ, got, m)
 	}
 }
 
-// TestNew_CalledTwiceForSameType_Panics proves one metadata declaration per
+// TestNew_CalledTwiceForSameType_Panics proves one schema declaration per
 // type is enforced (spec.md JV-01/AC2), same precedent as Property's own
 // double-registration panic.
 func TestNew_CalledTwiceForSameType_Panics(t *testing.T) {
 	zero := &registryUserEntity{}
 	typ := reflect.TypeOf(*zero)
-	metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	schema.New(typ, uintptr(unsafe.Pointer(zero)))
 
 	defer func() {
 		r := recover()
@@ -54,7 +54,7 @@ func TestNew_CalledTwiceForSameType_Panics(t *testing.T) {
 			t.Fatal("expected New to panic on second registration for the same type, it did not")
 		}
 	}()
-	metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	schema.New(typ, uintptr(unsafe.Pointer(zero)))
 }
 
 // TestLookup_NeverRegisteredType_ReturnsFalseNoPanic proves an unregistered
@@ -66,7 +66,7 @@ func TestLookup_NeverRegisteredType_ReturnsFalseNoPanic(t *testing.T) {
 	}
 	typ := reflect.TypeOf(neverRegisteredEntity{})
 
-	got, ok := metadata.Lookup(typ)
+	got, ok := schema.Lookup(typ)
 	if ok {
 		t.Fatalf("Lookup(%v) ok = true, want false (never registered)", typ)
 	}
@@ -99,14 +99,14 @@ func TestRegister_ConcurrentDistinctTypes_NoRace(t *testing.T) {
 			v := reflect.ValueOf(zero).Elem()
 			typ := v.Type()
 			addr := v.Addr().Pointer()
-			metadata.New(typ, addr)
+			schema.New(typ, addr)
 		}(z)
 	}
 	wg.Wait()
 
 	for _, z := range zeros {
 		typ := reflect.ValueOf(z).Elem().Type()
-		if _, ok := metadata.Lookup(typ); !ok {
+		if _, ok := schema.Lookup(typ); !ok {
 			t.Errorf("Lookup(%v) ok = false after concurrent registration, want true", typ)
 		}
 	}

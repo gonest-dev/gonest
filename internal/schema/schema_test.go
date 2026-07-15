@@ -1,4 +1,4 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
@@ -6,7 +6,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // userEntity reproduces INSIGHT.md's 7-field UserEntity example verbatim
@@ -23,19 +23,19 @@ type userEntity struct {
 	DeletedAt *time.Time
 }
 
-// newTestMetadata simulates what T2's NewMetadata[T] wrapper (root package,
+// newTestSchema simulates what T2's NewSchema[T] wrapper (root package,
 // out of scope for this task) will do: construct a zero value, take its
-// address as baseAddr, build a *Metadata for it. zero is returned alongside
+// address as baseAddr, build a *Schema for it. zero is returned alongside
 // m so the caller can keep it alive/addressable for the whole test -- taking
 // &zero's field addresses after this helper returns is safe because Go's
 // escape analysis moves zero to the heap the moment its address is taken and
 // handed outside this function's frame (via the returned pointer).
-func newTestMetadata(t *testing.T) (*userEntity, *metadata.Metadata) {
+func newTestSchema(t *testing.T) (*userEntity, *schema.Schema) {
 	t.Helper()
 	zero := &userEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
@@ -46,7 +46,7 @@ func newTestMetadata(t *testing.T) (*userEntity, *metadata.Metadata) {
 // design.md's Tech Decisions table flags as "not independently re-verified
 // this session" -- this test IS that verification.
 func TestProperty_IdentifiesEachFieldCorrectly(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	tests := []struct {
 		name     string
@@ -83,7 +83,7 @@ func TestProperty_IdentifiesEachFieldCorrectly(t *testing.T) {
 // specific failure mode design.md's offset technique could produce if
 // offsets were computed or compared incorrectly.
 func TestProperty_DoesNotSwapNeighboringFields(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	namePb := m.Property(&zero.Name)
 	emailPb := m.Property(&zero.Email)
@@ -103,7 +103,7 @@ func TestProperty_DoesNotSwapNeighboringFields(t *testing.T) {
 // given a pointer that does not belong to the type passed to New (spec.md
 // AC3 / MDR-03) -- e.g. a wholly unrelated local variable's address.
 func TestProperty_ForeignPointerPanics(t *testing.T) {
-	_, m := newTestMetadata(t)
+	_, m := newTestSchema(t)
 
 	var unrelated int64 = 42
 
@@ -121,7 +121,7 @@ func TestProperty_ForeignPointerPanics(t *testing.T) {
 // Strategy: panic chosen over silent merge, since merge semantics are
 // ambiguous and INSIGHT.md never demonstrates this case).
 func TestProperty_DuplicateRegistrationPanics(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	m.Property(&zero.Id)
 
@@ -139,7 +139,7 @@ func TestProperty_DuplicateRegistrationPanics(t *testing.T) {
 // *PropertyBuilder (chain continues), and the getters reflect exactly what
 // was set -- a real chained call, not four isolated calls.
 func TestPropertyBuilder_ChainStoresAllFourConstraints(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	pb := m.Property(&zero.Name)
 	got := pb.Required().Nullable().Description("the user's name").Examples("Alice", "Bob")
@@ -166,7 +166,7 @@ func TestPropertyBuilder_ChainStoresAllFourConstraints(t *testing.T) {
 // (before any setter call) reports false/empty/nil, not some hidden truthy
 // default.
 func TestPropertyBuilder_DefaultsAreZeroValue(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	pb := m.Property(&zero.Email)
 
@@ -189,7 +189,7 @@ func TestPropertyBuilder_DefaultsAreZeroValue(t *testing.T) {
 // state (same mutate-then-recheck pattern as Controller.OwnMiddleware's own
 // test).
 func TestPropertyBuilder_ExamplesListReturnsDefensiveCopy(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	pb := m.Property(&zero.Id).Examples(1, 2, 3)
 
@@ -202,22 +202,22 @@ func TestPropertyBuilder_ExamplesListReturnsDefensiveCopy(t *testing.T) {
 	}
 }
 
-// TestMetadata_DescriptionIsDistinctFromFieldDescription proves
-// Metadata.Description (whole-type) is stored/retrieved independently from
+// TestSchema_DescriptionIsDistinctFromFieldDescription proves
+// Schema.Description (whole-type) is stored/retrieved independently from
 // any individual PropertyBuilder's own Description (spec.md AC5 / MDR-05).
-func TestMetadata_DescriptionIsDistinctFromFieldDescription(t *testing.T) {
-	zero, m := newTestMetadata(t)
+func TestSchema_DescriptionIsDistinctFromFieldDescription(t *testing.T) {
+	zero, m := newTestSchema(t)
 
 	got := m.Description("Entidade de usuário")
 	if got != m {
-		t.Fatal("Metadata.Description did not return the same *Metadata for chaining")
+		t.Fatal("Schema.Description did not return the same *Schema for chaining")
 	}
 
 	pb := m.Property(&zero.Name)
 	pb.Description("the user's name")
 
 	if m.DescriptionText() != "Entidade de usuário" {
-		t.Errorf("Metadata.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
+		t.Errorf("Schema.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
 	}
 	if pb.DescriptionText() != "the user's name" {
 		t.Errorf("PropertyBuilder.DescriptionText() = %q, want %q", pb.DescriptionText(), "the user's name")
@@ -226,29 +226,29 @@ func TestMetadata_DescriptionIsDistinctFromFieldDescription(t *testing.T) {
 	// Setting the field's description must not retroactively affect the
 	// type-level description already set above.
 	if m.DescriptionText() == pb.DescriptionText() {
-		t.Fatal("Metadata-level and field-level Description got conflated")
+		t.Fatal("Schema-level and field-level Description got conflated")
 	}
 }
 
-// TestMetadata_DescriptionDefaultsEmpty proves DescriptionText returns ""
-// before Description is ever called on a fresh Metadata.
-func TestMetadata_DescriptionDefaultsEmpty(t *testing.T) {
-	_, m := newTestMetadata(t)
+// TestSchema_DescriptionDefaultsEmpty proves DescriptionText returns ""
+// before Description is ever called on a fresh Schema.
+func TestSchema_DescriptionDefaultsEmpty(t *testing.T) {
+	_, m := newTestSchema(t)
 
 	if m.DescriptionText() != "" {
 		t.Errorf("DescriptionText() = %q, want \"\" before Description() was ever called", m.DescriptionText())
 	}
 }
 
-// TestMetadata_TitleStoresAndReturnsSelf proves Metadata.Title sets the
+// TestSchema_TitleStoresAndReturnsSelf proves Schema.Title sets the
 // whole-type title (same tier as Description, sibling field, not a
 // PropertyBuilder field) and returns m so calls can chain.
-func TestMetadata_TitleStoresAndReturnsSelf(t *testing.T) {
-	_, m := newTestMetadata(t)
+func TestSchema_TitleStoresAndReturnsSelf(t *testing.T) {
+	_, m := newTestSchema(t)
 
 	got := m.Title("UserEntity")
 	if got != m {
-		t.Fatal("Metadata.Title did not return the same *Metadata for chaining")
+		t.Fatal("Schema.Title did not return the same *Schema for chaining")
 	}
 
 	if m.TitleText() != "UserEntity" {
@@ -256,11 +256,11 @@ func TestMetadata_TitleStoresAndReturnsSelf(t *testing.T) {
 	}
 }
 
-// TestMetadata_TitleDefaultsEmpty proves TitleText returns "" before Title is
-// ever called on a fresh Metadata (spec.md AC1 -- caller falls back to the Go
-// type name, generator's job, not Metadata's).
-func TestMetadata_TitleDefaultsEmpty(t *testing.T) {
-	_, m := newTestMetadata(t)
+// TestSchema_TitleDefaultsEmpty proves TitleText returns "" before Title is
+// ever called on a fresh Schema (spec.md AC1 -- caller falls back to the Go
+// type name, generator's job, not Schema's).
+func TestSchema_TitleDefaultsEmpty(t *testing.T) {
+	_, m := newTestSchema(t)
 
 	if m.TitleText() != "" {
 		t.Errorf("TitleText() = %q, want \"\" before Title() was ever called", m.TitleText())
@@ -270,7 +270,7 @@ func TestMetadata_TitleDefaultsEmpty(t *testing.T) {
 // TestOwnProperties_ReturnsAllRegisteredFields proves OwnProperties returns
 // every PropertyBuilder registered via Property so far.
 func TestOwnProperties_ReturnsAllRegisteredFields(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	m.Property(&zero.Id)
 	m.Property(&zero.Name)
@@ -287,7 +287,7 @@ func TestOwnProperties_ReturnsAllRegisteredFields(t *testing.T) {
 // Module.OwnProviders): mutating the returned slice must not affect
 // subsequent calls' results.
 func TestOwnProperties_ReturnsCopyNotInternalSlice(t *testing.T) {
-	zero, m := newTestMetadata(t)
+	zero, m := newTestSchema(t)
 
 	idPb := m.Property(&zero.Id)
 	m.Property(&zero.Name)
@@ -314,5 +314,5 @@ func TestNew_NonStructTypePanics(t *testing.T) {
 			t.Fatal("expected panic for non-struct structType, got none")
 		}
 	}()
-	metadata.New(reflect.TypeOf(42), 0)
+	schema.New(reflect.TypeOf(42), 0)
 }

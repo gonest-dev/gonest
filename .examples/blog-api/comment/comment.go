@@ -21,10 +21,10 @@ type Entity struct {
 	Body   string `json:"body"`
 }
 
-// EntityMetadata registers Entity's own OpenAPI schema (components.schemas.
-// CommentEntity) -- see user.EntityMetadata's own doc comment for the same
+// EntitySchema registers Entity's own OpenAPI schema (components.schemas.
+// CommentEntity) -- see user.EntitySchema's own doc comment for the same
 // rationale.
-var EntityMetadata = gonest.NewMetadata[Entity](func(t *Entity, m *gonest.Metadata) {
+var EntitySchema = gonest.NewSchema[Entity](func(t *Entity, m *gonest.Schema) {
 	m.Title("CommentEntity")
 	m.Property(&t.ID).Integer().Required()
 	m.Property(&t.PostID).Integer().Required()
@@ -99,7 +99,7 @@ var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
 })
 
 var Module = gonest.NewModule(func(module *gonest.Module) {
-	module.Imports(shared.DBModule, user.Module, post.Module)
+	module.Imports(shared.DatabaseModule, user.Module, post.Module)
 	module.Providers(Provider)
 	module.Controllers(Controller)
 })

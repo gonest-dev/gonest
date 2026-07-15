@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // defaultHttpCode is the status code a Route uses when HttpCode is never
@@ -45,15 +45,15 @@ type Route struct {
 	bearerAuthValue bool
 	bearerAuthSet   bool
 
-	requestBody *metadata.Metadata
+	requestBody *schema.Schema
 	// responses maps status code -> documented body schema. A nil value
 	// means "documented, no body" (Response(status) called with zero
 	// variadic args) -- the KEY's mere presence distinguishes "documented"
 	// from "never documented at all" (spec.md AC3).
-	responses map[int]*metadata.Metadata
+	responses map[int]*schema.Schema
 
-	pathParams  *metadata.Metadata
-	queryParams *metadata.Metadata
+	pathParams  *schema.Schema
+	queryParams *schema.Schema
 
 	excluded   bool
 	deprecated bool
@@ -212,29 +212,29 @@ func (r *Route) HasBearerAuth() (bool, bool) {
 // RequestBody stores m as this Route's documented request body schema and
 // returns r so calls can chain. Calling RequestBody more than once
 // overwrites the previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) RequestBody(m *metadata.Metadata) *Route {
+func (r *Route) RequestBody(m *schema.Schema) *Route {
 	r.requestBody = m
 	return r
 }
 
-// RequestBodyMetadata returns the *metadata.Metadata set via RequestBody,
+// RequestBodySchema returns the *schema.Schema set via RequestBody,
 // and whether RequestBody was ever called -- the bool distinguishes "never
 // documented" from "documented".
-func (r *Route) RequestBodyMetadata() (*metadata.Metadata, bool) {
+func (r *Route) RequestBodySchema() (*schema.Schema, bool) {
 	return r.requestBody, r.requestBody != nil
 }
 
 // Response documents status as one of this Route's possible responses. With
-// zero metadata args, status is documented as having no body (the map key
+// zero schema args, status is documented as having no body (the map key
 // still exists, with a nil value, distinguishing "documented, no body" from
 // "never documented" -- spec.md AC3). With one arg, status is documented
 // with that body schema. Calling Response again for the SAME status
 // overwrites that status's entry; calling it for a DIFFERENT status
 // accumulates alongside any previously documented statuses. Returns r so
 // calls can chain.
-func (r *Route) Response(status int, m ...*metadata.Metadata) *Route {
+func (r *Route) Response(status int, m ...*schema.Schema) *Route {
 	if r.responses == nil {
-		r.responses = map[int]*metadata.Metadata{}
+		r.responses = map[int]*schema.Schema{}
 	}
 	if len(m) > 0 {
 		r.responses[status] = m[0]
@@ -248,8 +248,8 @@ func (r *Route) Response(status int, m ...*metadata.Metadata) *Route {
 // Response. Read-only: mutating the returned map does not affect this
 // Route's internal state (same defensive-copy pattern as
 // Controller.OwnMiddleware/OwnTags).
-func (r *Route) Responses() map[int]*metadata.Metadata {
-	out := make(map[int]*metadata.Metadata, len(r.responses))
+func (r *Route) Responses() map[int]*schema.Schema {
+	out := make(map[int]*schema.Schema, len(r.responses))
 	for status, m := range r.responses {
 		out[status] = m
 	}
@@ -259,30 +259,30 @@ func (r *Route) Responses() map[int]*metadata.Metadata {
 // PathParams stores m as this Route's documented path-parameters schema and
 // returns r so calls can chain. Calling PathParams more than once
 // overwrites the previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) PathParams(m *metadata.Metadata) *Route {
+func (r *Route) PathParams(m *schema.Schema) *Route {
 	r.pathParams = m
 	return r
 }
 
-// PathParamsMetadata returns the *metadata.Metadata set via PathParams, and
+// PathParamsSchema returns the *schema.Schema set via PathParams, and
 // whether PathParams was ever called -- the bool distinguishes "never
 // documented" from "documented".
-func (r *Route) PathParamsMetadata() (*metadata.Metadata, bool) {
+func (r *Route) PathParamsSchema() (*schema.Schema, bool) {
 	return r.pathParams, r.pathParams != nil
 }
 
 // QueryParams stores m as this Route's documented query-parameters schema
 // and returns r so calls can chain. Calling QueryParams more than once
 // overwrites the previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) QueryParams(m *metadata.Metadata) *Route {
+func (r *Route) QueryParams(m *schema.Schema) *Route {
 	r.queryParams = m
 	return r
 }
 
-// QueryParamsMetadata returns the *metadata.Metadata set via QueryParams,
+// QueryParamsSchema returns the *schema.Schema set via QueryParams,
 // and whether QueryParams was ever called -- the bool distinguishes "never
 // documented" from "documented".
-func (r *Route) QueryParamsMetadata() (*metadata.Metadata, bool) {
+func (r *Route) QueryParamsSchema() (*schema.Schema, bool) {
 	return r.queryParams, r.queryParams != nil
 }
 

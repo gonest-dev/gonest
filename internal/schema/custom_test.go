@@ -1,4 +1,4 @@
-package metadata_test
+package schema_test
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // customEntity is a minimal fixture for exercising Custom/CustomFunc in
@@ -16,17 +16,17 @@ type customEntity struct {
 	Code string
 }
 
-func newCustomTestMetadata(t *testing.T) (*customEntity, *metadata.Metadata) {
+func newCustomTestSchema(t *testing.T) (*customEntity, *schema.Schema) {
 	t.Helper()
 	zero := &customEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
 func TestPropertyBuilder_CustomFunc_NeverCalled_ReturnsFalse(t *testing.T) {
-	zero, m := newCustomTestMetadata(t)
+	zero, m := newCustomTestSchema(t)
 	pb := m.Property(&zero.Code).String().PropertyBuilder
 
 	fn, ok := pb.CustomFunc()
@@ -36,7 +36,7 @@ func TestPropertyBuilder_CustomFunc_NeverCalled_ReturnsFalse(t *testing.T) {
 }
 
 func TestPropertyBuilder_Custom_StoresFn_RetrievableViaCustomFunc(t *testing.T) {
-	zero, m := newCustomTestMetadata(t)
+	zero, m := newCustomTestSchema(t)
 	pb := m.Property(&zero.Code)
 
 	called := false
@@ -67,7 +67,7 @@ func TestPropertyBuilder_Custom_StoresFn_RetrievableViaCustomFunc(t *testing.T) 
 }
 
 func TestPropertyBuilder_Custom_LastCallWins(t *testing.T) {
-	zero, m := newCustomTestMetadata(t)
+	zero, m := newCustomTestSchema(t)
 	pb := m.Property(&zero.Code)
 
 	pb.Custom(func(raw any) (any, error) { return "first", nil })

@@ -2,9 +2,9 @@
 // gonest.MustJsonBody[T] wrapper (Go cannot re-export a generic function via
 // var, see AD-004 -- same reasoning as inject.MustInject). It reads
 // *execution.Context's raw request body, validates it against T's
-// registered *metadata.Metadata (internal/metadata), and panics
+// registered *schema.Schema (internal/schema), and panics
 // *exception.BadRequestException on any violation -- this package is a thin
-// cross-cutting layer over internal/execution + internal/metadata +
+// cross-cutting layer over internal/execution + internal/schema +
 // internal/exception + internal/route (for MustParams/MustQuery's
 // route.HasParam lookups), none of which import each other back (design.md's
 // Architecture Overview).
@@ -18,7 +18,7 @@ import (
 
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // violation is one field-level validation failure -- the shape every
@@ -47,9 +47,9 @@ type violation struct {
 // is a pointer type at the call site, e.g. MustJsonBody[*UserProperties]).
 //
 // Steps (design.md's Components/"internal/validate" section):
-//  1. Look up T's (dereferenced) registered *metadata.Metadata via the
+//  1. Look up T's (dereferenced) registered *schema.Schema via the
 //     global registry -- panics immediately, BEFORE touching the body at
-//     all, if T was never registered via NewMetadata[T] (spec.md's Edge
+//     all, if T was never registered via NewSchema[T] (spec.md's Edge
 //     Cases).
 //  2. Unmarshal the raw body into `any` -- ground truth for BOTH JSON-key
 //     presence (Required checks) and JSON value TYPE checking
@@ -73,9 +73,9 @@ func MustJsonBody[T any](ctx *execution.Context) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
 
-	m, ok := metadata.Lookup(structType)
+	m, ok := schema.Lookup(structType)
 	if !ok {
-		panic(fmt.Sprintf("gonest: no metadata registered for type %s (call NewMetadata[%s] first)", structType, structType))
+		panic(fmt.Sprintf("gonest: no schema registered for type %s (call NewSchema[%s] first)", structType, structType))
 	}
 
 	body := ctx.Body()
@@ -170,7 +170,7 @@ func tagKeyVisible(field reflect.StructField, tag string) (string, bool) {
 // pathPrefix is prepended to every violation's Field (e.g. "address." for
 // a nested Object, so a violation reads "address.zip" -- spec.md's P5,
 // AC3).
-func validateStruct(presence map[string]any, m *metadata.Metadata, pathPrefix string) []violation {
+func validateStruct(presence map[string]any, m *schema.Schema, pathPrefix string) []violation {
 	var violations []violation
 
 	for _, p := range m.OwnProperties() {
@@ -203,7 +203,7 @@ func validateStruct(presence map[string]any, m *metadata.Metadata, pathPrefix st
 // was never set does validateValue handle the one concern shared by every
 // kind (null handling), then dispatch on p.KindValue() to the
 // kind-specific validator.
-func validateValue(raw any, p *metadata.PropertyBuilder, path string) []violation {
+func validateValue(raw any, p *schema.PropertyBuilder, path string) []violation {
 	if fn, ok := p.CustomFunc(); ok {
 		if _, err := fn(raw); err != nil {
 			return []violation{{Field: path, Message: err.Error()}}
@@ -247,7 +247,7 @@ func validateValue(raw any, p *metadata.PropertyBuilder, path string) []violatio
 // keeps the two passes' notion of "valid" consistent, and matches
 // OpenAPI's own integer format (a fractional value is not a valid
 // "integer").
-func validatePrimitive(raw any, p *metadata.PropertyBuilder, path string) []violation {
+func validatePrimitive(raw any, p *schema.PropertyBuilder, path string) []violation {
 	kind := p.KindValue()
 
 	switch kind {
@@ -317,10 +317,10 @@ func validatePrimitive(raw any, p *metadata.PropertyBuilder, path string) []viol
 // the FIELD itself, not any specific item), then recurses into every item:
 // either validateValue against the item's own *PropertyBuilder
 // (p.ItemBuilder()), or, if the item is Object(ref)-typed (p.ItemRef()),
-// validateStruct against the referenced *Metadata. Each item's path
+// validateStruct against the referenced *Schema. Each item's path
 // includes its index (e.g. "tags[2]", "addresses[0].zip") -- spec.md's P5
 // AC1.
-func validateArray(raw any, p *metadata.PropertyBuilder, path string) []violation {
+func validateArray(raw any, p *schema.PropertyBuilder, path string) []violation {
 	items, ok := raw.([]any)
 	if !ok {
 		return []violation{{Field: path, Message: "expected array"}}
@@ -356,22 +356,22 @@ func validateArray(raw any, p *metadata.PropertyBuilder, path string) []violatio
 
 // validateObject handles a field's own Object()-typed value: if
 // p.IsAdditionalProperties() is set (an open/free-form schema, e.g.
-// `Metadata map[string]any` -- INSIGHT.md's `om.AdditionalProperties()`),
+// `Schema map[string]any` -- INSIGHT.md's `om.AdditionalProperties()`),
 // structural validation is skipped entirely (spec.md's Out of Scope: "no
 // fixed shape exists to check against by definition"). Otherwise, if
-// p.MetadataRef() is set, raw is type-asserted to map[string]any and
+// p.SchemaRef() is set, raw is type-asserted to map[string]any and
 // recursed into via validateStruct, with path prefixed by "." so a nested
 // violation reads e.g. "address.zip" (spec.md's P5 AC3). If neither is
 // set, there is nothing to validate against -- treated as a no-op (a dev
-// called Object(fn) but never called Metadata(ref) or
+// called Object(fn) but never called Schema(ref) or
 // AdditionalProperties() inside fn, an edge case design.md doesn't assign
 // behavior to beyond "nothing to validate against").
-func validateObject(raw any, p *metadata.PropertyBuilder, path string) []violation {
+func validateObject(raw any, p *schema.PropertyBuilder, path string) []violation {
 	if p.IsAdditionalProperties() {
 		return nil
 	}
 
-	ref, ok := p.MetadataRef()
+	ref, ok := p.SchemaRef()
 	if !ok {
 		return nil
 	}
@@ -411,7 +411,7 @@ func validateObject(raw any, p *metadata.PropertyBuilder, path string) []violati
 // with a violation earlier, and MustJsonBody/MustParams/MustQuery all check
 // violations BEFORE calling populate, fn is guaranteed to succeed here too
 // (same raw input, same idempotent fn).
-func populate(dest reflect.Value, presence map[string]any, m *metadata.Metadata, tag string) error {
+func populate(dest reflect.Value, presence map[string]any, m *schema.Schema, tag string) error {
 	for _, p := range m.OwnProperties() {
 		key, visible := tagKeyVisible(p.Field(), tag)
 		if !visible {

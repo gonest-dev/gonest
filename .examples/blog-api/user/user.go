@@ -6,34 +6,11 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/gonest-dev/gonest"
-
 	"blog-api/shared"
 )
 
-type Entity struct {
-	ID    int64  `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-// EntityMetadata registers Entity's own OpenAPI schema (components.schemas.
-// UserEntity) -- referenced by Controller's Route.Response calls so
-// generated docs actually describe the response body shape, not just the
-// bare path/summary.
-var EntityMetadata = gonest.NewMetadata[Entity](func(t *Entity, m *gonest.Metadata) {
-	m.Title("UserEntity")
-	m.Property(&t.ID).Integer().Required()
-	m.Property(&t.Name).String().Required()
-	m.Property(&t.Email).Email().Required()
-})
-
 type Service struct {
 	db *sql.DB
-}
-
-func NewService(db *sql.DB) *Service {
-	return &Service{db: db}
 }
 
 func (s *Service) List() []*Entity {
@@ -80,15 +57,3 @@ func (s *Service) Create(name, email string) *Entity {
 	}
 	return &Entity{ID: id, Name: name, Email: email}
 }
-
-var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
-	db := gonest.MustInject[*sql.DB](provider)
-	provider.Constructor(func() *Service { return NewService(db) })
-})
-
-var Module = gonest.NewModule(func(module *gonest.Module) {
-	module.Imports(shared.DBModule)
-	module.Providers(Provider)
-	module.Controllers(Controller)
-	module.Exports(Provider)
-})

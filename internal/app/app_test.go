@@ -21,11 +21,11 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/schema"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
 )
@@ -102,9 +102,9 @@ type userIDParams struct {
 	UserID int64 `param:"user_id"`
 }
 
-var userIDParamsMetadata = func() *metadata.Metadata {
+var userIDParamsSchema = func() *schema.Schema {
 	f := &userIDParams{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.UserID).Integer().Required()
 	return m
 }()
@@ -113,9 +113,9 @@ type nameParams struct {
 	Name string `param:"name"`
 }
 
-var nameParamsMetadata = func() *metadata.Metadata {
+var nameParamsSchema = func() *schema.Schema {
 	f := &nameParams{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.Name).String().Required()
 	return m
 }()
@@ -125,9 +125,9 @@ type userIDNameParams struct {
 	Name   string `param:"name"`
 }
 
-var userIDNameParamsMetadata = func() *metadata.Metadata {
+var userIDNameParamsSchema = func() *schema.Schema {
 	f := &userIDNameParams{}
-	m := metadata.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
 	m.Property(&f.UserID).Integer().Required()
 	m.Property(&f.Name).String().Required()
 	return m
@@ -2815,7 +2815,7 @@ func TestNewApp_ZeroFilters_NonRegressionReference(t *testing.T) {
 	})
 }
 
-// --- T0 of "Schema Generation from Metadata": App.Root() accessor ---
+// --- T0 of "Schema Generation from Schema": App.Root() accessor ---
 
 // TestNewApp_Root_ReturnsSameModulePassedToNewApp proves App.Root() returns
 // the exact same *module.Module value NewApp was called with (identity, not

@@ -1,4 +1,4 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
@@ -6,15 +6,15 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // kindEntity exercises every branch family (String/Numeric/Boolean/
 // DateTime/Date/Array/Object) against real fields, standing in for the same
 // role arrayEntity/userEntity play in the sibling _test.go files -- this is
-// the P0 (json-body-validation feature) read-path proof: build a *Metadata,
+// the P0 (json-body-validation feature) read-path proof: build a *Schema,
 // discard every wrapper reference the declaring closures return, then read
-// EVERYTHING back through Metadata.OwnProperties() + PropertyBuilder's own
+// EVERYTHING back through Schema.OwnProperties() + PropertyBuilder's own
 // (P0-new) getters alone.
 type kindEntity struct {
 	Name      string
@@ -33,55 +33,55 @@ type kindAddressEntity struct {
 	Zip  string
 }
 
-func newKindTestMetadata(t *testing.T) (*kindEntity, *metadata.Metadata) {
+func newKindTestSchema(t *testing.T) (*kindEntity, *schema.Schema) {
 	t.Helper()
 	zero := &kindEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
-func newKindAddressTestMetadata(t *testing.T) *metadata.Metadata {
+func newKindAddressTestSchema(t *testing.T) *schema.Schema {
 	t.Helper()
 	zero := &kindAddressEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	return metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	return schema.New(typ, uintptr(unsafe.Pointer(zero)))
 }
 
 // TestPropertyBuilder_ReadsEveryBranchFamilyWithoutWrapperReference is P0's
-// own Independent Test (spec.md): builds a *Metadata via every one of the 4
+// own Independent Test (spec.md): builds a *Schema via every one of the 4
 // branch families (String w/ Min/Max/Pattern, Numeric w/ Min/Max, Array w/
 // item+quantity+ItemRef, Object w/ ref and AdditionalProperties), discards
 // every wrapper reference the declaring closure returned, then reads
-// everything back via Metadata.OwnProperties() + PropertyBuilder's own
+// everything back via Schema.OwnProperties() + PropertyBuilder's own
 // getters alone -- proving the relocation (T0) actually works, not just
 // compiles.
 func TestPropertyBuilder_ReadsEveryBranchFamilyWithoutWrapperReference(t *testing.T) {
-	zero, m := newKindTestMetadata(t)
-	addressMetadata := newKindAddressTestMetadata(t)
+	zero, m := newKindTestSchema(t)
+	addressSchema := newKindAddressTestSchema(t)
 
-	// Build via all 4 families, deliberately NOT keeping any *StringMetadata/
-	// *NumericMetadata/*ArrayMetadata/*ObjectMetadata reference around --
+	// Build via all 4 families, deliberately NOT keeping any *StringSchema/
+	// *NumericSchema/*ArraySchema/*ObjectSchema reference around --
 	// each branch call's return value is discarded immediately (chained and
 	// dropped), same as spec.md's Independent Test demands.
 	m.Property(&zero.Name).String().Min(1).Max(50).Pattern("^[a-z]+$")
 	m.Property(&zero.Age).Integer().Min(0).Max(120)
-	m.Property(&zero.Tags).Array().Items(func(am *metadata.ArrayMetadata) {
+	m.Property(&zero.Tags).Array().Items(func(am *schema.ArraySchema) {
 		am.String().Min(1).Max(10)
 	}).Min(1).Max(5)
-	m.Property(&zero.Address).Object(func(om *metadata.ObjectMetadata) {
-		om.Metadata(addressMetadata)
+	m.Property(&zero.Address).Object(func(om *schema.ObjectSchema) {
+		om.Schema(addressSchema)
 	})
-	m.Property(&zero.Meta).Object(func(om *metadata.ObjectMetadata) {
+	m.Property(&zero.Meta).Object(func(om *schema.ObjectSchema) {
 		om.AdditionalProperties()
 	})
 
-	// Now read EVERYTHING back through Metadata.OwnProperties() +
+	// Now read EVERYTHING back through Schema.OwnProperties() +
 	// PropertyBuilder getters alone -- no wrapper reference survives past
 	// this point.
-	byField := map[string]*metadata.PropertyBuilder{}
+	byField := map[string]*schema.PropertyBuilder{}
 	for _, pb := range m.OwnProperties() {
 		byField[pb.Field().Name] = pb
 	}
@@ -155,9 +155,9 @@ func TestPropertyBuilder_ReadsEveryBranchFamilyWithoutWrapperReference(t *testin
 	if kind := addressPB.KindValue(); kind != "object" {
 		t.Fatalf("Address.KindValue() = %q, want %q", kind, "object")
 	}
-	ref, ok := addressPB.MetadataRef()
-	if !ok || ref != addressMetadata {
-		t.Fatalf("Address.MetadataRef() = (%v, %v), want (addressMetadata, true)", ref, ok)
+	ref, ok := addressPB.SchemaRef()
+	if !ok || ref != addressSchema {
+		t.Fatalf("Address.SchemaRef() = (%v, %v), want (addressSchema, true)", ref, ok)
 	}
 	if addressPB.IsAdditionalProperties() {
 		t.Fatal("Address.IsAdditionalProperties() = true, want false")
@@ -174,8 +174,8 @@ func TestPropertyBuilder_ReadsEveryBranchFamilyWithoutWrapperReference(t *testin
 	if !metaPB.IsAdditionalProperties() {
 		t.Fatal("Meta.IsAdditionalProperties() = false, want true")
 	}
-	if _, ok := metaPB.MetadataRef(); ok {
-		t.Fatal("Meta.MetadataRef() ok = true, want false (never called)")
+	if _, ok := metaPB.SchemaRef(); ok {
+		t.Fatal("Meta.SchemaRef() ok = true, want false (never called)")
 	}
 }
 
@@ -184,7 +184,7 @@ func TestPropertyBuilder_ReadsEveryBranchFamilyWithoutWrapperReference(t *testin
 // pre-existing collision, design.md's Tech Decisions), but KindValue() now
 // distinguishes them.
 func TestKindValue_BooleanAndString_AreDifferent(t *testing.T) {
-	zero, m := newKindTestMetadata(t)
+	zero, m := newKindTestSchema(t)
 
 	strPB := m.Property(&zero.Name).String().PropertyBuilder
 	boolPB := m.Property(&zero.Active).Boolean()
@@ -207,7 +207,7 @@ func TestKindValue_BooleanAndString_AreDifferent(t *testing.T) {
 // "type" for every one of the 18 primitive branches, plus Array and Object
 // -- 20 cases total, mirroring design.md's Components table exactly.
 func TestKindValue_EveryBranch(t *testing.T) {
-	addressMetadata := newKindAddressTestMetadata(t)
+	addressSchema := newKindAddressTestSchema(t)
 
 	tests := []struct {
 		name string
@@ -236,17 +236,17 @@ func TestKindValue_EveryBranch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Each case uses its own throwaway *Metadata + field pointer so
+			// Each case uses its own throwaway *Schema + field pointer so
 			// Property's own double-registration panic never fires across
-			// subtests -- mirrors newKindTestMetadata's own baseAddr
+			// subtests -- mirrors newKindTestSchema's own baseAddr
 			// alignment requirement (Property requires fieldPtr to belong
 			// to m's own struct), so build a fresh single-field struct per
 			// case instead of reusing kindEntity's own fields.
 			zero := &struct{ V string }{}
 			typ := reflect.TypeOf(*zero)
-			t.Cleanup(func() { metadata.Deregister(typ) })
-			fm := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
-			var pb *metadata.PropertyBuilder
+			t.Cleanup(func() { schema.Deregister(typ) })
+			fm := schema.New(typ, uintptr(unsafe.Pointer(zero)))
+			var pb *schema.PropertyBuilder
 			switch tt.name {
 			case "String":
 				pb = fm.Property(&zero.V).String().PropertyBuilder
@@ -285,7 +285,7 @@ func TestKindValue_EveryBranch(t *testing.T) {
 			case "Array":
 				pb = fm.Property(&zero.V).Array().PropertyBuilder
 			case "Object":
-				pb = fm.Property(&zero.V).Object(func(om *metadata.ObjectMetadata) { om.Metadata(addressMetadata) }).PropertyBuilder
+				pb = fm.Property(&zero.V).Object(func(om *schema.ObjectSchema) { om.Schema(addressSchema) }).PropertyBuilder
 			}
 			if got := pb.KindValue(); got != tt.want {
 				t.Fatalf("%s: KindValue() = %q, want %q", tt.name, got, tt.want)
@@ -295,41 +295,41 @@ func TestKindValue_EveryBranch(t *testing.T) {
 }
 
 // TestKindValue_ArrayItemBranches_MirrorPropertyBuilder proves KindValue()
-// is correct via ArrayMetadata's own 17 mirrored item-branch methods
+// is correct via ArraySchema's own 17 mirrored item-branch methods
 // (String/.../Boolean/DateTime/Date on the item), reachable through
-// ArrayMetadata.ItemBuilder().KindValue() -- the array.go half of T0's
+// ArraySchema.ItemBuilder().KindValue() -- the array.go half of T0's
 // "kind" line additions (design.md's Components table).
 func TestKindValue_ArrayItemBranches_MirrorPropertyBuilder(t *testing.T) {
 	tests := []struct {
 		name string
-		set  func(am *metadata.ArrayMetadata)
+		set  func(am *schema.ArraySchema)
 		want string
 	}{
-		{"String", func(am *metadata.ArrayMetadata) { am.String() }, "string"},
-		{"Email", func(am *metadata.ArrayMetadata) { am.Email() }, "string"},
-		{"Uuid", func(am *metadata.ArrayMetadata) { am.Uuid() }, "string"},
-		{"Uri", func(am *metadata.ArrayMetadata) { am.Uri() }, "string"},
-		{"Hostname", func(am *metadata.ArrayMetadata) { am.Hostname() }, "string"},
-		{"Ipv4", func(am *metadata.ArrayMetadata) { am.Ipv4() }, "string"},
-		{"Ipv6", func(am *metadata.ArrayMetadata) { am.Ipv6() }, "string"},
-		{"Password", func(am *metadata.ArrayMetadata) { am.Password() }, "string"},
-		{"Byte", func(am *metadata.ArrayMetadata) { am.Byte() }, "string"},
-		{"Binary", func(am *metadata.ArrayMetadata) { am.Binary() }, "string"},
-		{"Integer", func(am *metadata.ArrayMetadata) { am.Integer() }, "integer"},
-		{"Int32", func(am *metadata.ArrayMetadata) { am.Int32() }, "integer"},
-		{"Float", func(am *metadata.ArrayMetadata) { am.Float() }, "number"},
-		{"Double", func(am *metadata.ArrayMetadata) { am.Double() }, "number"},
-		{"Boolean", func(am *metadata.ArrayMetadata) { am.Boolean() }, "boolean"},
-		{"DateTime", func(am *metadata.ArrayMetadata) { am.DateTime() }, "string"},
-		{"Date", func(am *metadata.ArrayMetadata) { am.Date() }, "string"},
+		{"String", func(am *schema.ArraySchema) { am.String() }, "string"},
+		{"Email", func(am *schema.ArraySchema) { am.Email() }, "string"},
+		{"Uuid", func(am *schema.ArraySchema) { am.Uuid() }, "string"},
+		{"Uri", func(am *schema.ArraySchema) { am.Uri() }, "string"},
+		{"Hostname", func(am *schema.ArraySchema) { am.Hostname() }, "string"},
+		{"Ipv4", func(am *schema.ArraySchema) { am.Ipv4() }, "string"},
+		{"Ipv6", func(am *schema.ArraySchema) { am.Ipv6() }, "string"},
+		{"Password", func(am *schema.ArraySchema) { am.Password() }, "string"},
+		{"Byte", func(am *schema.ArraySchema) { am.Byte() }, "string"},
+		{"Binary", func(am *schema.ArraySchema) { am.Binary() }, "string"},
+		{"Integer", func(am *schema.ArraySchema) { am.Integer() }, "integer"},
+		{"Int32", func(am *schema.ArraySchema) { am.Int32() }, "integer"},
+		{"Float", func(am *schema.ArraySchema) { am.Float() }, "number"},
+		{"Double", func(am *schema.ArraySchema) { am.Double() }, "number"},
+		{"Boolean", func(am *schema.ArraySchema) { am.Boolean() }, "boolean"},
+		{"DateTime", func(am *schema.ArraySchema) { am.DateTime() }, "string"},
+		{"Date", func(am *schema.ArraySchema) { am.Date() }, "string"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			zero := &struct{ V []string }{}
 			typ := reflect.TypeOf(*zero)
-			t.Cleanup(func() { metadata.Deregister(typ) })
-			fm := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+			t.Cleanup(func() { schema.Deregister(typ) })
+			fm := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 			am := fm.Property(&zero.V).Array()
 			tt.set(am)
 			if got := am.ItemBuilder().KindValue(); got != tt.want {

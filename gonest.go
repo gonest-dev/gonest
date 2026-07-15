@@ -24,13 +24,13 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/metadata"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/openapi"
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/scheduler"
+	"github.com/gonest-dev/gonest/internal/schema"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
 )
@@ -468,118 +468,118 @@ type Filter = filter.Filter
 var NewFilter = filter.New
 
 // ---------------------------------------------------------------------------
-// Metadata (Metadata Registration Core feature)
+// Schema (Schema Registration Core feature)
 // ---------------------------------------------------------------------------
 
-// Metadata holds the whole-type description plus every field registered via
-// Property, for a single NewMetadata[T] call (e.g. INSIGHT.md's
-// `gonest.NewMetadata[UserEntity](func(t *UserEntity, m *gonest.Metadata) {
-// ... })`). See internal/metadata.Metadata's doc comment for the full
+// Schema holds the whole-type description plus every field registered via
+// Property, for a single NewSchema[T] call (e.g. INSIGHT.md's
+// `gonest.NewSchema[UserEntity](func(t *UserEntity, m *gonest.Schema) {
+// ... })`). See internal/schema.Schema's doc comment for the full
 // contract.
-type Metadata = metadata.Metadata
+type Schema = schema.Schema
 
 // PropertyBuilder holds one field's own constraints -- Required/Nullable/
 // Description/Examples in this feature; future type+format branch features
 // (String(), Integer(), etc. -- see ROADMAP.md, explicitly out of scope
-// here) add their own methods on top. See internal/metadata.PropertyBuilder's
+// here) add their own methods on top. See internal/schema.PropertyBuilder's
 // doc comment for the full contract.
-type PropertyBuilder = metadata.PropertyBuilder
+type PropertyBuilder = schema.PropertyBuilder
 
-// StringMetadata is the branch-specific builder returned by all 10
+// StringSchema is the branch-specific builder returned by all 10
 // string-family branch methods on PropertyBuilder (String/Email/Uuid/Uri/
 // Hostname/Ipv4/Ipv6/Password/Byte/Binary -- String-family Branches
 // feature). It is a true Go type alias, so its own methods (Min/Max/
 // Pattern) plus the manually re-declared chain methods (Required/Nullable/
-// Description/Examples) are automatically visible on gonest.StringMetadata
+// Description/Examples) are automatically visible on gonest.StringSchema
 // with zero extra wrapper code, same as App/Module/Provider/etc above. See
-// internal/metadata.StringMetadata's doc comment for why those 4 chain
+// internal/schema.StringSchema's doc comment for why those 4 chain
 // methods are manually re-declared rather than promoted (AD-009 in
 // STATE.md: this section lives in this consolidated file rather than a
-// separate metadata.go).
-type StringMetadata = metadata.StringMetadata
+// separate schema.go).
+type StringSchema = schema.StringSchema
 
-// NewMetadata builds a *Metadata for T, identifying fields purely by their
+// NewSchema builds a *Schema for T, identifying fields purely by their
 // own pointer address within a zero value of T (INSIGHT.md's
 // `m.Property(&t.Id)` call shape) -- no struct tags required. Go cannot
 // re-export a generic function via var, so this is a real wrapper calling
 // the internal one (same pattern as MustInject/NewApp, see AD-004
 // in STATE.md; see also AD-009 in STATE.md for why this section lives in
-// this consolidated file rather than a separate metadata.go).
+// this consolidated file rather than a separate schema.go).
 //
 // Internally: a zero value of T is allocated, its address is passed to
-// internal/metadata.New as the base address every later Property(&t.Field)
+// internal/schema.New as the base address every later Property(&t.Field)
 // call's offset is measured against, then fn runs against that zero value
-// and the freshly built *Metadata (see internal/metadata.Metadata's doc
+// and the freshly built *Schema (see internal/schema.Schema's doc
 // comment for the full field-identification algorithm, empirically
 // confirmed working by T1's own test suite).
-func NewMetadata[T any](fn func(t *T, m *Metadata)) *Metadata {
+func NewSchema[T any](fn func(t *T, m *Schema)) *Schema {
 	var zero T
-	m := metadata.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
+	m := schema.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
 	fn(&zero, m)
 	return m
 }
 
 // ---------------------------------------------------------------------------
-// NumericMetadata (Numeric & Boolean Branches feature)
+// NumericSchema (Numeric & Boolean Branches feature)
 // ---------------------------------------------------------------------------
 
-// NumericMetadata is the branch-specific builder returned by all 4
+// NumericSchema is the branch-specific builder returned by all 4
 // numeric-family branch methods on PropertyBuilder (Integer/Int32/Float/
 // Double -- Numeric & Boolean Branches feature). It is a true Go type alias,
 // so its own methods (Min/Max) plus the manually re-declared chain methods
 // (Required/Nullable/Description/Examples) are automatically visible on
-// gonest.NumericMetadata with zero extra wrapper code, same as
-// gonest.StringMetadata above. Boolean() needs no re-export of its own here
+// gonest.NumericSchema with zero extra wrapper code, same as
+// gonest.StringSchema above. Boolean() needs no re-export of its own here
 // -- it returns a plain *PropertyBuilder (already a root alias since
-// Metadata Registration Core), since OpenAPI's boolean type carries no
+// Schema Registration Core), since OpenAPI's boolean type carries no
 // format-specific extra validators the way the numeric/string families do.
-// See internal/metadata.NumericMetadata's doc comment for why those 4 chain
+// See internal/schema.NumericSchema's doc comment for why those 4 chain
 // methods are manually re-declared rather than promoted (AD-009 in
 // STATE.md: this section lives in this consolidated file rather than a
-// separate metadata.go).
-type NumericMetadata = metadata.NumericMetadata
+// separate schema.go).
+type NumericSchema = schema.NumericSchema
 
 // ---------------------------------------------------------------------------
-// ArrayMetadata (Array Builder feature)
+// ArraySchema (Array Builder feature)
 // ---------------------------------------------------------------------------
 
-// ArrayMetadata is the dual-state branch builder returned by
-// PropertyBuilder.Array (Array Builder feature). Unlike StringMetadata/
-// NumericMetadata above, which describe a single field's own constraints,
-// ArrayMetadata holds TWO separate states: the embedded *PropertyBuilder
+// ArraySchema is the dual-state branch builder returned by
+// PropertyBuilder.Array (Array Builder feature). Unlike StringSchema/
+// NumericSchema above, which describe a single field's own constraints,
+// ArraySchema holds TWO separate states: the embedded *PropertyBuilder
 // (the FIELD itself, e.g. `Tags []string` -- mutated by Required/Nullable/
 // Description/Examples) and a synthetic item builder (the array's ELEMENTS
 // -- mutated by the type+format branch methods String()/Integer()/.../
 // Object() inside an Items(fn) callback), plus the array's own item-count
 // bounds via Min/Max (distinct from the item's own Min/Max). It is a true Go
 // type alias, so all of its methods are automatically visible on
-// gonest.ArrayMetadata with zero extra wrapper code, same as
-// gonest.StringMetadata/gonest.NumericMetadata above. See
-// internal/metadata.ArrayMetadata's doc comment for the full dual-state
+// gonest.ArraySchema with zero extra wrapper code, same as
+// gonest.StringSchema/gonest.NumericSchema above. See
+// internal/schema.ArraySchema's doc comment for the full dual-state
 // contract (AD-009 in STATE.md: this section lives in this consolidated
-// file rather than a separate metadata.go).
-type ArrayMetadata = metadata.ArrayMetadata
+// file rather than a separate schema.go).
+type ArraySchema = schema.ArraySchema
 
 // ---------------------------------------------------------------------------
-// ObjectMetadata (Object Builder feature)
+// ObjectSchema (Object Builder feature)
 // ---------------------------------------------------------------------------
 
-// ObjectMetadata is the branch-specific builder returned by
-// PropertyBuilder.Object (Object Builder feature). Unlike ArrayMetadata
+// ObjectSchema is the branch-specific builder returned by
+// PropertyBuilder.Object (Object Builder feature). Unlike ArraySchema
 // above, it is a SINGLE-STATE builder: it embeds the field's own
 // *PropertyBuilder directly (the same shared object already held in
-// Metadata.properties[offset]), with no synthetic secondary builder --
+// Schema.properties[offset]), with no synthetic secondary builder --
 // the field itself IS the nested object (e.g. `Address AddressEntity`), so
 // there is no separate "element" to describe the way an array's items are.
-// It is a true Go type alias, so its own methods (Metadata/MetadataRef/
+// It is a true Go type alias, so its own methods (Schema/SchemaRef/
 // AdditionalProperties/IsAdditionalProperties) plus the manually
 // re-declared chain methods (Required/Nullable/Description/Examples) are
-// automatically visible on gonest.ObjectMetadata with zero extra wrapper
-// code, same as gonest.ArrayMetadata/gonest.NumericMetadata above. See
-// internal/metadata.ObjectMetadata's doc comment for the full single-state
+// automatically visible on gonest.ObjectSchema with zero extra wrapper
+// code, same as gonest.ArraySchema/gonest.NumericSchema above. See
+// internal/schema.ObjectSchema's doc comment for the full single-state
 // contract (AD-009 in STATE.md: this section lives in this consolidated
-// file rather than a separate metadata.go).
-type ObjectMetadata = metadata.ObjectMetadata
+// file rather than a separate schema.go).
+type ObjectSchema = schema.ObjectSchema
 
 // Context encapsulates the HTTP request/response for a single route
 // Handler -- long-standing gap closed here (see STATE.md's Deferred
@@ -597,12 +597,12 @@ type Context = execution.Context
 // ---------------------------------------------------------------------------
 
 // MustJsonBody reads ctx's raw request body, validates it against T's
-// (dereferenced) registered *Metadata (built via NewMetadata[T] beforehand,
+// (dereferenced) registered *Schema (built via NewSchema[T] beforehand,
 // e.g. INSIGHT.md's UserEntity example), and returns a populated T. It
 // panics *BadRequestException (collecting EVERY violation found, not just
 // the first) if the body fails to parse as JSON or any field/array-item/
 // nested-object constraint is violated, and panics with a plain string if T
-// was never registered via NewMetadata[T]. Go cannot re-export a generic
+// was never registered via NewSchema[T]. Go cannot re-export a generic
 // function via var, so this is a real wrapper calling the internal one
 // (same pattern as MustInject/NewApp, see AD-004 in STATE.md).
 func MustJsonBody[T any](ctx *execution.Context) T {
@@ -610,12 +610,12 @@ func MustJsonBody[T any](ctx *execution.Context) T {
 }
 
 // MustParams reads ctx's current route's path params, validates every field
-// of T (dereferenced) against its registered *Metadata (built via
-// NewMetadata[T] beforehand, matched via a `param:"name"` struct tag) and
+// of T (dereferenced) against its registered *Schema (built via
+// NewSchema[T] beforehand, matched via a `param:"name"` struct tag) and
 // returns a populated T. It panics *BadRequestException (collecting EVERY
 // violation found, not just the first) if a required param is missing or
 // any param fails its declared constraint, and panics with a plain string
-// if T was never registered via NewMetadata[T]. Go cannot re-export a
+// if T was never registered via NewSchema[T]. Go cannot re-export a
 // generic function via var, so this is a real wrapper calling the internal
 // one (same pattern as MustJsonBody, see AD-004 in STATE.md).
 func MustParams[T any](ctx *execution.Context) T {
@@ -623,12 +623,12 @@ func MustParams[T any](ctx *execution.Context) T {
 }
 
 // MustQuery reads ctx's request query string, validates every field of T
-// (dereferenced) against its registered *Metadata (built via NewMetadata[T]
+// (dereferenced) against its registered *Schema (built via NewSchema[T]
 // beforehand, matched via a `query:"name"` struct tag) and returns a
 // populated T. It panics *BadRequestException (collecting EVERY violation
 // found, not just the first) if a required query param is missing or any
 // query param fails its declared constraint, and panics with a plain
-// string if T was never registered via NewMetadata[T]. Go cannot re-export
+// string if T was never registered via NewSchema[T]. Go cannot re-export
 // a generic function via var, so this is a real wrapper calling the
 // internal one (same pattern as MustJsonBody/MustParams, see AD-004 in
 // STATE.md).
@@ -646,14 +646,14 @@ func MustQuery[T any](ctx *execution.Context) T {
 // `gonest.NewOpenApiDocument("3.1.0", func (b *gonest.OpenApiDocument) {
 // ... })`. See internal/openapi.OpenApiDocument's doc comment for the full
 // contract. Serving it (SetupSwagger/SwaggerOptions) and generating
-// paths/schemas from registered routes/Metadata are separate ROADMAP
+// paths/schemas from registered routes/Schema are separate ROADMAP
 // features (spec.md's Out of Scope).
 type OpenApiDocument = openapi.OpenApiDocument
 
 // NewOpenApiDocument builds a *OpenApiDocument, storing specVersion (the
 // OpenAPI SPEC version, e.g. "3.1.0" -- distinct from the API's own
 // Version(s)) and running fn against it before returning it. Unlike
-// NewApp/NewMetadata elsewhere in this package, New here is not generic, so
+// NewApp/NewSchema elsewhere in this package, New here is not generic, so
 // Go allows aliasing the plain func directly via var -- no wrapper function
 // is needed (same precedent as NewHttpException/NewMiddleware/NewGuard, see
 // AD-004 in STATE.md). See internal/openapi.New's doc comment for the full
@@ -666,7 +666,7 @@ var NewOpenApiDocument = openapi.New
 // RequestBody/Response/PathParams/QueryParams/ExcludeFromDocs/Deprecated).
 // It is a true Go type alias, so every one of those methods is automatically
 // visible on gonest.Route with zero extra wrapper code, same as
-// App/Module/Metadata/etc above. See internal/route.Route's doc comment for
+// App/Module/Schema/etc above. See internal/route.Route's doc comment for
 // the full contract.
 type Route = route.Route
 
@@ -675,13 +675,13 @@ type Route = route.Route
 // comment) and populates doc's paths/components.schemas from every
 // registered Controller/Route's documentation (Controller.Tags/BearerAuth,
 // Route.Summary/RequestBody/Response/PathParams/QueryParams/
-// ExcludeFromDocs/etc, plus every *Metadata those routes reference,
+// ExcludeFromDocs/etc, plus every *Schema those routes reference,
 // recursively deduplicated by pointer identity). Call it after NewApp (so
 // the module tree is assembled) and before serving doc.Document() (e.g. via
 // a future SetupSwagger -- out of scope here, see ROADMAP.md's "Swagger UI
 // Setup" feature). Takes *App directly (not *Module) so callers never need
 // to reach for app.Root() themselves -- this wrapper does that internally.
-// Unlike NewApp/NewMetadata elsewhere in this package, internal/openapi.Generate
+// Unlike NewApp/NewSchema elsewhere in this package, internal/openapi.Generate
 // is not generic, but it takes *module.Module (an internal-only concept
 // gonest.go otherwise never exposes as a caller-facing parameter), so this
 // is a real wrapper rather than a plain var alias -- it accepts *App and

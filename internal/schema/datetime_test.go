@@ -1,4 +1,4 @@
-package metadata_test
+package schema_test
 
 import (
 	"reflect"
@@ -6,13 +6,13 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/metadata"
+	"github.com/gonest-dev/gonest/internal/schema"
 )
 
 // dateTimeEntity reproduces INSIGHT.md's UserEntity CreatedAt/UpdatedAt/
 // DeletedAt fields (lines ~379-402) plus one bare Date()-branch field, used
 // across this file's tests -- mirrors numeric_test.go's numericBoolEntity
-// helper struct/newNumericTestMetadata pattern for the DateTime/Date
+// helper struct/newNumericTestSchema pattern for the DateTime/Date
 // branches.
 type dateTimeEntity struct {
 	CreatedAt time.Time
@@ -22,16 +22,16 @@ type dateTimeEntity struct {
 	Id        int64
 }
 
-// newDateTimeTestMetadata mirrors metadata_test.go's own newTestMetadata /
-// numeric_test.go's newNumericTestMetadata helper (same pattern: construct a
-// zero value, keep it alive via the returned pointer, build *Metadata from
+// newDateTimeTestSchema mirrors schema_test.go's own newTestSchema /
+// numeric_test.go's newNumericTestSchema helper (same pattern: construct a
+// zero value, keep it alive via the returned pointer, build *Schema from
 // its address).
-func newDateTimeTestMetadata(t *testing.T) (*dateTimeEntity, *metadata.Metadata) {
+func newDateTimeTestSchema(t *testing.T) (*dateTimeEntity, *schema.Schema) {
 	t.Helper()
 	zero := &dateTimeEntity{}
 	typ := reflect.TypeOf(*zero)
-	t.Cleanup(func() { metadata.Deregister(typ) })
-	m := metadata.New(typ, uintptr(unsafe.Pointer(zero)))
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	return zero, m
 }
 
@@ -41,7 +41,7 @@ func newDateTimeTestMetadata(t *testing.T) (*dateTimeEntity, *metadata.Metadata)
 // TestBoolean_ReturnsSamePropertyBuilder, DateTime/Date being the second
 // branch family (after Boolean) with no wrapper type.
 func TestDateTime_ReturnsSamePropertyBuilder(t *testing.T) {
-	zero, m := newDateTimeTestMetadata(t)
+	zero, m := newDateTimeTestSchema(t)
 
 	pb := m.Property(&zero.CreatedAt)
 	got := pb.DateTime()
@@ -57,7 +57,7 @@ func TestDateTime_ReturnsSamePropertyBuilder(t *testing.T) {
 // TestDate_ReturnsSamePropertyBuilder proves Date() returns the SAME
 // *PropertyBuilder value and sets FormatValue() to "date".
 func TestDate_ReturnsSamePropertyBuilder(t *testing.T) {
-	zero, m := newDateTimeTestMetadata(t)
+	zero, m := newDateTimeTestSchema(t)
 
 	pb := m.Property(&zero.BirthDate)
 	got := pb.Date()
@@ -75,7 +75,7 @@ func TestDate_ReturnsSamePropertyBuilder(t *testing.T) {
 // since it IS *PropertyBuilder, but proven explicitly the same way
 // TestBoolean_CommonConstraintsWork does for Boolean().
 func TestDateTime_CommonConstraintsWork(t *testing.T) {
-	zero, m := newDateTimeTestMetadata(t)
+	zero, m := newDateTimeTestSchema(t)
 
 	now := time.Now()
 	pb := m.Property(&zero.CreatedAt).DateTime().Required().Nullable().Description("Data de criação do usuário").Examples(now)
@@ -103,9 +103,9 @@ func TestDateTime_CommonConstraintsWork(t *testing.T) {
 //	m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
 //	m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
 //
-// mirrors numeric_test.go's TestNumericMetadata_InsightIsActiveChain.
+// mirrors numeric_test.go's TestNumericSchema_InsightIsActiveChain.
 func TestDateTime_InsightCreatedAtUpdatedAtDeletedAtChains(t *testing.T) {
-	zero, m := newDateTimeTestMetadata(t)
+	zero, m := newDateTimeTestSchema(t)
 
 	now := time.Now()
 
@@ -161,7 +161,7 @@ func TestDateTime_InsightCreatedAtUpdatedAtDeletedAtChains(t *testing.T) {
 // on the SAME *PropertyBuilder does not panic, and FormatValue reflects the
 // LAST call -- mirrors numeric_test.go's TestBooleanThenInteger_NoPanicLastWins.
 func TestDateThenDateTime_NoPanicLastWins(t *testing.T) {
-	zero, m := newDateTimeTestMetadata(t)
+	zero, m := newDateTimeTestSchema(t)
 
 	pb := m.Property(&zero.CreatedAt)
 
@@ -185,7 +185,7 @@ func TestDateThenDateTime_NoPanicLastWins(t *testing.T) {
 // Cases: "no cross-branch-family special-casing" (same claim numeric_test.go's
 // TestIntegerThenBoolean_NoPanicLastWins already proves for Integer/Boolean).
 func TestIntegerThenDateTime_NoPanicLastWins(t *testing.T) {
-	zero, m := newDateTimeTestMetadata(t)
+	zero, m := newDateTimeTestSchema(t)
 
 	pb := m.Property(&zero.Id)
 

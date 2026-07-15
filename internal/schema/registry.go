@@ -1,4 +1,4 @@
-package metadata
+package schema
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 )
 
 // registry is the process-wide lookup from a Go struct type to its
-// registered *Metadata, so MustJsonBody[T] (internal/validate, out of scope
-// here) can find T's metadata without an explicit argument -- INSIGHT.md's
+// registered *Schema, so MustJsonBody[T] (internal/validate, out of scope
+// here) can find T's schema without an explicit argument -- INSIGHT.md's
 // own call shape (gonest.MustJsonBody[*UserProperties](ctx)) never passes
-// one. Populated automatically by New (NewMetadata[T]'s internal call),
+// one. Populated automatically by New (NewSchema[T]'s internal call),
 // never by hand -- registration becomes impossible to forget.
 //
 // Guarded by registryMu (not the zero-value sync.Map) because the whole
@@ -20,28 +20,28 @@ import (
 // message construction (fmt.Sprintf) trivially outside the critical
 // section without a second API to learn.
 var registryMu sync.RWMutex
-var registry = map[reflect.Type]*Metadata{}
+var registry = map[reflect.Type]*Schema{}
 
-// Register stores m under t, the struct type NewMetadata[T] was built for.
-// Panics if t was already registered -- one metadata declaration per type,
-// same precedent as Property's own double-registration panic (metadata.go):
+// Register stores m under t, the struct type NewSchema[T] was built for.
+// Panics if t was already registered -- one schema declaration per type,
+// same precedent as Property's own double-registration panic (schema.go):
 // silently overwriting an earlier declaration would let a typo'd duplicate
-// NewMetadata[T] call silently corrupt validation behavior instead of
+// NewSchema[T] call silently corrupt validation behavior instead of
 // failing loudly at startup.
-func Register(t reflect.Type, m *Metadata) {
+func Register(t reflect.Type, m *Schema) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
 	if _, ok := registry[t]; ok {
-		panic(fmt.Sprintf("gonest: NewMetadata already registered for type %s", t))
+		panic(fmt.Sprintf("gonest: NewSchema already registered for type %s", t))
 	}
 	registry[t] = m
 }
 
-// Lookup returns the *Metadata registered for t and true, or (nil, false)
+// Lookup returns the *Schema registered for t and true, or (nil, false)
 // if t was never registered -- the "not found" signal MustJsonBody uses to
-// panic a clear "no metadata registered for type X" error instead of a
+// panic a clear "no schema registered for type X" error instead of a
 // nil-pointer crash (spec.md's Edge Cases).
-func Lookup(t reflect.Type) (*Metadata, bool) {
+func Lookup(t reflect.Type) (*Schema, bool) {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
 	m, ok := registry[t]
@@ -51,7 +51,7 @@ func Lookup(t reflect.Type) (*Metadata, bool) {
 // Deregister removes t's entry from the registry, if any. It is a TEST-ONLY
 // escape hatch (unlike internal/inject's Reset, the registry is
 // intentionally process-long-lived in production -- see registry_test.go's
-// doc comment) -- this package's own test suite builds fresh *Metadata
+// doc comment) -- this package's own test suite builds fresh *Schema
 // values for the SAME handful of package-local types across many Test
 // functions within one test binary run, which would otherwise trip
 // Register's own duplicate panic. Production code has no reason to call
