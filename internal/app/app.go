@@ -239,6 +239,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	// controller.go's ResolveDirect/ResolveDirectAll).
 	declareControllers(modules)
 	declareListeners(modules)
+	declareSchedulers(modules)
 
 	// Phase 3: for every DISTINCT Middleware/Guard/Interceptor/Filter value
 	// referenced anywhere (by a Controller's Use/Guards/Interceptors/
@@ -612,6 +613,22 @@ func declareListeners(modules []*module.Module) {
 	for _, m := range modules {
 		for _, l := range m.OwnListeners() {
 			if d, ok := l.(declarable); ok {
+				d.Declare()
+			}
+		}
+	}
+}
+
+// declareSchedulers runs Declare on every scheduler registered across
+// modules, exactly once each -- same phase 2 as declareControllers/
+// declareListeners (a Scheduler has exactly one owning module, registered
+// directly via Module.Schedulers; Cron/Interval/Timeout calls made inside
+// its builder fn spawn their background goroutines immediately, as fn
+// runs).
+func declareSchedulers(modules []*module.Module) {
+	for _, m := range modules {
+		for _, s := range m.OwnSchedulers() {
+			if d, ok := s.(declarable); ok {
 				d.Declare()
 			}
 		}

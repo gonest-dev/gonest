@@ -3225,3 +3225,73 @@ func TestHealthController_RootAlias_InsightExample_Livez_AlwaysOk(t *testing.T) 
 	res := tester.MustRequest(HttpGet, "/health/livez", nil)
 	res.AssertStatus(t, http.StatusOK)
 }
+
+// ---------------------------------------------------------------------------
+// Scheduler (Milestone 10)
+// ---------------------------------------------------------------------------
+
+// insightSchedulerUserService/insightCleanupScheduler reproduce INSIGHT.md's
+// "exemplo de Schedule" section: a Scheduler depending on a service via
+// MustInject (same builder-time resolution as Controller/Listener), with
+// Cron/Interval/Timeout jobs -- test uses millisecond-scale durations
+// instead of INSIGHT.md's real-world ones (time.Minute etc), same
+// adaptation this feature's own spec.md's Independent Test calls for.
+type insightSchedulerUserService struct {
+	purgeCh  chan struct{}
+	pingCh   chan struct{}
+	warmupCh chan struct{}
+}
+
+func (s *insightSchedulerUserService) PurgeExpired(ctx context.Context) {
+	select {
+	case s.purgeCh <- struct{}{}:
+	default:
+	}
+}
+func (s *insightSchedulerUserService) Ping(ctx context.Context) {
+	select {
+	case s.pingCh <- struct{}{}:
+	default:
+	}
+}
+func (s *insightSchedulerUserService) WarmupCache(ctx context.Context) {
+	close(s.warmupCh)
+}
+
+func TestScheduler_RootAlias_InsightCleanupSchedulerExample(t *testing.T) {
+	userService := &insightSchedulerUserService{
+		purgeCh:  make(chan struct{}, 1),
+		pingCh:   make(chan struct{}, 1),
+		warmupCh: make(chan struct{}),
+	}
+	userProvider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *insightSchedulerUserService { return userService })
+	})
+
+	cleanupScheduler := NewScheduler(func(scheduler *Scheduler) {
+		us := MustInject[*insightSchedulerUserService](scheduler)
+		scheduler.Cron("cleanup-expired-users", "0 0 * * *", func(ctx context.Context) { us.PurgeExpired(ctx) })
+		scheduler.Interval("healthcheck-ping", 10*time.Millisecond, func(ctx context.Context) { us.Ping(ctx) })
+		scheduler.Timeout("warmup-cache", 20*time.Millisecond, func(ctx context.Context) { us.WarmupCache(ctx) })
+	})
+
+	appModule := NewModule(func(module *Module) {
+		module.Providers(userProvider)
+		module.Schedulers(cleanupScheduler)
+	})
+
+	tester := MustNewTestApp(appModule, nil)
+	defer tester.Close()
+
+	select {
+	case <-userService.pingCh:
+	case <-time.After(time.Second):
+		t.Fatal("Interval job (healthcheck-ping) did not fire within 1s")
+	}
+
+	select {
+	case <-userService.warmupCh:
+	case <-time.After(time.Second):
+		t.Fatal("Timeout job (warmup-cache) did not fire within 1s")
+	}
+}

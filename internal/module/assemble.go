@@ -53,6 +53,9 @@ func assemble(root *Module) ([]*Module, error) {
 		for _, l := range m.listeners {
 			l.SetOwnerModule(m)
 		}
+		for _, s := range m.schedulers {
+			s.SetOwnerModule(m)
+		}
 
 		queue = append(queue, m.imports...)
 	}

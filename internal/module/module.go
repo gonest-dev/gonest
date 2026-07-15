@@ -85,6 +85,14 @@ type ListenerRef interface {
 	SetOwnerModule(m *Module)
 }
 
+// SchedulerRef is the Scheduler equivalent of ListenerRef -- same
+// single-module ownership rationale (a Scheduler is registered directly
+// via Module.Schedulers, same level as Providers/Controllers/Listeners).
+type SchedulerRef interface {
+	IsScheduler()
+	SetOwnerModule(m *Module)
+}
+
 // Module represents a declarative unit of the DI graph: its own providers
 // and controllers, the modules it imports, and the subset of its own
 // providers it exports to importers.
@@ -103,6 +111,7 @@ type Module struct {
 	middleware  []MiddlewareRef
 	filters     []FilterRef
 	listeners   []ListenerRef
+	schedulers  []SchedulerRef
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -216,6 +225,19 @@ func (m *Module) Listeners(ls ...ListenerRef) {
 // this Module's internal state.
 func (m *Module) OwnListeners() []ListenerRef {
 	return append([]ListenerRef(nil), m.listeners...)
+}
+
+// Schedulers registers schedulers owned by this module -- same
+// registration level as Providers/Controllers/Listeners.
+func (m *Module) Schedulers(ss ...SchedulerRef) {
+	m.schedulers = append(m.schedulers, ss...)
+}
+
+// OwnSchedulers returns a copy of the schedulers registered on this module
+// via Schedulers. Read-only: mutating the returned slice does not affect
+// this Module's internal state.
+func (m *Module) OwnSchedulers() []SchedulerRef {
+	return append([]SchedulerRef(nil), m.schedulers...)
 }
 
 // ImportedModules returns a copy of the modules registered on this module

@@ -29,6 +29,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/openapi"
 	"github.com/gonest-dev/gonest/internal/provider"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/scheduler"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
 )
@@ -702,3 +703,15 @@ var NewListener = emitter.NewListener
 func MustOn[EventType any](listener *Listener, handler func(ctx context.Context, event EventType)) {
 	emitter.MustOn[EventType](listener, handler)
 }
+
+// ---------------------------------------------------------------------------
+// Scheduler (Milestone 10)
+// ---------------------------------------------------------------------------
+
+// Scheduler represents a single unit of job registration -- its builder fn
+// (deferred until bootstrap runs it, same New*-deferred pattern as
+// Provider/Controller) is expected to call Cron/Interval/Timeout.
+type Scheduler = scheduler.Scheduler
+
+// NewScheduler creates a Scheduler that defers fn until bootstrap runs it.
+var NewScheduler = scheduler.New

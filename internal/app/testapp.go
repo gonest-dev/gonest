@@ -99,6 +99,7 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp 
 
 	declareControllers(modules)
 	declareListeners(modules)
+	declareSchedulers(modules)
 
 	ownership := discoverPipelineStageOwnership(modules)
 	declarePipelineStageTypes(ownership)
