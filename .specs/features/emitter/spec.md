@@ -1,5 +1,7 @@
 # Emitter Specification
 
+**Status: COMPLETE (2026-07-15, commit `1e08298`).** `Emitter`'s "resolve from any module, no registration" requirement (spec's own Goal, not resolved by design.md since none was written) solved via a new generic mechanism in `internal/inject`: `RegisterGlobalSingleton`/`GlobalSingletonFor`, checked by `MustInject[T]` BEFORE the existing `directResolver`/placeholder dispatch. `internal/app`'s `NewApp`/`MustNewTestApp` register a fresh `*emitter.Emitter` this way at the very start of every bootstrap (alongside `inject.Reset()`). `Listener` ended up following `Controller`'s single-module-ownership pattern (registered via `Module.Listeners`, declared in phase 2), not the union-of-referencing-modules pattern Middleware/Guard/Interceptor/Filter use -- `Module.Listeners(l)` is a direct per-module registration, same level as `Module.Providers`/`Controllers`, so there's no multi-controller-reference ambiguity to resolve.
+
 ## Problem Statement
 
 Milestone 9 (equivalente `@nestjs/event-emitter`, ver ROADMAP.md): evento tipado por struct (não string solta), listener registrado via `Module.Listeners()`, emissão assíncrona fire-and-forget via um `Emitter` global (singleton do framework, sempre disponível). INSIGHT.md's "# exemplo de Emitter" já especifica o call shape completo (corrigido nesta sessão -- ver nota abaixo).
