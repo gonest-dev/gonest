@@ -271,3 +271,5 @@ _Nenhum ainda._
 ## Preferences
 
 **Model Guidance Shown:** never
+
+**Commit convention (2026-07-15):** every commit, every iteration/task, MUST be in en-US, using Conventional Commits format (`type(scope): summary`, e.g. `feat(emitter): add Emitter/Listener/MustOn`, `docs(specs): close Emitter feature`, `refactor(app)!: ...` for breaking changes). Types used so far in this project: `feat`, `fix`, `refactor` (with `!` suffix for breaking changes), `docs`. Body (when present) explains WHY, not WHAT (the diff already shows what changed) -- see git log for the established tone/depth. Applies regardless of what language the conversation itself is happening in (this repo's own conversations are often in pt-BR, but commits stay en-US).
