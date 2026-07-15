@@ -2,3 +2,4 @@
 /.examples/**/*.exe
 *.db
 *.sqlite
+/.examples/blog-api/uploads/

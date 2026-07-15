@@ -1,23 +1,23 @@
 # Testing
 
-**Status:** greenfield — definido antes da 1ª feature (Provider & DI Graph), sem código Go ainda.
+**Status:** maduro — v1 completo (Milestones 1-11) + Milestone 12 (Multipart Form Streaming) pós-v1, suite inteira verde ao longo de toda a sessão.
 
 ## Tooling
 
 - Runner: `go test` (stdlib)
-- Assertions: `github.com/stretchr/testify/assert` (sem mock framework por enquanto — feature de DI não precisa)
+- Assertions: stdlib puro (`t.Fatalf`/`t.Errorf`/`t.Fatal`) -- `testify/assert` foi cogitado no planejamento inicial (greenfield) mas NUNCA usado na prática; não está em `go.mod`. Atualizado aqui pra refletir a convenção real, não a intenção original.
 - Race detector: sempre ligado (`-race`) — relevante desde a 1ª feature por causa do `errgroup`/paralelismo no bootstrap
 
 ## Gate Check Commands
 
-**Ambiente Windows local:** o processo que spawna cada shell injeta `CC=clang` (target MSVC), que quebra o build cgo do `-race` (`clang: error: unsupported option '-mthreads'`) — não vem de variável de ambiente User/Machine (essas ficaram vazias antes do B-001), então `go env -w` e `setx` não resolvem, só reiniciar a sessão do harness pegaria a variável persistida. MinGW-w64 já instalado (WinLibs, `winget install BrechtSanders.WinLibs.POSIX.UCRT`) — enquanto a sessão não reinicia, todo Gate command precisa do override inline abaixo.
+**Ambiente Windows local:** o workaround antigo (`CC=clang` injetado quebrando o build cgo do `-race`, exigindo override inline `CC=gcc CXX=g++ PATH=...`) não se aplica mais nesta sessão do harness -- `CC`/`CXX` já vêm resolvidos (`gcc`/`g++`) sem override manual, confirmado empiricamente rodando `go test ./... -race` puro repetidamente. Simplificado de volta, exatamente como a nota anterior já previa.
 
 | Gate | Command | Quando roda |
 | --- | --- | --- |
-| quick | `CC=gcc CXX=g++ PATH="/c/Users/Leandro/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/bin:$PATH" go test ./... -race` | A cada task com só `unit` |
+| quick | `go test ./... -race` | A cada task com só `unit` |
 | full | mesmo comando acima (sem flag extra — `app.Test(req)` do Fiber não sobe porta real, roda dentro do `go test` normal, sem precisar de gate separado) | Task com `integration` + antes de fechar a feature inteira |
 
-**Nota:** se uma sessão futura do harness já nascer sem `CC=clang` embutido (ex: depois de reiniciar o Claude Code), o prefixo `CC=gcc CXX=g++ PATH=...` vira redundante mas inofensivo — pode simplificar de volta pra `go test ./... -race` puro quando confirmar isso.
+**Se o workaround `CC=clang` voltar a aparecer** (harness reiniciado com config antiga), o prefixo é `CC=gcc CXX=g++ PATH="<pasta do MinGW-w64 instalado via winget>:$PATH"` na frente de qualquer comando `go test`/`go build` que use `-race`.
 
 ## Test Coverage Matrix
 
@@ -35,6 +35,8 @@
 **Atualizado na feature "Controller & Route Registration":** primeira camada e2e/integration do projeto — dispatch HTTP real via Fiber precisa provar que rota registrada responde corretamente, não só que a struct `Route` foi montada certo (isso é unit).
 
 **Atualizado na feature "App Bootstrap & Listen":** segunda camada integration — agora cobrindo bind real de porta (`Listen`/`MustListen`/`OnListen`) e, no T6 final, um dial de verdade via `net/http.Client` (não `app.Test`) contra o `UserController`/`UserService` de exemplo, provando a cadeia inteira ponta a ponta.
+
+**Atualizado na feature "Multipart Form Streaming" (Milestone 12):** achado importante -- `app.Test(req)` do Fiber (linha da matriz acima, "Dispatch de rota via Fiber real") NÃO serve pra provar comportamento de STREAMING: `Test` usa `httputil.DumpRequest(req, true)` internamente, que lê `req.Body` inteiro pra memória ANTES do `ServeConn` sequer rodar -- confirmado via leitura direta do source do `gofiber/fiber/v3`, não assumido. Qualquer teste que precise provar "bytes chegaram progressivamente, sem buffer completo antes" precisa do dial real (`Bind/Listen real`, linha abaixo), não do `app.Test` mais leve. A matriz de cobertura em si não ganhou linha nova (a rota multipart continua "Dispatch via Fiber real" pra correção funcional) -- só a prova ESPECÍFICA de streaming exige a camada mais pesada.
 
 ## Parallelism Assessment
 

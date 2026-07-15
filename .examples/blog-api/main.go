@@ -19,6 +19,7 @@
 //	curl -H "Authorization: Bearer demo-token" -X POST localhost:3001/posts -d '{"user_id":1,"title":"Hello","body":"World"}'
 //	curl -H "Authorization: Bearer demo-token" -X POST localhost:3001/comments -d '{"post_id":1,"user_id":1,"body":"Nice post!"}'
 //	curl -H "Authorization: Bearer demo-token" localhost:3001/comments?post_id=1
+//	curl -H "Authorization: Bearer demo-token" -F "description=cover photo" -F "file=@/path/to/photo.jpg" localhost:3001/posts/1/attachment
 //	curl localhost:3001/docs   (Swagger UI, no auth required)
 package main
 
@@ -41,7 +42,12 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 })
 
 func main() {
-	app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
+	app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{
+		// Required for POST /posts/:post_id/attachment (Multipart Form
+		// Streaming) -- app-wide setting, doesn't change how any other
+		// existing route (JSON body/params/query) behaves.
+		EnableFormStreaming: true,
+	})
 
 	doc := gonest.NewOpenAPI("3.1.0", func(b *gonest.OpenAPI) {
 		b.Title("Blog API")

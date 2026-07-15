@@ -531,6 +531,82 @@ o valor CRU (string, no caso de param/query) e devolvendo o valor Go final ou
 um `error` que vira violation. Ver a seção "exemplo de Middleware, Guard,
 Interceptor e Filter" acima (`PrefixedUserIdParam`) pro exemplo completo.
 
+# exemplo de upload de arquivo (multipart/form-data com streaming de verdade)
+
+Nenhum framework Go visto (nem o próprio `multer`/`FileInterceptor` do Nest)
+tem uma forma plausível de repassar bytes de arquivo direto pro storage (S3
+etc) SEM bufferizar o arquivo inteiro localmente primeiro. Confirmado via
+leitura direta do source vendorizado (`gofiber/fiber/v3@v3.4.0` +
+`valyala/fasthttp@v1.72.0`, sem assumir nada) que isso é viável com as
+dependências já existentes -- ver `.specs/features/multipart-form-streaming/`
+pro spec/design completo.
+
+`gonest.ParseRestFormBody`/`MustParseRestFormBody` seguem o mesmo par
+Parse/Must de `MustParseRestJsonBody`/etc, com um argumento a mais: `onFile`,
+chamado SINCRONAMENTE assim que uma parte-arquivo aparece no stream multipart
+cru -- antes de qualquer outra parte ser lida. Campos normais (sem
+`filename`) usam a MESMA validação de `Schema`, com uma tag nova
+`form:"..."` (distinta de `param`/`query`/`json`, mesma convenção "uma tag
+por origem").
+
+```go
+package ex
+
+import (
+  "io"
+
+  "github.com/gonest-dev/gonest"
+)
+
+type CreatePostForm struct {
+  Title string `form:"title"`
+}
+
+var createPostFormSchema = gonest.NewSchema[CreatePostForm](func (t *CreatePostForm, m *gonest.Schema) {
+  m.Property(&t.Title).String().Required()
+})
+
+var PostController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/posts")
+
+  controller.Route(gonest.HttpPost, "/", func (route *gonest.Route) {
+    route.Summary("Cria um post com anexo, repassando o arquivo pro S3 em streaming")
+    route.Handler(func(ctx *gonest.RestContext) {
+      form := gonest.MustParseRestFormBody[*CreatePostForm](ctx, createPostFormSchema, func (f *gonest.FormFile) error {
+        // f.Reader() é a parte AINDA não consumida do stream multipart --
+        // repassa direto pro S3 (ou qualquer io.Writer) sem nunca
+        // bufferizar o arquivo inteiro localmente primeiro.
+        return uploadToS3(f.Filename(), f.ContentType(), f.Reader())
+      })
+      ctx.Json(map[string]string{"title": form.Title})
+    })
+  })
+})
+
+func uploadToS3(filename, contentType string, r io.Reader) error {
+  // ... s3Client.PutObject(..., Body: r, ...) -- streaming de verdade,
+  // r nunca é lido inteiro na memória antes de chegar aqui.
+  return nil
+}
+```
+
+Pra `onFile`/`route.Handler` acima funcionarem, o app precisa ser construído
+com `AppOptions.EnableFormStreaming: true` -- é uma configuração de app
+INTEIRO (não por rota, `fasthttp.Server` não tem essa granularidade), mas
+não muda nada pras rotas existentes (`MustParseRestJsonBody`/`Params`/`Query`
+continuam funcionando idênticos, já que `Context.Body()` continua
+bufferizando a stream na primeira leitura, config ligada ou não):
+
+```go
+app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{
+  EnableFormStreaming: true,
+})
+```
+
+Se `onFile` devolver um `error` (ex: arquivo grande demais, content-type
+inválido), o walk pára na hora e vira `*BadRequestException` igual qualquer
+outra violação -- mesmo formato `{name, message, details}` de sempre.
+
 # exemplo de Schema Generation from Schema
 
 Mapeamento NestJS `@nestjs/swagger` -> gonest (decorator -> builder method, já
