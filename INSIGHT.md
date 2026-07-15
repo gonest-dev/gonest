@@ -618,60 +618,60 @@ import (
   "github.com/gonest-dev/gonest"
 )
 
-// Animal é a interface -- múltiplos providers podem satisfazer a mesma.
-type Animal interface { Talk() string }
+// Connectable é a interface -- múltiplos providers podem satisfazer a mesma.
+type Connectable interface { Ping() bool }
 
-type Cat struct{}
-var _ Animal = (*Cat)(nil)
-func (c *Cat) Talk() string { return "miau" }
+type Postgres struct{}
+var _ Connectable = (*Postgres)(nil)
+func (c *Postgres) Ping() bool { return true }
 
-var CatProvider = gonest.NewProvider(func (provider *gonest.Provider) {
-  provider.Constructor(func() *Cat { return &Cat{} })
+var PostgresProvider = gonest.NewProvider(func (provider *gonest.Provider) {
+  provider.Constructor(func() *Postgres { return &Postgres{} })
 })
 
-type Dog struct{}
-var _ Animal = (*Dog)(nil)
-func (d *Dog) Talk() string { return "woff woff" }
-var DogProvider = gonest.NewProvider(func (provider *gonest.Provider) {
-  provider.Constructor(func() *Dog { return &Dog{} })
+type Redis struct{}
+var _ Connectable = (*Redis)(nil)
+func (d *Redis) Ping() bool { return true }
+var RedisProvider = gonest.NewProvider(func (provider *gonest.Provider) {
+  provider.Constructor(func() *Redis { return &Redis{} })
 })
 
-// AnimalSoundService recebe TODOS os Animal registrados no módulo, sem
-// precisar conhecer Cat/Dog especificamente -- novo Animal registrado no
-// módulo (ex: Bird) aparece automaticamente na próxima resolução, sem
-// mudar AnimalSoundService nenhum.
-type AnimalSoundService struct {
-  animals []Animal
+// ConnectableService recebe TODOS os Connectable registrados no módulo, sem
+// precisar conhecer Postgres/Redis especificamente -- novo Connectable registrado no
+// módulo (ex: PostgresDatabase) aparece automaticamente na próxima resolução, sem
+// mudar DatabaseQueryService nenhum.
+type ConnectableService struct {
+  connectables []Connectable
 }
-func (t *AnimalSoundService) TalkAll() []string {
-  out := make([]string, 0, len(t.animals))
-  for _, a := range t.animals {
-    out = append(out, a.Talk())
+func (t *ConnectableService) PingAll() []bool {
+  out := make([]bool, 0, len(t.connectables))
+  for _, a := range t.connectables {
+    out = append(out, a.Ping())
   }
   return out
 }
 
-var AnimalController = gonest.NewController(func (controller *gonest.Controller) {
-  controller.Path("/animals")
+var SystemController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/health")
 
-  // MustInjectAll[Animal] -- resolvido UMA vez aqui, fora do Handler (o
+  // MustInjectAll[Connectable] -- resolvido UMA vez aqui, fora do Handler (o
   // grafo de providers já está totalmente resolvido nesse ponto -- ver
   // "exemplo mais simples" pra ordem de bootstrap). Handler só fecha sobre
   // o slice já pronto, não resolve de novo a cada request.
-  animals := gonest.MustInjectAll[Animal](controller)
-  soundService := &AnimalSoundService{animals: animals}
+  connectables := gonest.MustInjectAll[Connectable](controller)
+  service := &ConnectableService{connectables: connectables}
 
-  controller.Route(gonest.HttpGet, "/talk", func (route *gonest.Route) {
+  controller.Route(gonest.HttpGet, "/ping", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
     route.Handler(func(ctx *gonest.Context) {
-      ctx.Json(soundService.TalkAll()) // ["miau", "woof woof"]
+      ctx.Json(service.PingAll())
     })
   })
 })
 
-var AnimalModule = gonest.NewModule(func (module *gonest.Module) {
-  module.Providers(CatProvider, DogProvider)
-  module.Controllers(AnimalController)
+var SystemModule = gonest.NewModule(func (module *gonest.Module) {
+  module.Providers(PostgresProvider, RedisProvider)
+  module.Controllers(SystemController)
 })
 ```
 
@@ -757,7 +757,12 @@ var AppModule = gonest.NewModule(func (module *gonest.Module) {
 // roda isolada (recover próprio), erro só vai pro logger, igual comportamento de job.
 ```
 
-# exemplo de Terminus/health (equivalente @nestjs/terminus)
+# exemplo de Probes / health (equivalente @nestjs/terminus)
+
+No NestJS, o Terminus não introduz uma estrutura nova de bootstrap; ele é
+simplesmente um Controller padrão (anotado com `@Controller`) que expõe as
+checagens. No `gonest`, o modelo mental é exatamente o mesmo: não precisamos
+de um `NewProbe` dedicado, apenas usamos um `NewController` normal!
 
 ```go
 package ex
@@ -768,25 +773,61 @@ import (
   "github.com/gonest-dev/gonest"
 )
 
-var AppHealth = gonest.NewHealthCheck(func (health *gonest.HealthCheck) {
-  db, redis := gonest.MustInject[*Db](health), gonest.MustInject[*Redis](health)
-  health.Check("database", func (ctx context.Context) error { return db.Ping(ctx) })
-  health.Check("redis", func (ctx context.Context) error { return redis.Ping(ctx) })
+// Pingable é a interface que toda dependência checável implementa -- nome
+// distinto de Connectable (usada no exemplo de MustInjectAll acima, que tem
+// assinatura diferente: Ping() bool, sem Name()) para não colidir.
+type Pingable interface {
+  Name() string
+  Ping(ctx context.Context) error
+}
+
+// HealthController atua exatamente como o Terminus no NestJS: é um controller
+// comum, onde você injeta as dependências que quer checar e as expõe via rotas.
+var HealthController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/health")
+
+  // MustInjectAll resolve todas as implementações de Pingable (ex: Db, Redis)
+  pingables := gonest.MustInjectAll[Pingable](controller)
+
+  // Readiness Probe (Padrão K8s: /readyz) - "Estou pronto pra receber tráfego?"
+  controller.Route(gonest.HttpGet, "/readyz", func (route *gonest.Route) {
+    route.Handler(func(ctx *gonest.Context) {
+      results, status := make(map[string]string), gonest.HttpStatusOk
+
+      for _, c := range pingables {
+        name := c.Name()
+        if err := c.Ping(ctx); err != nil {
+          results[name], status = "down", gonest.HttpStatusServiceUnavailable
+        } else {
+          results[name] = "up"
+        }
+      }
+
+      ctx.Status(status).Json(map[string]any{"status": "ok","checks": results})
+    })
+  })
+
+  // Liveness Probe (Padrão K8s: /livez) - "Eu travei em deadlock?"
+  // Responder 200 OK direto costuma ser o suficiente, já que se o container
+  // travar no Go, o servidor HTTP sequer conseguirá responder a esse request.
+  controller.Route(gonest.HttpGet, "/livez", func (route *gonest.Route) {
+    route.HttpCode(gonest.HttpStatusOk)
+    route.Handler(func(ctx *gonest.Context) {
+      ctx.Status(gonest.HttpStatusOk).SendString("OK")
+    })
+  })
 })
 
 var AppModule = gonest.NewModule(func (module *gonest.Module) {
-  module.HealthChecks(AppHealth)
+  module.Controllers(HealthController) // registrado como um controller normal!
 })
 
 func main() {
   app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
   defer app.Close()
 
-  // monta GET /health automaticamente a partir dos HealthChecks registrados no módulo.
-  // status 200 + { "status": "ok", "checks": {"database":"ok","redis":"ok"} } se tudo passar.
-  // 503 + detalhe do check que falhou (nome + erro) se algum falhar.
-  app.UseHealthCheck("/health")
-
+  // Nenhuma configuração especial no main() para Probes/HealthChecks! 
+  // O HealthController já registrou as rotas de forma nativa.
   app.MustListen(":3000", nil)
 }
 ```

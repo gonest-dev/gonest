@@ -3120,13 +3120,16 @@ func TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration(t *testing.T) {
 // Terminus/health checks (Milestone 11 -- plain Controller, no new type)
 // ---------------------------------------------------------------------------
 
-// insightHealthConnectable/insightHealthDb/insightHealthRedis reproduce
-// INSIGHT.md's "exemplo de Probes / health" section: Connectable providers
+// insightPingable/insightHealthDb/insightHealthRedis reproduce
+// INSIGHT.md's "exemplo de Probes / health" section: Pingable providers
 // controllable per-test (toggle up/down), a HealthController built via
 // gonest.NewController (no new bootstrap type at all), exposing /readyz
-// (aggregates every Connectable via MustInjectAll) and /livez (static OK
-// via Context.SendString).
-type insightHealthConnectable interface {
+// (aggregates every Pingable via MustInjectAll) and /livez (static OK via
+// Context.SendString). Pingable is a DISTINCT interface from the earlier
+// "exemplo de MustInjectAll" section's Connectable (different signature:
+// Ping() bool there vs Ping(ctx) error + Name() here) -- same name
+// collision INSIGHT.md itself avoids by naming this one Pingable.
+type insightPingable interface {
 	Name() string
 	Ping(ctx context.Context) error
 }
@@ -3162,13 +3165,13 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 	healthController := NewController(func(controller *Controller) {
 		controller.Path("/health")
 
-		connectableList := MustInjectAll[insightHealthConnectable](controller)
+		pingables := MustInjectAll[insightPingable](controller)
 
 		controller.Route(HttpGet, "/readyz", func(r *Route) {
 			r.Handler(func(ctx *execution.Context) {
 				results, status := make(map[string]string), HttpStatusOk
 
-				for _, c := range connectableList {
+				for _, c := range pingables {
 					name := c.Name()
 					if err := c.Ping(context.Background()); err != nil {
 						results[name], status = "down", HttpStatusServiceUnavailable
