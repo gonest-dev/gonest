@@ -1,0 +1,20 @@
+package shared
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/gonest-dev/gonest"
+)
+
+// TimingInterceptor logs how long each request took, wrapping the route
+// Handler's own execution -- dogfoods the (ctx, next) continuation shape,
+// attached per-controller (Interceptor has no Module-level global
+// registration, unlike Middleware/Filter).
+var TimingInterceptor = gonest.NewInterceptor(func(interceptor *gonest.Interceptor) {
+	interceptor.Handler(func(ctx *gonest.Context, next gonest.InterceptorNext) {
+		start := time.Now()
+		next(ctx)
+		fmt.Printf("[timing] request took %s\n", time.Since(start))
+	})
+})
