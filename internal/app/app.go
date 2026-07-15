@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/gonest-dev/gonest/internal/emitter"
@@ -25,7 +26,21 @@ import (
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/resolver"
 	"github.com/gonest-dev/gonest/internal/route"
+	"github.com/gonest-dev/gonest/internal/version"
 )
+
+// banner is gonest's own ASCII wordmark, printed once by MustListen before
+// its 3 structured log lines -- unformatted (no timestamp/level tag), the
+// same convention Fiber's own suppressed banner used (see
+// internal/adapter/fiber.FiberApp.Listen's DisableStartupMessage), so
+// gonest presents its OWN identity rather than the underlying adapter's.
+const banner = `
+   ______                          __
+  / ____/___  ____  ___  ___  ____/ /_
+ / / __/ __ \/ __ \/ _ \/ _ \/ ___/ __/
+/ /_/ / /_/ / / / /  __/  __(__  ) /_
+\____/\____/_/ /_/\___/\___/____/\__/
+`
 
 // bootstrapTimeout bounds Stage 3 (Parallel Resolution): every Provider's
 // Constructor -- including ones that don't accept a context.Context
@@ -100,7 +115,9 @@ func (a *App) Root() *module.Module {
 // the underlying error.
 func (a *App) MustListen(addr string, onListen OnListen) {
 	onListenFunc := func() {
-		logger.Info(fmt.Sprintf("Gonest started on: http://%s", addr))
+		fmt.Print(banner)
+		fmt.Printf("  %s\n\n", versionLabel())
+		logger.Info(fmt.Sprintf("Gonest started on: http://%s", displayAddr(addr)))
 		logger.Info(fmt.Sprintf("Loaded:            Modules(%d), Controllers(%d), Routes(%d)", a.moduleCount, a.controllerCount, a.routeCount))
 		logger.Info(fmt.Sprintf("PID:               %d", os.Getpid()))
 		if onListen != nil {
@@ -110,6 +127,31 @@ func (a *App) MustListen(addr string, onListen OnListen) {
 	if err := a.adapter.Listen(addr, onListenFunc); err != nil {
 		panic(fmt.Sprintf("gonest: failed to listen on %q: %v", addr, err))
 	}
+}
+
+// versionLabel formats version.String() for the banner's own version
+// line -- a real tagged version prints as "vX.Y.Z"; the "(devel)" fallback
+// (no tag cut yet, e.g. local `go run .`) prints as-is, without a
+// misleading "v" prefix.
+func versionLabel() string {
+	v := version.String()
+	if v == "(devel)" {
+		return v
+	}
+	return "v" + v
+}
+
+// displayAddr rewrites a bare ":PORT" addr (Go's own net.Listen shorthand
+// for "all interfaces") into "0.0.0.0:PORT" for the startup log line --
+// "http://:3000" is technically what was passed to Listen, but reads as a
+// typo/missing host to a human, and every adapter's own default banner
+// this replaces (e.g. Fiber's) already showed a real host, not a bare
+// colon.
+func displayAddr(addr string) string {
+	if strings.HasPrefix(addr, ":") {
+		return "0.0.0.0" + addr
+	}
+	return addr
 }
 
 // HttpAdapter is the minimal contract an HTTP adapter must satisfy for
