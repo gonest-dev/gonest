@@ -89,18 +89,80 @@ const (
 	HttpQuery = route.HttpQuery
 )
 
-// HttpStatusOk/HttpStatusServiceUnavailable are the 2 raw HTTP status codes
-// INSIGHT.md's own examples reference directly (e.g. "exemplo de Testing"'s
-// res.AssertStatus(t, gonest.HttpStatusOk), "exemplo de Probes / health"'s
-// readiness probe). Deliberately NOT a full status-code enum -- only these
-// 2 are demonstrated anywhere; a fuller enum is a separate, later
-// housekeeping task if a real need appears (same "don't invent unused API
-// surface" stance as every prior feature this session).
+// HttpStatus* is the full standard HTTP status code enum, re-exporting every
+// net/http.StatusXxx constant under an "HttpStatus" prefix (e.g.
+// net/http.StatusNotFound -> gonest.HttpStatusNotFound) -- so route/response
+// code can stay entirely within the gonest namespace instead of importing
+// net/http alongside it just for a status code. Each value is a direct
+// alias of its net/http counterpart, never a re-declared literal, so this
+// list never drifts if net/http itself ever adds/changes one.
 const (
-	// HttpStatusOk corresponds to net/http.StatusOK (200).
-	HttpStatusOk = http.StatusOK
-	// HttpStatusServiceUnavailable corresponds to net/http.StatusServiceUnavailable (503).
-	HttpStatusServiceUnavailable = http.StatusServiceUnavailable
+	HttpStatusContinue           = http.StatusContinue
+	HttpStatusSwitchingProtocols = http.StatusSwitchingProtocols
+	HttpStatusProcessing         = http.StatusProcessing
+	HttpStatusEarlyHints         = http.StatusEarlyHints
+
+	HttpStatusOk                   = http.StatusOK
+	HttpStatusCreated              = http.StatusCreated
+	HttpStatusAccepted             = http.StatusAccepted
+	HttpStatusNonAuthoritativeInfo = http.StatusNonAuthoritativeInfo
+	HttpStatusNoContent            = http.StatusNoContent
+	HttpStatusResetContent         = http.StatusResetContent
+	HttpStatusPartialContent       = http.StatusPartialContent
+	HttpStatusMultiStatus          = http.StatusMultiStatus
+	HttpStatusAlreadyReported      = http.StatusAlreadyReported
+	HttpStatusIMUsed               = http.StatusIMUsed
+
+	HttpStatusMultipleChoices   = http.StatusMultipleChoices
+	HttpStatusMovedPermanently  = http.StatusMovedPermanently
+	HttpStatusFound             = http.StatusFound
+	HttpStatusSeeOther          = http.StatusSeeOther
+	HttpStatusNotModified       = http.StatusNotModified
+	HttpStatusUseProxy          = http.StatusUseProxy
+	HttpStatusTemporaryRedirect = http.StatusTemporaryRedirect
+	HttpStatusPermanentRedirect = http.StatusPermanentRedirect
+
+	HttpStatusBadRequest                   = http.StatusBadRequest
+	HttpStatusUnauthorized                 = http.StatusUnauthorized
+	HttpStatusPaymentRequired              = http.StatusPaymentRequired
+	HttpStatusForbidden                    = http.StatusForbidden
+	HttpStatusNotFound                     = http.StatusNotFound
+	HttpStatusMethodNotAllowed             = http.StatusMethodNotAllowed
+	HttpStatusNotAcceptable                = http.StatusNotAcceptable
+	HttpStatusProxyAuthRequired            = http.StatusProxyAuthRequired
+	HttpStatusRequestTimeout               = http.StatusRequestTimeout
+	HttpStatusConflict                     = http.StatusConflict
+	HttpStatusGone                         = http.StatusGone
+	HttpStatusLengthRequired               = http.StatusLengthRequired
+	HttpStatusPreconditionFailed           = http.StatusPreconditionFailed
+	HttpStatusRequestEntityTooLarge        = http.StatusRequestEntityTooLarge
+	HttpStatusRequestURITooLong            = http.StatusRequestURITooLong
+	HttpStatusUnsupportedMediaType         = http.StatusUnsupportedMediaType
+	HttpStatusRequestedRangeNotSatisfiable = http.StatusRequestedRangeNotSatisfiable
+	HttpStatusExpectationFailed            = http.StatusExpectationFailed
+	HttpStatusTeapot                       = http.StatusTeapot
+	HttpStatusMisdirectedRequest           = http.StatusMisdirectedRequest
+	HttpStatusUnprocessableEntity          = http.StatusUnprocessableEntity
+	HttpStatusLocked                       = http.StatusLocked
+	HttpStatusFailedDependency             = http.StatusFailedDependency
+	HttpStatusTooEarly                     = http.StatusTooEarly
+	HttpStatusUpgradeRequired              = http.StatusUpgradeRequired
+	HttpStatusPreconditionRequired         = http.StatusPreconditionRequired
+	HttpStatusTooManyRequests              = http.StatusTooManyRequests
+	HttpStatusRequestHeaderFieldsTooLarge  = http.StatusRequestHeaderFieldsTooLarge
+	HttpStatusUnavailableForLegalReasons   = http.StatusUnavailableForLegalReasons
+
+	HttpStatusInternalServerError           = http.StatusInternalServerError
+	HttpStatusNotImplemented                = http.StatusNotImplemented
+	HttpStatusBadGateway                    = http.StatusBadGateway
+	HttpStatusServiceUnavailable            = http.StatusServiceUnavailable
+	HttpStatusGatewayTimeout                = http.StatusGatewayTimeout
+	HttpStatusHTTPVersionNotSupported       = http.StatusHTTPVersionNotSupported
+	HttpStatusVariantAlsoNegotiates         = http.StatusVariantAlsoNegotiates
+	HttpStatusInsufficientStorage           = http.StatusInsufficientStorage
+	HttpStatusLoopDetected                  = http.StatusLoopDetected
+	HttpStatusNotExtended                   = http.StatusNotExtended
+	HttpStatusNetworkAuthenticationRequired = http.StatusNetworkAuthenticationRequired
 )
 
 // Controller represents a declarative unit that consumes providers via

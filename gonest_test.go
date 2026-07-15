@@ -3298,3 +3298,36 @@ func TestScheduler_RootAlias_InsightCleanupSchedulerExample(t *testing.T) {
 		t.Fatal("Timeout job (warmup-cache) did not fire within 1s")
 	}
 }
+
+// TestHttpStatusConstants_MatchNetHttp proves every gonest.HttpStatus*
+// constant is a faithful alias of its net/http.StatusXxx counterpart --
+// enough of the 63-entry enum spot-checked (1 per class, plus a few
+// easy-to-mistype WebDAV/teapot ones) to catch a copy-paste typo in the
+// const block without exhaustively re-listing all 63 pairs.
+func TestHttpStatusConstants_MatchNetHttp(t *testing.T) {
+	cases := []struct {
+		name string
+		got  int
+		want int
+	}{
+		{"HttpStatusContinue", HttpStatusContinue, http.StatusContinue},
+		{"HttpStatusOk", HttpStatusOk, http.StatusOK},
+		{"HttpStatusCreated", HttpStatusCreated, http.StatusCreated},
+		{"HttpStatusMultiStatus", HttpStatusMultiStatus, http.StatusMultiStatus},
+		{"HttpStatusMovedPermanently", HttpStatusMovedPermanently, http.StatusMovedPermanently},
+		{"HttpStatusBadRequest", HttpStatusBadRequest, http.StatusBadRequest},
+		{"HttpStatusNotFound", HttpStatusNotFound, http.StatusNotFound},
+		{"HttpStatusConflict", HttpStatusConflict, http.StatusConflict},
+		{"HttpStatusTeapot", HttpStatusTeapot, http.StatusTeapot},
+		{"HttpStatusUnprocessableEntity", HttpStatusUnprocessableEntity, http.StatusUnprocessableEntity},
+		{"HttpStatusTooManyRequests", HttpStatusTooManyRequests, http.StatusTooManyRequests},
+		{"HttpStatusInternalServerError", HttpStatusInternalServerError, http.StatusInternalServerError},
+		{"HttpStatusServiceUnavailable", HttpStatusServiceUnavailable, http.StatusServiceUnavailable},
+		{"HttpStatusNetworkAuthenticationRequired", HttpStatusNetworkAuthenticationRequired, http.StatusNetworkAuthenticationRequired},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("%s = %d, want %d (net/http)", c.name, c.got, c.want)
+		}
+	}
+}

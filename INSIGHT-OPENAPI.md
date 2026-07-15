@@ -172,7 +172,7 @@ func (m *UserServiceMock) Get(userId int64) *UserEntity { return m.GetFn(userId)
 func TestUserController_Get(t *testing.T) {
   mock := &UserServiceMock{
     GetFn: func(userId int64) *UserEntity {
-      return &UserEntity{ID: gonest.NewValue(userId)}
+      return &UserEntity{ID: userId}
     },
   }
 
@@ -316,7 +316,7 @@ var UserProvider = gonest.NewProvider(func (provider *gonest.Provider) {
 
 func (t *UserService) Create(properties UserProperties) *UserEntity {
   entity := &UserEntity{ /* ... */ }
-  t.emitter.Emit(UserCreatedEvent{UserID: entity.ID.Value()})
+  t.emitter.Emit(UserCreatedEvent{UserID: entity.ID})
   return entity
 }
 
@@ -426,7 +426,6 @@ var AppModule = gonest.NewModule(func (module *gonest.Module) {
 
 func main() {
   app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
-  defer app.Close()
 
   // Nenhuma configuração especial no main() para Probes/HealthChecks! 
   // O HealthController já registrou as rotas de forma nativa.
@@ -631,15 +630,15 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 
     // liga status HTTP -> *Schema da resposta. Múltiplas chamadas = múltiplos
     // status documentados (ex: 201 sucesso, 409 conflito reusando outra Schema).
-    route.Response(201, func (response *gonest.Response) {
+    route.Response(gonest.HttpStatusCreated, func (response *gonest.Response) {
       response.Description("Usuário criado com sucesso")
       response.Schema(userEntitySchema)
     })
-    route.Response(409, func (response *gonest.Response) {
+    route.Response(gonest.HttpStatusConflict, func (response *gonest.Response) {
       response.Description("Conflito: usuário já existe")
     })
 
-    route.HttpCode(201)
+    route.HttpCode(gonest.HttpStatusCreated)
     route.Handler(func(ctx *gonest.Context) {
       properties := gonest.MustJsonBody[*UserEntity](ctx, userEntitySchema)
       ctx.Json(userService.Create(properties))
@@ -652,15 +651,15 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     // UserIdParams de MustParams) -- Schema Generation vira "parameters"
     // (in: path) no OpenAPI a partir dela, sem redeclarar nada.
     route.Params(userIdParamsSchema)
-    route.Response(200, func (response *gonest.Response) {
+    route.Response(gonest.HttpStatusOk, func (response *gonest.Response) {
       response.Description("Usuário encontrado")
       response.Schema(userEntitySchema)
     })
     // sem passar a função de construção da response então retorna um modelo padronizado
     // seguindo as mensagens comuns em ingles e o formato do gonest.HttpException básico
-    route.Response(404) 
+    route.Response(gonest.HttpStatusNotFound) 
 
-    route.HttpCode(200)
+    route.HttpCode(gonest.HttpStatusOk)
     route.Handler(func(ctx *gonest.Context) {
       params := gonest.MustParams[*UserIdParams](ctx, userIdParamsSchema)
       ctx.Json(userService.Get(params.UserId))
@@ -670,7 +669,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   // rota interna, não documentada -- equivalente @ApiExcludeEndpoint.
   controller.Route(gonest.HttpGet, "/_internal/debug", func (route *gonest.Route) {
     route.ExcludeFromDocs()
-    route.HttpCode(200)
+    route.HttpCode(gonest.HttpStatusOk)
     route.Handler(func(ctx *gonest.Context) { ctx.Json(map[string]any{"ok": true}) })
   })
 })
