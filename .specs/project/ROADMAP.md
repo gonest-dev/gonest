@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Scheduler (Milestone 10), next up
-**Status:** Milestones 1-9 COMPLETE
+**Current Milestone:** Scheduler (Milestone 10), only remaining
+**Status:** Milestones 1-9 e 11 COMPLETE (11 executado antes de 10 -- escopo trivial, sem dependência bloqueante)
 
 ---
 
@@ -218,13 +218,14 @@
 ## Milestone 11: Terminus/health checks
 
 **Goal:** equivalente `@nestjs/terminus` -- probes `/readyz` (readiness) e `/livez` (liveness), estilo Kubernetes.
-**Status:** REVISADO (2026-07-15) -- usuário reescreveu o exemplo do INSIGHT.md: Terminus NÃO é mais um tipo `New*`-builder dedicado (`NewHealthCheck` removido). Mesmo modelo mental do NestJS real -- health check é só um `Controller` comum, usando `MustInjectAll[Connectable]` (já existe desde Milestone 8/9). SEM dependência bloqueante -- pode rodar a qualquer momento. Ver `.specs/features/terminus-health/spec.md` pro spec revisado.
+**Status:** COMPLETE (2026-07-15, commit `5c2fde4`)
 
 ### Features
 
-**Health Check** - PLANNED (escopo reduzido drasticamente)
-- `HealthController` é um `gonest.NewController` comum, sem tipo novo de bootstrap -- `MustInjectAll[Connectable](controller)` resolve todo `Connectable` registrado (ex: Db, Redis), `/readyz` pinga todos e agrega status, `/livez` responde 200 estático
-- Únicos 2 primitivos novos necessários (de uso geral, não específicos de Terminus): `Context.SendString` (`internal/execution`, novo `Responder.SendString`) e `gonest.HttpStatusOk`/`HttpStatusServiceUnavailable` (constantes raiz -- INSIGHT.md já assumia que existiam em mais de um exemplo)
+**Health Check** - COMPLETE
+- `HealthController` é um `gonest.NewController` comum, SEM tipo novo de bootstrap -- `MustInjectAll[Connectable](controller)` resolve todo `Connectable` registrado (ex: Db, Redis), `/readyz` pinga todos e agrega status, `/livez` responde 200 estático via `Context.SendString`
+- `Context.SendString` (novo, `internal/execution`, `Responder` ganhou o método) + `gonest.HttpStatusOk`/`HttpStatusServiceUnavailable` (constantes raiz -- INSIGHT.md já assumia que existiam em mais de um exemplo) -- ambos de uso geral, não específicos de Terminus
+- Reproduz `HealthController`/`AppModule` do INSIGHT.md verbatim via dispatch HTTP real
 
 ---
 
