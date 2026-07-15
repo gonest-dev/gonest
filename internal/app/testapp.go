@@ -104,7 +104,7 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp 
 	ownership := discoverPipelineStageOwnership(modules)
 	declarePipelineStageTypes(ownership)
 
-	adapter := newAdapter[fiber.FiberApp]()
+	adapter := newAdapter[fiber.FiberApp](AppOptions{})
 	if err := registerRoutes(adapter, root, modules); err != nil {
 		panic(err)
 	}

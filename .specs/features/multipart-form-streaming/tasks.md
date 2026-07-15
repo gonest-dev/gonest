@@ -1,7 +1,7 @@
 # Multipart Form Streaming Tasks
 
 **Design**: `.specs/features/multipart-form-streaming/design.md`
-**Status**: Draft
+**Status**: In Progress (T1 done -- AD-022 in STATE.md)
 
 ---
 

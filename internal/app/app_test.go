@@ -492,7 +492,7 @@ type recordingFakeAdapter struct {
 
 var lastRecordingAdapter *recordingFakeAdapter
 
-func (f *recordingFakeAdapter) Init() {
+func (f *recordingFakeAdapter) Init(opts AppOptions) {
 	lastRecordingAdapter = f
 }
 
@@ -924,7 +924,7 @@ type listenSpyAdapter struct {
 	err error
 }
 
-func (f *listenSpyAdapter) Init() {}
+func (f *listenSpyAdapter) Init(opts AppOptions) {}
 
 func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error {
 	return nil

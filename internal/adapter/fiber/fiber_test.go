@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonest-dev/gonest/internal/appoptions"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -24,7 +25,7 @@ import (
 func TestInit_ZeroValueFiberApp_BecomesUsable(t *testing.T) {
 	app := &FiberApp{}
 
-	app.Init()
+	app.Init(appoptions.AppOptions{})
 
 	if err := app.RegisterRoute(route.HttpGet, "/ping", func(ctx *execution.Context) {
 		ctx.Status(200).Json(map[string]string{"ok": "true"})
@@ -52,7 +53,7 @@ func TestInit_CalledTwice_DoesNotResetExistingApp(t *testing.T) {
 	app := New()
 	original := app.FiberApp()
 
-	app.Init()
+	app.Init(appoptions.AppOptions{})
 
 	if app.FiberApp() != original {
 		t.Fatalf("Init replaced an already-initialized *fiber.App")

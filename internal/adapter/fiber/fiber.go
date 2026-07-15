@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/gonest-dev/gonest/internal/appoptions"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/route"
@@ -26,12 +27,12 @@ type FiberApp struct {
 }
 
 // New builds a FiberApp around a freshly constructed *fiber.App with default
-// config. Exported (rather than requiring callers to reach into Fiber
-// themselves) so T8's NewApp[T] can construct one via reflection/generics
-// without importing Fiber itself.
+// config (equivalent to Init(appoptions.AppOptions{})). Exported (rather than
+// requiring callers to reach into Fiber themselves) so T8's NewApp[T] can
+// construct one via reflection/generics without importing Fiber itself.
 func New() *FiberApp {
 	f := &FiberApp{}
-	f.Init()
+	f.Init(appoptions.AppOptions{})
 	return f
 }
 
@@ -43,14 +44,27 @@ func New() *FiberApp {
 // This exists for internal/app's generic NewApp[T HttpAdapter]: it builds
 // the zero-value T via reflect.New(reflect.TypeFor[T]()).Interface(), which
 // for FiberApp produces &FiberApp{app: nil} -- calling RegisterRoute on that
-// would nil-panic dereferencing f.app. NewApp[T] calls Init() once right
+// would nil-panic dereferencing f.app. NewApp[T] calls Init(opts) once right
 // after construction (part of the HttpAdapter contract), which for FiberApp
 // fills in the real *fiber.App. New() above also calls Init() internally so
 // both construction paths converge on the same lazy-init logic instead of
 // duplicating "fiber.New() unless already set".
-func (f *FiberApp) Init() {
+//
+// opts.EnableFormStreaming, when true, sets BOTH StreamRequestBody AND
+// DisablePreParseMultipartForm on the underlying fiber.Config -- confirmed
+// via fasthttp@v1.72.0's own source (server.go/http.go) that BOTH are
+// required together: multipart pre-parsing stays on by default even with
+// StreamRequestBody alone, which would silently buffer the whole multipart
+// body before any Handler runs, defeating streaming entirely (Multipart
+// Form Streaming feature, AD-022 in STATE.md). fiber.Config is immutable
+// once fiber.New() returns, so this MUST happen here, at construction time
+// -- there is no later hook to flip it on.
+func (f *FiberApp) Init(opts appoptions.AppOptions) {
 	if f.app == nil {
-		f.app = fiber.New()
+		f.app = fiber.New(fiber.Config{
+			StreamRequestBody:            opts.EnableFormStreaming,
+			DisablePreParseMultipartForm: opts.EnableFormStreaming,
+		})
 	}
 }
 

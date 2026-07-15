@@ -213,8 +213,13 @@ type HttpAdapter interface {
 	// value of this adapter type needs before RegisterRoute/Listen are
 	// safe to call. Implementations must be idempotent -- NewApp[T] calls
 	// it exactly once, but nothing prevents an adapter's own constructor
-	// (like fiber.New) from also calling it internally.
-	Init()
+	// (like fiber.New) from also calling it internally. opts is the SAME
+	// AppOptions NewApp[T] itself received -- the only channel an adapter
+	// has to see feature toggles (e.g. EnableFormStreaming) that must be
+	// baked into its own underlying engine's config BEFORE that engine is
+	// constructed (a *fiber.App's config is immutable after fiber.New()
+	// returns, so this has to happen here, not later).
+	Init(opts AppOptions)
 	// RegisterRoute wires one route (method + full path) onto the real
 	// underlying HTTP engine, translating h into whatever handler shape
 	// that engine expects.
@@ -347,7 +352,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	ownership := discoverPipelineStageOwnership(modules)
 	declarePipelineStageTypes(ownership)
 
-	adapter := newAdapter[T, PT]()
+	adapter := newAdapter[T, PT](opts)
 	if err := registerRoutes(adapter, root, modules); err != nil {
 		return nil, err
 	}
@@ -403,9 +408,9 @@ func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOption
 // then called exactly once so the adapter can replace any
 // construction-produced nil internals with real ones (see HttpAdapter's own
 // doc comment for why this exists).
-func newAdapter[T any, PT httpAdapterPtr[T]]() PT {
+func newAdapter[T any, PT httpAdapterPtr[T]](opts AppOptions) PT {
 	adapter := PT(new(T))
-	adapter.Init()
+	adapter.Init(opts)
 	return adapter
 }
 
