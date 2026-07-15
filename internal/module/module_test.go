@@ -4,10 +4,21 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/gonest-dev/gonest/internal/filter"
-	"github.com/gonest-dev/gonest/internal/middleware"
 )
+
+// fakeMiddleware/fakeFilter are minimal stand-ins for the real
+// *middleware.Middleware/*filter.Filter types, mirroring fakeProvider/
+// fakeController below -- this package cannot import internal/middleware or
+// internal/filter directly (they import internal/module for
+// Declare(scope []*Module), so importing them back here would cycle). They
+// only need to satisfy MiddlewareRef/FilterRef.
+type fakeMiddleware struct{}
+
+func (*fakeMiddleware) IsMiddleware() {}
+
+type fakeFilter struct{}
+
+func (*fakeFilter) IsFilter() {}
 
 // fakeProvider is a minimal stand-in for the real *provider.Provider type.
 // It only needs to satisfy ProviderRef.
@@ -317,8 +328,8 @@ func TestModule_Name_CalledTwice_LastCallWins(t *testing.T) {
 }
 
 func TestModule_Use_StoresMiddlewareInRegistrationOrder(t *testing.T) {
-	first := middleware.New(func(m *middleware.Middleware) {})
-	second := middleware.New(func(m *middleware.Middleware) {})
+	first := &fakeMiddleware{}
+	second := &fakeMiddleware{}
 	m := New(func(m *Module) {
 		m.Use(first, second)
 	})
@@ -334,7 +345,7 @@ func TestModule_Use_StoresMiddlewareInRegistrationOrder(t *testing.T) {
 }
 
 func TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
-	mw := middleware.New(func(m *middleware.Middleware) {})
+	mw := &fakeMiddleware{}
 	m := New(func(m *Module) {
 		m.Use(mw)
 	})
@@ -344,7 +355,7 @@ func TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
 	}
 
 	got := m.OwnMiddleware()
-	got[0] = middleware.New(func(m *middleware.Middleware) {})
+	got[0] = &fakeMiddleware{}
 
 	got2 := m.OwnMiddleware()
 	if got2[0] != mw {
@@ -353,8 +364,8 @@ func TestModule_OwnMiddleware_ReturnsCopyNotInternalSlice(t *testing.T) {
 }
 
 func TestModule_Filters_StoresFiltersInRegistrationOrder(t *testing.T) {
-	first := filter.New(func(f *filter.Filter) {})
-	second := filter.New(func(f *filter.Filter) {})
+	first := &fakeFilter{}
+	second := &fakeFilter{}
 	m := New(func(m *Module) {
 		m.Filters(first, second)
 	})
@@ -370,7 +381,7 @@ func TestModule_Filters_StoresFiltersInRegistrationOrder(t *testing.T) {
 }
 
 func TestModule_OwnFilters_ReturnsCopyNotInternalSlice(t *testing.T) {
-	f := filter.New(func(f *filter.Filter) {})
+	f := &fakeFilter{}
 	m := New(func(m *Module) {
 		m.Filters(f)
 	})
@@ -380,7 +391,7 @@ func TestModule_OwnFilters_ReturnsCopyNotInternalSlice(t *testing.T) {
 	}
 
 	got := m.OwnFilters()
-	got[0] = filter.New(func(f *filter.Filter) {})
+	got[0] = &fakeFilter{}
 
 	got2 := m.OwnFilters()
 	if got2[0] != f {

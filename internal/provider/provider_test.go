@@ -271,3 +271,22 @@ func TestResolvedType_ReturnsConstructorReturnType_FuncReturningTAndError(t *tes
 		t.Fatalf("ResolvedType() = %v, want %v", got, want)
 	}
 }
+
+func TestSetResolvedValue_ThenResolvedValue_ReturnsStoredValue(t *testing.T) {
+	p := New(nil)
+	real := &fakeService{}
+
+	if _, ok := p.ResolvedValue(); ok {
+		t.Fatalf("ResolvedValue() ok=true before SetResolvedValue, want false")
+	}
+
+	p.SetResolvedValue(reflect.ValueOf(real))
+
+	v, ok := p.ResolvedValue()
+	if !ok {
+		t.Fatalf("ResolvedValue() ok=false after SetResolvedValue, want true")
+	}
+	if v.Interface().(*fakeService) != real {
+		t.Fatalf("ResolvedValue() = %v, want %v", v.Interface(), real)
+	}
+}

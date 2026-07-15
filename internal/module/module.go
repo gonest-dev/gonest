@@ -6,9 +6,6 @@ package module
 
 import (
 	"reflect"
-
-	"github.com/gonest-dev/gonest/internal/filter"
-	"github.com/gonest-dev/gonest/internal/middleware"
 )
 
 // ProviderRef is a minimal marker interface satisfied by the real
@@ -53,6 +50,27 @@ type Owner interface {
 	OwnerModule() *Module
 }
 
+// MiddlewareRef is a minimal marker interface satisfied by the real
+// *middleware.Middleware type (owned by internal/middleware). Module never
+// needs to know the concrete middleware type -- it only stores registrations
+// for the app package's later composition/bootstrap use. Declared here
+// (rather than importing internal/middleware directly) specifically to avoid
+// an import cycle: internal/middleware needs to import internal/module (for
+// Declare(scope []*Module), part of this feature's AD-008 reversal), so
+// internal/module cannot import internal/middleware back. Same
+// cross-package marker-interface rationale as ProviderRef/ControllerRef
+// above (exported marker method, not just an exported interface, since Go
+// ties unexported interface methods to the declaring package).
+type MiddlewareRef interface {
+	IsMiddleware()
+}
+
+// FilterRef is the Filter equivalent of MiddlewareRef, same rationale (see
+// MiddlewareRef's own doc comment).
+type FilterRef interface {
+	IsFilter()
+}
+
 // Module represents a declarative unit of the DI graph: its own providers
 // and controllers, the modules it imports, and the subset of its own
 // providers it exports to importers.
@@ -68,8 +86,8 @@ type Module struct {
 	providers   []ProviderRef
 	controllers []ControllerRef
 	exports     []ProviderRef
-	middleware  []*middleware.Middleware
-	filters     []*filter.Filter
+	middleware  []MiddlewareRef
+	filters     []FilterRef
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -121,7 +139,7 @@ func (m *Module) Exports(ps ...ProviderRef) {
 // the root module's is, imported modules' Use registrations are not
 // cascaded -- is decided later, by the code that reads OwnMiddleware (a
 // later task), not by this method.
-func (m *Module) Use(items ...*middleware.Middleware) {
+func (m *Module) Use(items ...MiddlewareRef) {
 	m.middleware = append(m.middleware, items...)
 }
 
@@ -134,7 +152,7 @@ func (m *Module) Use(items ...*middleware.Middleware) {
 // across imported modules or is limited to the root module -- is decided
 // later, by the code that reads OwnFilters (a later task), not by this
 // method.
-func (m *Module) Filters(items ...*filter.Filter) {
+func (m *Module) Filters(items ...FilterRef) {
 	m.filters = append(m.filters, items...)
 }
 
@@ -158,16 +176,16 @@ func (m *Module) OwnControllers() []ControllerRef {
 // via Use. Read-only: mutating the returned slice does not affect this
 // Module's internal state. Used by a later task to determine which
 // middleware wrap the root module's dispatch chain.
-func (m *Module) OwnMiddleware() []*middleware.Middleware {
-	return append([]*middleware.Middleware(nil), m.middleware...)
+func (m *Module) OwnMiddleware() []MiddlewareRef {
+	return append([]MiddlewareRef(nil), m.middleware...)
 }
 
 // OwnFilters returns a copy of the filters registered on this module via
 // Filters. Read-only: mutating the returned slice does not affect this
 // Module's internal state. Used by a later task to determine which filters
 // apply during exception handling.
-func (m *Module) OwnFilters() []*filter.Filter {
-	return append([]*filter.Filter(nil), m.filters...)
+func (m *Module) OwnFilters() []FilterRef {
+	return append([]FilterRef(nil), m.filters...)
 }
 
 // ImportedModules returns a copy of the modules registered on this module

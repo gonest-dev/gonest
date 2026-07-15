@@ -27,13 +27,13 @@ func (f *fakeResponder) Body() []byte                      { return nil }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
 func (f *fakeResponder) HTML(s string) error               { return nil }
 
-// TestNew_RunsFnImmediately proves guard.New(fn) runs fn synchronously at
-// call time -- unlike Provider/Module/Controller/Pipe, which all defer fn
-// until a later bootstrap stage. Guard.Handler registration has no
-// dependency on the module tree being assembled first (no MustInject
-// support this feature, see design.md's Tech Decisions), so there is no
-// further stage to usefully defer to (same reasoning as middleware.New).
-func TestNew_RunsFnImmediately(t *testing.T) {
+// TestNew_DoesNotExecuteFnOnCall proves guard.New(fn) defers fn until
+// Declare(scope) runs it -- AD-008 reversed (see
+// .specs/features/test-app-bootstrap/design.md): a *Guard can now call
+// MustInject/MustInjectAll inside fn, which requires fn to run during
+// bootstrap's pipeline-stage-type phase (once scope is known), not at Go
+// package-init time.
+func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
 	ran := false
 	g := New(func(g *Guard) {
 		ran = true
@@ -42,9 +42,41 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 	if g == nil {
 		t.Fatal("expected New to return a non-nil *Guard")
 	}
-	if !ran {
-		t.Fatal("expected fn passed to New to run immediately, not be deferred")
+	if ran {
+		t.Fatal("expected New(fn) to defer fn, not run it synchronously")
 	}
+}
+
+func TestDeclare_ExecutesFn(t *testing.T) {
+	ran := false
+	g := New(func(g *Guard) {
+		ran = true
+	})
+
+	g.Declare(nil)
+
+	if !ran {
+		t.Fatal("expected Declare to run the deferred fn")
+	}
+}
+
+func TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls(t *testing.T) {
+	count := 0
+	g := New(func(g *Guard) {
+		count++
+	})
+
+	g.Declare(nil)
+	g.Declare(nil)
+
+	if count != 1 {
+		t.Fatalf("expected fn to run exactly once across repeated Declare calls, ran %d times", count)
+	}
+}
+
+func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
+	g := New(nil)
+	g.Declare(nil)
 }
 
 // TestHandler_HandlerFunc_RoundTrip_True proves Handler stores the given
@@ -60,6 +92,7 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 			return true
 		})
 	})
+	g.Declare(nil)
 
 	fn := g.HandlerFunc()
 	if fn == nil {
@@ -89,6 +122,7 @@ func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
 			return false
 		})
 	})
+	g.Declare(nil)
 
 	fn := g.HandlerFunc()
 	if fn == nil {
@@ -111,6 +145,7 @@ func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
 // zero-value contract.
 func TestHandlerFunc_NilWhenNeverCalled(t *testing.T) {
 	g := New(func(g *Guard) {})
+	g.Declare(nil)
 
 	if fn := g.HandlerFunc(); fn != nil {
 		t.Fatal("expected HandlerFunc to return nil when Handler was never called")

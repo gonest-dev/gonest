@@ -8,11 +8,14 @@
 package controller
 
 import (
+	"reflect"
+
 	"github.com/gonest-dev/gonest/internal/filter"
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/interceptor"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/resolver"
 	"github.com/gonest-dev/gonest/internal/route"
 )
 
@@ -84,6 +87,22 @@ func (c *Controller) SetOwnerModule(m *module.Module) {
 // SetOwnerModule has been called on this controller.
 func (c *Controller) OwnerModule() *module.Module {
 	return c.owner
+}
+
+// ResolveDirect satisfies internal/inject's directResolver interface,
+// scoping the search to a SINGLE module: this Controller's own OwnerModule
+// (module-scoped, same encapsulation Controllers already have today via
+// findOwn/findExported) -- unlike Middleware/Guard/Interceptor/Filter's
+// union-of-referencing-modules scope, a Controller has exactly one owner,
+// known since Stage 1 assembly, so no external scope needs to be passed in.
+func (c *Controller) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+	return resolver.FindDirect([]*module.Module{c.owner}, t)
+}
+
+// ResolveDirectAll satisfies internal/inject's directResolver interface,
+// same single-module scope as ResolveDirect.
+func (c *Controller) ResolveDirectAll(t reflect.Type) []reflect.Value {
+	return resolver.FindDirectAll([]*module.Module{c.owner}, t)
 }
 
 // Path stores prefix as this controller's route path prefix. Route

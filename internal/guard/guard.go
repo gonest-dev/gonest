@@ -4,32 +4,67 @@
 // design.md's "Guard" component.
 package guard
 
-import "github.com/gonest-dev/gonest/internal/execution"
+import (
+	"reflect"
+
+	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/resolver"
+)
 
 // Guard represents a single authorization-check unit: it holds the
 // ctx-in/bool-out handler function registered via Handler. Unlike
 // Middleware, a Guard doesn't decorate/wrap a continuation -- it gates:
 // true means continue, false means stop.
 type Guard struct {
+	fn      func(*Guard)
 	handler func(ctx *execution.Context) bool
+
+	scope    []*module.Module
+	declared bool
 }
 
-// New creates a Guard and runs fn on it IMMEDIATELY -- unlike
-// Provider/Module/Controller/Pipe, which all defer fn until a later
-// bootstrap stage (their own Declare()). Guard.Handler(...) registration has
-// no dependency on the module tree being assembled first -- this feature
-// deliberately has no MustInject support (see design.md's Tech Decisions: a
-// *Guard can be attached to multiple controllers across different modules,
-// with no clean single "owner" to resolve MustInject against) -- so there
-// is no further stage left to usefully defer to. This mirrors
-// middleware.New's own precedent (internal/middleware/middleware.go) for
-// the same reason.
+// New creates a Guard that defers fn until Declare(scope) runs it -- AD-008
+// reversed (see .specs/features/test-app-bootstrap/design.md): a *Guard can
+// now call MustInject/MustInjectAll inside fn, since it is no longer run at
+// Go package-init time (the typical `var X = gonest.NewGuard(...)`
+// declaration style, which always runs BEFORE NewApp), but during
+// bootstrap's pipeline-stage-type phase (phase 3), once its scope (the
+// union of every referencing module) is known.
 func New(fn func(*Guard)) *Guard {
-	g := &Guard{}
-	if fn != nil {
-		fn(g)
+	return &Guard{fn: fn}
+}
+
+// Declare runs this guard's deferred fn exactly once, with scope stored
+// first so ResolveDirect/ResolveDirectAll (called from WITHIN fn, via
+// MustInject/MustInjectAll) know what to search. Idempotent -- a no-op on
+// any call after the first (including when fn is nil) -- same contract as
+// Pipe.Declare's own precedent (L-012 in STATE.md): a shared Guard value
+// attached to MULTIPLE controllers/modules must only run its OWN fn once,
+// not once per attachment.
+func (g *Guard) Declare(scope []*module.Module) {
+	if g.declared {
+		return
 	}
-	return g
+	g.declared = true
+	g.scope = scope
+	if g.fn != nil {
+		g.fn(g)
+	}
+}
+
+// ResolveDirect satisfies internal/inject's directResolver interface,
+// delegating to internal/resolver's FindDirect using the scope Declare
+// stored.
+func (g *Guard) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+	return resolver.FindDirect(g.scope, t)
+}
+
+// ResolveDirectAll satisfies internal/inject's directResolver interface,
+// delegating to internal/resolver's FindDirectAll using the scope Declare
+// stored.
+func (g *Guard) ResolveDirectAll(t reflect.Type) []reflect.Value {
+	return resolver.FindDirectAll(g.scope, t)
 }
 
 // Handler stores h as this Guard's ctx-in/bool-out handler function.

@@ -7,6 +7,7 @@ package provider
 import (
 	"context"
 	"reflect"
+	"sync"
 
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/scope"
@@ -34,6 +35,9 @@ type Provider struct {
 
 	ownerModule *module.Module
 	declared    bool
+
+	resolvedValueMu sync.Mutex
+	resolvedValue   reflect.Value
 }
 
 // New creates a Provider that defers fn until Stage 2 builder execution
@@ -92,6 +96,42 @@ func (p *Provider) ResolvedType() reflect.Type {
 		return nil
 	}
 	return p.constructor.Type().Out(0)
+}
+
+// SetResolvedValue stores v as this provider's fully-resolved instance. It
+// is called by internal/resolver's Stage 3, right after callConstructor
+// succeeds for this provider -- in ADDITION to the existing
+// placeholder-copy-in-place behavior Stage 3 already performed before this
+// was added (purely additive, see ResolvedValue's own doc comment for why a
+// separate storage is used rather than repurposing the placeholder
+// mechanism). Guarded by a mutex: a scope.Transient provider's Stage 3 path
+// (invokeAndCopyEdge) invokes Constructor once per pending edge, each in its
+// own goroutine, so multiple concurrent SetResolvedValue calls on the SAME
+// *Provider are a real possibility (last-write-wins is an accepted
+// implementation detail for Transient -- direct resolution of a Transient
+// provider's "resolved value" is not a scenario this feature's spec
+// requires, only Singleton's single stable value is), not just a
+// theoretical race the mutex happens to also close off.
+func (p *Provider) SetResolvedValue(v reflect.Value) {
+	p.resolvedValueMu.Lock()
+	defer p.resolvedValueMu.Unlock()
+	p.resolvedValue = v
+}
+
+// ResolvedValue returns the value stored via SetResolvedValue, and whether
+// one has been set yet. Used by internal/resolver's direct-resolution
+// helpers (FindDirect/FindDirectAll), which run strictly after Stage 3
+// completes and only ever need to READ an already-resolved value once --
+// unlike the placeholder mechanism (which exists to hand a caller a stable
+// address BEFORE the value exists), a direct-resolution caller has no need
+// for that indirection at all.
+func (p *Provider) ResolvedValue() (reflect.Value, bool) {
+	p.resolvedValueMu.Lock()
+	defer p.resolvedValueMu.Unlock()
+	if !p.resolvedValue.IsValid() {
+		return reflect.Value{}, false
+	}
+	return p.resolvedValue, true
 }
 
 // Scope sets the lifetime of this provider's instance. If never called,

@@ -27,12 +27,14 @@ func (f *fakeResponder) Body() []byte                      { return nil }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
 func (f *fakeResponder) HTML(s string) error               { return nil }
 
-// TestNew_RunsFnImmediately proves middleware.New(fn) runs fn synchronously
-// at call time -- unlike Provider/Module/Controller/Pipe, which all defer fn
-// until a later bootstrap stage. Middleware.Handler registration has no
-// dependency on the module tree being assembled first, so there is no
-// further stage to usefully defer to (same reasoning as route.New).
-func TestNew_RunsFnImmediately(t *testing.T) {
+// TestNew_DoesNotExecuteFnOnCall proves middleware.New(fn) defers fn until
+// Declare(scope) runs it -- AD-008 reversed (see
+// .specs/features/test-app-bootstrap/design.md): a *Middleware can now call
+// MustInject/MustInjectAll inside fn, which requires fn to run during
+// bootstrap's pipeline-stage-type phase (once scope is known), not at Go
+// package-init time. Mirrors Provider/Controller/Module's own
+// TestNew_DoesNotExecuteFnOnCall precedent.
+func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
 	ran := false
 	m := New(func(m *Middleware) {
 		ran = true
@@ -41,9 +43,46 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 	if m == nil {
 		t.Fatal("expected New to return a non-nil *Middleware")
 	}
-	if !ran {
-		t.Fatal("expected fn passed to New to run immediately, not be deferred")
+	if ran {
+		t.Fatal("expected New(fn) to defer fn, not run it synchronously")
 	}
+}
+
+// TestDeclare_ExecutesFn proves Declare runs the deferred fn, and
+// TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls proves it does so exactly
+// once even across multiple calls -- same idempotent contract Pipe.Declare
+// established (L-012 in STATE.md), now shared by Middleware/Guard/
+// Interceptor/Filter.
+func TestDeclare_ExecutesFn(t *testing.T) {
+	ran := false
+	m := New(func(m *Middleware) {
+		ran = true
+	})
+
+	m.Declare(nil)
+
+	if !ran {
+		t.Fatal("expected Declare to run the deferred fn")
+	}
+}
+
+func TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls(t *testing.T) {
+	count := 0
+	m := New(func(m *Middleware) {
+		count++
+	})
+
+	m.Declare(nil)
+	m.Declare(nil)
+
+	if count != 1 {
+		t.Fatalf("expected fn to run exactly once across repeated Declare calls, ran %d times", count)
+	}
+}
+
+func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
+	m := New(nil)
+	m.Declare(nil)
 }
 
 // TestHandler_HandlerFunc_RoundTrip proves Handler stores the given function
@@ -59,6 +98,7 @@ func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
 			next(ctx)
 		})
 	})
+	m.Declare(nil)
 
 	fn := m.HandlerFunc()
 	if fn == nil {
@@ -83,6 +123,7 @@ func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
 // contract.
 func TestHandlerFunc_NilWhenNeverCalled(t *testing.T) {
 	m := New(func(m *Middleware) {})
+	m.Declare(nil)
 
 	if fn := m.HandlerFunc(); fn != nil {
 		t.Fatal("expected HandlerFunc to return nil when Handler was never called")

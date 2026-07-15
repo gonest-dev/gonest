@@ -4,7 +4,13 @@
 // "Next / Middleware" component.
 package middleware
 
-import "github.com/gonest-dev/gonest/internal/execution"
+import (
+	"reflect"
+
+	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/resolver"
+)
 
 // Next represents the continuation of the middleware chain: calling it runs
 // whatever comes after the current middleware (the next middleware, or
@@ -18,22 +24,63 @@ type Next func(ctx *execution.Context)
 // Middleware represents a single middleware unit: it holds the (ctx, next)
 // handler function registered via Handler.
 type Middleware struct {
+	fn      func(*Middleware)
 	handler func(ctx *execution.Context, next Next)
+
+	scope    []*module.Module
+	declared bool
 }
 
-// New creates a Middleware and runs fn on it IMMEDIATELY -- unlike
-// Provider/Module/Controller/Pipe, which all defer fn until a later
-// bootstrap stage (their own Declare()). Middleware.Handler(...)
-// registration has no dependency on the module tree being assembled first
-// -- it needs no MustInject, no Owner/module-scope knowledge at all --
-// so there is no further stage left to usefully defer to. This mirrors
-// route.New's own precedent (internal/route/route.go) for the same reason.
+// New creates a Middleware that defers fn until Declare(scope) runs it --
+// AD-008 reversed (see .specs/features/test-app-bootstrap/design.md): a
+// *Middleware can now call MustInject/MustInjectAll inside fn, since it is
+// no longer run at Go package-init time (the typical `var X =
+// gonest.NewMiddleware(...)` declaration style, which always runs BEFORE
+// NewApp), but during bootstrap's pipeline-stage-type phase (phase 3),
+// once its scope (the union of every referencing module) is known.
 func New(fn func(*Middleware)) *Middleware {
-	m := &Middleware{}
-	if fn != nil {
-		fn(m)
+	return &Middleware{fn: fn}
+}
+
+// Declare runs this middleware's deferred fn exactly once, with scope
+// stored first so ResolveDirect/ResolveDirectAll (called from WITHIN fn,
+// via MustInject/MustInjectAll) know what to search. Idempotent -- a no-op
+// on any call after the first (including when fn is nil) -- same contract
+// as Pipe.Declare's own precedent (L-012 in STATE.md): a shared Middleware
+// value attached to MULTIPLE controllers/modules must only run its OWN fn
+// once, not once per attachment.
+func (m *Middleware) Declare(scope []*module.Module) {
+	if m.declared {
+		return
 	}
-	return m
+	m.declared = true
+	m.scope = scope
+	if m.fn != nil {
+		m.fn(m)
+	}
+}
+
+// IsMiddleware is the marker method that satisfies module.MiddlewareRef, so
+// *Middleware can be passed to (*module.Module).Use without module needing
+// to import this package (avoiding an import cycle -- this package imports
+// module for Declare(scope []*module.Module), so module cannot import this
+// package back). Exported: Go ties unexported interface methods to the
+// declaring package, so an unexported marker here could never satisfy
+// module's interface across packages.
+func (m *Middleware) IsMiddleware() {}
+
+// ResolveDirect satisfies internal/inject's directResolver interface,
+// delegating to internal/resolver's FindDirect using the scope Declare
+// stored.
+func (m *Middleware) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+	return resolver.FindDirect(m.scope, t)
+}
+
+// ResolveDirectAll satisfies internal/inject's directResolver interface,
+// delegating to internal/resolver's FindDirectAll using the scope Declare
+// stored.
+func (m *Middleware) ResolveDirectAll(t reflect.Type) []reflect.Value {
+	return resolver.FindDirectAll(m.scope, t)
 }
 
 // Handler stores h as this Middleware's (ctx, next) handler function.

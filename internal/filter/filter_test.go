@@ -40,15 +40,13 @@ type barExampleError struct {
 	Reason string
 }
 
-// TestNew_RunsFnImmediately proves filter.New(fn) runs fn synchronously at
-// call time -- unlike Provider/Module/Controller/Pipe, which all defer fn
-// until a later bootstrap stage. Filter.Catch registration has no dependency
-// on the module tree being assembled first (no MustInject support this
-// feature, see design.md's Tech Decisions: a *Filter can be attached to
-// multiple controllers/modules with no clean single owner), so there is no
-// further stage to usefully defer to -- same reasoning as
-// middleware.New/guard.New/interceptor.New.
-func TestNew_RunsFnImmediately(t *testing.T) {
+// TestNew_DoesNotExecuteFnOnCall proves filter.New(fn) defers fn until
+// Declare(scope) runs it -- AD-008 reversed (see
+// .specs/features/test-app-bootstrap/design.md): a *Filter can now call
+// MustInject/MustInjectAll inside fn, which requires fn to run during
+// bootstrap's pipeline-stage-type phase (once scope is known), not at Go
+// package-init time.
+func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
 	ran := false
 	f := filter.New(func(f *filter.Filter) {
 		ran = true
@@ -57,9 +55,41 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 	if f == nil {
 		t.Fatal("expected New to return a non-nil *Filter")
 	}
-	if !ran {
-		t.Fatal("expected fn passed to New to run immediately, not be deferred")
+	if ran {
+		t.Fatal("expected New(fn) to defer fn, not run it synchronously")
 	}
+}
+
+func TestDeclare_ExecutesFn(t *testing.T) {
+	ran := false
+	f := filter.New(func(f *filter.Filter) {
+		ran = true
+	})
+
+	f.Declare(nil)
+
+	if !ran {
+		t.Fatal("expected Declare to run the deferred fn")
+	}
+}
+
+func TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls(t *testing.T) {
+	count := 0
+	f := filter.New(func(f *filter.Filter) {
+		count++
+	})
+
+	f.Declare(nil)
+	f.Declare(nil)
+
+	if count != 1 {
+		t.Fatalf("expected fn to run exactly once across repeated Declare calls, ran %d times", count)
+	}
+}
+
+func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
+	f := filter.New(nil)
+	f.Declare(nil)
 }
 
 // TestCatch_HandlerFor_RoundTrip proves a valid Catch registration is
@@ -68,6 +98,7 @@ func TestCatch_HandlerFor_RoundTrip(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
 		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {})
 	})
+	f.Declare(nil)
 
 	fn, ok := f.HandlerFor(reflect.TypeOf(&fooExampleError{}))
 	if !ok {
@@ -84,6 +115,7 @@ func TestHandlerFor_MissReturnsFalse(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
 		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {})
 	})
+	f.Declare(nil)
 
 	_, ok := f.HandlerFor(reflect.TypeOf(&barExampleError{}))
 	if ok {
@@ -98,6 +130,7 @@ func TestCatch_MultipleDistinctTypes(t *testing.T) {
 		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {})
 		f.Catch(&barExampleError{}, func(ctx *execution.Context, exc *barExampleError) {})
 	})
+	f.Declare(nil)
 
 	fooFn, fooOK := f.HandlerFor(reflect.TypeOf(&fooExampleError{}))
 	if !fooOK || !fooFn.IsValid() {
@@ -124,6 +157,7 @@ func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
 			gotExc = exc
 		})
 	})
+	f.Declare(nil)
 
 	fn, ok := f.HandlerFor(reflect.TypeOf(&fooExampleError{}))
 	if !ok {
@@ -158,7 +192,7 @@ func TestCatch_PanicsOnWrongParamCount(t *testing.T) {
 
 	filter.New(func(f *filter.Filter) {
 		f.Catch(&fooExampleError{}, func(ctx *execution.Context) {})
-	})
+	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongFirstParamType proves Catch panics when the first
@@ -173,7 +207,7 @@ func TestCatch_PanicsOnWrongFirstParamType(t *testing.T) {
 
 	filter.New(func(f *filter.Filter) {
 		f.Catch(&fooExampleError{}, func(exc *fooExampleError, ctx *execution.Context) {})
-	})
+	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongSecondParamType proves Catch panics when the second
@@ -188,7 +222,7 @@ func TestCatch_PanicsOnWrongSecondParamType(t *testing.T) {
 
 	filter.New(func(f *filter.Filter) {
 		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *barExampleError) {})
-	})
+	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongReturnCount proves Catch panics when handler returns
@@ -206,7 +240,7 @@ func TestCatch_PanicsOnWrongReturnCount(t *testing.T) {
 		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) error {
 			return nil
 		})
-	})
+	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnNonFunc proves Catch panics when handler isn't a func at
@@ -221,5 +255,5 @@ func TestCatch_PanicsOnNonFunc(t *testing.T) {
 
 	filter.New(func(f *filter.Filter) {
 		f.Catch(&fooExampleError{}, 42)
-	})
+	}).Declare(nil)
 }

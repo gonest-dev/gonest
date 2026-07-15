@@ -5,7 +5,13 @@
 // Nest interceptors. See design.md's "Next / Interceptor" component.
 package interceptor
 
-import "github.com/gonest-dev/gonest/internal/execution"
+import (
+	"reflect"
+
+	"github.com/gonest-dev/gonest/internal/execution"
+	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/resolver"
+)
 
 // Next represents the continuation of the interceptor chain: calling it runs
 // whatever comes after the current interceptor (the next interceptor, or
@@ -25,24 +31,54 @@ type Next func(ctx *execution.Context)
 // Interceptor represents a single interceptor unit: it holds the (ctx, next)
 // handler function registered via Handler.
 type Interceptor struct {
+	fn      func(*Interceptor)
 	handler func(ctx *execution.Context, next Next)
+
+	scope    []*module.Module
+	declared bool
 }
 
-// New creates an Interceptor and runs fn on it IMMEDIATELY -- unlike
-// Provider/Module/Controller/Pipe, which all defer fn until a later
-// bootstrap stage (their own Declare()). Interceptor.Handler(...)
-// registration has no dependency on the module tree being assembled first
-// -- it needs no MustInject, no Owner/module-scope knowledge at all --
-// so there is no further stage left to usefully defer to (AD-008 in
-// STATE.md: pipeline-stage types don't support MustInject in v1, same
-// reasoning as middleware.New/guard.New). This mirrors route.New's own
-// precedent (internal/route/route.go) for the same reason.
+// New creates an Interceptor that defers fn until Declare(scope) runs it --
+// AD-008 reversed (see .specs/features/test-app-bootstrap/design.md): an
+// *Interceptor can now call MustInject/MustInjectAll inside fn, since it is
+// no longer run at Go package-init time (the typical `var X =
+// gonest.NewInterceptor(...)` declaration style, which always runs BEFORE
+// NewApp), but during bootstrap's pipeline-stage-type phase (phase 3), once
+// its scope (the union of every referencing module) is known.
 func New(fn func(*Interceptor)) *Interceptor {
-	i := &Interceptor{}
-	if fn != nil {
-		fn(i)
+	return &Interceptor{fn: fn}
+}
+
+// Declare runs this interceptor's deferred fn exactly once, with scope
+// stored first so ResolveDirect/ResolveDirectAll (called from WITHIN fn,
+// via MustInject/MustInjectAll) know what to search. Idempotent -- a no-op
+// on any call after the first (including when fn is nil) -- same contract
+// as Pipe.Declare's own precedent (L-012 in STATE.md): a shared Interceptor
+// value attached to MULTIPLE controllers/modules must only run its OWN fn
+// once, not once per attachment.
+func (i *Interceptor) Declare(scope []*module.Module) {
+	if i.declared {
+		return
 	}
-	return i
+	i.declared = true
+	i.scope = scope
+	if i.fn != nil {
+		i.fn(i)
+	}
+}
+
+// ResolveDirect satisfies internal/inject's directResolver interface,
+// delegating to internal/resolver's FindDirect using the scope Declare
+// stored.
+func (i *Interceptor) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+	return resolver.FindDirect(i.scope, t)
+}
+
+// ResolveDirectAll satisfies internal/inject's directResolver interface,
+// delegating to internal/resolver's FindDirectAll using the scope Declare
+// stored.
+func (i *Interceptor) ResolveDirectAll(t reflect.Type) []reflect.Value {
+	return resolver.FindDirectAll(i.scope, t)
 }
 
 // Handler stores h as this Interceptor's (ctx, next) handler function.

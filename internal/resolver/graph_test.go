@@ -4,10 +4,25 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/module"
 )
+
+// fakeControllerOwner is a minimal module.Owner stand-in for
+// *controller.Controller -- this package cannot import internal/controller
+// directly (it imports internal/filter, which imports internal/resolver for
+// FindDirect/FindDirectAll, so importing controller back here would cycle
+// within this test binary). It deliberately does NOT implement
+// internal/inject's directResolver (no ResolveDirect/ResolveDirectAll), so
+// MustInject calls against it still fall through to the OLD
+// placeholder+PendingEdge path below -- exactly what this file's
+// TestBuildGraph_ExcludesControllerOwnedEdges needs to prove (a Controller's
+// MustInject call must not become a graph node/edge).
+type fakeControllerOwner struct {
+	owner *module.Module
+}
+
+func (f *fakeControllerOwner) OwnerModule() *module.Module { return f.owner }
 
 // resetForGraphTest clears inject's pending edges before a test builds
 // fresh bookkeeping, so tests don't see edges recorded by other tests
@@ -63,8 +78,7 @@ func TestBuildGraph_ExcludesControllerOwnedEdges(t *testing.T) {
 	})
 	m.Assemble()
 
-	ctrl := controller.New(func(c *controller.Controller) {})
-	ctrl.SetOwnerModule(m)
+	ctrl := &fakeControllerOwner{owner: m}
 
 	// A Controller's MustInject call must NOT become a graph node/edge --
 	// controllers are never a dependency-graph key (design.md: "Controller

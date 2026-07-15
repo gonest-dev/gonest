@@ -209,7 +209,11 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 		return nil, err
 	}
 
-	declareAll(modules)
+	// Phase 1: declare + fully resolve every module's own Providers. Any
+	// MustInject call inside a Provider's builder closure is Provider-to-
+	// Provider (placeholder+PendingEdge, unchanged) -- see
+	// .specs/features/test-app-bootstrap/design.md's Architecture Overview.
+	declareProviders(modules)
 
 	ctx, cancel := context.WithTimeout(context.Background(), bootstrapTimeout)
 	defer cancel()
@@ -217,6 +221,23 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	if err := resolver.Resolve(ctx, modules); err != nil {
 		return nil, err
 	}
+
+	// Phase 2: declare every module's own Controllers, now that every
+	// Provider is a real, resolved value -- MustInject/MustInjectAll calls
+	// inside a Controller's builder closure resolve DIRECTLY (Controller
+	// satisfies internal/inject's directResolver post-Stage-1 assembly, see
+	// controller.go's ResolveDirect/ResolveDirectAll).
+	declareControllers(modules)
+
+	// Phase 3: for every DISTINCT Middleware/Guard/Interceptor/Filter value
+	// referenced anywhere (by a Controller's Use/Guards/Interceptors/
+	// Filters, now fully recorded since phase 2 just completed, or by a
+	// Module's own global Use/Filters), run its OWN (now-deferred, AD-008
+	// reversed) builder closure exactly once, with an effective
+	// MustInject/MustInjectAll search scope equal to the union of every
+	// referencing module's own+exported providers.
+	ownership := discoverPipelineStageOwnership(modules)
+	declarePipelineStageTypes(ownership)
 
 	adapter := newAdapter[T, PT]()
 	if err := registerRoutes(adapter, root, modules); err != nil {
@@ -307,8 +328,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 
 	var routes []collected
 	seen := map[string]bool{}
-	globalMiddleware := root.OwnMiddleware()
-	globalFilters := root.OwnFilters()
+	globalMiddleware := asMiddleware(root.OwnMiddleware())
+	globalFilters := asFilters(root.OwnFilters())
 
 	for _, m := range modules {
 		for _, c := range m.OwnControllers() {
@@ -506,6 +527,30 @@ func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middlew
 	return func(ctx *execution.Context) { next(ctx) }
 }
 
+// asMiddleware converts root's []module.MiddlewareRef (module stores these
+// as a marker interface only, to avoid an import cycle with
+// internal/middleware -- see module.MiddlewareRef's own doc comment) back
+// to the concrete []*middleware.Middleware this file's composition helpers
+// (composeHandler) actually need. Every value module.Module.OwnMiddleware()
+// returns was constructed via middleware.New, so this type assertion never
+// fails in practice.
+func asMiddleware(refs []module.MiddlewareRef) []*middleware.Middleware {
+	out := make([]*middleware.Middleware, len(refs))
+	for i, r := range refs {
+		out[i] = r.(*middleware.Middleware)
+	}
+	return out
+}
+
+// asFilters is asMiddleware's Filter equivalent (see its own doc comment).
+func asFilters(refs []module.FilterRef) []*filter.Filter {
+	out := make([]*filter.Filter, len(refs))
+	for i, r := range refs {
+		out[i] = r.(*filter.Filter)
+	}
+	return out
+}
+
 // declarable is satisfied by both *provider.Provider and
 // *controller.Controller (both expose Declare). Declared locally so this
 // file can invoke Declare on module.ProviderRef/module.ControllerRef values
@@ -516,23 +561,112 @@ type declarable interface {
 	Declare()
 }
 
-// declareAll runs Declare (Stage 2 builder execution) on every provider and
-// controller registered across modules, exactly once each. Order does not
-// matter: MustInject calls made during Declare only ever look up an
-// already-assembled module tree (Stage 1 has already fully run by the time
-// this is called from NewApp), never another provider/controller's
-// Declare-time state.
-func declareAll(modules []*module.Module) {
+// declareProviders runs Declare (phase 1) on every provider registered
+// across modules, exactly once each. MustInject calls made during Declare
+// are Provider-to-Provider (placeholder+PendingEdge, resolved by the
+// following resolver.Resolve call in NewApp) -- order among providers does
+// not matter here, only that every provider's OWN Declare has run before
+// Stage 3 (resolver.Resolve) walks pending edges.
+func declareProviders(modules []*module.Module) {
 	for _, m := range modules {
 		for _, p := range m.OwnProviders() {
 			if d, ok := p.(declarable); ok {
 				d.Declare()
 			}
 		}
+	}
+}
+
+// declareControllers runs Declare (phase 2) on every controller registered
+// across modules, exactly once each. Called AFTER resolver.Resolve (Stage
+// 3) has fully resolved every Provider, so MustInject/MustInjectAll calls
+// made during a Controller's Declare resolve DIRECTLY (no placeholder) --
+// see controller.go's ResolveDirect/ResolveDirectAll.
+func declareControllers(modules []*module.Module) {
+	for _, m := range modules {
 		for _, c := range m.OwnControllers() {
 			if d, ok := c.(declarable); ok {
 				d.Declare()
 			}
 		}
+	}
+}
+
+// pipelineStageType is satisfied by *middleware.Middleware/*guard.Guard/
+// *interceptor.Interceptor/*filter.Filter (all 4 expose an identically
+// shaped Declare(scope []*module.Module), per this feature's AD-008
+// reversal). Declared as a small interface (rather than keying
+// discoverPipelineStageOwnership's map by `any`) so declarePipelineStageTypes
+// can call Declare directly on every distinct key without a further type
+// switch across 4 concrete types.
+type pipelineStageType interface {
+	Declare(scope []*module.Module)
+}
+
+// discoverPipelineStageOwnership walks every module's OwnControllers() (
+// fully declared by this point, phase 2 having just completed -- so every
+// Use()/Guards()/Interceptors()/Filters() call any Controller's builder
+// closure made has already run) plus every module's OWN global Use()/
+// Filters() registrations, and builds the union-of-referencing-modules
+// ownership map that phase 3 (declarePipelineStageTypes) needs: for every
+// DISTINCT Middleware/Guard/Interceptor/Filter value (deduplicated by
+// pointer identity, since the map key is the interface value itself),
+// the set of every module that referenced it, deduplicated by module
+// identity as well (the SAME module referencing the same value twice, e.g.
+// via two different controllers, must not appear twice in its own scope
+// slice). See .specs/features/test-app-bootstrap/design.md's "Direct
+// resolution scope" section for the full worked example.
+func discoverPipelineStageOwnership(modules []*module.Module) map[pipelineStageType][]*module.Module {
+	ownership := make(map[pipelineStageType][]*module.Module)
+
+	addRef := func(ref pipelineStageType, m *module.Module) {
+		for _, existing := range ownership[ref] {
+			if existing == m {
+				return
+			}
+		}
+		ownership[ref] = append(ownership[ref], m)
+	}
+
+	for _, m := range modules {
+		for _, c := range m.OwnControllers() {
+			rc, ok := c.(routableController)
+			if !ok {
+				continue
+			}
+			for _, mw := range rc.OwnMiddleware() {
+				addRef(mw, m)
+			}
+			for _, g := range rc.OwnGuards() {
+				addRef(g, m)
+			}
+			for _, ic := range rc.OwnInterceptors() {
+				addRef(ic, m)
+			}
+			for _, f := range rc.OwnFilters() {
+				addRef(f, m)
+			}
+		}
+
+		for _, mw := range asMiddleware(m.OwnMiddleware()) {
+			addRef(mw, m)
+		}
+		for _, f := range asFilters(m.OwnFilters()) {
+			addRef(f, m)
+		}
+	}
+
+	return ownership
+}
+
+// declarePipelineStageTypes runs Declare(scope) exactly once on every
+// distinct pipeline-stage-type value discovered by
+// discoverPipelineStageOwnership -- this is phase 3, the point at which
+// Middleware/Guard/Interceptor/Filter builder closures (and any
+// MustInject/MustInjectAll calls inside them) actually run, with the
+// union-scoped visibility computed above.
+func declarePipelineStageTypes(ownership map[pipelineStageType][]*module.Module) {
+	for ref, scope := range ownership {
+		ref.Declare(scope)
 	}
 }

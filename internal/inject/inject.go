@@ -93,23 +93,113 @@ func pendingEdgesFor(owner module.Owner) []PendingEdge {
 	return out
 }
 
-// MustInject declares a dependency on type T (which must be a pointer
-// type, e.g. *Foo) from owner's builder fn. It allocates and returns a
-// placeholder value via reflect, and records a pending edge (owner -> T)
-// for a future task to consult when performing real module-scoped
-// resolution. It panics if T is not a pointer type.
-func MustInject[T any](owner module.Owner) T {
+// directResolver is satisfied by *controller.Controller (once Provider
+// phase/phase 1 has completed) and by *middleware.Middleware/*guard.Guard/
+// *interceptor.Interceptor/*filter.Filter (once Controller phase/phase 2 has
+// completed) -- see .specs/features/test-app-bootstrap/design.md's
+// Architecture Overview. Declared here, unexported: owner (a module.Owner
+// value) satisfying this interface is what lets MustInject/MustInjectAll
+// dispatch to DIRECT resolution (no placeholder, no PendingEdge, the real
+// value already exists by the time these types' builder closures run)
+// instead of the OLD placeholder+PendingEdge path below, which remains
+// exclusively how *provider.Provider (Provider-to-Provider dependencies)
+// resolves -- Provider deliberately does NOT implement this interface.
+type directResolver interface {
+	ResolveDirect(t reflect.Type) (reflect.Value, bool)
+	ResolveDirectAll(t reflect.Type) []reflect.Value
+}
+
+// MustInject declares a dependency on type T from owner's builder fn.
+// owner is typed any (not module.Owner) specifically because
+// Middleware/Guard/Interceptor/Filter values have no single owning Module
+// (their ownership is the UNION of every referencing module, discovered
+// only after Controller phase completes -- see
+// .specs/features/test-app-bootstrap/context.md's Decision 4) and so
+// cannot implement module.Owner's OwnerModule() at all; only their
+// directResolver capability matters for dispatch here.
+//
+// If owner satisfies directResolver (a Controller, Middleware, Guard,
+// Interceptor, or Filter -- see directResolver's doc comment), resolution
+// happens DIRECTLY, right now: for an interface T, every provider in
+// owner's scope implementing T is found via ResolveDirectAll, panicking on
+// zero or 2+ matches (ambiguous -- use MustInjectAll); for a pointer T,
+// ResolveDirect performs a single exact-match lookup, panicking if not
+// found. No placeholder, no PendingEdge bookkeeping for either case.
+//
+// Otherwise (owner is a *provider.Provider, Provider-to-Provider
+// dependency -- the only remaining caller, which DOES implement
+// module.Owner), behavior is UNCHANGED from before this dispatch existed: T
+// must be a pointer type (panics otherwise), a placeholder is allocated via
+// reflect and returned immediately, and a PendingEdge is recorded for
+// internal/resolver's Stage 3 (topological/errgroup/cycle-detecting) to
+// resolve and copy-in-place later.
+func MustInject[T any](owner any) T {
 	t := reflect.TypeFor[T]()
+
+	if dr, ok := owner.(directResolver); ok {
+		if t.Kind() == reflect.Interface {
+			matches := dr.ResolveDirectAll(t)
+			switch len(matches) {
+			case 0:
+				panic(fmt.Sprintf("gonest: no provider implements interface %s", t.String()))
+			case 1:
+				return matches[0].Interface().(T)
+			default:
+				panic(fmt.Sprintf("gonest: ambiguous: %d providers implement interface %s, use MustInjectAll", len(matches), t.String()))
+			}
+		}
+
+		v, ok := dr.ResolveDirect(t)
+		if !ok {
+			panic(fmt.Sprintf("gonest: no provider registered for type %s", t.String()))
+		}
+		return v.Interface().(T)
+	}
 
 	if t.Kind() != reflect.Pointer {
 		panic(fmt.Sprintf("gonest: MustInject[T] requires T to be a pointer type, got %s", t.String()))
 	}
 
+	moOwner, ok := owner.(module.Owner)
+	if !ok {
+		panic("gonest: MustInject[T] requires owner to be a *provider.Provider when T is a pointer type and owner is not a Controller/Middleware/Guard/Interceptor/Filter")
+	}
+
 	placeholder := reflect.New(t.Elem())
 
 	pendingEdgesMu.Lock()
-	pendingEdges = append(pendingEdges, PendingEdge{Owner: owner, TargetType: t, Placeholder: placeholder})
+	pendingEdges = append(pendingEdges, PendingEdge{Owner: moOwner, TargetType: t, Placeholder: placeholder})
 	pendingEdgesMu.Unlock()
 
 	return placeholder.Interface().(T)
+}
+
+// MustInjectAll returns every provider in owner's scope whose resolved
+// value satisfies interface T, as []T. T must be an interface kind (panics
+// otherwise -- multi-binding only makes sense for interfaces, a pointer
+// type has no "multiple implementations" concept, see MustInject's
+// single-match contract for that case). owner must satisfy directResolver
+// (panics otherwise -- Provider never supports multi-binding, matching
+// Provider-to-Provider dependencies staying single-value only). Returns an
+// empty slice, never panics, if zero providers match -- "give me all of
+// them" reasonably tolerates "there are none", unlike MustInject[T]'s
+// single-match contract.
+func MustInjectAll[T any](owner any) []T {
+	t := reflect.TypeFor[T]()
+
+	if t.Kind() != reflect.Interface {
+		panic(fmt.Sprintf("gonest: MustInjectAll[T] requires T to be an interface type, got %s", t.String()))
+	}
+
+	dr, ok := owner.(directResolver)
+	if !ok {
+		panic("gonest: MustInjectAll[T] is not supported from this owner (Provider-to-Provider dependencies stay single-value via MustInject)")
+	}
+
+	matches := dr.ResolveDirectAll(t)
+	out := make([]T, len(matches))
+	for i, v := range matches {
+		out[i] = v.Interface().(T)
+	}
+	return out
 }

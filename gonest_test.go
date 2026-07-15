@@ -551,6 +551,7 @@ func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 	if m == nil {
 		t.Fatal("NewMiddleware() returned nil *Middleware")
 	}
+	m.Declare(nil)
 
 	fn := m.HandlerFunc()
 	if fn == nil {
@@ -655,6 +656,7 @@ func TestNewGuard_RootAlias_TypeCheck(t *testing.T) {
 	if g == nil {
 		t.Fatal("NewGuard() returned nil *Guard")
 	}
+	g.Declare(nil)
 
 	fn := g.HandlerFunc()
 	if fn == nil {
@@ -822,6 +824,7 @@ func TestNewInterceptor_RootAlias_TypeCheck(t *testing.T) {
 	if i == nil {
 		t.Fatal("NewInterceptor() returned nil *Interceptor")
 	}
+	i.Declare(nil)
 
 	fn := i.HandlerFunc()
 	if fn == nil {
@@ -955,6 +958,7 @@ func TestNewFilter_RootAlias_TypeCheck(t *testing.T) {
 	if f == nil {
 		t.Fatal("NewFilter() returned nil *Filter")
 	}
+	f.Declare(nil)
 
 	excType := reflect.TypeOf(&FooExampleError{})
 	fn, ok := f.HandlerFor(excType)

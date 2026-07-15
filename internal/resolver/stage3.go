@@ -31,6 +31,18 @@ type scoped interface {
 	ResolvedScope() scope.Scope
 }
 
+// resolvedSetter is satisfied by *provider.Provider. Declared here for the
+// same reason constructable/scoped are: module.ProviderRef only needs
+// identity/type information, not a way to store the fully-resolved value --
+// that is Stage 3's concern alone. Calling SetResolvedValue here is purely
+// additive to the existing placeholder-copy-in-place mechanism below (see
+// invokeAndCopy/invokeAndCopyEdge): it lets internal/resolver's direct.go
+// (phase 2/3 callers, post-Stage-3) read an already-resolved provider's
+// value once, without needing any placeholder indirection.
+type resolvedSetter interface {
+	SetResolvedValue(v reflect.Value)
+}
+
 // contextType matches internal/provider's own contextType constant, used
 // here to decide whether a Constructor wants a context.Context as its sole
 // argument.
@@ -235,6 +247,10 @@ func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
 		return err
 	}
 
+	if rs, ok := node.(resolvedSetter); ok {
+		rs.SetResolvedValue(real)
+	}
+
 	for _, placeholder := range placeholdersFor(node) {
 		placeholder.Elem().Set(real.Elem())
 	}
@@ -250,6 +266,10 @@ func invokeAndCopyEdge(ctx context.Context, node module.ProviderRef, edge inject
 	real, err := callConstructor(ctx, node)
 	if err != nil {
 		return err
+	}
+
+	if rs, ok := node.(resolvedSetter); ok {
+		rs.SetResolvedValue(real)
 	}
 
 	edge.Placeholder.Elem().Set(real.Elem())
