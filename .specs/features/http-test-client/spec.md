@@ -1,5 +1,7 @@
 # HTTP Test Client Specification
 
+**Status: COMPLETE (2026-07-15, commit `96f3d57`).** Design gap noted below (HttpAdapter needing a Test method) resolved exactly as flagged: `Test(req *http.Request) (*http.Response, error)` added to `internal/app.HttpAdapter`, `internal/adapter/fiber.FiberApp.Test` delegates to `*fiber.App.Test`. `AssertStatus`/`AssertJsonPath`'s own "prove it fails the test" cases could not be tested cleanly (a failing `t.Run` sub-test unconditionally marks the parent test failed too, no clean way to intercept that with a real `*testing.T`) -- covered instead by a positive-path test proving the real dispatched status/body flow through correctly.
+
 ## Problem Statement
 
 Milestone 8's second and last feature: `tester.MustRequest(method, path, body)` dispatches an HTTP request against a `MustNewTestApp`-built app WITHOUT starting a real network listener, and the returned response gains `AssertStatus`/`AssertJsonPath` test-assertion helpers. INSIGHT.md's own "exemplo de Testing" section already specifies the full call shape verbatim. This feature is BLOCKED on "Test App Bootstrap" (`.specs/features/test-app-bootstrap/`) actually being built first -- it has NOT been implemented yet (spec-only, execution deferred to a future session, see that feature's own HANDOFF note).
