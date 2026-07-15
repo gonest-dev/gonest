@@ -38,6 +38,47 @@ var (
 	pendingEdges   []PendingEdge
 )
 
+// globalSingletons holds framework-provided singletons (today: only
+// *emitter.Emitter, see internal/emitter) that MUST resolve via
+// MustInject[T] from ANY owner, in ANY module, with no explicit
+// registration anywhere -- unlike every other MustInject target, which
+// requires a real Provider (or, for Guard/Middleware/Interceptor/Filter's
+// own union-scoped search, a provider visible in scope). Declared here
+// (not in internal/emitter) so this stays a GENERIC mechanism, reusable by
+// any future framework-provided singleton (Scheduler/HealthCheck are
+// candidates -- see ROADMAP.md's Milestones 10/11), rather than emitter-
+// specific plumbing baked into MustInject itself.
+var (
+	globalSingletonsMu sync.Mutex
+	globalSingletons   map[reflect.Type]reflect.Value
+)
+
+// RegisterGlobalSingleton registers v (of type t) as a framework singleton
+// resolvable via MustInject[T] from any owner, any module, with no
+// explicit Provider registration. Called once per bootstrap (by
+// internal/app's NewApp/MustNewTestApp, right after Reset()) for each
+// framework-provided singleton type.
+func RegisterGlobalSingleton(t reflect.Type, v reflect.Value) {
+	globalSingletonsMu.Lock()
+	defer globalSingletonsMu.Unlock()
+	if globalSingletons == nil {
+		globalSingletons = make(map[reflect.Type]reflect.Value)
+	}
+	globalSingletons[t] = v
+}
+
+// GlobalSingletonFor returns the value registered via RegisterGlobalSingleton
+// for t, and whether one exists. Exported so internal/emitter's MustOn (a
+// free function, not a method -- Go disallows a type parameter on a method,
+// L-001 in STATE.md) can look up the current bootstrap's Emitter singleton
+// directly, the same instance MustInject[*Emitter] would resolve.
+func GlobalSingletonFor(t reflect.Type) (reflect.Value, bool) {
+	globalSingletonsMu.Lock()
+	defer globalSingletonsMu.Unlock()
+	v, ok := globalSingletons[t]
+	return v, ok
+}
+
 // PendingEdges returns a copy of all pending edges recorded so far, in
 // registration order. Read-only: mutating the returned slice does not
 // affect this package's internal state. Used by internal/resolver to build
@@ -67,8 +108,12 @@ func PendingEdges() []PendingEdge {
 // TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges.
 func Reset() {
 	pendingEdgesMu.Lock()
-	defer pendingEdgesMu.Unlock()
 	pendingEdges = nil
+	pendingEdgesMu.Unlock()
+
+	globalSingletonsMu.Lock()
+	globalSingletons = nil
+	globalSingletonsMu.Unlock()
 }
 
 // resetPendingEdges is Reset, kept under its original unexported name for
@@ -135,6 +180,10 @@ type directResolver interface {
 // resolve and copy-in-place later.
 func MustInject[T any](owner any) T {
 	t := reflect.TypeFor[T]()
+
+	if v, ok := GlobalSingletonFor(t); ok {
+		return v.Interface().(T)
+	}
 
 	if dr, ok := owner.(directResolver); ok {
 		if t.Kind() == reflect.Interface {

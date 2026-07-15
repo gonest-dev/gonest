@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/gonest-dev/gonest/internal/emitter"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/filter"
@@ -211,6 +212,7 @@ type httpAdapterPtr[T any] interface {
 // LogLevels (see AppOptions' doc comment in options.go).
 func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (*App, error) {
 	inject.Reset()
+	registerFrameworkSingletons()
 
 	modules, err := root.Assemble()
 	if err != nil {
@@ -236,6 +238,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	// satisfies internal/inject's directResolver post-Stage-1 assembly, see
 	// controller.go's ResolveDirect/ResolveDirectAll).
 	declareControllers(modules)
+	declareListeners(modules)
 
 	// Phase 3: for every DISTINCT Middleware/Guard/Interceptor/Filter value
 	// referenced anywhere (by a Controller's Use/Guards/Interceptors/
@@ -598,6 +601,33 @@ func declareControllers(modules []*module.Module) {
 			}
 		}
 	}
+}
+
+// declareListeners runs Declare on every listener registered across
+// modules, exactly once each -- same phase 2 as declareControllers (a
+// Listener has exactly one owning module, registered directly via
+// Module.Listeners, like Controller; MustOn/MustInject calls inside its
+// builder fn resolve DIRECTLY, same as Controller's own).
+func declareListeners(modules []*module.Module) {
+	for _, m := range modules {
+		for _, l := range m.OwnListeners() {
+			if d, ok := l.(declarable); ok {
+				d.Declare()
+			}
+		}
+	}
+}
+
+// registerFrameworkSingletons registers every framework-provided singleton
+// (today: only *emitter.Emitter) via internal/inject.RegisterGlobalSingleton,
+// called once per bootstrap right after inject.Reset() -- so
+// MustInject[*Emitter] resolves from ANY module, with no explicit
+// registration, for the ENTIRE lifetime of this specific bootstrap (a new
+// Emitter instance is created per NewApp/MustNewTestApp call, matching
+// inject.Reset()'s own "one bootstrap at a time per process" contract).
+func registerFrameworkSingletons() {
+	em := emitter.New()
+	inject.RegisterGlobalSingleton(reflect.TypeOf(em), reflect.ValueOf(em))
 }
 
 // pipelineStageType is satisfied by *middleware.Middleware/*guard.Guard/

@@ -71,6 +71,20 @@ type FilterRef interface {
 	IsFilter()
 }
 
+// ListenerRef is a minimal marker interface satisfied by the real
+// *listener.Listener type (owned by internal/emitter). Same cross-package
+// rationale as ProviderRef/ControllerRef -- a Listener is owned by exactly
+// ONE module (registered directly via Module.Listeners, same level as
+// Module.Providers/Controllers), unlike Middleware/Guard/Interceptor/
+// Filter's union-of-referencing-modules ownership.
+type ListenerRef interface {
+	IsListener()
+	// SetOwnerModule associates this listener with the module that owns
+	// it. Called by assemble during Stage 1, same as ProviderRef/
+	// ControllerRef's own SetOwnerModule.
+	SetOwnerModule(m *Module)
+}
+
 // Module represents a declarative unit of the DI graph: its own providers
 // and controllers, the modules it imports, and the subset of its own
 // providers it exports to importers.
@@ -88,6 +102,7 @@ type Module struct {
 	exports     []ProviderRef
 	middleware  []MiddlewareRef
 	filters     []FilterRef
+	listeners   []ListenerRef
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -186,6 +201,21 @@ func (m *Module) OwnMiddleware() []MiddlewareRef {
 // apply during exception handling.
 func (m *Module) OwnFilters() []FilterRef {
 	return append([]FilterRef(nil), m.filters...)
+}
+
+// Listeners registers listeners owned by this module -- same registration
+// level as Providers/Controllers (a Listener has exactly ONE owning
+// module, unlike Middleware/Guard/Interceptor/Filter's union-of-
+// referencing-modules ownership).
+func (m *Module) Listeners(ls ...ListenerRef) {
+	m.listeners = append(m.listeners, ls...)
+}
+
+// OwnListeners returns a copy of the listeners registered on this module
+// via Listeners. Read-only: mutating the returned slice does not affect
+// this Module's internal state.
+func (m *Module) OwnListeners() []ListenerRef {
+	return append([]ListenerRef(nil), m.listeners...)
 }
 
 // ImportedModules returns a copy of the modules registered on this module

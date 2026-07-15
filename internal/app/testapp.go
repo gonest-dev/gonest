@@ -81,6 +81,7 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp 
 	}
 
 	inject.Reset()
+	registerFrameworkSingletons()
 
 	modules, err := root.Assemble()
 	if err != nil {
@@ -97,6 +98,7 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp 
 	}
 
 	declareControllers(modules)
+	declareListeners(modules)
 
 	ownership := discoverPipelineStageOwnership(modules)
 	declarePipelineStageTypes(ownership)

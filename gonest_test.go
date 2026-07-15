@@ -2,6 +2,7 @@ package gonest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -2993,4 +2994,122 @@ func TestMustRequest_NotFound_StatusPropagatesGenericException(t *testing.T) {
 
 	res := tester.MustRequest(HttpGet, "/user/999", nil)
 	res.AssertStatus(t, http.StatusNotFound)
+}
+
+// ---------------------------------------------------------------------------
+// Emitter & Listener (Milestone 9)
+// ---------------------------------------------------------------------------
+
+// insightUserCreatedEvent/insightLoggerService/insightUserCreatedListener/
+// insightEmitterUserService/insightEmitterUserProvider reproduce INSIGHT.md's
+// "exemplo de Emitter" section: a typed event (not a bare string), a
+// Listener registered via NewListener+MustOn (itself depending on a
+// LoggerService via MustInject, proving Listener's own builder resolves
+// direct dependencies too), and a Provider that resolves the framework's
+// global Emitter singleton (via MustInject[*Emitter], no explicit
+// registration) BEFORE calling its own Constructor -- the real
+// Provider-to-Provider/Provider-to-framework-singleton dependency pattern.
+type insightUserCreatedEvent struct {
+	UserID int64
+}
+
+type insightLoggerService struct {
+	mu      sync.Mutex
+	message string
+	userID  int64
+}
+
+func (l *insightLoggerService) Log(message string, userID int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.message = message
+	l.userID = userID
+}
+
+func (l *insightLoggerService) snapshot() (string, int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.message, l.userID
+}
+
+type insightEmitterUserService struct {
+	emitter *Emitter
+}
+
+func (s *insightEmitterUserService) Create(userID int64) {
+	s.emitter.Emit(insightUserCreatedEvent{UserID: userID})
+}
+
+// TestEmitter_RootAlias_InsightUserCreatedExample reproduces INSIGHT.md's
+// "exemplo de Emitter" end to end: emits a typed event from a Provider's
+// service (via the framework's global Emitter singleton, no registration),
+// confirms the Listener (itself depending on a LoggerService via
+// MustInject) runs asynchronously with the correct payload.
+func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
+	logger := &insightLoggerService{}
+	loggerProvider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *insightLoggerService { return logger })
+	})
+
+	ranCh := make(chan struct{})
+	userCreatedListener := NewListener(func(listener *Listener) {
+		loggerDep := MustInject[*insightLoggerService](listener)
+		MustOn[insightUserCreatedEvent](listener, func(ctx context.Context, event insightUserCreatedEvent) {
+			loggerDep.Log("user created", event.UserID)
+			close(ranCh)
+		})
+	})
+
+	var userService *insightEmitterUserService
+	userProvider := NewProvider(func(provider *Provider) {
+		em := MustInject[*Emitter](provider)
+		provider.Constructor(func() *insightEmitterUserService {
+			userService = &insightEmitterUserService{emitter: em}
+			return userService
+		})
+	})
+
+	userModule := NewModule(func(module *Module) {
+		module.Providers(loggerProvider, userProvider)
+		module.Listeners(userCreatedListener)
+	})
+
+	tester := MustNewTestApp(userModule, nil)
+	defer tester.Close()
+
+	resolvedService := MustInject[*insightEmitterUserService](tester)
+	resolvedService.Create(42)
+
+	select {
+	case <-ranCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("listener did not run within 2s")
+	}
+
+	message, userID := logger.snapshot()
+	if message != "user created" || userID != 42 {
+		t.Fatalf("logger.snapshot() = (%q, %d), want (\"user created\", 42)", message, userID)
+	}
+}
+
+// TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration proves
+// spec.md EM-01: MustInject[*Emitter] resolves successfully from ANY
+// module, with zero explicit registration anywhere.
+func TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration(t *testing.T) {
+	var resolved *Emitter
+	c := NewController(func(controller *Controller) {
+		resolved = MustInject[*Emitter](controller)
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(c)
+	})
+
+	if _, err := NewApp[fiber.FiberApp](root, AppOptions{}); err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	if resolved == nil {
+		t.Fatal("MustInject[*Emitter] returned nil, want a real Emitter singleton")
+	}
 }

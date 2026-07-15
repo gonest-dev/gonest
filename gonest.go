@@ -9,11 +9,13 @@
 package gonest
 
 import (
+	"context"
 	"reflect"
 	"unsafe"
 
 	"github.com/gonest-dev/gonest/internal/app"
 	"github.com/gonest-dev/gonest/internal/controller"
+	"github.com/gonest-dev/gonest/internal/emitter"
 	"github.com/gonest-dev/gonest/internal/exception"
 	"github.com/gonest-dev/gonest/internal/execution"
 	"github.com/gonest-dev/gonest/internal/filter"
@@ -658,4 +660,30 @@ type SwaggerOptions = openapi.SwaggerOptions
 // contract.
 func SetupSwagger(app *App, uiPath string, doc *OpenApiDocument, options SwaggerOptions) error {
 	return openapi.SetupSwagger(app, uiPath, doc, options)
+}
+
+// ---------------------------------------------------------------------------
+// Emitter (Emitter & Listener feature, Milestone 9)
+// ---------------------------------------------------------------------------
+
+// Emitter is the framework's built-in event-emitter singleton: it is
+// ALWAYS resolvable via MustInject[*Emitter](owner), from ANY module, with
+// no explicit Provider registration anywhere -- see
+// internal/emitter.Emitter's own doc comment.
+type Emitter = emitter.Emitter
+
+// Listener represents a single unit of event-handling registration --
+// its builder fn (deferred until bootstrap runs it, same New*-deferred
+// pattern as Provider/Controller) is expected to call MustOn.
+type Listener = emitter.Listener
+
+// NewListener creates a Listener that defers fn until bootstrap runs it.
+var NewListener = emitter.NewListener
+
+// MustOn registers handler as the callback for events of type EventType on
+// the current bootstrap's Emitter singleton. Go cannot re-export a generic
+// function via var, so this is a real wrapper calling the internal one
+// (same pattern as MustInject/MustInjectAll, see AD-004 in STATE.md).
+func MustOn[EventType any](listener *Listener, handler func(ctx context.Context, event EventType)) {
+	emitter.MustOn[EventType](listener, handler)
 }
