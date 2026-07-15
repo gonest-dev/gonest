@@ -35,38 +35,12 @@ import (
 // Fiber's own suppressed banner used (see
 // internal/adapter/fiber.FiberApp.Listen's DisableStartupMessage), so
 // gonest presents its OWN identity rather than the underlying adapter's.
-// Built from an explicit 5x5 block glyph per letter (not a hand-copied
-// figlet font) specifically so every row is mechanically verifiable
-// letter-by-letter -- a hand-copied font is exactly how a previous
-// version of this banner ended up with a stray extra "E".
-var bannerRows = buildBanner("GONEST")
-
-// glyphs is a 5-row-tall, 5-column-wide block font for each letter this
-// banner needs. Adding a new letter later just means adding one more
-// 5-element entry here.
-var glyphs = map[byte][5]string{
-	'G': {" ### ", "#    ", "#  ##", "#   #", " ### "},
-	'O': {" ### ", "#   #", "#   #", "#   #", " ### "},
-	'N': {"#   #", "##  #", "# # #", "#  ##", "#   #"},
-	'E': {"#####", "#    ", "#### ", "#    ", "#####"},
-	'S': {" ####", "#    ", " ### ", "    #", "#### "},
-	'T': {"#####", "  #  ", "  #  ", "  #  ", "  #  "},
-}
-
-// buildBanner joins each letter's glyph rows (1-space gap between
-// letters) into the banner's own 5 text rows.
-func buildBanner(word string) [5]string {
-	var rows [5]string
-	for i := 0; i < len(word); i++ {
-		g := glyphs[word[i]]
-		for row := 0; row < 5; row++ {
-			if i > 0 {
-				rows[row] += " "
-			}
-			rows[row] += g[row]
-		}
-	}
-	return rows
+var bannerRows = [5]string{
+	`    _____                      __`,
+	`  / ____/___  ____  ___  _____/ /_`,
+	` / / __/ __ \/ __ \/ _ \/ ___/ __/`,
+	`/ /_/ / /_/ / / / /  __(__  ) /_  `,
+	`\____/\____/_/ /_/\___/____/\__/  `,
 }
 
 // bootstrapTimeout bounds Stage 3 (Parallel Resolution): every Provider's
@@ -128,31 +102,44 @@ func (a *App) Root() *module.Module {
 	return a.root
 }
 
-// MustListen starts the app serving on addr via the underlying adapter's
-// Listen, blocking until it stops. Before onListen (if non-nil) runs,
-// gonest prints its OWN 3-line startup log via internal/logger -- NOT the
-// underlying adapter's own default console output (e.g. Fiber's ASCII-art
-// banner, suppressed at the adapter level -- see
-// internal/adapter/fiber.FiberApp.Listen) -- matching Nest's own startup
-// log convention, so every adapter (present or future) presents identically
-// regardless of which HTTP engine actually answers requests underneath.
-// Panics, using the same "Must"-prefixed panic-on-error convention as
-// MustNewApp/MustInject/MustParam, if adapter.Listen returns an error (e.g.
-// the addr is already in use) -- the panic message contains both addr and
-// the underlying error.
-func (a *App) MustListen(addr string, onListen OnListen) {
+// Listen starts the app serving on addr via the underlying adapter's
+// Listen, blocking until it stops, and returns whatever error the adapter
+// itself produced (e.g. the addr is already in use) instead of panicking --
+// the non-panicking counterpart to MustListen, same "plain vs Must-
+// prefixed" pairing as NewApp/MustNewApp. Before optionalOnListen[0] (if
+// provided and non-nil) runs, gonest prints its OWN startup log via
+// internal/logger -- NOT the underlying adapter's own default console
+// output (e.g. Fiber's ASCII-art banner, suppressed at the adapter level --
+// see internal/adapter/fiber.FiberApp.Listen) -- matching Nest's own
+// startup log convention, so every adapter (present or future) presents
+// identically regardless of which HTTP engine actually answers requests
+// underneath. optionalOnListen is variadic (0 or 1 callback) so a caller
+// that doesn't need the hook can write `app.Listen(addr)` directly, no nil
+// literal required.
+func (a *App) Listen(addr string, optionalOnListen ...OnListen) error {
 	onListenFunc := func() {
 		if !a.opts.DisableBanner {
 			printBanner()
 		}
-		logger.Info(fmt.Sprintf("Gonest started on: http://%s", displayAddr(addr)))
-		logger.Info(fmt.Sprintf("Loaded:            Modules(%d), Controllers(%d), Routes(%d)", a.moduleCount, a.controllerCount, a.routeCount))
-		logger.Info(fmt.Sprintf("PID:               %d", os.Getpid()))
-		if onListen != nil {
-			onListen()
+		if !a.opts.DisableLoaded {
+			logger.Info(fmt.Sprintf("Modules Loaded:     %d", a.moduleCount))
+			logger.Info(fmt.Sprintf("Controllers Loaded: %d", a.controllerCount))
+			logger.Info(fmt.Sprintf("Routes Loaded:      %d", a.routeCount))
+		}
+		logger.Info(fmt.Sprintf("Listening on:       http://%s, PID: %d", displayAddr(addr), os.Getpid()))
+		if len(optionalOnListen) > 0 && optionalOnListen[0] != nil {
+			optionalOnListen[0]()
 		}
 	}
-	if err := a.adapter.Listen(addr, onListenFunc); err != nil {
+	return a.adapter.Listen(addr, onListenFunc)
+}
+
+// MustListen calls Listen and panics, using the same "Must"-prefixed
+// panic-on-error convention as MustNewApp/MustInject/MustParam, if it
+// returns an error -- the panic message contains both addr and the
+// underlying error.
+func (a *App) MustListen(addr string, optionalOnListen ...OnListen) {
+	if err := a.Listen(addr, optionalOnListen...); err != nil {
 		panic(fmt.Sprintf("gonest: failed to listen on %q: %v", addr, err))
 	}
 }

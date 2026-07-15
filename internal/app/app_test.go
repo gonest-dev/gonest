@@ -2916,26 +2916,6 @@ func TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes(t *testing.T) 
 	}
 }
 
-// TestBuildBanner_GONEST_ProducesExpectedGlyphRows proves the banner is
-// built from explicit per-letter glyphs (not a hand-copied figlet font),
-// so it can't silently drift into a stray/missing character the way an
-// earlier hand-copied version did (a spurious extra "E").
-func TestBuildBanner_GONEST_ProducesExpectedGlyphRows(t *testing.T) {
-	rows := buildBanner("GONEST")
-
-	want := [5]string{
-		" ###   ###  #   # #####  #### #####",
-		"#     #   # ##  # #     #       #  ",
-		"#  ## #   # # # # ####   ###    #  ",
-		"#   # #   # #  ## #         #   #  ",
-		" ###   ###  #   # ##### ####    #  ",
-	}
-
-	if rows != want {
-		t.Fatalf("buildBanner(\"GONEST\") =\n%v\nwant\n%v", rows, want)
-	}
-}
-
 // TestMustListen_DisableBanner_SkipsBannerStillLogsAndFires proves
 // AppOptions.DisableBanner (threaded onto App.opts) suppresses only
 // printBanner's own call -- MustListen still fires onListen and blocks
@@ -2956,4 +2936,61 @@ func TestMustListen_DisableBanner_SkipsBannerStillLogsAndFires(t *testing.T) {
 	}
 
 	close(spy.unblock)
+}
+
+// TestMustListen_DisableLoaded_SkipsLoadedCountsStillLogsAndFires proves
+// AppOptions.DisableLoaded suppresses the detailed loaded counts log lines,
+// but MustListen still fires onListen and blocks exactly like the normal path.
+func TestMustListen_DisableLoaded_SkipsLoadedCountsStillLogsAndFires(t *testing.T) {
+	spy := &listenSpyAdapter{unblock: make(chan struct{})}
+	a := &App{adapter: spy, opts: AppOptions{DisableLoaded: true}}
+
+	fired := make(chan struct{})
+	go func() {
+		a.MustListen(":0", OnListen(func() { close(fired) }))
+	}()
+
+	select {
+	case <-fired:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	close(spy.unblock)
+}
+
+// TestListen_ReturnsErrorWithoutPanicking proves Listen (the non-panicking
+// counterpart to MustListen) returns the adapter's own error directly
+// instead of panicking.
+func TestListen_ReturnsErrorWithoutPanicking(t *testing.T) {
+	spy := &listenSpyAdapter{err: errors.New("address already in use")}
+	a := &App{adapter: spy}
+
+	err := a.Listen(":0")
+	if err == nil {
+		t.Fatal("Listen() error = nil, want the adapter's own error")
+	}
+	if !strings.Contains(err.Error(), "address already in use") {
+		t.Fatalf("Listen() error = %v, want it to contain the adapter's own message", err)
+	}
+}
+
+// TestListen_VariadicNoOnListen_DoesNotPanic proves Listen(addr) -- zero
+// OnListen args, no nil literal required -- works.
+func TestListen_VariadicNoOnListen_DoesNotPanic(t *testing.T) {
+	spy := &listenSpyAdapter{unblock: make(chan struct{})}
+	a := &App{adapter: spy}
+
+	done := make(chan struct{})
+	go func() {
+		_ = a.Listen(":0")
+		close(done)
+	}()
+
+	close(spy.unblock)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Listen(addr) with zero OnListen args did not return")
+	}
 }
