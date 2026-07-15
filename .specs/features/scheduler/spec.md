@@ -1,5 +1,7 @@
 # Scheduler Specification
 
+**Status: COMPLETE (2026-07-15, commit `34cb536`).** Cron expression parsing uses a new external dependency, `github.com/robfig/cron/v3` (`cronlib.ParseStandard`), rather than a hand-written parser -- correct 5-field cron parsing (ranges, steps, lists) is a well-solved problem not worth reinventing. Each of Cron/Interval/Timeout spawns its own background goroutine when called (during the Scheduler's own Declare, phase 2) -- no explicit Stop/cancellation mechanism exists (Out of Scope, unchanged from the original spec).
+
 ## Problem Statement
 
 Milestone 10 (equivalente `@nestjs/schedule`, ver ROADMAP.md): jobs agendados (`Cron`/`Interval`/`Timeout`), cada execução isolada (recover próprio, não derruba o processo). INSIGHT.md's "# exemplo de Schedule" já especifica o call shape completo.

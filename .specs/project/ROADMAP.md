@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Scheduler (Milestone 10), only remaining
-**Status:** Milestones 1-9 e 11 COMPLETE (11 executado antes de 10 -- escopo trivial, sem dependência bloqueante)
+**Current Milestone:** none -- v1 roadmap COMPLETE
+**Status:** Milestones 1-11 COMPLETE
 
 ---
 
@@ -204,14 +204,15 @@
 ## Milestone 10: Scheduler (Cron/Interval/Timeout)
 
 **Goal:** equivalente `@nestjs/schedule` -- jobs agendados, cada execução isolada (recover próprio, não derruba o processo).
-**Status:** PLANNED -- spec.md escrito (2026-07-14), execução não iniciada. Mesma dependência de "Test App Bootstrap" que Emitter (`Scheduler` é `New*` com `MustInject`).
+**Status:** COMPLETE (2026-07-15, commit `34cb536`)
 
 ### Features
 
-**Scheduler** - PLANNED
-- `NewScheduler`, `Module.Schedulers(...)`
-- `scheduler.Cron(name, expr, fn)` / `scheduler.Interval(name, dur, fn)` / `scheduler.Timeout(name, dur, fn)`
-- Cada execução roda isolada (recover próprio), panic/erro só vai pro logger, não derruba o processo
+**Scheduler** - COMPLETE
+- `NewScheduler`, `Module.Schedulers(...)` -- mesmo padrão de ownership de módulo único do Controller/Listener
+- `scheduler.Cron(name, expr, fn)` (via novo dependency `github.com/robfig/cron/v3` pro parsing de expressão padrão de 5 campos) / `scheduler.Interval(name, dur, fn)` / `scheduler.Timeout(name, dur, fn)`
+- Cada execução roda isolada (recover próprio, goroutine independente), panic/erro nunca derruba o processo nem impede execução seguinte
+- Reproduz `CleanupScheduler` do INSIGHT.md verbatim (durações em milissegundos no teste)
 
 ---
 
