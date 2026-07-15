@@ -51,6 +51,11 @@ type Route struct {
 	// variadic args) -- the KEY's mere presence distinguishes "documented"
 	// from "never documented at all" (spec.md AC3).
 	responses map[int]*schema.Schema
+	// responseDescriptions maps status code -> a dev-supplied override for
+	// that response's description, set via ResponseDescription. Independent
+	// of responses itself (keyed the same, but not required to have a
+	// matching entry there).
+	responseDescriptions map[int]string
 
 	pathParams  *schema.Schema
 	queryParams *schema.Schema
@@ -252,6 +257,32 @@ func (r *Route) Responses() map[int]*schema.Schema {
 	out := make(map[int]*schema.Schema, len(r.responses))
 	for status, m := range r.responses {
 		out[status] = m
+	}
+	return out
+}
+
+// ResponseDescription sets a custom description for status, overriding
+// whatever description generation would otherwise pick (empty string for a
+// schema-carrying Response, or the auto-derived http.StatusText for an
+// undocumented 4xx/5xx Response -- see internal/openapi's buildResponses).
+// Independent of Response itself: it can be called before or after
+// Response(status, ...) for the same status, in either order. Returns r so
+// calls can chain.
+func (r *Route) ResponseDescription(status int, description string) *Route {
+	if r.responseDescriptions == nil {
+		r.responseDescriptions = map[int]string{}
+	}
+	r.responseDescriptions[status] = description
+	return r
+}
+
+// ResponseDescriptions returns a copy of the status -> description map
+// built via ResponseDescription (same defensive-copy pattern as
+// Responses).
+func (r *Route) ResponseDescriptions() map[int]string {
+	out := make(map[int]string, len(r.responseDescriptions))
+	for status, desc := range r.responseDescriptions {
+		out[status] = desc
 	}
 	return out
 }

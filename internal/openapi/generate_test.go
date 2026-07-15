@@ -885,3 +885,48 @@ func TestGenerate_CircularModuleImport_Terminates(t *testing.T) {
 		t.Fatalf("moduleB's controller route missing, got %v", doc.paths)
 	}
 }
+
+// TestGenerate_ResponseDescription_OverridesDefault proves
+// ResponseDescription wins over both defaultErrorResponse's auto-derived
+// http.StatusText description AND a schema-carrying Response's own empty
+// default description.
+func TestGenerate_ResponseDescription_OverridesDefault(t *testing.T) {
+	okSchema := schema.New(reflect.TypeOf(addressEntity{}), 0)
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Path("/posts")
+		c.Route(route.HttpGet, "/:post_id", func(r *route.Route) {
+			r.Response(200, okSchema)
+			r.ResponseDescription(200, "The post")
+			r.Response(404)
+			r.ResponseDescription(404, "Cannot find a post using post_id")
+		})
+	})
+	c.Declare()
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+	if _, err := root.Assemble(); err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+
+	doc := New("3.1.0", nil)
+	Generate(doc, root)
+
+	op := doc.paths["/posts/:post_id"]["get"].(map[string]any)
+	responses := op["responses"].(map[string]any)
+
+	resp200 := responses["200"].(map[string]any)
+	if resp200["description"] != "The post" {
+		t.Fatalf("200 description = %v, want %q", resp200["description"], "The post")
+	}
+
+	resp404 := responses["404"].(map[string]any)
+	if resp404["description"] != "Cannot find a post using post_id" {
+		t.Fatalf("404 description = %v, want %q", resp404["description"], "Cannot find a post using post_id")
+	}
+	if _, ok := resp404["content"]; !ok {
+		t.Fatalf("404 should still default to HttpException content, got %v", resp404)
+	}
+}

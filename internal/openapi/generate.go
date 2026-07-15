@@ -184,9 +184,11 @@ func resolveBearerAuth(c routableController, r *route.Route) bool {
 // exception.Schema instead of a bare empty description -- HttpException is
 // the framework's single default carrier for every built-in and dev-defined
 // exception, so it is always a truthful (if generic) description of what
-// that status actually returns.
+// that status actually returns. r.ResponseDescription(status, ...) always
+// wins over both of those defaults, for any status.
 func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	responses := r.Responses()
+	descriptions := r.ResponseDescriptions()
 	out := map[string]any{}
 
 	if len(responses) == 0 {
@@ -196,18 +198,23 @@ func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bo
 
 	for status, m := range responses {
 		key := strconv.Itoa(status)
+		var entry map[string]any
+
 		if m == nil && status >= http.StatusBadRequest {
-			out[key] = defaultErrorResponse(status, doc, visiting)
-			continue
+			entry = defaultErrorResponse(status, doc, visiting)
+		} else {
+			entry = map[string]any{"description": ""}
+			if m != nil {
+				entry["content"] = map[string]any{
+					"application/json": map[string]any{
+						"schema": refSchema(m, doc, visiting),
+					},
+				}
+			}
 		}
 
-		entry := map[string]any{"description": ""}
-		if m != nil {
-			entry["content"] = map[string]any{
-				"application/json": map[string]any{
-					"schema": refSchema(m, doc, visiting),
-				},
-			}
+		if desc, ok := descriptions[status]; ok {
+			entry["description"] = desc
 		}
 		out[key] = entry
 	}
