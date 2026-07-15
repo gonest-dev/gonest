@@ -15,6 +15,11 @@ type createBody struct {
 }
 
 var createBodyMetadata = gonest.NewMetadata[createBody](func(t *createBody, m *gonest.Metadata) {
+	// Title distinguishes this from user/post's own "createBody" local
+	// type -- see user.createBodyMetadata's own comment for why this is
+	// required, not optional, once 2+ controllers each have a same-named
+	// unexported request-body type.
+	m.Title("CreateCommentRequest")
 	m.Property(&t.PostID).Integer().Min(1).Required()
 	m.Property(&t.UserID).Integer().Min(1).Required()
 	m.Property(&t.Body).String().Min(1).Required()
@@ -40,6 +45,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
+		r.QueryParams(listQueryMetadata)
+		r.Response(http.StatusOK, EntityMetadata)
 		r.Handler(func(ctx *gonest.Context) {
 			q := gonest.MustQuery[*listQuery](ctx)
 			ctx.Json(service.List(q.PostID, q.UserID))
@@ -49,6 +56,9 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.Summary("Create a comment")
 		r.HttpCode(http.StatusCreated)
+		r.RequestBody(createBodyMetadata)
+		r.Response(http.StatusCreated, EntityMetadata)
+		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.Context) {
 			body := gonest.MustJsonBody[*createBody](ctx)
 			ctx.Status(http.StatusCreated).Json(service.Create(body.PostID, body.UserID, body.Body))

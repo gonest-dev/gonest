@@ -58,7 +58,5 @@ func main() {
 		panic(err)
 	}
 
-	app.MustListen(":3001", func() {
-		println("blog-api listening on :3001 (Swagger UI at /docs)")
-	})
+	app.MustListen(":3001")
 }

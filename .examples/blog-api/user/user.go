@@ -17,6 +17,17 @@ type Entity struct {
 	Email string `json:"email"`
 }
 
+// EntityMetadata registers Entity's own OpenAPI schema (components.schemas.
+// UserEntity) -- referenced by Controller's Route.Response calls so
+// generated docs actually describe the response body shape, not just the
+// bare path/summary.
+var EntityMetadata = gonest.NewMetadata[Entity](func(t *Entity, m *gonest.Metadata) {
+	m.Title("UserEntity")
+	m.Property(&t.ID).Integer().Required()
+	m.Property(&t.Name).String().Required()
+	m.Property(&t.Email).Email().Required()
+})
+
 type Service struct {
 	db *sql.DB
 }

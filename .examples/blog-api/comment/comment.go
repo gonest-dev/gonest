@@ -21,6 +21,17 @@ type Entity struct {
 	Body   string `json:"body"`
 }
 
+// EntityMetadata registers Entity's own OpenAPI schema (components.schemas.
+// CommentEntity) -- see user.EntityMetadata's own doc comment for the same
+// rationale.
+var EntityMetadata = gonest.NewMetadata[Entity](func(t *Entity, m *gonest.Metadata) {
+	m.Title("CommentEntity")
+	m.Property(&t.ID).Integer().Required()
+	m.Property(&t.PostID).Integer().Required()
+	m.Property(&t.UserID).Integer().Required()
+	m.Property(&t.Body).String().Required()
+})
+
 type Service struct {
 	db          *sql.DB
 	userService *user.Service
