@@ -2761,7 +2761,7 @@ func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
 // runtime vtable swap for a concrete struct), UserService is the real
 // implementation, UserServiceMock is a hand-written test double.
 type insightTestUserEntity struct {
-	ID int64
+	ID int64 `json:"id"`
 }
 
 type insightTestIUserService interface {
@@ -2953,4 +2953,44 @@ func TestMustNewTestApp_NilConfigure_BehavesLikeNewAppMinusListen(t *testing.T) 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d (real, non-overridden UserService resolving user 42)", resp.StatusCode, http.StatusOK)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// HTTP Test Client (MustRequest / AssertStatus / AssertJsonPath)
+// ---------------------------------------------------------------------------
+
+// TestMustRequest_RootAlias_InsightTestUserControllerExample reproduces
+// INSIGHT.md's TestUserController_Get VERBATIM (unlike
+// TestMustNewTestApp_OverrideByInterface_RealHTTPDispatch above, which
+// predates this feature and dispatches through the concrete Fiber adapter
+// directly) -- tester.MustRequest + res.AssertStatus + res.AssertJsonPath.
+func TestMustRequest_RootAlias_InsightTestUserControllerExample(t *testing.T) {
+	mock := &insightTestUserServiceMock{
+		GetFn: func(userID int64) *insightTestUserEntity {
+			return &insightTestUserEntity{ID: userID}
+		},
+	}
+
+	tester := MustNewTestApp(newInsightTestUserModule(), func(b *TestBuilder) {
+		MustOverride[insightTestIUserService](b, mock)
+	})
+	defer tester.Close()
+
+	res := tester.MustRequest(HttpGet, "/user/42", nil)
+	res.AssertStatus(t, http.StatusOK)
+	res.AssertJsonPath(t, "id", int64(42))
+}
+
+// TestMustRequest_NotFound_StatusPropagatesGenericException proves a
+// MustRequest dispatch against a route whose Handler panics an Exception
+// (NotFoundException, from the real UserService for a missing ID) produces
+// the expected non-2xx status through the SAME MustRequest/AssertStatus
+// path -- confirming AssertStatus reads the genuine dispatched status, not
+// a hardcoded 200.
+func TestMustRequest_NotFound_StatusPropagatesGenericException(t *testing.T) {
+	tester := MustNewTestApp(newInsightTestUserModule(), nil)
+	defer tester.Close()
+
+	res := tester.MustRequest(HttpGet, "/user/999", nil)
+	res.AssertStatus(t, http.StatusNotFound)
 }

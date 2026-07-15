@@ -7,6 +7,7 @@
 package fiber
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -165,6 +166,16 @@ func (f *FiberApp) Listen(addr string, onListen func()) error {
 		})
 	}
 	return f.app.Listen(addr)
+}
+
+// Test dispatches req against f.app in-memory, via Fiber's own *fiber.App.Test
+// (no real network port bound) -- satisfies internal/app's HttpAdapter
+// contract for MustNewTestApp's MustRequest ("HTTP Test Client" feature).
+// Every test in this codebase already reaches this same underlying Fiber
+// method directly (via FiberApp() above); this is simply the generic,
+// HttpAdapter-interface-level path to it.
+func (f *FiberApp) Test(req *http.Request) (*http.Response, error) {
+	return f.app.Test(req)
 }
 
 // fiberResponder is the real, Fiber-backed implementation of

@@ -8,6 +8,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"time"
 
@@ -131,6 +132,13 @@ type HttpAdapter interface {
 	// itself -- reserved for the "App Bootstrap & Listen" feature that
 	// follows this one (see App.MustListen).
 	Listen(addr string, onListen func()) error
+	// Test dispatches req against the underlying HTTP engine IN-MEMORY, with
+	// no real network port bound -- used by MustNewTestApp's MustRequest
+	// (the "HTTP Test Client" feature) to exercise a registered route
+	// without ever calling Listen. Every adapter implementation (today only
+	// Fiber, via *fiber.App's own Test method) provides this identically to
+	// however its underlying engine already supports in-memory dispatch.
+	Test(req *http.Request) (*http.Response, error)
 }
 
 // httpAdapterPtr is the generic-constraint counterpart to HttpAdapter,

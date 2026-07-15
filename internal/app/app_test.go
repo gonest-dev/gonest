@@ -501,6 +501,10 @@ func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path strin
 	return nil
 }
 
+func (f *recordingFakeAdapter) Test(req *http.Request) (*http.Response, error) {
+	return nil, nil
+}
+
 func (f *recordingFakeAdapter) Listen(addr string, onListen func()) error {
 	return nil
 }
@@ -924,6 +928,10 @@ func (f *listenSpyAdapter) Init() {}
 
 func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error {
 	return nil
+}
+
+func (f *listenSpyAdapter) Test(req *http.Request) (*http.Response, error) {
+	return nil, nil
 }
 
 func (f *listenSpyAdapter) Listen(addr string, onListen func()) error {

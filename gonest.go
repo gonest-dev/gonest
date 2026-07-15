@@ -67,6 +67,23 @@ const (
 	ScopeRequest = scope.Request
 )
 
+// HttpMethod identifies the HTTP verb a route responds to.
+type HttpMethod = route.HttpMethod
+
+const (
+	// HttpGet corresponds to the HTTP GET method.
+	HttpGet = route.HttpGet
+	// HttpPost corresponds to the HTTP POST method.
+	HttpPost = route.HttpPost
+	// HttpPut corresponds to the HTTP PUT method.
+	HttpPut = route.HttpPut
+	// HttpDelete corresponds to the HTTP DELETE method.
+	HttpDelete = route.HttpDelete
+	// HttpQuery corresponds to the HTTP QUERY method, used for list/query
+	// endpoints (see INSIGHT.md).
+	HttpQuery = route.HttpQuery
+)
+
 // Controller represents a declarative unit that consumes providers via
 // MustInject. It does not participate in the provider resolution graph --
 // it only consumes placeholders it requests.
@@ -216,6 +233,11 @@ func MustOverride[T any](b *TestBuilder, mockValue T) {
 func MustNewTestApp(root *Module, configure func(*TestBuilder)) *TestApp {
 	return app.MustNewTestApp(root, configure)
 }
+
+// TestResponse wraps the response TestApp.MustRequest dispatched, exposing
+// AssertStatus/AssertJsonPath test-assertion helpers. See
+// internal/app.TestResponse's own doc comment.
+type TestResponse = app.TestResponse
 
 // ---------------------------------------------------------------------------
 // Exceptions (HttpException Core feature)
