@@ -1010,9 +1010,12 @@ func TestMustListen_FiresOnListenOnceAndBlocks(t *testing.T) {
 }
 
 // TestMustListen_NilOnListen_BlocksWithoutPanicOrCall proves passing a nil
-// OnListen to MustListen is safe: the adapter's Listen still gets called (a
-// nil onListen func passed straight through), MustListen blocks until
-// Listen returns, and nothing panics.
+// OnListen to MustListen is safe: MustListen ALWAYS passes its own
+// non-nil wrapper closure to adapter.Listen now (it needs to run
+// unconditionally to print gonest's own startup log -- see MustListen's
+// own doc comment), but a nil caller-supplied OnListen is simply never
+// invoked from inside that wrapper. MustListen still blocks until Listen
+// returns, and nothing panics.
 func TestMustListen_NilOnListen_BlocksWithoutPanicOrCall(t *testing.T) {
 	spy := &listenSpyAdapter{unblock: make(chan struct{})}
 	a := &App{adapter: spy}
@@ -1041,11 +1044,11 @@ func TestMustListen_NilOnListen_BlocksWithoutPanicOrCall(t *testing.T) {
 
 	spy.mu.Lock()
 	defer spy.mu.Unlock()
-	if spy.onListen != nil {
-		t.Fatalf("adapter.Listen received a non-nil onListen, want nil to have been passed straight through")
+	if spy.onListen == nil {
+		t.Fatalf("adapter.Listen received a nil onListen, want gonest's own non-nil wrapper (always passed now, so it can log its own startup line)")
 	}
-	if spy.onListenRan != 0 {
-		t.Fatalf("onListenRan = %d, want 0 -- nil onListen must never be called", spy.onListenRan)
+	if spy.onListenRan != 1 {
+		t.Fatalf("onListenRan = %d, want 1 -- gonest's own wrapper always runs once, even with a nil caller-supplied OnListen", spy.onListenRan)
 	}
 }
 

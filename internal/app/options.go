@@ -1,12 +1,13 @@
 package app
 
+import "github.com/gonest-dev/gonest/internal/logger"
+
 // AppOptions is Nest-parity bootstrap config for NewApp/MustNewApp
 // (BufferLogs, LogLevels), matching INSIGHT.md's literal call sites
 // (gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{...})).
-// It is captured on *App and otherwise inert per design.md's "App
-// (extended)" component -- no Logger exists yet to consume it, so this type
-// only proves the shape compiles and stores cleanly; nothing reads its
-// fields in this task.
+// It is captured on *App; LogLevels is now REAL (see NewApp's own call to
+// logger.Configure) -- BufferLogs remains inert (no buffering mechanism
+// exists yet, only immediate output).
 //
 // It lives in internal/app rather than its own internal/appoptions package
 // per AD-004 (.specs/project/STATE.md): AD-004's "1 package per DI-graph
@@ -20,48 +21,31 @@ package app
 type AppOptions struct {
 	// BufferLogs, when true, defers emitting any buffered log output until
 	// a Logger is attached later (Nest's own BufferLogs semantics). Stored
-	// only -- no Logger exists yet in this codebase to act on it.
+	// only -- no buffering mechanism exists yet to act on it.
 	BufferLogs bool
-	// LogLevels restricts which LogLevel values a future Logger should
-	// emit. Stored only -- see BufferLogs' comment above.
+	// LogLevels restricts which LogLevel values the real internal/logger
+	// package emits -- see NewApp's own call to logger.Configure(opts.LogLevels).
 	LogLevels []LogLevel
 }
 
-// LogLevel identifies one of Nest's 5 standard log severities. Modeled
-// after HttpMethod in internal/route/method.go: an iota-based const block
-// plus a switch-based String() for debug-friendly output.
-type LogLevel int
+// LogLevel is internal/logger.Level's own alias -- kept under this name
+// (rather than requiring every AppOptions caller to import internal/logger
+// directly) since AppOptions/NewApp/MustNewApp already lived in this
+// package before the real Logger existed.
+type LogLevel = logger.Level
 
 const (
 	// LogLevelError is the most severe level -- unrecoverable failures.
-	LogLevelError LogLevel = iota
+	LogLevelError = logger.LevelError
 	// LogLevelWarn signals a recoverable but noteworthy condition.
-	LogLevelWarn
+	LogLevelWarn = logger.LevelWarn
 	// LogLevelLog is Nest's default, general-purpose informational level.
-	LogLevelLog
+	LogLevelLog = logger.LevelLog
 	// LogLevelDebug carries diagnostic detail useful during development.
-	LogLevelDebug
+	LogLevelDebug = logger.LevelDebug
 	// LogLevelVerbose is the most granular, chattiest level.
-	LogLevelVerbose
+	LogLevelVerbose = logger.LevelVerbose
 )
-
-// String implements fmt.Stringer for debug-friendly output.
-func (l LogLevel) String() string {
-	switch l {
-	case LogLevelError:
-		return "Error"
-	case LogLevelWarn:
-		return "Warn"
-	case LogLevelLog:
-		return "Log"
-	case LogLevelDebug:
-		return "Debug"
-	case LogLevelVerbose:
-		return "Verbose"
-	default:
-		return "Unknown"
-	}
-}
 
 // OnListen is the "bind succeeded" callback shape passed to a future
 // App.MustListen (see design.md's "OnListen" component). Declared as a

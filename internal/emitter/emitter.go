@@ -6,8 +6,11 @@ package emitter
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/gonest-dev/gonest/internal/logger"
 )
 
 // Emitter holds every registered listener (via MustOn), keyed by the exact
@@ -51,11 +54,9 @@ func (e *Emitter) handlersFor(t reflect.Type) []reflect.Value {
 // immediately -- fire-and-forget, never blocks the caller (spec.md's own
 // explicit requirement: "não bloqueia quem chamou Emit"). A listener that
 // panics is recovered INSIDE its own goroutine and never propagates to the
-// caller of Emit or to any other listener's goroutine -- no logger exists
-// yet in this framework (see AppOptions' own doc comment on
-// BufferLogs/LogLevels being inert config today), so a recovered panic is
-// silently swallowed rather than crashing the process; this is a
-// documented limitation, not a bug, until a real Logger feature exists.
+// caller of Emit or to any other listener's goroutine -- the recovered
+// value is logged via internal/logger.Error (Nest's own equivalent
+// behavior: an event handler failing surfaces in the log, not silently).
 func (e *Emitter) Emit(event any) {
 	t := reflect.TypeOf(event)
 	eventValue := reflect.ValueOf(event)
@@ -63,7 +64,11 @@ func (e *Emitter) Emit(event any) {
 	for _, h := range e.handlersFor(t) {
 		h := h
 		go func() {
-			defer func() { _ = recover() }()
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(fmt.Sprintf("listener for event %s panicked: %v", t, r))
+				}
+			}()
 			h.Call([]reflect.Value{reflect.ValueOf(context.Background()), eventValue})
 		}()
 	}

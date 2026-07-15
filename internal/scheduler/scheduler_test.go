@@ -131,3 +131,62 @@ func TestRunIsolated_PanicNeverPropagates(t *testing.T) {
 		t.Fatal("expected a later scheduled job to still run after an earlier one panicked")
 	}
 }
+
+func TestStop_Interval_PreventsFutureRuns(t *testing.T) {
+	runs := make(chan struct{}, 100)
+
+	s := New(func(s *Scheduler) {
+		s.Interval("ping", 10*time.Millisecond, func(ctx context.Context) {
+			runs <- struct{}{}
+		})
+	})
+	s.Declare()
+
+	<-runs // wait for at least one run
+
+	s.Stop("ping")
+
+	// Drain any in-flight run, then confirm no MORE arrive.
+	select {
+	case <-runs:
+	default:
+	}
+	select {
+	case <-runs:
+		t.Fatal("Interval job ran again after Stop, want no further runs")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestStop_Timeout_PreventsItFromEverFiring(t *testing.T) {
+	ran := make(chan struct{})
+
+	s := New(func(s *Scheduler) {
+		s.Timeout("warmup", 30*time.Millisecond, func(ctx context.Context) {
+			close(ran)
+		})
+	})
+	s.Declare()
+	s.Stop("warmup")
+
+	select {
+	case <-ran:
+		t.Fatal("Timeout job fired despite being Stopped before its deadline")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestStop_UnknownName_NoPanic(t *testing.T) {
+	s := New(func(s *Scheduler) {})
+	s.Declare()
+	s.Stop("never-registered")
+}
+
+func TestStop_CalledTwice_NoPanic(t *testing.T) {
+	s := New(func(s *Scheduler) {
+		s.Timeout("job", time.Hour, func(ctx context.Context) {})
+	})
+	s.Declare()
+	s.Stop("job")
+	s.Stop("job")
+}

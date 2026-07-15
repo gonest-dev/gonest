@@ -165,7 +165,12 @@ func (f *FiberApp) Listen(addr string, onListen func()) error {
 			return nil
 		})
 	}
-	return f.app.Listen(addr)
+	// DisableStartupMessage suppresses Fiber's own ASCII-art banner --
+	// gonest presents its own adapter-agnostic startup log instead (see
+	// internal/app.App.MustListen), so every adapter (present or future)
+	// looks identical to a caller regardless of which HTTP engine actually
+	// answers requests underneath.
+	return f.app.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
 }
 
 // Test dispatches req against f.app in-memory, via Fiber's own *fiber.App.Test

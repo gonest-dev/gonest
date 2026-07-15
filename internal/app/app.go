@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/logger"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/resolver"
@@ -43,6 +45,13 @@ type App struct {
 	root    *module.Module
 	adapter HttpAdapter
 	opts    AppOptions
+
+	// moduleCount/controllerCount/routeCount are populated by
+	// registerRoutes (Stage 2.5) -- used by MustListen's own startup log
+	// line ("Loaded: Modules(N), Controllers(N), Routes(N)").
+	moduleCount     int
+	controllerCount int
+	routeCount      int
 }
 
 // Adapter returns the HttpAdapter NewApp[T] constructed and registered
@@ -78,18 +87,25 @@ func (a *App) Root() *module.Module {
 }
 
 // MustListen starts the app serving on addr via the underlying adapter's
-// Listen, blocking until it stops. onListen, if non-nil, is wrapped into a
-// plain func() and passed through to adapter.Listen -- a nil onListen is
-// passed straight through as nil, relying on HttpAdapter.Listen's own
-// documented nil-safety rather than gonest wrapping it in a no-op closure.
+// Listen, blocking until it stops. Before onListen (if non-nil) runs,
+// gonest prints its OWN 3-line startup log via internal/logger -- NOT the
+// underlying adapter's own default console output (e.g. Fiber's ASCII-art
+// banner, suppressed at the adapter level -- see
+// internal/adapter/fiber.FiberApp.Listen) -- matching Nest's own startup
+// log convention, so every adapter (present or future) presents identically
+// regardless of which HTTP engine actually answers requests underneath.
 // Panics, using the same "Must"-prefixed panic-on-error convention as
 // MustNewApp/MustInject/MustParam, if adapter.Listen returns an error (e.g.
 // the addr is already in use) -- the panic message contains both addr and
 // the underlying error.
 func (a *App) MustListen(addr string, onListen OnListen) {
-	var onListenFunc func()
-	if onListen != nil {
-		onListenFunc = func() { onListen() }
+	onListenFunc := func() {
+		logger.Info(fmt.Sprintf("Gonest started on: http://%s", addr))
+		logger.Info(fmt.Sprintf("Loaded:            Modules(%d), Controllers(%d), Routes(%d)", a.moduleCount, a.controllerCount, a.routeCount))
+		logger.Info(fmt.Sprintf("PID:               %d", os.Getpid()))
+		if onListen != nil {
+			onListen()
+		}
 	}
 	if err := a.adapter.Listen(addr, onListenFunc); err != nil {
 		panic(fmt.Sprintf("gonest: failed to listen on %q: %v", addr, err))
@@ -211,6 +227,7 @@ type httpAdapterPtr[T any] interface {
 // them -- no Logger exists yet in this codebase to act on BufferLogs/
 // LogLevels (see AppOptions' doc comment in options.go).
 func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (*App, error) {
+	logger.Configure(opts.LogLevels)
 	inject.Reset()
 	registerFrameworkSingletons()
 
@@ -256,7 +273,28 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 		return nil, err
 	}
 
-	return &App{root: root, adapter: adapter, opts: opts}, nil
+	moduleCount, controllerCount, routeCount := countTree(modules)
+	return &App{root: root, adapter: adapter, opts: opts, moduleCount: moduleCount, controllerCount: controllerCount, routeCount: routeCount}, nil
+}
+
+// countTree tallies how many modules/controllers/routes the assembled tree
+// contains -- used by MustListen's own startup log line. Controllers
+// without a routableController's own OwnRoutes() (should not happen for
+// *controller.Controller, but this mirrors registerRoutes' own defensive
+// type-assertion) are simply skipped for the route tally, same as
+// registerRoutes does for actual registration.
+func countTree(modules []*module.Module) (moduleCount, controllerCount, routeCount int) {
+	moduleCount = len(modules)
+	for _, m := range modules {
+		controllers := m.OwnControllers()
+		controllerCount += len(controllers)
+		for _, c := range controllers {
+			if rc, ok := c.(routableController); ok {
+				routeCount += len(rc.OwnRoutes())
+			}
+		}
+	}
+	return moduleCount, controllerCount, routeCount
 }
 
 // MustNewApp calls NewApp and panics if it returns an error. Convenience
