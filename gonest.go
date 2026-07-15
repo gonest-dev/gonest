@@ -185,6 +185,39 @@ func MustNewApp[T any, PT interface {
 }
 
 // ---------------------------------------------------------------------------
+// Testing (Test App Bootstrap feature)
+// ---------------------------------------------------------------------------
+
+// TestBuilder collects overrides for MustNewTestApp's provider substitution
+// (see MustOverride). See internal/app.TestBuilder's own doc comment.
+type TestBuilder = app.TestBuilder
+
+// TestApp is MustNewTestApp's return value -- the same fully-bootstrapped
+// module tree NewApp produces, minus a real bound network port. Usable
+// directly with MustInject[T](tester) for unit-style tests (module-scoped,
+// override-aware, same as a Controller's own MustInject). See
+// internal/app.TestApp's own doc comment.
+type TestApp = app.TestApp
+
+// MustOverride registers mockValue as the substitute for any Provider whose
+// resolved type exactly matches T (pointer override) or is implemented by
+// T (interface override) -- that Provider's real Constructor never runs.
+// Go cannot re-export a generic function via var, so this is a real
+// wrapper calling the internal one (same pattern as MustInject/
+// MustInjectAll, see AD-004 in STATE.md).
+func MustOverride[T any](b *TestBuilder, mockValue T) {
+	app.MustOverride[T](b, mockValue)
+}
+
+// MustNewTestApp runs the same 3-phase bootstrap NewApp does, with an
+// optional configure callback to register MustOverride calls before
+// provider resolution, and never binds a real network port (no Listen).
+// See internal/app.MustNewTestApp's own doc comment for the full contract.
+func MustNewTestApp(root *Module, configure func(*TestBuilder)) *TestApp {
+	return app.MustNewTestApp(root, configure)
+}
+
+// ---------------------------------------------------------------------------
 // Exceptions (HttpException Core feature)
 // ---------------------------------------------------------------------------
 

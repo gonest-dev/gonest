@@ -71,6 +71,48 @@ var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 // Constructor receives -- callers configure a bootstrap timeout by passing
 // a ctx already wrapped with context.WithTimeout.
 func Resolve(ctx context.Context, modules []*module.Module) error {
+	return resolveGraph(ctx, modules, nil)
+}
+
+// ResolveWithOverrides behaves exactly like Resolve, except: for any
+// provider whose ResolvedType() is found in overrides (exact match, or --
+// when the override was registered for an interface -- via
+// reflect.Type.Implements()), the override's value is used DIRECTLY
+// instead of invoking that provider's real Constructor (which never runs
+// for a matching provider -- no wasted work, no side effects from the real
+// dependency). Used by MustNewTestApp's test-mode bootstrap (see
+// .specs/features/test-app-bootstrap/design.md's Architecture Overview,
+// "test-mode variant" section) -- overrides is nil (or empty) for every
+// other caller, in which case this is behaviorally identical to Resolve.
+func ResolveWithOverrides(ctx context.Context, modules []*module.Module, overrides map[reflect.Type]reflect.Value) error {
+	return resolveGraph(ctx, modules, overrides)
+}
+
+// overrideFor looks up node's declared ResolvedType() in overrides: exact
+// match first, then (for any override key that is an interface kind) a
+// reflect.Type.Implements() fallback -- same exact-then-Implements()
+// precedence internal/resolver's own findDirectMatches uses for direct
+// resolution, kept consistent so "this provider is overridden" means the
+// same thing whether checked here (Stage 3, construction time) or via
+// FindDirect/FindDirectAll (phase 2/3, post-construction reads).
+func overrideFor(overrides map[reflect.Type]reflect.Value, node module.ProviderRef) (reflect.Value, bool) {
+	if len(overrides) == 0 {
+		return reflect.Value{}, false
+	}
+
+	t := node.ResolvedType()
+	if v, ok := overrides[t]; ok {
+		return v, true
+	}
+	for key, v := range overrides {
+		if key.Kind() == reflect.Interface && t != nil && t.Implements(key) {
+			return v, true
+		}
+	}
+	return reflect.Value{}, false
+}
+
+func resolveGraph(ctx context.Context, modules []*module.Module, overrides map[reflect.Type]reflect.Value) error {
 	nodes := allProviders(modules)
 	if len(nodes) == 0 {
 		return nil
@@ -150,7 +192,7 @@ func Resolve(ctx context.Context, modules []*module.Module) error {
 					case <-gctx.Done():
 						return gctx.Err()
 					}
-					return invokeAndCopyEdge(gctx, n, edge)
+					return invokeAndCopyEdge(gctx, n, edge, overrides)
 				})
 			}
 			continue
@@ -163,7 +205,7 @@ func Resolve(ctx context.Context, modules []*module.Module) error {
 				return err
 			}
 
-			return invokeAndCopy(gctx, n)
+			return invokeAndCopy(gctx, n, overrides)
 		})
 	}
 
@@ -240,11 +282,16 @@ func allProviders(modules []*module.Module) []module.ProviderRef {
 // error, then copies the resolved instance in place into every placeholder
 // any pending MustInject edge allocated for this exact provider. This is
 // the Singleton path: one Constructor call, result shared across every
-// edge targeting node.
-func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
-	real, err := callConstructor(ctx, node)
-	if err != nil {
-		return err
+// edge targeting node. If overrides has a matching entry for node (see
+// overrideFor), the real Constructor never runs -- the override's value is
+// used directly instead.
+func invokeAndCopy(ctx context.Context, node module.ProviderRef, overrides map[reflect.Type]reflect.Value) (err error) {
+	real, overridden := overrideFor(overrides, node)
+	if !overridden {
+		real, err = callConstructor(ctx, node)
+		if err != nil {
+			return err
+		}
 	}
 
 	if rs, ok := node.(resolvedSetter); ok {
@@ -252,6 +299,18 @@ func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
 	}
 
 	for _, placeholder := range placeholdersFor(node) {
+		// An override's concrete type may differ from node's own declared
+		// ResolvedType() (e.g. a *UserServiceMock substituting a
+		// *UserService provider via an interface override) -- a placeholder
+		// allocated for the ORIGINAL declared type cannot always accept an
+		// assignment from a differently-shaped override value. This is not
+		// a scenario spec.md's own stories exercise (Provider-to-Provider
+		// placeholder consumers of an overridden provider), so skip rather
+		// than panic; FindDirect/FindDirectAll (this feature's primary
+		// override-aware read path, via ResolvedValue) are unaffected.
+		if real.Type() != placeholder.Type() {
+			continue
+		}
 		placeholder.Elem().Set(real.Elem())
 	}
 
@@ -262,17 +321,23 @@ func invokeAndCopy(ctx context.Context, node module.ProviderRef) (err error) {
 // (the Transient path: one independent Constructor call per pending edge
 // targeting node), copying the result ONLY into edge's own placeholder --
 // never shared with any other edge targeting the same node.
-func invokeAndCopyEdge(ctx context.Context, node module.ProviderRef, edge inject.PendingEdge) error {
-	real, err := callConstructor(ctx, node)
-	if err != nil {
-		return err
+func invokeAndCopyEdge(ctx context.Context, node module.ProviderRef, edge inject.PendingEdge, overrides map[reflect.Type]reflect.Value) error {
+	real, overridden := overrideFor(overrides, node)
+	if !overridden {
+		var err error
+		real, err = callConstructor(ctx, node)
+		if err != nil {
+			return err
+		}
 	}
 
 	if rs, ok := node.(resolvedSetter); ok {
 		rs.SetResolvedValue(real)
 	}
 
-	edge.Placeholder.Elem().Set(real.Elem())
+	if real.Type() == edge.Placeholder.Type() {
+		edge.Placeholder.Elem().Set(real.Elem())
+	}
 	return nil
 }
 

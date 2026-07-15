@@ -2749,3 +2749,208 @@ func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
 
 	MustNewApp[fiber.FiberApp](root, AppOptions{})
 }
+
+// ---------------------------------------------------------------------------
+// Testing (Test App Bootstrap feature -- MustNewTestApp/TestBuilder/MustOverride)
+// ---------------------------------------------------------------------------
+
+// insightTestUserEntity/IUserService/UserService/UserServiceMock/
+// UserController/UserModule reproduce INSIGHT.md's "exemplo de Testing"
+// section: UserController depends on IUserService (an interface, the
+// precondition for MustOverride to have anything to intercept -- Go has no
+// runtime vtable swap for a concrete struct), UserService is the real
+// implementation, UserServiceMock is a hand-written test double.
+type insightTestUserEntity struct {
+	ID int64
+}
+
+type insightTestIUserService interface {
+	Get(userID int64) *insightTestUserEntity
+}
+
+type insightTestUserService struct {
+	list []*insightTestUserEntity
+}
+
+var _ insightTestIUserService = (*insightTestUserService)(nil)
+
+func (s *insightTestUserService) Get(userID int64) *insightTestUserEntity {
+	for _, u := range s.list {
+		if u.ID == userID {
+			return u
+		}
+	}
+	panic(NewNotFoundException(nil))
+}
+
+type insightTestUserServiceMock struct {
+	GetFn func(userID int64) *insightTestUserEntity
+}
+
+func (m *insightTestUserServiceMock) Get(userID int64) *insightTestUserEntity {
+	return m.GetFn(userID)
+}
+
+type insightTestUserIDParam struct {
+	ID int64 `param:"id"`
+}
+
+var insightTestUserIDParamMetadata = NewMetadata[insightTestUserIDParam](func(t *insightTestUserIDParam, m *Metadata) {
+	m.Property(&t.ID).Integer().Required()
+})
+
+// newInsightTestUserModule builds a FRESH *Module (+ Provider + Controller)
+// per call -- a *Module's own builder fn is not idempotent across multiple
+// bootstrap calls (Assemble/MustNewTestApp re-running it a second time
+// would re-register providers/controllers, producing duplicate routes),
+// the same constraint plain NewApp already has (every other test in this
+// file that calls NewApp/MustNewApp also builds its own root fresh, never
+// reusing a package-level *Module across multiple bootstrap calls).
+func newInsightTestUserModule() *Module {
+	provider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *insightTestUserService {
+			return &insightTestUserService{list: []*insightTestUserEntity{{ID: 42}}}
+		})
+	})
+
+	controller := NewController(func(controller *Controller) {
+		controller.Path("/user")
+
+		userService := MustInject[insightTestIUserService](controller)
+
+		controller.Route(route.HttpGet, "/:id", func(r *route.Route) {
+			r.HttpCode(http.StatusOK)
+			r.Handler(func(ctx *execution.Context) {
+				p := validate.MustParams[*insightTestUserIDParam](ctx)
+				ctx.Json(userService.Get(p.ID))
+			})
+		})
+	})
+
+	return NewModule(func(module *Module) {
+		module.Providers(provider)
+		module.Controllers(controller)
+	})
+}
+
+// TestMustNewTestApp_OverrideByInterface_RealHTTPDispatch reproduces
+// INSIGHT.md's TestUserController_Get verbatim (adapted: MustRequest/
+// AssertStatus/AssertJsonPath belong to the separate, not-yet-built "HTTP
+// Test Client" feature -- spec.md's own Out of Scope -- so dispatch here
+// uses the same real app.Test mechanism every other HTTP test in this file
+// already uses, via tester.Adapter()).
+func TestMustNewTestApp_OverrideByInterface_RealHTTPDispatch(t *testing.T) {
+	mock := &insightTestUserServiceMock{
+		GetFn: func(userID int64) *insightTestUserEntity {
+			return &insightTestUserEntity{ID: userID}
+		},
+	}
+
+	tester := MustNewTestApp(newInsightTestUserModule(), func(b *TestBuilder) {
+		MustOverride[insightTestIUserService](b, mock)
+	})
+	defer tester.Close()
+
+	fiberAdapter, ok := tester.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("tester.Adapter() is not a *fiber.FiberApp: %T", tester.Adapter())
+	}
+	t.Cleanup(func() { _ = fiberAdapter.FiberApp().Shutdown() })
+
+	req := httptest.NewRequest(http.MethodGet, "/user/42", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	var got insightTestUserEntity
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+	if got.ID != 42 {
+		t.Fatalf("body.ID = %d, want 42 (from the OVERRIDE mock, not the real UserService's seeded user)", got.ID)
+	}
+}
+
+// TestMustNewTestApp_NoOverride_DirectMustInject_UnitStyle reproduces
+// INSIGHT.md's TestUserService_Get_NotFound verbatim: no override,
+// MustInject[*UserService](tester) resolves the REAL provider directly
+// (unit-test style, no HTTP dispatch at all), and calling Get for a
+// missing ID panics the real NotFoundException.
+func TestMustNewTestApp_NoOverride_DirectMustInject_UnitStyle(t *testing.T) {
+	tester := MustNewTestApp(newInsightTestUserModule(), nil)
+	defer tester.Close()
+
+	service := MustInject[*insightTestUserService](tester)
+
+	defer func() {
+		exc, ok := recover().(*NotFoundException)
+		if !ok {
+			t.Fatal("expected a *NotFoundException panic")
+		}
+		_ = exc
+	}()
+	service.Get(999)
+}
+
+// TestMustNewTestApp_RealProviderConstructor_NeverRunsWhenOverridden proves
+// spec.md P3 AC2: the real Provider's Constructor never runs for an
+// overridden provider (observable via a side effect -- a counter -- that
+// would only increment if the real Constructor executed).
+func TestMustNewTestApp_RealProviderConstructor_NeverRunsWhenOverridden(t *testing.T) {
+	realConstructorRuns := 0
+	p := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *insightTestUserService {
+			realConstructorRuns++
+			return &insightTestUserService{}
+		})
+	})
+	c := NewController(func(controller *Controller) {
+		MustInject[insightTestIUserService](controller)
+	})
+	m := NewModule(func(module *Module) {
+		module.Providers(p)
+		module.Controllers(c)
+	})
+
+	mock := &insightTestUserServiceMock{GetFn: func(int64) *insightTestUserEntity { return nil }}
+	tester := MustNewTestApp(m, func(b *TestBuilder) {
+		MustOverride[insightTestIUserService](b, mock)
+	})
+	defer tester.Close()
+
+	if realConstructorRuns != 0 {
+		t.Fatalf("real Constructor ran %d times, want 0 (overridden provider must never invoke its real Constructor)", realConstructorRuns)
+	}
+}
+
+// TestMustNewTestApp_NilConfigure_BehavesLikeNewAppMinusListen proves
+// spec.md P3 AC4: MustNewTestApp(module, nil) bootstraps identically to
+// NewApp in every observable way (routes registered, DI resolved) except
+// not starting a real HTTP listener.
+func TestMustNewTestApp_NilConfigure_BehavesLikeNewAppMinusListen(t *testing.T) {
+	tester := MustNewTestApp(newInsightTestUserModule(), nil)
+	defer tester.Close()
+
+	fiberAdapter, ok := tester.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("tester.Adapter() is not a *fiber.FiberApp: %T", tester.Adapter())
+	}
+	t.Cleanup(func() { _ = fiberAdapter.FiberApp().Shutdown() })
+
+	req := httptest.NewRequest(http.MethodGet, "/user/42", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d (real, non-overridden UserService resolving user 42)", resp.StatusCode, http.StatusOK)
+	}
+}

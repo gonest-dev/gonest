@@ -1,10 +1,12 @@
 package resolver
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/gonest-dev/gonest/internal/module"
+	"github.com/gonest-dev/gonest/internal/provider"
 )
 
 // fakeResolvedProvider extends fakeProvider (resolver_test.go) with a
@@ -156,3 +158,113 @@ func TestFindDirect_UnexportedImports_NotVisible(t *testing.T) {
 		t.Fatalf("FindDirect() found an unexported provider from an imported module, want not visible")
 	}
 }
+
+func TestResolveWithOverrides_MatchingPointerOverride_SkipsRealConstructor(t *testing.T) {
+	realConstructorRan := false
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *overrideFooService {
+			realConstructorRan = true
+			return &overrideFooService{}
+		})
+	})
+	p.Declare()
+
+	m := module.New(func(m *module.Module) { m.Providers(p) })
+	modules, err := m.Assemble()
+	if err != nil {
+		t.Fatalf("Assemble() error = %v", err)
+	}
+
+	mock := &overrideFooService{Name: "mock"}
+	overrides := map[reflect.Type]reflect.Value{
+		reflect.TypeOf(&overrideFooService{}): reflect.ValueOf(mock),
+	}
+
+	if err := ResolveWithOverrides(context.Background(), modules, overrides); err != nil {
+		t.Fatalf("ResolveWithOverrides() error = %v", err)
+	}
+
+	if realConstructorRan {
+		t.Fatal("real Constructor ran for an overridden provider, want it to never run")
+	}
+
+	v, ok := p.ResolvedValue()
+	if !ok {
+		t.Fatal("ResolvedValue() ok=false after ResolveWithOverrides, want true")
+	}
+	if v.Interface().(*overrideFooService) != mock {
+		t.Fatalf("ResolvedValue() = %v, want the override's mock value %v", v.Interface(), mock)
+	}
+}
+
+func TestResolveWithOverrides_InterfaceOverride_SkipsRealConstructor(t *testing.T) {
+	realConstructorRan := false
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *overrideFooService {
+			realConstructorRan = true
+			return &overrideFooService{}
+		})
+	})
+	p.Declare()
+
+	m := module.New(func(m *module.Module) { m.Providers(p) })
+	modules, err := m.Assemble()
+	if err != nil {
+		t.Fatalf("Assemble() error = %v", err)
+	}
+
+	mock := &overrideFooServiceMock{}
+	overrides := map[reflect.Type]reflect.Value{
+		reflect.TypeOf((*overrideFooIface)(nil)).Elem(): reflect.ValueOf(mock),
+	}
+
+	if err := ResolveWithOverrides(context.Background(), modules, overrides); err != nil {
+		t.Fatalf("ResolveWithOverrides() error = %v", err)
+	}
+
+	if realConstructorRan {
+		t.Fatal("real Constructor ran for an overridden provider, want it to never run")
+	}
+
+	v, ok := p.ResolvedValue()
+	if !ok {
+		t.Fatal("ResolvedValue() ok=false after ResolveWithOverrides, want true")
+	}
+	if v.Interface().(*overrideFooServiceMock) != mock {
+		t.Fatalf("ResolvedValue() = %v, want the override's mock value %v", v.Interface(), mock)
+	}
+}
+
+func TestResolveWithOverrides_NoMatch_RunsRealConstructor(t *testing.T) {
+	realConstructorRan := false
+	p := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *overrideFooService {
+			realConstructorRan = true
+			return &overrideFooService{}
+		})
+	})
+	p.Declare()
+
+	m := module.New(func(m *module.Module) { m.Providers(p) })
+	modules, err := m.Assemble()
+	if err != nil {
+		t.Fatalf("Assemble() error = %v", err)
+	}
+
+	if err := ResolveWithOverrides(context.Background(), modules, nil); err != nil {
+		t.Fatalf("ResolveWithOverrides() error = %v", err)
+	}
+
+	if !realConstructorRan {
+		t.Fatal("real Constructor did not run when no override matched, want it to run")
+	}
+}
+
+type overrideFooService struct{ Name string }
+type overrideFooIface interface{ isOverrideFoo() }
+
+func (*overrideFooService) isOverrideFoo() {}
+
+type overrideFooServiceMock struct{}
+
+func (*overrideFooServiceMock) isOverrideFoo() {}
