@@ -217,15 +217,14 @@
 
 ## Milestone 11: Terminus/health checks
 
-**Goal:** equivalente `@nestjs/terminus` -- endpoint `/health` automático a partir de `HealthCheck`s registrados.
-**Status:** PLANNED -- spec.md escrito (2026-07-14), execução não iniciada. Mesma dependência de "Test App Bootstrap" que Emitter/Scheduler (`HealthCheck` é `New*` com `MustInject`).
+**Goal:** equivalente `@nestjs/terminus` -- probes `/readyz` (readiness) e `/livez` (liveness), estilo Kubernetes.
+**Status:** REVISADO (2026-07-15) -- usuário reescreveu o exemplo do INSIGHT.md: Terminus NÃO é mais um tipo `New*`-builder dedicado (`NewHealthCheck` removido). Mesmo modelo mental do NestJS real -- health check é só um `Controller` comum, usando `MustInjectAll[Connectable]` (já existe desde Milestone 8/9). SEM dependência bloqueante -- pode rodar a qualquer momento. Ver `.specs/features/terminus-health/spec.md` pro spec revisado.
 
 ### Features
 
-**Health Check** - PLANNED
-- `NewHealthCheck`, `Module.HealthChecks(...)`
-- `health.Check(name, func(ctx) error)` -- 1+ checagens nomeadas
-- `App.UseHealthCheck(path)` -- monta rota GET automaticamente; 200 + `{status:"ok", checks:{...}}` se tudo passar, 503 + detalhe do check que falhou senão
+**Health Check** - PLANNED (escopo reduzido drasticamente)
+- `HealthController` é um `gonest.NewController` comum, sem tipo novo de bootstrap -- `MustInjectAll[Connectable](controller)` resolve todo `Connectable` registrado (ex: Db, Redis), `/readyz` pinga todos e agrega status, `/livez` responde 200 estático
+- Únicos 2 primitivos novos necessários (de uso geral, não específicos de Terminus): `Context.SendString` (`internal/execution`, novo `Responder.SendString`) e `gonest.HttpStatusOk`/`HttpStatusServiceUnavailable` (constantes raiz -- INSIGHT.md já assumia que existiam em mais de um exemplo)
 
 ---
 
