@@ -1,7 +1,3 @@
-// Package comment implements the Comment domain: a Comment belongs to
-// exactly one Post AND exactly one User (its author) -- simulating the
-// M:N shape "a User can comment on many Posts, a Post can have comments
-// from many Users" via two foreign keys, no explicit join table needed.
 package comment
 
 import (
@@ -10,36 +6,13 @@ import (
 	"github.com/gonest-dev/gonest"
 
 	"blog-api/post"
-	"blog-api/shared"
 	"blog-api/user"
 )
-
-type Entity struct {
-	ID     int64  `json:"id"`
-	PostID int64  `json:"post_id"`
-	UserID int64  `json:"user_id"`
-	Body   string `json:"body"`
-}
-
-// EntitySchema registers Entity's own OpenAPI schema (components.schemas.
-// CommentEntity) -- see user.EntitySchema's own doc comment for the same
-// rationale.
-var EntitySchema = gonest.NewSchema[Entity](func(t *Entity, m *gonest.Schema) {
-	m.Title("CommentEntity")
-	m.Property(&t.ID).Integer().Required()
-	m.Property(&t.PostID).Integer().Required()
-	m.Property(&t.UserID).Integer().Required()
-	m.Property(&t.Body).String().Required()
-})
 
 type Service struct {
 	db          *sql.DB
 	userService *user.Service
 	postService *post.Service
-}
-
-func NewService(db *sql.DB, userService *user.Service, postService *post.Service) *Service {
-	return &Service{db: db, userService: userService, postService: postService}
 }
 
 func (s *Service) List(postID, userID int64) []*Entity {
@@ -90,16 +63,3 @@ func (s *Service) Create(postID, userID int64, body string) *Entity {
 	}
 	return &Entity{ID: id, PostID: postID, UserID: userID, Body: body}
 }
-
-var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
-	db := gonest.MustInject[*sql.DB](provider)
-	userService := gonest.MustInject[*user.Service](provider)
-	postService := gonest.MustInject[*post.Service](provider)
-	provider.Constructor(func() *Service { return NewService(db, userService, postService) })
-})
-
-var Module = gonest.NewModule(func(module *gonest.Module) {
-	module.Imports(shared.DatabaseModule, user.Module, post.Module)
-	module.Providers(Provider)
-	module.Controllers(Controller)
-})

@@ -8,33 +8,6 @@ import (
 	"blog-api/shared"
 )
 
-type createBody struct {
-	PostID int64  `json:"post_id"`
-	UserID int64  `json:"user_id"`
-	Body   string `json:"body"`
-}
-
-var createBodySchema = gonest.NewSchema[createBody](func(t *createBody, m *gonest.Schema) {
-	// Title distinguishes this from user/post's own "createBody" local
-	// type -- see user.createBodySchema's own comment for why this is
-	// required, not optional, once 2+ controllers each have a same-named
-	// unexported request-body type.
-	m.Title("CreateCommentRequest")
-	m.Property(&t.PostID).Integer().Min(1).Required()
-	m.Property(&t.UserID).Integer().Min(1).Required()
-	m.Property(&t.Body).String().Min(1).Required()
-})
-
-type listQuery struct {
-	PostID int64 `query:"post_id"`
-	UserID int64 `query:"user_id"`
-}
-
-var listQuerySchema = gonest.NewSchema[listQuery](func(t *listQuery, m *gonest.Schema) {
-	m.Property(&t.PostID).Integer()
-	m.Property(&t.UserID).Integer()
-})
-
 var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/comments")
 	controller.Tags("comments")
@@ -45,10 +18,10 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
-		r.QueryParams(listQuerySchema)
-		r.Response(http.StatusOK, EntitySchema)
+		r.QueryParams(listQueryDTOSchema)
+		r.Response(http.StatusOK, Schema)
 		r.Handler(func(ctx *gonest.Context) {
-			q := gonest.MustQuery[*listQuery](ctx)
+			q := gonest.MustQuery[*ListQueryDTO](ctx)
 			ctx.Json(service.List(q.PostID, q.UserID))
 		})
 	})
@@ -56,11 +29,11 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.Summary("Create a comment")
 		r.HttpCode(http.StatusCreated)
-		r.RequestBody(createBodySchema)
-		r.Response(http.StatusCreated, EntitySchema)
+		r.RequestBody(createBodyDTOSchema)
+		r.Response(http.StatusCreated, Schema)
 		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.Context) {
-			body := gonest.MustJsonBody[*createBody](ctx)
+			body := gonest.MustJsonBody[*CreateBodyDTO](ctx)
 			ctx.Status(http.StatusCreated).Json(service.Create(body.PostID, body.UserID, body.Body))
 		})
 	})

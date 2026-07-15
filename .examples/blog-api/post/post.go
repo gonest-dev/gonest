@@ -1,5 +1,3 @@
-// Package post implements the Post domain: a Post belongs to exactly one
-// User (its author).
 package post
 
 import (
@@ -7,35 +5,12 @@ import (
 
 	"github.com/gonest-dev/gonest"
 
-	"blog-api/shared"
 	"blog-api/user"
 )
-
-type Entity struct {
-	ID     int64  `json:"id"`
-	UserID int64  `json:"user_id"`
-	Title  string `json:"title"`
-	Body   string `json:"body"`
-}
-
-// EntitySchema registers Entity's own OpenAPI schema (components.schemas.
-// PostEntity) -- see user.EntitySchema's own doc comment for the same
-// rationale.
-var EntitySchema = gonest.NewSchema[Entity](func(t *Entity, m *gonest.Schema) {
-	m.Title("PostEntity")
-	m.Property(&t.ID).Integer().Required()
-	m.Property(&t.UserID).Integer().Required()
-	m.Property(&t.Title).String().Required()
-	m.Property(&t.Body).String().Required()
-})
 
 type Service struct {
 	db          *sql.DB
 	userService *user.Service
-}
-
-func NewService(db *sql.DB, userService *user.Service) *Service {
-	return &Service{db: db, userService: userService}
 }
 
 func (s *Service) List(userID int64) []*Entity {
@@ -91,16 +66,3 @@ func (s *Service) Create(userID int64, title, body string) *Entity {
 	}
 	return &Entity{ID: id, UserID: userID, Title: title, Body: body}
 }
-
-var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
-	db := gonest.MustInject[*sql.DB](provider)
-	userService := gonest.MustInject[*user.Service](provider)
-	provider.Constructor(func() *Service { return NewService(db, userService) })
-})
-
-var Module = gonest.NewModule(func(module *gonest.Module) {
-	module.Imports(shared.DatabaseModule, user.Module)
-	module.Providers(Provider)
-	module.Controllers(Controller)
-	module.Exports(Provider)
-})
