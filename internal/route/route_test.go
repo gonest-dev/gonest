@@ -143,7 +143,7 @@ func TestPath_ReturnsConstructedPath(t *testing.T) {
 }
 
 // newTestSchemaFor builds a throwaway *schema.Schema for zero's own
-// type, suitable for use as RequestBody/Response/PathParams/QueryParams
+// type, suitable for use as RequestBody/Response/Params/Query
 // payloads in route documentation-builder tests -- Route only needs a
 // *schema.Schema pointer identity, never inspects its contents. The
 // registry (internal/schema/registry.go) keys registration by Go type and
@@ -478,79 +478,77 @@ func TestResponses_ReturnsCopyNotInternalMap(t *testing.T) {
 	}
 }
 
-// TestPathParams_StoresAndReportsSet proves PathParams stores the
-// *schema.Schema retrievable via PathParamsSchema, and returns r so
-// calls can chain.
-func TestPathParams_StoresAndReportsSet(t *testing.T) {
+// TestParams_StoresAndReportsSet proves Params stores the *schema.Schema
+// retrievable via ParamsSchema, and returns r so calls can chain.
+func TestParams_StoresAndReportsSet(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	var got *Route
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		got = r.PathParams(m)
+		got = r.Params(m)
 	})
 
 	if got != r {
-		t.Fatal("Route.PathParams did not return the same *Route for chaining")
+		t.Fatal("Route.Params did not return the same *Route for chaining")
 	}
 
-	gotMeta, set := r.PathParamsSchema()
+	gotMeta, set := r.ParamsSchema()
 	if !set {
-		t.Fatal("PathParamsSchema() set = false, want true after PathParams() was called")
+		t.Fatal("ParamsSchema() set = false, want true after Params() was called")
 	}
 	if gotMeta != m {
-		t.Fatalf("PathParamsSchema() = %v, want %v", gotMeta, m)
+		t.Fatalf("ParamsSchema() = %v, want %v", gotMeta, m)
 	}
 }
 
-// TestPathParams_NeverCalled_ReportsUnset proves PathParamsSchema returns
-// (nil, false) before PathParams is ever called.
-func TestPathParams_NeverCalled_ReportsUnset(t *testing.T) {
+// TestParams_NeverCalled_ReportsUnset proves ParamsSchema returns
+// (nil, false) before Params is ever called.
+func TestParams_NeverCalled_ReportsUnset(t *testing.T) {
 	r := New(HttpGet, "/users/:id", func(r *Route) {})
 
-	gotMeta, set := r.PathParamsSchema()
+	gotMeta, set := r.ParamsSchema()
 	if set {
-		t.Fatal("PathParamsSchema() set = true, want false before PathParams() was ever called")
+		t.Fatal("ParamsSchema() set = true, want false before Params() was ever called")
 	}
 	if gotMeta != nil {
-		t.Fatalf("PathParamsSchema() = %v, want nil", gotMeta)
+		t.Fatalf("ParamsSchema() = %v, want nil", gotMeta)
 	}
 }
 
-// TestQueryParams_StoresAndReportsSet proves QueryParams stores the
-// *schema.Schema retrievable via QueryParamsSchema, and returns r so
-// calls can chain.
-func TestQueryParams_StoresAndReportsSet(t *testing.T) {
+// TestQuery_StoresAndReportsSet proves Query stores the *schema.Schema
+// retrievable via QuerySchema, and returns r so calls can chain.
+func TestQuery_StoresAndReportsSet(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	var got *Route
 	r := New(HttpGet, "/users", func(r *Route) {
-		got = r.QueryParams(m)
+		got = r.Query(m)
 	})
 
 	if got != r {
-		t.Fatal("Route.QueryParams did not return the same *Route for chaining")
+		t.Fatal("Route.Query did not return the same *Route for chaining")
 	}
 
-	gotMeta, set := r.QueryParamsSchema()
+	gotMeta, set := r.QuerySchema()
 	if !set {
-		t.Fatal("QueryParamsSchema() set = false, want true after QueryParams() was called")
+		t.Fatal("QuerySchema() set = false, want true after Query() was called")
 	}
 	if gotMeta != m {
-		t.Fatalf("QueryParamsSchema() = %v, want %v", gotMeta, m)
+		t.Fatalf("QuerySchema() = %v, want %v", gotMeta, m)
 	}
 }
 
-// TestQueryParams_NeverCalled_ReportsUnset proves QueryParamsSchema
-// returns (nil, false) before QueryParams is ever called.
-func TestQueryParams_NeverCalled_ReportsUnset(t *testing.T) {
+// TestQuery_NeverCalled_ReportsUnset proves QuerySchema returns (nil,
+// false) before Query is ever called.
+func TestQuery_NeverCalled_ReportsUnset(t *testing.T) {
 	r := New(HttpGet, "/users", func(r *Route) {})
 
-	gotMeta, set := r.QueryParamsSchema()
+	gotMeta, set := r.QuerySchema()
 	if set {
-		t.Fatal("QueryParamsSchema() set = true, want false before QueryParams() was ever called")
+		t.Fatal("QuerySchema() set = true, want false before Query() was ever called")
 	}
 	if gotMeta != nil {
-		t.Fatalf("QueryParamsSchema() = %v, want nil", gotMeta)
+		t.Fatalf("QuerySchema() = %v, want nil", gotMeta)
 	}
 }
 

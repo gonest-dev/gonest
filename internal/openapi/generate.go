@@ -127,11 +127,11 @@ func walkRoute(c routableController, r *route.Route, doc *OpenAPI) {
 	visiting := map[*schema.Schema]bool{}
 
 	var parameters []any
-	if pathParams, ok := r.PathParamsSchema(); ok {
-		parameters = append(parameters, paramsToParameters(pathParams, "path", "param", doc, visiting)...)
+	if params, ok := r.ParamsSchema(); ok {
+		parameters = append(parameters, paramsToParameters(params, "path", "param", doc, visiting)...)
 	}
-	if queryParams, ok := r.QueryParamsSchema(); ok {
-		parameters = append(parameters, paramsToParameters(queryParams, "query", "query", doc, visiting)...)
+	if query, ok := r.QuerySchema(); ok {
+		parameters = append(parameters, paramsToParameters(query, "query", "query", doc, visiting)...)
 	}
 	if len(parameters) > 0 {
 		op["parameters"] = parameters

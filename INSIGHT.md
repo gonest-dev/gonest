@@ -832,15 +832,16 @@ func main() {
 }
 ```
 
-# exemplo de Param/Query Validation
+# exemplo de Param, Query e Header Validation + Swagger
 
-Path params e query string seguem exatamente o mesmo mecanismo de `MustJsonBody`
-(exemplo acima): declara um struct pequeno, registra sua `Schema` via
-`NewSchema[T]` (tags `param:"..."`/`query:"..."` em vez de `json:"..."`), e
-o handler resolve o struct inteiro já validado de uma vez -- nunca campo a
-campo. Não existe (nem nunca existiu como API pública) um `MustParam[T](ctx, name)`
-avulso paralelo; `MustParams`/`MustQuery` são o único caminho pra path
-param/query string.
+Path params, query string e headers seguem exatamente o mesmo mecanismo de `MustJsonBody`:
+declara um struct pequeno, registra seu `Schema` via `NewSchema[T]`
+(usando as tags correspondentes: `param:"..."`, `query:"..."`, `header:"..."`), e
+o handler resolve o struct inteiro já validado de uma vez -- nunca campo a campo. 
+
+Além da validação em runtime (`MustParams`, `MustQuery`, `MustHeaders`), esse mesmíssimo
+`Schema` é injetado no builder da Rota (`route.Params()`, `route.Query()`, `route.Headers()`)
+para compilar a documentação OpenAPI sem duplicar declarações.
 
 ```go
 package ex
@@ -854,7 +855,7 @@ type UserIdParams struct {
   UserId int64 `param:"user_id"`
 }
 
-var _ = gonest.NewSchema[UserIdParams](func (t *UserIdParams, m *gonest.Schema) {
+var userIdParamsSchema = gonest.NewSchema[UserIdParams](func (t *UserIdParams, m *gonest.Schema) {
   m.Property(&t.UserId).Integer().Min(1).Required()
 })
 
@@ -865,9 +866,20 @@ type ListUsersQuery struct {
   Limit int `query:"limit"`
 }
 
-var _ = gonest.NewSchema[ListUsersQuery](func (t *ListUsersQuery, m *gonest.Schema) {
+var listUsersQuerySchema = gonest.NewSchema[ListUsersQuery](func (t *ListUsersQuery, m *gonest.Schema) {
   m.Property(&t.Page).Integer().Min(1).Required()
   m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
+})
+
+// headers: struct + tag `header:"..."`
+type CustomHeaders struct {
+  UserAgent string `header:"user-agent"`
+  RequestId string `header:"x-request-id"`
+}
+
+var customHeadersSchema = gonest.NewSchema[CustomHeaders](func (t *CustomHeaders, m *gonest.Schema) {
+  m.Property(&t.UserAgent).String().Required()
+  m.Property(&t.RequestId).String().Required()
 })
 
 var UserController = gonest.NewController(func (controller *gonest.Controller) {
@@ -875,37 +887,33 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   userService := gonest.MustInject[*UserService](controller)
 
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
+    route.Summary("Busca usuário e extrai path/headers")
+    
+    // Injeta o Schema na Rota para OpenAPI (Documentação)
+    route.Params(userIdParamsSchema)
+    route.Headers(customHeadersSchema)
+
     route.Handler(func(ctx *gonest.Context) {
-      // MustParams[T](ctx) -- igual MustJsonBody, mas lê os ":name" da rota
-      // atual em vez do corpo JSON. Path param ausente ou fora de Min/Max
-      // vira violation, coletada junto com qualquer outra (não fail-fast) --
-      // panica *BadRequestException se alguma sobrar.
+      // MustParams e MustHeaders usam o MESMO Schema para Validação Runtime
       params := gonest.MustParams[*UserIdParams](ctx)
+      headers := gonest.MustHeaders[*CustomHeaders](ctx)
+      
+      // ... uso ...
       ctx.Json(userService.Get(params.UserId))
     })
   })
 
   controller.Route(gonest.HttpGet, "/", func (route *gonest.Route) {
+    route.Summary("Lista usuários com paginação")
+    
+    // Injeta o Schema na Rota para OpenAPI (Documentação)
+    route.Query(listUsersQuerySchema)
+
     route.Handler(func(ctx *gonest.Context) {
-      // MustQuery[T](ctx) -- mesmo mecanismo de MustParams, lendo da query
-      // string em vez dos ":name" da rota.
+      // MustQuery[T](ctx) usa o MESMO Schema para Validação Runtime
       query := gonest.MustQuery[*ListUsersQuery](ctx)
+      
       ctx.Json(userService.List(query.Page, query.Limit))
-    })
-  })
-})
-
-// path param + query juntos na mesma rota: MustParams e MustQuery são
-// independentes entre si, dá pra chamar os dois no mesmo handler.
-var OrderController = gonest.NewController(func (controller *gonest.Controller) {
-  controller.Path("/user")
-  userService := gonest.MustInject[*UserService](controller)
-
-  controller.Route(gonest.HttpGet, "/:user_id/orders", func (route *gonest.Route) {
-    route.Handler(func(ctx *gonest.Context) {
-      params := gonest.MustParams[*UserIdParams](ctx)
-      query := gonest.MustQuery[*ListUsersQuery](ctx)
-      ctx.Json(userService.ListOrders(params.UserId, query.Page, query.Limit))
     })
   })
 })
@@ -936,8 +944,8 @@ que Go não tem decorator):
   é opcional (variádico): zero args documenta o status sem body, um arg
   permite formatar a resposta (schema, description). Chamar de novo pro MESMO status sobrescreve; pra status
   DIFERENTES acumula.
-- `@ApiParam` -> `Route.PathParams(schema)`
-- `@ApiQuery` -> `Route.QueryParams(schema)`
+- `@ApiParam` -> `Route.Params(schema)`
+- `@ApiQuery` -> `Route.Query(schema)`
 - `@ApiBearerAuth`/`@ApiBasicAuth` -> `Controller.BearerAuth()` (herda) /
   `Route.BearerAuth()` (override, mesma prioridade "rota vence" de Tags)
 - `@ApiExcludeEndpoint` -> `Route.ExcludeFromDocs()`
@@ -1038,7 +1046,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     // path params TAMBÉM documentados via Schema já registrada (mesma
     // UserIdParams de MustParams) -- Schema Generation vira "parameters"
     // (in: path) no OpenAPI a partir dela, sem redeclarar nada.
-    route.PathParams(userIdParamsSchema)
+    route.Params(userIdParamsSchema)
     route.Response(200, func (response *gonest.Response) {
       response.Description("Usuário encontrado")
       response.Schema(userEntitySchema)
@@ -1063,7 +1071,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 })
 
 // rota SEM nenhuma chamada de documentação (Summary/RequestBody/Response/
-// PathParams) ainda aparece em paths -- Schema Generation infere o que já dá
+// Params) ainda aparece em paths -- Schema Generation infere o que já dá
 // pra inferir do que a Route/Controller já sabem (path/método/HttpCode), sem
 // exigir documentação explícita como pré-requisito pra aparecer.
 ```
@@ -1104,82 +1112,4 @@ ainda funciona em Schema Generation: o campo aparece no schema SEM
 type/format (só `description`/`examples`/`nullable`/`required` se setados) --
 limitação documentada, não erro.
 
-# reflexão: Suporte a GraphQL (Futuro)
 
-A adoção do sistema de builders e o uso de `gonest.Schema` (que hoje já consolida validação em runtime e geração de OpenAPI) criam um caminho extremamente natural e elegante para suportar **GraphQL** no futuro. Podemos reaproveitar quase toda a infraestrutura base do framework, mudando apenas a ponta de exposição e aproveitando o modelo mental que o próprio NestJS adotou para GraphQL: **Resolvers ao invés de Controllers**.
-
-No NestJS, o GraphQL é construído usando os decorators `@Resolver`, `@Query`, `@Mutation` e `@Args`. No Gonest, adotaríamos a mesma filosofia baseada em closures (builders) semânticos, mantendo a consistência do framework sem recorrer à pesada reflexão de anotações.
-
-## 1. Resolvers como Porteiros do GraphQL
-
-Um `Resolver` atuaria de forma análoga a um `Controller`. Ele pertenceria a um Módulo e consumiria suas dependências normalmente (via `MustInject`), sendo registrado via `module.Resolvers(...)`. 
-
-```go
-var UserResolver = gonest.NewResolver("User", func (r *gonest.Resolver) {
-  // Injeção de dependência funciona de forma idêntica a um Controller
-  userService := gonest.MustInject[*UserService](r)
-
-  // Equivalente ao @Query() do Nest
-  r.Query("getUser", func (q *gonest.Query) {
-    // Reutilizamos a MESMA gonest.Schema do OpenAPI/HTTP para validar argumentos!
-    q.Args(userIdParamsSchema) 
-    
-    // E reutilizamos para tipar o retorno no Schema do GraphQL
-    q.Returns(userEntitySchema) 
-
-    q.Resolve(func(ctx *gonest.Context) {
-      // MustArgs seria o equivalente GraphQL para MustParams / MustJsonBody
-      args := gonest.MustArgs[*UserIdParams](ctx)
-      
-      // ctx.Data ou ctx.GraphQL sinaliza o retorno final do resolver (sem response HTTP)
-      ctx.Data(userService.Get(args.UserId))
-    })
-  })
-
-  // Equivalente ao @Mutation() do Nest
-  r.Mutation("createUser", func (m *gonest.Mutation) {
-    // O mesmo schema do REST pode ser consumido como Input no GraphQL
-    m.Args(userEntitySchema) 
-    m.Returns(userEntitySchema)
-    
-    m.Resolve(func(ctx *gonest.Context) {
-      input := gonest.MustArgs[*UserEntity](ctx)
-      ctx.Data(userService.Create(input))
-    })
-  })
-})
-```
-
-## 2. Geração Code-First do Schema GraphQL (SDL)
-
-Como o `gonest.Schema` já retém nativamente os tipos fundamentais (`String`, `Integer`, `Array`, `Object`) e suas restrições lógicas (ex: `Required()`), nós podemos compilar automaticamente um **Schema GraphQL (SDL)** exatamente com a mesma inteligência do motor que usamos para a especificação do Swagger/OpenAPI.
-
-O framework leria o `userEntitySchema` (que validava os requests no REST) e o traduziria de forma 1:1 para os equivalentes em GraphQL:
-
-```graphql
-type UserEntity {
-  Id: Int!
-  Name: String!
-  Address: AddressEntity!
-  Addresses: [AddressEntity!]!
-}
-
-input UserEntityInput {
-  Id: Int!
-  Name: String!
-  # ...
-}
-```
-
-### Conclusão dessa reflexão
-
-Ao invés de criarmos tipos isolados, structs repetidas, e usar strings reflexivas apenas para o GraphQL (como é comum em bibliotecas genéricas de Go), a infraestrutura do Gonest transforma o `gonest.Schema` e os construtores de `Module/Provider/Resolver` em **Uma Única Fonte de Verdade**. 
-
-Você declararia a regra, a dependência e o modelo de dados uma única vez, e o Gonest orquestraria isso para servir 4 propósitos simultaneamente:
-
-1. Injeção de dependência universal (Providers independentes de HTTP/GQL)
-2. Validação unificada em runtime (`MustJsonBody`, `MustParams`, `MustArgs`)
-3. Geração Automática de Documentação OpenAPI (REST)
-4. Geração Automática de Schema SDL (GraphQL)
-
-Dessa forma, Controllers REST e Resolvers GraphQL seriam apenas "transportes/adaptadores", permitindo que uma aplicação escale para os dois mundos utilizando rigorosamente a mesma base de código de negócio e validação.

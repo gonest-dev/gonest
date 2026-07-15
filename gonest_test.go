@@ -2362,7 +2362,7 @@ func TestNewOpenAPI_RootAlias_InsightBootstrapExample(t *testing.T) {
 
 // TestGenerateOpenApiSchema_RootAlias_InsightExample reproduces INSIGHT.md's
 // settled "Schema Generation from Schema" example (UserEntity/AddressEntity,
-// Controller.Tags/BearerAuth, Route.Summary/RequestBody/Response/PathParams/
+// Controller.Tags/BearerAuth, Route.Summary/RequestBody/Response/Params/
 // ExcludeFromDocs) entirely through root gonest aliases, then confirms
 // GenerateOpenApiSchema(app, doc) produces the expected paths/
 // components.schemas shape: the excluded route is absent, a documented
@@ -2412,7 +2412,7 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 
 		c.Route(route.HttpGet, "/:user_id", func(r *Route) {
 			r.Summary("Busca um usuario por ID")
-			r.PathParams(userIdParamsSchema)
+			r.Params(userIdParamsSchema)
 			r.Response(http.StatusOK, func(response *Response) { response.Schema(userEntitySchema) })
 			r.Response(http.StatusNotFound)
 			r.HttpCode(http.StatusOK)

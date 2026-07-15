@@ -18,7 +18,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List posts, optionally filtered by user_id")
-		r.QueryParams(listQueryDTOSchema)
+		r.Query(listQueryDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Handler(func(ctx *gonest.Context) {
 			q := gonest.MustQuery[*ListQueryDTO](ctx)
@@ -28,7 +28,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/:post_id", func(r *gonest.Route) {
 		r.Summary("Get a post by id")
-		r.PathParams(paramsDTOSchema)
+		r.Params(paramsDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound, func(response *gonest.Response) {
 			response.Description("Cannot find a post using post_id")

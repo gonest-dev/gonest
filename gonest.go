@@ -663,7 +663,7 @@ var NewOpenAPI = openapi.New
 // Route holds one HTTP method+path registration (see Controller.Route)
 // plus the documentation builder methods a caller uses to describe it for
 // schema generation (Summary/Description/OperationId/Tags/BearerAuth/
-// RequestBody/Response/PathParams/QueryParams/ExcludeFromDocs/Deprecated).
+// RequestBody/Response/Params/Query/ExcludeFromDocs/Deprecated).
 // It is a true Go type alias, so every one of those methods is automatically
 // visible on gonest.Route with zero extra wrapper code, same as
 // App/Module/Schema/etc above. See internal/route.Route's doc comment for
@@ -684,7 +684,7 @@ type Response = route.Response
 // recursing into every imported module -- see internal/app.App.Root's doc
 // comment) and populates doc's paths/components.schemas from every
 // registered Controller/Route's documentation (Controller.Tags/BearerAuth,
-// Route.Summary/RequestBody/Response/PathParams/QueryParams/
+// Route.Summary/RequestBody/Response/Params/Query/
 // ExcludeFromDocs/etc, plus every *Schema those routes reference,
 // recursively deduplicated by pointer identity). Call it after NewApp (so
 // the module tree is assembled) and before serving doc.Document() (e.g. via

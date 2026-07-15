@@ -52,8 +52,8 @@ type Route struct {
 	// "documented, no body".
 	responses map[int]*Response
 
-	pathParams  *schema.Schema
-	queryParams *schema.Schema
+	params *schema.Schema
+	query  *schema.Schema
 
 	excluded   bool
 	deprecated bool
@@ -257,34 +257,37 @@ func (r *Route) Responses() map[int]*Response {
 	return out
 }
 
-// PathParams stores m as this Route's documented path-parameters schema and
-// returns r so calls can chain. Calling PathParams more than once
-// overwrites the previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) PathParams(m *schema.Schema) *Route {
-	r.pathParams = m
+// Params stores m as this Route's documented path-parameters schema and
+// returns r so calls can chain (named after NestJS's `@Param()`, not
+// `@PathParam()` -- matches MustParams' own naming, which reads path
+// params at runtime). Calling Params more than once overwrites the
+// previous value (last-write-wins, spec.md's Edge Cases).
+func (r *Route) Params(m *schema.Schema) *Route {
+	r.params = m
 	return r
 }
 
-// PathParamsSchema returns the *schema.Schema set via PathParams, and
-// whether PathParams was ever called -- the bool distinguishes "never
-// documented" from "documented".
-func (r *Route) PathParamsSchema() (*schema.Schema, bool) {
-	return r.pathParams, r.pathParams != nil
+// ParamsSchema returns the *schema.Schema set via Params, and whether
+// Params was ever called -- the bool distinguishes "never documented" from
+// "documented".
+func (r *Route) ParamsSchema() (*schema.Schema, bool) {
+	return r.params, r.params != nil
 }
 
-// QueryParams stores m as this Route's documented query-parameters schema
-// and returns r so calls can chain. Calling QueryParams more than once
-// overwrites the previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) QueryParams(m *schema.Schema) *Route {
-	r.queryParams = m
+// Query stores m as this Route's documented query-parameters schema and
+// returns r so calls can chain (matches MustQuery's own naming, which reads
+// query params at runtime). Calling Query more than once overwrites the
+// previous value (last-write-wins, spec.md's Edge Cases).
+func (r *Route) Query(m *schema.Schema) *Route {
+	r.query = m
 	return r
 }
 
-// QueryParamsSchema returns the *schema.Schema set via QueryParams,
-// and whether QueryParams was ever called -- the bool distinguishes "never
-// documented" from "documented".
-func (r *Route) QueryParamsSchema() (*schema.Schema, bool) {
-	return r.queryParams, r.queryParams != nil
+// QuerySchema returns the *schema.Schema set via Query, and whether Query
+// was ever called -- the bool distinguishes "never documented" from
+// "documented".
+func (r *Route) QuerySchema() (*schema.Schema, bool) {
+	return r.query, r.query != nil
 }
 
 // ExcludeFromDocs marks this Route to be omitted entirely from OpenAPI

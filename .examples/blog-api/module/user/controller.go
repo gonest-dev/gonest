@@ -28,7 +28,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/:user_id", func(r *gonest.Route) {
 		r.Summary("Get a user by id")
-		r.PathParams(paramsDTOSchema)
+		r.Params(paramsDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.Context) {

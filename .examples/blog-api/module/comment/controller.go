@@ -18,7 +18,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
-		r.QueryParams(listQueryDTOSchema)
+		r.Query(listQueryDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Handler(func(ctx *gonest.Context) {
 			q := gonest.MustQuery[*ListQueryDTO](ctx)
