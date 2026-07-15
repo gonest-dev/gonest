@@ -31,6 +31,11 @@ type AppOptions struct {
 	// print regardless (those carry actual operational information: bind
 	// address, loaded module/controller/route counts, PID).
 	DisableBanner bool
+
+	// DisableLoaded, when true, skips printing the 3 structured log lines
+	// that detail how many Modules, Controllers, and Routes were loaded
+	// during bootstrap. The final "Listening on: ..." line still prints.
+	DisableLoaded bool
 }
 
 // LogLevel is internal/logger.Level's own alias -- kept under this name

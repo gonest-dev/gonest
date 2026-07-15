@@ -23,8 +23,12 @@ import (
 )
 
 func main() {
-	app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
-	app.MustListen(":3000", func() {
-		println("simple-todo listening on :3000")
-	})
+	app, err := gonest.NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
+	if err != nil {
+		panic(err)
+	}
+	err = app.Listen(":3000")
+	if err != nil {
+		panic(err)
+	}
 }

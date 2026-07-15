@@ -122,9 +122,15 @@ func (a *App) Listen(addr string, optionalOnListen ...OnListen) error {
 			printBanner()
 		}
 		if !a.opts.DisableLoaded {
-			logger.Info(fmt.Sprintf("Modules Loaded:     %d", a.moduleCount))
-			logger.Info(fmt.Sprintf("Controllers Loaded: %d", a.controllerCount))
-			logger.Info(fmt.Sprintf("Routes Loaded:      %d", a.routeCount))
+			if a.moduleCount > 0 {
+				logger.Info(fmt.Sprintf("Modules    : %d", a.moduleCount))
+			}
+			if a.controllerCount > 0 {
+				logger.Info(fmt.Sprintf("Controllers: %d", a.controllerCount))
+			}
+			if a.routeCount > 0 {
+				logger.Info(fmt.Sprintf("Routes     : %d", a.routeCount))
+			}
 		}
 		logger.Info(fmt.Sprintf("Listening on:       http://%s, PID: %d", displayAddr(addr), os.Getpid()))
 		if len(optionalOnListen) > 0 && optionalOnListen[0] != nil {
@@ -347,7 +353,14 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	}
 
 	moduleCount, controllerCount, routeCount := countTree(modules)
-	return &App{root: root, adapter: adapter, opts: opts, moduleCount: moduleCount, controllerCount: controllerCount, routeCount: routeCount}, nil
+	return &App{
+		root:            root,
+		adapter:         adapter,
+		opts:            opts,
+		moduleCount:     moduleCount,
+		controllerCount: controllerCount,
+		routeCount:      routeCount,
+	}, nil
 }
 
 // countTree tallies how many modules/controllers/routes the assembled tree
