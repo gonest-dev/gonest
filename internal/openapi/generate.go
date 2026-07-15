@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"reflect"
 	"strconv"
 
 	"github.com/gonest-dev/gonest/internal/module"
@@ -28,9 +29,9 @@ type routableController interface {
 // shapes) and every Module's OwnControllers()/Controller's OwnRoutes(),
 // building doc.paths/doc.schemas as it goes (design.md's Components: "internal/
 // openapi.Generate"). doc.paths/doc.schemas/doc.schemaNames are lazily
-// initialized here if nil, so a fresh *OpenApiDocument (from New) works
+// initialized here if nil, so a fresh *OpenAPI (from New) works
 // without any extra setup.
-func Generate(doc *OpenApiDocument, root *module.Module) {
+func Generate(doc *OpenAPI, root *module.Module) {
 	if doc.paths == nil {
 		doc.paths = map[string]map[string]any{}
 	}
@@ -49,7 +50,7 @@ func Generate(doc *OpenApiDocument, root *module.Module) {
 // recursion on circular/diamond module imports -- design.md's Error Handling
 // Strategy), walking its own controllers before recursing into
 // m.ImportedModules().
-func walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *OpenApiDocument) {
+func walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *OpenAPI) {
 	if m == nil || visitedModules[m] {
 		return
 	}
@@ -74,7 +75,7 @@ func walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *O
 // fullPath := prefix + r.Path(), confirmed by reading that file directly --
 // no separator inserted, matching whatever the controller/route declared
 // literally).
-func walkController(c routableController, doc *OpenApiDocument) {
+func walkController(c routableController, doc *OpenAPI) {
 	for _, r := range c.OwnRoutes() {
 		if r.IsExcludedFromDocs() {
 			continue
@@ -88,7 +89,7 @@ func walkController(c routableController, doc *OpenApiDocument) {
 // controller's -- design.md's Tech Decisions: "resolution deferred to
 // generation time", since Route has no back-reference to its owning
 // Controller).
-func walkRoute(c routableController, r *route.Route, doc *OpenApiDocument) {
+func walkRoute(c routableController, r *route.Route, doc *OpenAPI) {
 	fullPath := c.PathPrefix() + r.Path()
 	method := r.Method().String()
 	methodKey := toLowerAscii(method)
@@ -124,10 +125,10 @@ func walkRoute(c routableController, r *route.Route, doc *OpenApiDocument) {
 
 	var parameters []any
 	if pathParams, ok := r.PathParamsSchema(); ok {
-		parameters = append(parameters, paramsToParameters(pathParams, "path", doc, visiting)...)
+		parameters = append(parameters, paramsToParameters(pathParams, "path", "param", doc, visiting)...)
 	}
 	if queryParams, ok := r.QueryParamsSchema(); ok {
-		parameters = append(parameters, paramsToParameters(queryParams, "query", doc, visiting)...)
+		parameters = append(parameters, paramsToParameters(queryParams, "query", "query", doc, visiting)...)
 	}
 	if len(parameters) > 0 {
 		op["parameters"] = parameters
@@ -176,7 +177,7 @@ func resolveBearerAuth(c routableController, r *route.Route) bool {
 // a synthesized default status (via r.Code()) when Response was never called
 // at all (spec.md's Decision 4 -- undocumented routes still appear, using
 // whatever is inferable).
-func buildResponses(r *route.Route, doc *OpenApiDocument, visiting map[*schema.Schema]bool) map[string]any {
+func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	responses := r.Responses()
 	out := map[string]any{}
 
@@ -202,12 +203,18 @@ func buildResponses(r *route.Route, doc *OpenApiDocument, visiting map[*schema.S
 }
 
 // paramsToParameters converts every OwnProperties() entry of m into one
-// OpenAPI Parameter Object, keyed by json tag name (design.md's Components:
-// "each property in that Schema becomes one parameter object").
-func paramsToParameters(m *schema.Schema, in string, doc *OpenApiDocument, visiting map[*schema.Schema]bool) []any {
+// OpenAPI Parameter Object, keyed by tagName's resolution (design.md's
+// Components: "each property in that Schema becomes one parameter object").
+// contextTag is "param" for path params, "query" for query params -- a
+// path/query DTO field typically has no "json" tag at all (it's bound via
+// MustParams/MustQuery against the "param"/"query" tag, not JSON), so
+// falling back straight to the bare Go field name (e.g. "UserID" instead of
+// "user_id") would document a name that doesn't match what actually binds
+// the request.
+func paramsToParameters(m *schema.Schema, in string, contextTag string, doc *OpenAPI, visiting map[*schema.Schema]bool) []any {
 	var out []any
 	for _, p := range m.OwnProperties() {
-		name := tagName(p)
+		name := tagName(p, contextTag)
 		out = append(out, map[string]any{
 			"name":     name,
 			"in":       in,
@@ -218,17 +225,36 @@ func paramsToParameters(m *schema.Schema, in string, doc *OpenApiDocument, visit
 	return out
 }
 
-// tagName resolves a PropertyBuilder's json tag name (falling back to the Go
-// field name if no tag is present), mirroring internal/validate's own
-// tagKey/tagKeyVisible resolution (validate.go) closely enough for
-// parameter/schema naming purposes -- Generate does not need the "-"
-// (hidden) skip behavior validate's tagKeyVisible has, since a field that
-// reaches OwnProperties() was deliberately registered via Property.
-func tagName(p *schema.PropertyBuilder) string {
+// tagName resolves a PropertyBuilder's display name: the "json" tag wins
+// first (the convention every request/response body schema is keyed by),
+// then contextTag (the tag that actually binds path/query params at
+// runtime -- "param"/"query", passed empty by callers where it doesn't
+// apply), and only once neither tag is present does it fall back to the Go
+// field name. Mirrors internal/validate's own tagKey/tagKeyVisible
+// resolution (validate.go) closely enough for parameter/schema naming
+// purposes -- Generate does not need the "-" (hidden) skip behavior
+// validate's tagKeyVisible has, since a field that reaches OwnProperties()
+// was deliberately registered via Property.
+func tagName(p *schema.PropertyBuilder, contextTag string) string {
 	field := p.Field()
-	raw := field.Tag.Get("json")
+	if name, ok := tagValue(field, "json"); ok {
+		return name
+	}
+	if contextTag != "" {
+		if name, ok := tagValue(field, contextTag); ok {
+			return name
+		}
+	}
+	return field.Name
+}
+
+// tagValue extracts tag's value off field (splitting on the first comma to
+// drop options like ",omitempty"), reporting false when the tag is absent,
+// empty, or "-".
+func tagValue(field reflect.StructField, tag string) (string, bool) {
+	raw := field.Tag.Get(tag)
 	if raw == "" || raw == "-" {
-		return field.Name
+		return "", false
 	}
 	name := raw
 	for i, c := range raw {
@@ -238,9 +264,9 @@ func tagName(p *schema.PropertyBuilder) string {
 		}
 	}
 	if name == "" {
-		return field.Name
+		return "", false
 	}
-	return name
+	return name, true
 }
 
 // refSchema builds the schema for a whole *schema.Schema used as a
@@ -249,7 +275,7 @@ func tagName(p *schema.PropertyBuilder) string {
 // $ref (a request/response body is always the FULL registered shape, never
 // inlined, matching how ItemRef()/SchemaRef() are handled by schemaFor for
 // nested fields).
-func refSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema.Schema]bool) map[string]any {
+func refSchema(m *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	name := registerSchema(m, doc, visiting)
 	return map[string]any{"$ref": "#/components/schemas/" + name}
 }
@@ -260,7 +286,7 @@ func refSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema.Sche
 // truth, different destination -- schema instead of violation). Custom(fn)
 // is checked FIRST, before the kind dispatch, mirroring validateValue's own
 // short-circuit (validate.go).
-func schemaFor(p *schema.PropertyBuilder, doc *OpenApiDocument, visiting map[*schema.Schema]bool) map[string]any {
+func schemaFor(p *schema.PropertyBuilder, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	schema := map[string]any{}
 
 	if _, isCustom := p.CustomFunc(); isCustom {
@@ -405,7 +431,7 @@ func addDescriptionAndExamples(schema map[string]any, p *schema.PropertyBuilder)
 // same *Schema) resolve to a single walk, and reserving before recursing
 // is what prevents infinite recursion if m indirectly references itself
 // (e.g. a self-referential tree-shaped struct).
-func registerSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema.Schema]bool) string {
+func registerSchema(m *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]bool) string {
 	if doc.schemas == nil {
 		doc.schemas = map[string]any{}
 	}
@@ -428,7 +454,7 @@ func registerSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema
 	var required []string
 
 	for _, p := range m.OwnProperties() {
-		key := tagName(p)
+		key := tagName(p, "")
 		properties[key] = schemaFor(p, doc, visiting)
 		if p.IsRequired() {
 			required = append(required, key)
@@ -457,7 +483,7 @@ func registerSchema(m *schema.Schema, doc *OpenApiDocument, visiting map[*schema
 // holds -- both the document-level fields openapi.go's own builder methods
 // populate (Title/Contact/etc) and the paths/schemas Generate populates.
 // This is what a future "Swagger UI Setup" feature will json.Marshal.
-func (doc *OpenApiDocument) Document() map[string]any {
+func (doc *OpenAPI) Document() map[string]any {
 	info := map[string]any{
 		"title":   doc.TitleText(),
 		"version": doc.VersionText(),
@@ -543,7 +569,7 @@ func (doc *OpenApiDocument) Document() map[string]any {
 // generated path operation carries a bearer-auth security requirement
 // (design.md's Components: "securitySchemes":{"bearerAuth":...} if doc has
 // any bearer auth anywhere).
-func hasAnyBearerAuth(doc *OpenApiDocument) bool {
+func hasAnyBearerAuth(doc *OpenAPI) bool {
 	if doc.HasBearerAuth() {
 		return true
 	}
