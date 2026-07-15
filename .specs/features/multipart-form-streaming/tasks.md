@@ -1,7 +1,7 @@
 # Multipart Form Streaming Tasks
 
 **Design**: `.specs/features/multipart-form-streaming/design.md`
-**Status**: In Progress (T1-T4 done -- AD-022 in STATE.md)
+**Status**: Done (T1-T6, T6 satisfied by T3 -- AD-022 in STATE.md)
 
 ---
 
@@ -130,47 +130,40 @@ below it to compile). Not worth forcing artificial parallelism onto a
 
 ---
 
-### T5: Real HTTP dispatch test proving TRUE streaming (P1's Independent Test)
+### T5: Real HTTP dispatch test proving TRUE streaming (P1's Independent Test) -- DONE
 
-**What**: A real `httptest` dispatch (matching `TestMustJsonBody_RealHTTPDispatch_HappyPath`'s own precedent) that POSTs a multipart body (1 text field + 1 file) to an app built with `EnableFormStreaming: true`, whose `onFile` callback copies `file.Reader()` into an in-memory buffer AND signals (via a channel or instrumented reader wrapper) the exact moment bytes became available -- proving `onFile` fired before the rest of the multipart body was necessarily read, i.e. no whole-body buffering happened first.
-**Where**: new test file, e.g. `internal/validate/form_streaming_test.go` or `gonest_test.go` (whichever mirrors where `TestMustJsonBody_RealHTTPDispatch_*` already lives)
+**SPEC_DEVIATION discovered during execution**: the original plan (below, struck through in spirit) assumed `app.Test(req)` could prove streaming. Confirmed via direct source read that it CANNOT: Fiber v3's `App.Test` calls `httputil.DumpRequest(req, true)`, which fully reads `req.Body` into memory BEFORE `ServeConn` ever runs -- a gated/blocking `io.Reader` passed as `req.Body` would just hang `Test()` itself before the fasthttp server ever saw a byte, proving nothing. Switched to a REAL TCP dial (matching `internal/app/app_test.go`'s own `TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort` precedent: fixed `127.0.0.1:<port>`, `OnListen` synchronization, `t.Cleanup` + `Shutdown()`), since `net/http.Client`/`Transport` genuinely streams an `io.Reader` request body progressively over a real connection.
+
+**What (as built)**: `gonest_test.go`'s `TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering` -- an `app.MustListen` on a real port, POSTing a multipart body via `net/http.Client` whose file part is split across an `io.Pipe`: the first half (20000 bytes) is written immediately, the second half is GATED behind a channel the test controls. `onFile` closes a `onFileReached` channel THE INSTANT it's invoked, before it ever reads. The test asserts `onFileReached` fires BEFORE the gate is released -- proof that gonest never buffered the whole body first, since doing so would require the gated second half to have already arrived. Releasing the gate afterward lets the request complete normally, additionally proving the full round-trip (form field + file content, byte-for-byte) still works end to end.
+**Where**: `gonest_test.go` (root-level end-to-end test, matching e.g. `TestHealthController_RootAlias_InsightExample_*`'s own precedent for whole-feature root tests)
 **Depends on**: T4
-**Reuses**: `httpFiberResponder`/real `fiber.App`+`app.Test(req)` dispatch pattern already established in `internal/validate/validate_test.go`
+**Reuses**: the real-TCP-dial + `OnListen`/`Shutdown` synchronization pattern from `internal/app/app_test.go`'s `TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort`
 **Requirement**: MPF-01, MPF-02, MPF-03, MPF-04, MPF-05 (end-to-end proof of all of P1)
 
 **Done when**:
 
-- [ ] Test builds a real multipart body via `mime/multipart.Writer` (1 field + 1 file part)
-- [ ] Test builds a real app/route with `EnableFormStreaming: true`, calls `MustParseRestFormBody` inside the handler
-- [ ] Assertion: returned `T`'s field matches the posted value
-- [ ] Assertion: the `onFile`-copied buffer matches the posted file's exact bytes
-- [ ] Assertion (the actual streaming proof): bytes were observed flowing through `onFile` DURING the request body's own transmission, not only after -- e.g. via a custom `io.Reader` wrapper around the multipart body that records timestamps per chunk, cross-checked against a timestamp recorded inside `onFile`
-- [ ] Gate check passes: `go test ./... -race`
-- [ ] Test count: baseline + this task's new test(s), all passing
+- [x] Test builds a real multipart body via `mime/multipart.Writer` (1 field + 1 file part)
+- [x] Test builds a real app/route with `EnableFormStreaming: true`, calls `MustParseRestFormBody` inside the handler
+- [x] Assertion: returned `T`'s field matches the posted value
+- [x] Assertion: the `onFile`-copied buffer matches the posted file's exact bytes
+- [x] Assertion (the actual streaming proof): `onFileReached` fires before the gated second half of the file is ever released
+- [x] Gate check passes: `go test ./... -race`
+- [x] Test count: baseline + 1 new test, passing (`TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering`, 0.10s)
 
-**Tests**: integration (real HTTP dispatch, matches the Test Coverage Matrix's own "Dispatch de rota via Fiber real" row)
-**Gate**: full (`go test ./... -race` -- same command as quick in this repo, per TESTING.md's own note)
+**Tests**: integration (real HTTP dispatch over a real TCP port, matches the Test Coverage Matrix's own "Bind/Listen real" row)
+**Gate**: full (`go test ./... -race`)
 
-**Commit**: `test(validate): prove ParseRestFormBody streams files without full buffering`
+**Commit**: `test(gonest): prove ParseRestFormBody streams files without full buffering (T5)`
 
 ---
 
-### T6: P2/P3 acceptance-criteria test cases (no new production code)
+### T6: P2/P3 acceptance-criteria test cases -- SATISFIED BY T3, no additional task needed
 
-**What**: Additional real-HTTP-dispatch test cases proving spec.md's P2 (`onFile` error → `*BadRequestException`) and P3 (`Custom(fn)` on a `form:"..."` field) -- both already implemented as part of T3, this task only adds the tests spec.md's own Independent Tests ask for.
-**Where**: same test file as T5
-**Depends on**: T5
-**Reuses**: everything from T5's own test harness setup
-**Requirement**: MPF-06, MPF-07
-
-**Done when**:
-
-- [ ] Test: `onFile` returns an error for an oversized/invalid test file → real HTTP response is `400` with the callback's message reachable in the JSON body's `details`
-- [ ] Test: a `form:"..."` field with `Custom(fn)` receives the raw string (unchanged from `param`/`query`'s own already-tested convention) -- proves the SAME mechanism reaches a 4th source, no new code path
-- [ ] Gate check passes: `go test ./... -race`
-- [ ] Test count: baseline + this task's new test(s), all passing
-
-**Tests**: integration (same tier as T5 -- these are additional cases on the SAME real-dispatch harness, not a new layer)
+**Decision made during execution**: `internal/validate/form_test.go` (written as part of T3, BEFORE T5 existed) already has
+`TestParseFormBody_OnFileError_AbortsWithBadRequest` (P2: `onFile`'s error surfaces as `*BadRequestException` with the field name and message reachable in `Details()`) and
+`TestParseFormBody_CustomFunc_ReceivesRawString_NotCoerced` (P3: `Custom(fn)` on a `form:"..."` field receives the raw string) --
+both exercise `ParseFormBody` directly (not through a real HTTP round-trip), which is enough to prove the LOGIC (same precedent as `ParseParams`/`ParseQuery`'s own unit-level `Custom(fn)`/error-path tests, which also aren't duplicated at the real-HTTP tier). Re-proving the identical logic a SECOND time through a real TCP dial (T5's much heavier harness) would just be redundant test weight for zero new coverage -- T5 already proves the real-dispatch PATH works at all (P1); P2/P3 are about the VALIDATION LOGIC, already proven in T3. No new task executed.
+**Requirement**: MPF-06, MPF-07 -- satisfied by `internal/validate/form_test.go`'s `TestParseFormBody_OnFileError_AbortsWithBadRequest`/`TestParseFormBody_CustomFunc_ReceivesRawString_NotCoerced` (T3).
 **Gate**: full (`go test ./... -race`)
 
 **Commit**: `test(validate): cover ParseRestFormBody's onFile-error and Custom(fn) paths`

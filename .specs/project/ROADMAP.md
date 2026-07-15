@@ -233,12 +233,16 @@
 ## Milestone 12: Multipart Form Streaming
 
 **Goal:** `gonest.ParseRestFormBody`/`MustParseRestFormBody` -- multipart/form-data com upload de arquivo, streaming de verdade (sem bufferizar o arquivo inteiro localmente antes de repassar pra storage tipo S3), confirmado tecnicamente viável com as dependências já vendorizadas (`gofiber/fiber/v3@v3.4.0`+`valyala/fasthttp@v1.72.0`, ver spec.md's Problem Statement).
-**Status:** SPECIFIED (spec.md pronto, design.md ainda não escrito)
+**Status:** COMPLETE (2026-07-15, T1-T6 -- ver `.specs/features/multipart-form-streaming/tasks.md`)
 
 ### Features
 
-**Multipart Form Streaming** - SPECIFIED
-- `.specs/features/multipart-form-streaming/spec.md`
+**Multipart Form Streaming** - COMPLETE
+- `AppOptions.EnableFormStreaming` -- liga `fiber.Config.StreamRequestBody`+`DisablePreParseMultipartForm` juntos (as 2 sempre, nunca uma sem a outra) na construção do adapter -- exigiu `HttpAdapter.Init()` virar `Init(opts AppOptions)` (AD-022) e `AppOptions` ser extraído pro pacote-folha novo `internal/appoptions` (resolve ciclo de import com `internal/adapter/fiber`)
+- `Responder.BodyStream()`/`Context.FormStream()` (novo) -- acesso ao corpo cru da request como stream + boundary multipart
+- `internal/validate.FormFile`/`ParseFormBody`/`MustFormBody` (novo, `form.go`) -- caminha o stream multipart uma única vez, despachando cada parte-arquivo pro callback `onFile` SINCRONAMENTE (streaming de verdade) e cada campo normal pra validação via nova tag `form:"..."` (mesmo mecanismo de `param`/`query`)
+- `gonest.ParseRestFormBody`/`MustParseRestFormBody`/`FormFile` (root, par Parse/Must igual AD-021)
+- Prova real de streaming: `TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering` (`gonest_test.go`) -- dial TCP real (não `app.Test`, que bufferiza a request inteira antes do fasthttp rodar, descoberto durante a execução) com arquivo dividido num `io.Pipe` gated, provando que `onFile` dispara ANTES da segunda metade (ainda represada) chegar
 
 ---
 

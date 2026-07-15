@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -3372,5 +3373,196 @@ func TestHttpStatusConstants_MatchNetHttp(t *testing.T) {
 		if c.got != c.want {
 			t.Errorf("%s = %d, want %d (net/http)", c.name, c.got, c.want)
 		}
+	}
+}
+
+// TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering is
+// the Multipart Form Streaming feature's own Independent Test (spec.md's
+// P1): a REAL TCP dial (not app.Test -- Fiber's own Test helper calls
+// httputil.DumpRequest, which fully reads req.Body into memory BEFORE
+// ServeConn ever runs, which would defeat this exact proof -- confirmed via
+// gofiber/fiber/v3@v3.4.0/app.go source, not assumed) posts a multipart
+// body whose file part is deliberately split into 2 halves over an
+// io.Pipe: the first half is written immediately, the second half is
+// GATED behind a channel the test controls. onFile signals a channel the
+// INSTANT it's invoked, before it ever reads -- if gonest had fully
+// buffered the request body first (the old/naive behavior this feature
+// exists to avoid), onFile could never fire until the gate is released,
+// since the full body (including the gated second half) would need to
+// arrive first. Observing onFileReached fire BEFORE the gate is released
+// is the actual streaming proof; releasing the gate afterward lets the
+// request complete normally, additionally proving the full round-trip
+// (form field + file content) still works end to end.
+func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *testing.T) {
+	type uploadForm struct {
+		Title string `form:"title"`
+	}
+	uploadSchema := NewSchema[uploadForm](func(t *uploadForm, m *Schema) {
+		m.Property(&t.Title).String().Required()
+	})
+
+	onFileReached := make(chan struct{})
+	var gotFilename string
+	var gotContent []byte
+
+	uploadController := NewController(func(controller *Controller) {
+		controller.Path("/upload")
+		controller.Route(HttpPost, "/", func(r *Route) {
+			r.Handler(func(ctx *RestContext) {
+				result := MustParseRestFormBody[*uploadForm](ctx, uploadSchema, func(f *FormFile) error {
+					close(onFileReached)
+					gotFilename = f.Filename()
+					b, err := io.ReadAll(f.Reader())
+					if err != nil {
+						return err
+					}
+					gotContent = b
+					return nil
+				})
+				ctx.Json(map[string]string{"title": result.Title})
+			})
+		})
+	})
+
+	uploadModule := NewModule(func(m *Module) {
+		m.Controllers(uploadController)
+	})
+
+	app := MustNewApp[FiberApp](uploadModule, AppOptions{EnableFormStreaming: true})
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+
+	const addr = "127.0.0.1:34612"
+
+	fired := make(chan struct{})
+	var once sync.Once
+	onListen := OnListen(func() { once.Do(func() { close(fired) }) })
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		app.MustListen(addr, onListen)
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := fiberAdapter.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Errorf("MustListen goroutine did not return within timeout after Shutdown")
+		}
+	})
+
+	select {
+	case <-fired:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	// Build the full multipart body, remembering the byte offset right
+	// after the file part's first half -- this is where the pipe write
+	// will be gated.
+	firstChunk := bytes.Repeat([]byte("A"), 20000)
+	secondChunk := bytes.Repeat([]byte("B"), 20000)
+
+	bodyBuf := &bytes.Buffer{}
+	mw := multipart.NewWriter(bodyBuf)
+	if err := mw.WriteField("title", "Streamed Upload"); err != nil {
+		t.Fatalf("WriteField failed: %v", err)
+	}
+	fw, err := mw.CreateFormFile("attachment", "attachment.bin")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := fw.Write(firstChunk); err != nil {
+		t.Fatalf("failed writing first chunk: %v", err)
+	}
+	splitPoint := bodyBuf.Len()
+	if _, err := fw.Write(secondChunk); err != nil {
+		t.Fatalf("failed writing second chunk: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("multipart.Writer.Close failed: %v", err)
+	}
+	fullBody := bodyBuf.Bytes()
+	boundary := mw.Boundary()
+
+	pr, pw := io.Pipe()
+	proceed := make(chan struct{})
+	go func() {
+		if _, err := pw.Write(fullBody[:splitPoint]); err != nil {
+			return
+		}
+		<-proceed
+		if _, err := pw.Write(fullBody[splitPoint:]); err != nil {
+			return
+		}
+		pw.Close()
+	}()
+
+	req, err := http.NewRequest(http.MethodPost, "http://"+addr+"/upload/", pr)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+	req.ContentLength = int64(len(fullBody))
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	respCh := make(chan *http.Response, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		resp, doErr := client.Do(req)
+		if doErr != nil {
+			errCh <- doErr
+			return
+		}
+		respCh <- resp
+	}()
+
+	select {
+	case <-onFileReached:
+		// SUCCESS: onFile fired before the gate was ever released -- proves
+		// the Handler ran, and reached the file part, WITHOUT the rest of
+		// the body (still gated) having arrived yet.
+	case err := <-errCh:
+		t.Fatalf("client.Do failed before onFile was reached: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("onFile was not reached before the gated second half was released -- streaming did not happen (body may have been fully buffered first)")
+	}
+
+	close(proceed)
+
+	var resp *http.Response
+	select {
+	case resp = <-respCh:
+	case err := <-errCh:
+		t.Fatalf("client.Do failed: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("request did not complete after releasing the gated second half")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var got map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+	if got["title"] != "Streamed Upload" {
+		t.Fatalf("response title = %q, want %q", got["title"], "Streamed Upload")
+	}
+
+	if gotFilename != "attachment.bin" {
+		t.Fatalf("onFile's Filename() = %q, want %q", gotFilename, "attachment.bin")
+	}
+	wantContent := append(append([]byte{}, firstChunk...), secondChunk...)
+	if !bytes.Equal(gotContent, wantContent) {
+		t.Fatalf("onFile's Reader() content mismatch: got %d bytes, want %d bytes", len(gotContent), len(wantContent))
 	}
 }
