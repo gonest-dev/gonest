@@ -725,6 +725,44 @@ func MustParseRestQuery[T any](ctx *RestContext, m *Schema) T {
 	return validate.MustQuery[T](ctx, m)
 }
 
+// FormFile is one file part from a multipart/form-data stream, still
+// un-consumed at the moment ParseRestFormBody's onFile callback runs --
+// reading FormFile.Reader() consumes the underlying multipart stream in
+// real time (Multipart Form Streaming feature, AD-022 in STATE.md). Not
+// safe to retain past onFile's own call. See internal/validate.FormFile's
+// doc comment for the full contract.
+type FormFile = validate.FormFile
+
+// ParseRestFormBody walks ctx's raw multipart/form-data request body
+// EXACTLY ONCE, dispatching each part as it's encountered: a part with a
+// filename invokes onFile synchronously (true streaming -- a caller can
+// pipe file.Reader() straight to S3/etc from inside onFile, before the
+// next part is even read), while a regular field is validated against m
+// (the *Schema built via NewSchema[T] for that same T, matched via a
+// `form:"name"` struct tag -- passed explicitly, AD-019) exactly like
+// ParseRestParams/ParseRestQuery validate their own fields. Requires the
+// app to have been built with AppOptions.EnableFormStreaming AND the
+// request's Content-Type to genuinely be multipart/form-data -- panics
+// with a plain string otherwise (a coding/config error, not a request-
+// validation failure, so unlike the violations below it is never returned
+// via the error return). Returns a non-nil *BadRequestException (collecting
+// EVERY violation found -- missing required field, onFile's own returned
+// error, or a malformed multipart stream) as the error otherwise -- AD-021's
+// non-panicking half of the family (see MustParseRestFormBody for the
+// panicking twin). Go cannot re-export a generic function via var, so this
+// is a real wrapper calling the internal one (same pattern as
+// ParseRestJsonBody/ParseRestParams/ParseRestQuery, see AD-004 in STATE.md).
+func ParseRestFormBody[T any](ctx *RestContext, m *Schema, onFile func(*FormFile) error) (T, error) {
+	return validate.ParseFormBody[T](ctx, m, onFile)
+}
+
+// MustParseRestFormBody is ParseRestFormBody, panicking on any returned
+// error instead of returning it -- AD-021's panicking twin, for call sites
+// that don't want to handle the error themselves.
+func MustParseRestFormBody[T any](ctx *RestContext, m *Schema, onFile func(*FormFile) error) T {
+	return validate.MustFormBody[T](ctx, m, onFile)
+}
+
 // ---------------------------------------------------------------------------
 // OpenAPI (OpenAPI Document Builder feature)
 // ---------------------------------------------------------------------------
