@@ -57,6 +57,10 @@ func (f *fakeResponder) HTML(s string) error {
 	return f.htmlErr
 }
 
+func (f *fakeResponder) SendString(s string) error {
+	return nil
+}
+
 func TestContext_Json_DelegatesToResponder(t *testing.T) {
 	fake := newFakeResponder()
 	ctx := New(fake)

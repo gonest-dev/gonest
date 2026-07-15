@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -273,6 +274,7 @@ func (f *paramFakeResponder) GetParam(name string) string       { return f.param
 func (f *paramFakeResponder) Body() []byte                      { return nil }
 func (f *paramFakeResponder) Queries() map[string]string        { return nil }
 func (f *paramFakeResponder) HTML(s string) error               { return nil }
+func (f *paramFakeResponder) SendString(s string) error         { return nil }
 
 // TestMustParams_RootPackage_RealHTTPDispatch proves the replacement for the
 // old TestParseIntPipe_RootAlias_InsightCallShape: a route param round-trips
@@ -3112,4 +3114,114 @@ func TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("MustInject[*Emitter] returned nil, want a real Emitter singleton")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Terminus/health checks (Milestone 11 -- plain Controller, no new type)
+// ---------------------------------------------------------------------------
+
+// insightHealthConnectable/insightHealthDb/insightHealthRedis reproduce
+// INSIGHT.md's "exemplo de Probes / health" section: Connectable providers
+// controllable per-test (toggle up/down), a HealthController built via
+// gonest.NewController (no new bootstrap type at all), exposing /readyz
+// (aggregates every Connectable via MustInjectAll) and /livez (static OK
+// via Context.SendString).
+type insightHealthConnectable interface {
+	Name() string
+	Ping(ctx context.Context) error
+}
+
+type insightHealthDb struct {
+	mu   sync.Mutex
+	down bool
+}
+
+func (d *insightHealthDb) Name() string { return "database" }
+func (d *insightHealthDb) Ping(ctx context.Context) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.down {
+		return fmt.Errorf("connection refused")
+	}
+	return nil
+}
+
+type insightHealthRedis struct{}
+
+func (r *insightHealthRedis) Name() string                   { return "redis" }
+func (r *insightHealthRedis) Ping(ctx context.Context) error { return nil }
+
+func newInsightHealthModule(db *insightHealthDb) *Module {
+	dbProvider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *insightHealthDb { return db })
+	})
+	redisProvider := NewProvider(func(provider *Provider) {
+		provider.Constructor(func() *insightHealthRedis { return &insightHealthRedis{} })
+	})
+
+	healthController := NewController(func(controller *Controller) {
+		controller.Path("/health")
+
+		connectableList := MustInjectAll[insightHealthConnectable](controller)
+
+		controller.Route(HttpGet, "/readyz", func(r *Route) {
+			r.Handler(func(ctx *execution.Context) {
+				results, status := make(map[string]string), HttpStatusOk
+
+				for _, c := range connectableList {
+					name := c.Name()
+					if err := c.Ping(context.Background()); err != nil {
+						results[name], status = "down", HttpStatusServiceUnavailable
+					} else {
+						results[name] = "up"
+					}
+				}
+
+				ctx.Status(status).Json(map[string]any{"status": "ok", "checks": results})
+			})
+		})
+
+		controller.Route(HttpGet, "/livez", func(r *Route) {
+			r.HttpCode(HttpStatusOk)
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Status(HttpStatusOk).SendString("OK")
+			})
+		})
+	})
+
+	return NewModule(func(module *Module) {
+		module.Providers(dbProvider, redisProvider)
+		module.Controllers(healthController)
+	})
+}
+
+func TestHealthController_RootAlias_InsightExample_Readyz_AllUp(t *testing.T) {
+	db := &insightHealthDb{}
+	tester := MustNewTestApp(newInsightHealthModule(db), nil)
+	defer tester.Close()
+
+	res := tester.MustRequest(HttpGet, "/health/readyz", nil)
+	res.AssertStatus(t, http.StatusOK)
+	res.AssertJsonPath(t, "checks.database", "up")
+	res.AssertJsonPath(t, "checks.redis", "up")
+}
+
+func TestHealthController_RootAlias_InsightExample_Readyz_OneDown(t *testing.T) {
+	db := &insightHealthDb{down: true}
+	tester := MustNewTestApp(newInsightHealthModule(db), nil)
+	defer tester.Close()
+
+	res := tester.MustRequest(HttpGet, "/health/readyz", nil)
+	res.AssertStatus(t, http.StatusServiceUnavailable)
+	res.AssertJsonPath(t, "checks.database", "down")
+	res.AssertJsonPath(t, "checks.redis", "up")
+}
+
+func TestHealthController_RootAlias_InsightExample_Livez_AlwaysOk(t *testing.T) {
+	db := &insightHealthDb{}
+	tester := MustNewTestApp(newInsightHealthModule(db), nil)
+	defer tester.Close()
+
+	res := tester.MustRequest(HttpGet, "/health/livez", nil)
+	res.AssertStatus(t, http.StatusOK)
 }

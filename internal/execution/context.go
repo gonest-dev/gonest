@@ -23,6 +23,7 @@ type Responder interface {
 	Body() []byte
 	Queries() map[string]string
 	HTML(s string) error
+	SendString(s string) error
 }
 
 // Context encapsulates the HTTP request/response for a single route Handler.
@@ -118,4 +119,13 @@ func (ctx *Context) Queries() map[string]string {
 // (internal/openapi) to serve the Swagger UI's HTML page.
 func (ctx *Context) HTML(s string) error {
 	return ctx.res.HTML(s)
+}
+
+// SendString writes s as a raw, uninterpreted response body -- no
+// JSON-encoding (unlike Json), no text/html Content-Type (unlike HTML).
+// Used by health/liveness-probe style handlers (see "Terminus/health
+// checks" feature) that just need to write a plain status string like
+// "OK".
+func (ctx *Context) SendString(s string) error {
+	return ctx.res.SendString(s)
 }

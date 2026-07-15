@@ -26,6 +26,7 @@ func (f *fakeResponder) GetParam(name string) string       { return f.params[nam
 func (f *fakeResponder) Body() []byte                      { return nil }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
 func (f *fakeResponder) HTML(s string) error               { return nil }
+func (f *fakeResponder) SendString(s string) error         { return nil }
 
 // TestNew_DoesNotExecuteFnOnCall proves guard.New(fn) defers fn until
 // Declare(scope) runs it -- AD-008 reversed (see

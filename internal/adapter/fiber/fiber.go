@@ -275,3 +275,10 @@ func (r *fiberResponder) HTML(s string) error {
 	r.c.Type("html")
 	return r.c.SendString(s)
 }
+
+// SendString writes s as the raw response body via Fiber's own
+// Ctx.SendString, with NO Content-Type override -- unlike HTML above, which
+// deliberately sets text/html first.
+func (r *fiberResponder) SendString(s string) error {
+	return r.c.SendString(s)
+}

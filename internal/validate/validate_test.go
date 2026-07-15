@@ -104,6 +104,7 @@ func (f *fakeResponder) GetParam(name string) string       { return "" }
 func (f *fakeResponder) Body() []byte                      { return f.body }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
 func (f *fakeResponder) HTML(s string) error               { return nil }
+func (f *fakeResponder) SendString(s string) error         { return nil }
 
 func expectBadRequest(t *testing.T, r any) *exception.BadRequestException {
 	t.Helper()
@@ -718,3 +719,4 @@ func (r *httpFiberResponder) HTML(s string) error {
 	r.c.Type("html")
 	return r.c.SendString(s)
 }
+func (r *httpFiberResponder) SendString(s string) error { return r.c.SendString(s) }

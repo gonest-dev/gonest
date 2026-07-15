@@ -10,6 +10,7 @@ package gonest
 
 import (
 	"context"
+	"net/http"
 	"reflect"
 	"unsafe"
 
@@ -84,6 +85,20 @@ const (
 	// HttpQuery corresponds to the HTTP QUERY method, used for list/query
 	// endpoints (see INSIGHT.md).
 	HttpQuery = route.HttpQuery
+)
+
+// HttpStatusOk/HttpStatusServiceUnavailable are the 2 raw HTTP status codes
+// INSIGHT.md's own examples reference directly (e.g. "exemplo de Testing"'s
+// res.AssertStatus(t, gonest.HttpStatusOk), "exemplo de Probes / health"'s
+// readiness probe). Deliberately NOT a full status-code enum -- only these
+// 2 are demonstrated anywhere; a fuller enum is a separate, later
+// housekeeping task if a real need appears (same "don't invent unused API
+// surface" stance as every prior feature this session).
+const (
+	// HttpStatusOk corresponds to net/http.StatusOK (200).
+	HttpStatusOk = http.StatusOK
+	// HttpStatusServiceUnavailable corresponds to net/http.StatusServiceUnavailable (503).
+	HttpStatusServiceUnavailable = http.StatusServiceUnavailable
 )
 
 // Controller represents a declarative unit that consumes providers via

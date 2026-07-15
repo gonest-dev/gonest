@@ -28,6 +28,7 @@ func (f *fakeResponder) GetParam(name string) string       { return f.params[nam
 func (f *fakeResponder) Body() []byte                      { return nil }
 func (f *fakeResponder) Queries() map[string]string        { return nil }
 func (f *fakeResponder) HTML(s string) error               { return nil }
+func (f *fakeResponder) SendString(s string) error         { return nil }
 
 // fooExampleError and barExampleError are two distinct exemplar types used to
 // prove Catch/HandlerFor dispatch on exact type identity, mirroring
