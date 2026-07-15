@@ -2915,3 +2915,45 @@ func TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes(t *testing.T) 
 		t.Fatalf("missing routes from walk: %+v -- App.Root()+ImportedModules()+OwnControllers()+OwnRoutes() did not reach every registered route", want)
 	}
 }
+
+// TestBuildBanner_GONEST_ProducesExpectedGlyphRows proves the banner is
+// built from explicit per-letter glyphs (not a hand-copied figlet font),
+// so it can't silently drift into a stray/missing character the way an
+// earlier hand-copied version did (a spurious extra "E").
+func TestBuildBanner_GONEST_ProducesExpectedGlyphRows(t *testing.T) {
+	rows := buildBanner("GONEST")
+
+	want := [5]string{
+		" ###   ###  #   # #####  #### #####",
+		"#     #   # ##  # #     #       #  ",
+		"#  ## #   # # # # ####   ###    #  ",
+		"#   # #   # #  ## #         #   #  ",
+		" ###   ###  #   # ##### ####    #  ",
+	}
+
+	if rows != want {
+		t.Fatalf("buildBanner(\"GONEST\") =\n%v\nwant\n%v", rows, want)
+	}
+}
+
+// TestMustListen_DisableBanner_SkipsBannerStillLogsAndFires proves
+// AppOptions.DisableBanner (threaded onto App.opts) suppresses only
+// printBanner's own call -- MustListen still fires onListen and blocks
+// exactly like the banner-enabled path.
+func TestMustListen_DisableBanner_SkipsBannerStillLogsAndFires(t *testing.T) {
+	spy := &listenSpyAdapter{unblock: make(chan struct{})}
+	a := &App{adapter: spy, opts: AppOptions{DisableBanner: true}}
+
+	fired := make(chan struct{})
+	go func() {
+		a.MustListen(":0", OnListen(func() { close(fired) }))
+	}()
+
+	select {
+	case <-fired:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("onListen callback did not fire within timeout")
+	}
+
+	close(spy.unblock)
+}

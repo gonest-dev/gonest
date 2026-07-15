@@ -26,6 +26,11 @@ type AppOptions struct {
 	// LogLevels restricts which LogLevel values the real internal/logger
 	// package emits -- see NewApp's own call to logger.Configure(opts.LogLevels).
 	LogLevels []LogLevel
+	// DisableBanner, when true, skips MustListen's own "Gonest" ASCII
+	// banner + version line -- the 3 structured [INFO] log lines still
+	// print regardless (those carry actual operational information: bind
+	// address, loaded module/controller/route counts, PID).
+	DisableBanner bool
 }
 
 // LogLevel is internal/logger.Level's own alias -- kept under this name

@@ -29,18 +29,45 @@ import (
 	"github.com/gonest-dev/gonest/internal/version"
 )
 
-// banner is gonest's own ASCII wordmark, printed once by MustListen before
-// its 3 structured log lines -- unformatted (no timestamp/level tag), the
-// same convention Fiber's own suppressed banner used (see
+// bannerRows is gonest's own ASCII wordmark, printed once by MustListen
+// (unless AppOptions.DisableBanner is set) before its 3 structured log
+// lines -- unformatted (no timestamp/level tag), the same convention
+// Fiber's own suppressed banner used (see
 // internal/adapter/fiber.FiberApp.Listen's DisableStartupMessage), so
 // gonest presents its OWN identity rather than the underlying adapter's.
-const banner = `
-   ______                          __
-  / ____/___  ____  ___  ___  ____/ /_
- / / __/ __ \/ __ \/ _ \/ _ \/ ___/ __/
-/ /_/ / /_/ / / / /  __/  __(__  ) /_
-\____/\____/_/ /_/\___/\___/____/\__/
-`
+// Built from an explicit 5x5 block glyph per letter (not a hand-copied
+// figlet font) specifically so every row is mechanically verifiable
+// letter-by-letter -- a hand-copied font is exactly how a previous
+// version of this banner ended up with a stray extra "E".
+var bannerRows = buildBanner("GONEST")
+
+// glyphs is a 5-row-tall, 5-column-wide block font for each letter this
+// banner needs. Adding a new letter later just means adding one more
+// 5-element entry here.
+var glyphs = map[byte][5]string{
+	'G': {" ### ", "#    ", "#  ##", "#   #", " ### "},
+	'O': {" ### ", "#   #", "#   #", "#   #", " ### "},
+	'N': {"#   #", "##  #", "# # #", "#  ##", "#   #"},
+	'E': {"#####", "#    ", "#### ", "#    ", "#####"},
+	'S': {" ####", "#    ", " ### ", "    #", "#### "},
+	'T': {"#####", "  #  ", "  #  ", "  #  ", "  #  "},
+}
+
+// buildBanner joins each letter's glyph rows (1-space gap between
+// letters) into the banner's own 5 text rows.
+func buildBanner(word string) [5]string {
+	var rows [5]string
+	for i := 0; i < len(word); i++ {
+		g := glyphs[word[i]]
+		for row := 0; row < 5; row++ {
+			if i > 0 {
+				rows[row] += " "
+			}
+			rows[row] += g[row]
+		}
+	}
+	return rows
+}
 
 // bootstrapTimeout bounds Stage 3 (Parallel Resolution): every Provider's
 // Constructor -- including ones that don't accept a context.Context
@@ -115,8 +142,9 @@ func (a *App) Root() *module.Module {
 // the underlying error.
 func (a *App) MustListen(addr string, onListen OnListen) {
 	onListenFunc := func() {
-		fmt.Print(banner)
-		fmt.Printf("  %s\n\n", versionLabel())
+		if !a.opts.DisableBanner {
+			printBanner()
+		}
 		logger.Info(fmt.Sprintf("Gonest started on: http://%s", displayAddr(addr)))
 		logger.Info(fmt.Sprintf("Loaded:            Modules(%d), Controllers(%d), Routes(%d)", a.moduleCount, a.controllerCount, a.routeCount))
 		logger.Info(fmt.Sprintf("PID:               %d", os.Getpid()))
@@ -139,6 +167,22 @@ func versionLabel() string {
 		return v
 	}
 	return "v" + v
+}
+
+// printBanner writes bannerRows to stdout, unformatted, with the version
+// label appended at the end of the LAST row (same placement convention
+// Fiber's own suppressed banner used for its own version number) -- so
+// "Gonest" and its version share one line, not two.
+func printBanner() {
+	fmt.Println()
+	for i, row := range bannerRows {
+		if i == len(bannerRows)-1 {
+			fmt.Printf("%s   %s\n", row, versionLabel())
+			continue
+		}
+		fmt.Println(row)
+	}
+	fmt.Println()
 }
 
 // displayAddr rewrites a bare ":PORT" addr (Go's own net.Listen shorthand
