@@ -602,6 +602,79 @@ func TestUserService_Get_NotFound(t *testing.T) {
 }
 ```
 
+# exemplo de MustInjectAll (multi-binding por interface)
+
+`MustInject[T]` (T interface) espera EXATAMENTE 1 provider cuja implementação
+satisfaça `T` -- panica se 0 ou 2+. `MustInjectAll[T]` (T SEMPRE interface,
+nunca ponteiro concreto) é o caso "2+ é esperado": devolve `[]T` com TODA
+implementação registrada que satisfaz a interface, sem panicar por
+ambiguidade -- útil pra padrão de plugin/estratégia (ex: múltiplos handlers
+de notificação, múltiplos validators customizados etc).
+
+```go
+package ex
+
+import (
+  "github.com/gonest-dev/gonest"
+)
+
+// Animal é a interface -- múltiplos providers podem satisfazer a mesma.
+type Animal interface { Talk() string }
+
+type Cat struct{}
+var _ Animal = (*Cat)(nil)
+func (c *Cat) Talk() string { return "miau" }
+
+var CatProvider = gonest.NewProvider(func (provider *gonest.Provider) {
+  provider.Constructor(func() *Cat { return &Cat{} })
+})
+
+type Dog struct{}
+var _ Animal = (*Dog)(nil)
+func (d *Dog) Talk() string { return "woff woff" }
+var DogProvider = gonest.NewProvider(func (provider *gonest.Provider) {
+  provider.Constructor(func() *Dog { return &Dog{} })
+})
+
+// AnimalSoundService recebe TODOS os Animal registrados no módulo, sem
+// precisar conhecer Cat/Dog especificamente -- novo Animal registrado no
+// módulo (ex: Bird) aparece automaticamente na próxima resolução, sem
+// mudar AnimalSoundService nenhum.
+type AnimalSoundService struct {
+  animals []Animal
+}
+func (t *AnimalSoundService) TalkAll() []string {
+  out := make([]string, 0, len(t.animals))
+  for _, a := range t.animals {
+    out = append(out, a.Talk())
+  }
+  return out
+}
+
+var AnimalController = gonest.NewController(func (controller *gonest.Controller) {
+  controller.Path("/animals")
+
+  // MustInjectAll[Animal] -- resolvido UMA vez aqui, fora do Handler (o
+  // grafo de providers já está totalmente resolvido nesse ponto -- ver
+  // "exemplo mais simples" pra ordem de bootstrap). Handler só fecha sobre
+  // o slice já pronto, não resolve de novo a cada request.
+  animals := gonest.MustInjectAll[Animal](controller)
+  soundService := &AnimalSoundService{animals: animals}
+
+  controller.Route(gonest.HttpGet, "/talk", func (route *gonest.Route) {
+    route.HttpCode(gonest.HttpStatusOk)
+    route.Handler(func(ctx *gonest.Context) {
+      ctx.Json(soundService.TalkAll()) // ["miau", "woof woof"]
+    })
+  })
+})
+
+var AnimalModule = gonest.NewModule(func (module *gonest.Module) {
+  module.Providers(CatProvider, DogProvider)
+  module.Controllers(AnimalController)
+})
+```
+
 # exemplo de Emitter (equivalente @nestjs/event-emitter, casa com cqrs.EventBus)
 
 ```go
