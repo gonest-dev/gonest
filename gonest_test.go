@@ -203,7 +203,7 @@ func TestMustParams_RootPackage_HappyPath(t *testing.T) {
 	res.params["id"] = "42"
 	ctx := execution.New(res).WithRoute(r)
 
-	got := validate.MustParams[*idParams](ctx)
+	got := validate.MustParams[*idParams](ctx, idParamsSchema)
 	if got.ID != 42 {
 		t.Fatalf("MustParams[*idParams](ctx).ID = %d, want %d", got.ID, 42)
 	}
@@ -231,7 +231,7 @@ func TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) 
 		}
 	}()
 
-	validate.MustParams[*idParams](ctx)
+	validate.MustParams[*idParams](ctx, idParamsSchema)
 }
 
 // TestMustParams_RootPackage_PanicsOnConversionFailure proves the
@@ -253,7 +253,7 @@ func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
 		}
 	}()
 
-	validate.MustParams[*idParams](ctx)
+	validate.MustParams[*idParams](ctx, idParamsSchema)
 }
 
 // paramFakeResponder is a minimal test-only execution.Responder for exercising
@@ -289,7 +289,7 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*idParams](ctx)
+				p := validate.MustParams[*idParams](ctx, idParamsSchema)
 				gotID = p.ID
 				handlerRan = true
 				ctx.Json(map[string]int{"id": gotID})
@@ -391,8 +391,8 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/users/:user_id/orders", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				params := MustParams[*insightUserIdParams](ctx)
-				query := MustQuery[*insightListUsersQuery](ctx)
+				params := MustParams[*insightUserIdParams](ctx, insightUserIdParamsSchema)
+				query := MustQuery[*insightListUsersQuery](ctx, insightListUsersQuerySchema)
 				gotUserId = params.UserId
 				gotPage = query.Page
 				gotLimit = query.Limit
@@ -2135,7 +2135,7 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpPost, "/users", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				gotUser = MustJsonBody[*jsonBodyUserEntity](ctx)
+				gotUser = MustJsonBody[*jsonBodyUserEntity](ctx, jsonBodyUserSchema)
 				ctx.Json(gotUser)
 			})
 		})
@@ -2824,7 +2824,7 @@ func newInsightTestUserModule() *Module {
 		controller.Route(route.HttpGet, "/:id", func(r *route.Route) {
 			r.HttpCode(http.StatusOK)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*insightTestUserIDParam](ctx)
+				p := validate.MustParams[*insightTestUserIDParam](ctx, insightTestUserIDParamSchema)
 				ctx.Json(userService.Get(p.ID))
 			})
 		})

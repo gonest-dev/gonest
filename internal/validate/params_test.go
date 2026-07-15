@@ -79,9 +79,10 @@ var customParamFixtureSchema = func() *schema.Schema {
 	return m
 }()
 
-// UnregisteredParams is deliberately never passed to schema.New/Register --
-// used to prove MustParams panics BEFORE reading any param.
-type UnregisteredParams struct {
+// MismatchedParams is a type NO schema was ever built for -- used to prove
+// MustParams panics BEFORE reading any param when handed a schema built for
+// a DIFFERENT type (AD-019's resolveSchema check).
+type MismatchedParams struct {
 	Id int64 `param:"id"`
 }
 
@@ -120,7 +121,7 @@ func TestMustParams_HappyPath_TwoParams(t *testing.T) {
 		"order_id": "20",
 	})
 
-	result := MustParams[*UserOrderParams](ctx)
+	result := MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -153,7 +154,7 @@ func TestMustParams_FieldWithNoRouteMatch_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOnlyParams](ctx)
+	MustParams[*UserOnlyParams](ctx, userOnlyParamsSchema)
 }
 
 func TestMustParams_PresentButInvalid_ProducesViolation(t *testing.T) {
@@ -175,7 +176,7 @@ func TestMustParams_PresentButInvalid_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOrderParams](ctx)
+	MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
 }
 
 func TestMustParams_WrongTypeParam_ProducesViolation(t *testing.T) {
@@ -196,7 +197,7 @@ func TestMustParams_WrongTypeParam_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOrderParams](ctx)
+	MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
 }
 
 func TestMustParams_TwoSimultaneousViolations_BothCollected(t *testing.T) {
@@ -226,13 +227,13 @@ func TestMustParams_TwoSimultaneousViolations_BothCollected(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOrderParams](ctx)
+	MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
 }
 
 func TestMustParams_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	ctx := newParamCtx("/codes/:code", map[string]string{"code": "abc"})
 
-	result := MustParams[*CustomParamFixture](ctx)
+	result := MustParams[*CustomParamFixture](ctx, customParamFixtureSchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -242,13 +243,13 @@ func TestMustParams_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	}
 }
 
-func TestMustParams_UnregisteredType_PanicsBeforeReadingAnyParam(t *testing.T) {
+func TestMustParams_MismatchedSchema_PanicsBeforeReadingAnyParam(t *testing.T) {
 	// paramFakeResponder with a params map that would panic on access if
 	// consulted (nil map is safe to read in Go, so instead assert directly
 	// that a panic happens BEFORE returning any value -- if MustParams tried
 	// to read params first, this would still technically be reachable, so
-	// the real proof is the panic message mentioning "no schema
-	// registered", not GetParam side effects).
+	// the real proof is the panic message mentioning a schema mismatch, not
+	// GetParam side effects).
 	ctx := newParamCtx("/x/:id", map[string]string{"id": "5"})
 
 	defer func() {
@@ -265,7 +266,7 @@ func TestMustParams_UnregisteredType_PanicsBeforeReadingAnyParam(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UnregisteredParams](ctx)
+	MustParams[*MismatchedParams](ctx, userOrderParamsSchema) // built for UserOrderParams, not MismatchedParams
 }
 
 // --- real HTTP dispatch ---------------------------------------------------
@@ -285,7 +286,7 @@ func TestMustParams_RealHTTPDispatch_HappyPath(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustParams[*UserOrderParams](ctx)
+		result := MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
 		return c.JSON(map[string]any{"userId": result.UserId, "orderId": result.OrderId})
 	})
 
@@ -327,7 +328,7 @@ func TestMustParams_RealHTTPDispatch_InvalidOneParam(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		MustParams[*UserOrderParams](ctx)
+		MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -368,7 +369,7 @@ func TestMustParams_RealHTTPDispatch_CustomFunc(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustParams[*CustomParamFixture](ctx)
+		result := MustParams[*CustomParamFixture](ctx, customParamFixtureSchema)
 		return c.JSON(map[string]any{"code": result.Code})
 	})
 

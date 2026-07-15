@@ -123,7 +123,7 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 		c.Route(route.HttpGet, "/pipeline/:id", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
 				*order = append(*order, "handler-before-pipe")
-				p := validate.MustParams[*pipelineIDParams](ctx)
+				p := validate.MustParams[*pipelineIDParams](ctx, pipelineIDParamsSchema)
 				*order = append(*order, "pipe")
 				ctx.Json(map[string]any{"id": p.ID})
 			})

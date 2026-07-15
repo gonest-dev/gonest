@@ -14,22 +14,22 @@ import (
 // MustParams is the real implementation behind the public root
 // gonest.MustParams[T] wrapper (Go cannot re-export a generic function via
 // var, see AD-004). T is a pointer type at the call site (e.g.
-// MustParams[*UserIdParams]).
+// MustParams[*UserIdParams]), and m must be the *schema.Schema built via
+// NewSchema[T] for that same T (AD-019) -- resolveSchema panics if it
+// describes a different type.
 //
 // Unlike MustJsonBody (which validates a single JSON object payload),
-// MustParams validates every path param declared on T's registered
-// *schema.Schema (via a `param:"name"` struct tag, same tag-resolution
-// convention MustJsonBody uses for `json:"..."`) against the CURRENT
-// route's actual ":name" segments -- reusing validateValue/populate
-// UNCHANGED once each param's raw string is coerced into the same any-shape
-// (string/float64/bool) JSON decoding already produces (design.md's Tech
-// Decisions: "coerce-then-reuse, not a parallel validation path").
+// MustParams validates every path param declared on m (via a
+// `param:"name"` struct tag, same tag-resolution convention MustJsonBody
+// uses for `json:"..."`) against the CURRENT route's actual ":name"
+// segments -- reusing validateValue/populate UNCHANGED once each param's
+// raw string is coerced into the same any-shape (string/float64/bool) JSON
+// decoding already produces (design.md's Tech Decisions: "coerce-then-reuse,
+// not a parallel validation path").
 //
 // Steps (design.md's Architecture Overview, "MustParams" section):
-//  1. Look up T's (dereferenced) registered *schema.Schema via the
-//     global registry -- panics immediately, BEFORE reading any param at
-//     all, if T was never registered via NewSchema[T] (spec.md's Edge
-//     Cases, same precedent as MustJsonBody).
+//  1. resolveSchema confirms m describes T, panicking immediately, BEFORE
+//     reading any param at all, otherwise.
 //  2. Resolve ctx's currently-attached *route.Route (via ctx.Route(), an
 //     `any` type-asserted back to *route.Route -- see execution.Context's
 //     WithRoute/Route doc comment for why the link is untyped at the
@@ -56,14 +56,10 @@ import (
 //  7. Otherwise: populate a fresh *structType field-by-field via the shared
 //     populate core (tag="param"), using the SAME raw/coerced value already
 //     produced during validation as the presence map's value.
-func MustParams[T any](ctx *execution.Context) T {
+func MustParams[T any](ctx *execution.Context, m *schema.Schema) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
-
-	m, ok := schema.Lookup(structType)
-	if !ok {
-		panic(fmt.Sprintf("gonest: no schema registered for type %s (call NewSchema[%s] first)", structType, structType))
-	}
+	resolveSchema(m, structType)
 
 	r, hasRoute := ctx.Route().(*route.Route)
 

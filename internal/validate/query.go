@@ -12,7 +12,9 @@ import (
 // MustQuery is the real implementation behind the public root
 // gonest.MustQuery[T] wrapper (Go cannot re-export a generic function via
 // var, see AD-004). T is a pointer type at the call site (e.g.
-// MustQuery[*ListUsersQuery]).
+// MustQuery[*ListUsersQuery]), and m must be the *schema.Schema built via
+// NewSchema[T] for that same T (AD-019) -- resolveSchema panics if it
+// describes a different type.
 //
 // It is the SAME shape as MustParams (internal/validate/params.go), except
 // presence/raw values come from ctx.Queries() (a plain map[string]string
@@ -22,10 +24,8 @@ import (
 // "coerce-then-reuse, not a parallel validation path".
 //
 // Steps (design.md's Architecture Overview, "MustQuery" section):
-//  1. Look up T's (dereferenced) registered *schema.Schema via the
-//     global registry -- panics immediately, BEFORE reading any query value
-//     at all, if T was never registered via NewSchema[T] (spec.md's Edge
-//     Cases, same precedent as MustJsonBody/MustParams).
+//  1. resolveSchema confirms m describes T, panicking immediately, BEFORE
+//     reading any query value at all, otherwise.
 //  2. Read ctx.Queries() once (a plain map[string]string).
 //  3. For each of T's own registered properties: resolve its key via
 //     tagKey(field, "query"), check presence via `_, ok :=
@@ -46,14 +46,10 @@ import (
 //  7. Otherwise: populate a fresh *structType field-by-field via the shared
 //     populate core (tag="query"), using the SAME raw/coerced value already
 //     produced during validation as the presence map's value.
-func MustQuery[T any](ctx *execution.Context) T {
+func MustQuery[T any](ctx *execution.Context, m *schema.Schema) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
-
-	m, ok := schema.Lookup(structType)
-	if !ok {
-		panic(fmt.Sprintf("gonest: no schema registered for type %s (call NewSchema[%s] first)", structType, structType))
-	}
+	resolveSchema(m, structType)
 
 	queries := ctx.Queries()
 

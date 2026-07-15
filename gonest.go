@@ -596,44 +596,47 @@ type Context = execution.Context
 // Validation (JSON Body Validation feature)
 // ---------------------------------------------------------------------------
 
-// MustJsonBody reads ctx's raw request body, validates it against T's
-// (dereferenced) registered *Schema (built via NewSchema[T] beforehand,
-// e.g. INSIGHT.md's UserEntity example), and returns a populated T. It
+// MustJsonBody reads ctx's raw request body, validates it against m (the
+// *Schema built via NewSchema[T] for that same T, e.g. INSIGHT.md's
+// UserEntity example -- passed explicitly, AD-019: a caller can no longer
+// invoke MustJsonBody[T] without a real Schema value in hand, since there is
+// no longer a global lookup to fall back on), and returns a populated T. It
 // panics *BadRequestException (collecting EVERY violation found, not just
 // the first) if the body fails to parse as JSON or any field/array-item/
-// nested-object constraint is violated, and panics with a plain string if T
-// was never registered via NewSchema[T]. Go cannot re-export a generic
-// function via var, so this is a real wrapper calling the internal one
-// (same pattern as MustInject/NewApp, see AD-004 in STATE.md).
-func MustJsonBody[T any](ctx *execution.Context) T {
-	return validate.MustJsonBody[T](ctx)
+// nested-object constraint is violated, and panics with a plain string if m
+// was not built for T. Go cannot re-export a generic function via var, so
+// this is a real wrapper calling the internal one (same pattern as
+// MustInject/NewApp, see AD-004 in STATE.md).
+func MustJsonBody[T any](ctx *execution.Context, m *Schema) T {
+	return validate.MustJsonBody[T](ctx, m)
 }
 
 // MustParams reads ctx's current route's path params, validates every field
-// of T (dereferenced) against its registered *Schema (built via
-// NewSchema[T] beforehand, matched via a `param:"name"` struct tag) and
-// returns a populated T. It panics *BadRequestException (collecting EVERY
-// violation found, not just the first) if a required param is missing or
-// any param fails its declared constraint, and panics with a plain string
-// if T was never registered via NewSchema[T]. Go cannot re-export a
-// generic function via var, so this is a real wrapper calling the internal
-// one (same pattern as MustJsonBody, see AD-004 in STATE.md).
-func MustParams[T any](ctx *execution.Context) T {
-	return validate.MustParams[T](ctx)
+// of T (dereferenced) against m (the *Schema built via NewSchema[T] for
+// that same T, matched via a `param:"name"` struct tag -- passed
+// explicitly, AD-019) and returns a populated T. It panics
+// *BadRequestException (collecting EVERY violation found, not just the
+// first) if a required param is missing or any param fails its declared
+// constraint, and panics with a plain string if m was not built for T. Go
+// cannot re-export a generic function via var, so this is a real wrapper
+// calling the internal one (same pattern as MustJsonBody, see AD-004 in
+// STATE.md).
+func MustParams[T any](ctx *execution.Context, m *Schema) T {
+	return validate.MustParams[T](ctx, m)
 }
 
 // MustQuery reads ctx's request query string, validates every field of T
-// (dereferenced) against its registered *Schema (built via NewSchema[T]
-// beforehand, matched via a `query:"name"` struct tag) and returns a
-// populated T. It panics *BadRequestException (collecting EVERY violation
-// found, not just the first) if a required query param is missing or any
-// query param fails its declared constraint, and panics with a plain
-// string if T was never registered via NewSchema[T]. Go cannot re-export
-// a generic function via var, so this is a real wrapper calling the
-// internal one (same pattern as MustJsonBody/MustParams, see AD-004 in
+// (dereferenced) against m (the *Schema built via NewSchema[T] for that
+// same T, matched via a `query:"name"` struct tag -- passed explicitly,
+// AD-019) and returns a populated T. It panics *BadRequestException
+// (collecting EVERY violation found, not just the first) if a required
+// query param is missing or any query param fails its declared constraint,
+// and panics with a plain string if m was not built for T. Go cannot
+// re-export a generic function via var, so this is a real wrapper calling
+// the internal one (same pattern as MustJsonBody/MustParams, see AD-004 in
 // STATE.md).
-func MustQuery[T any](ctx *execution.Context) T {
-	return validate.MustQuery[T](ctx)
+func MustQuery[T any](ctx *execution.Context, m *Schema) T {
+	return validate.MustQuery[T](ctx, m)
 }
 
 // ---------------------------------------------------------------------------

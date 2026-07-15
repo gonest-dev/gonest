@@ -43,14 +43,31 @@ type violation struct {
 	Message string `json:"message"`
 }
 
+// resolveSchema verifies m was built for structType (m.StructType() ==
+// structType) before any of Must*'s reflect-heavy work runs, panicking with
+// a clear message otherwise -- m's field offsets are measured against ITS
+// OWN struct's memory layout (internal/schema.New's own doc comment), so
+// populating/reading against a mismatched T would silently misinterpret
+// memory instead of failing loudly. Shared by MustJsonBody/MustParams/
+// MustQuery, all 3 of which now take m explicitly (AD-019) instead of
+// looking it up in a global registry keyed by T -- this is the one
+// remaining safety net for "the schema I passed doesn't actually describe
+// the T I asked for".
+func resolveSchema(m *schema.Schema, structType reflect.Type) *schema.Schema {
+	if m.StructType() != structType {
+		panic(fmt.Sprintf("gonest: schema mismatch -- schema built for %s, but T is %s", m.StructType(), structType))
+	}
+	return m
+}
+
 // MustJsonBody is the real implementation behind gonest.MustJsonBody[T] (T
 // is a pointer type at the call site, e.g. MustJsonBody[*UserProperties]).
+// m must be the *schema.Schema built via NewSchema[T] for that same T
+// (AD-019) -- resolveSchema panics if it describes a different type.
 //
 // Steps (design.md's Components/"internal/validate" section):
-//  1. Look up T's (dereferenced) registered *schema.Schema via the
-//     global registry -- panics immediately, BEFORE touching the body at
-//     all, if T was never registered via NewSchema[T] (spec.md's Edge
-//     Cases).
+//  1. resolveSchema confirms m describes T, panicking immediately, BEFORE
+//     touching the body at all, otherwise.
 //  2. Unmarshal the raw body into `any` -- ground truth for BOTH JSON-key
 //     presence (Required checks) and JSON value TYPE checking
 //     (context.md's Decision 1). A parse failure here panics
@@ -69,14 +86,10 @@ type violation struct {
 //     feature's context.md Decision 5) instead of a second opaque
 //     json.Unmarshal call, so Custom(fn)'s transformed value can actually
 //     reach the final result.
-func MustJsonBody[T any](ctx *execution.Context) T {
+func MustJsonBody[T any](ctx *execution.Context, m *schema.Schema) T {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
-
-	m, ok := schema.Lookup(structType)
-	if !ok {
-		panic(fmt.Sprintf("gonest: no schema registered for type %s (call NewSchema[%s] first)", structType, structType))
-	}
+	resolveSchema(m, structType)
 
 	body := ctx.Body()
 

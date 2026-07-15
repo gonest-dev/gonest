@@ -51,6 +51,11 @@ type UserProperties struct {
 
 var addressSchema *schema.Schema
 
+// userSchema is package-level (not init()-local) since every MustJsonBody
+// call site in this file must now pass it explicitly (AD-019) instead of
+// relying on a global type-keyed registry lookup.
+var userSchema *schema.Schema
+
 func init() {
 	// addressSchema built via schema.New directly (not through the
 	// generic NewSchema[T] root wrapper, which lives in gonest.go and
@@ -64,7 +69,7 @@ func init() {
 	addressSchema.Property(&addr.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`)
 
 	u := &UserProperties{}
-	userSchema := schema.New(reflect.TypeOf(*u), uintptr(unsafe.Pointer(u)))
+	userSchema = schema.New(reflect.TypeOf(*u), uintptr(unsafe.Pointer(u)))
 	userSchema.Property(&u.Id).Integer().Required()
 	userSchema.Property(&u.Name).String().Required().Min(1).Max(50)
 	userSchema.Property(&u.Age).Integer().Required().Min(0).Max(130)
@@ -159,7 +164,7 @@ func validBody() []byte {
 func TestMustJsonBody_HappyPath_ReturnsPopulatedValue(t *testing.T) {
 	ctx := newCtx(validBody())
 
-	result := MustJsonBody[*UserProperties](ctx)
+	result := MustJsonBody[*UserProperties](ctx, userSchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -198,7 +203,7 @@ func TestMustJsonBody_MalformedJSON_PanicsWithOneViolation(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_EmptyBody_TreatedAsParseFailure(t *testing.T) {
@@ -212,7 +217,7 @@ func TestMustJsonBody_EmptyBody_TreatedAsParseFailure(t *testing.T) {
 		expectBadRequest(t, r)
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_MissingRequiredField_RecordsViolation(t *testing.T) {
@@ -239,7 +244,7 @@ func TestMustJsonBody_MissingRequiredField_RecordsViolation(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_OutOfRangeValue_RecordsViolation(t *testing.T) {
@@ -266,7 +271,7 @@ func TestMustJsonBody_OutOfRangeValue_RecordsViolation(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_FractionalValueOnIntegerField_RecordsViolation(t *testing.T) {
@@ -297,7 +302,7 @@ func TestMustJsonBody_FractionalValueOnIntegerField_RecordsViolation(t *testing.
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_MultipleViolations_AllCollected(t *testing.T) {
@@ -330,7 +335,7 @@ func TestMustJsonBody_MultipleViolations_AllCollected(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_NullableRequiredField_NullAccepted(t *testing.T) {
@@ -342,7 +347,7 @@ func TestMustJsonBody_NullableRequiredField_NullAccepted(t *testing.T) {
 	// primitive. See nullableRequiredFixture below.
 	ctx := newCtx(nullableRequiredValidBody())
 
-	result := MustJsonBody[*NullableRequiredFixture](ctx)
+	result := MustJsonBody[*NullableRequiredFixture](ctx, nullableRequiredFixtureSchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -386,7 +391,7 @@ func TestMustJsonBody_RequiredNotNullable_NullRejected(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*RequiredNotNullableFixture](ctx)
+	MustJsonBody[*RequiredNotNullableFixture](ctx, requiredNotNullableFixtureSchema)
 }
 
 type RequiredNotNullableFixture struct {
@@ -432,7 +437,7 @@ func TestMustJsonBody_ArrayItemViolation_IdentifiesIndex(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_ArrayQuantityViolation_IdentifiesField(t *testing.T) {
@@ -460,7 +465,7 @@ func TestMustJsonBody_ArrayQuantityViolation_IdentifiesField(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_ObjectRefViolation_IdentifiesNestedPath(t *testing.T) {
@@ -487,7 +492,7 @@ func TestMustJsonBody_ObjectRefViolation_IdentifiesNestedPath(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_AdditionalProperties_NoStructuralValidation(t *testing.T) {
@@ -503,7 +508,7 @@ func TestMustJsonBody_AdditionalProperties_NoStructuralValidation(t *testing.T) 
 	})
 	ctx := newCtx(body)
 
-	result := MustJsonBody[*UserProperties](ctx)
+	result := MustJsonBody[*UserProperties](ctx, userSchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result (AdditionalProperties should not fail structural validation)")
@@ -538,12 +543,17 @@ func TestMustJsonBody_CombinedArrayAndObjectViolations_BothReported(t *testing.T
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 // --- Edge cases --------------------------------------------------------
 
-func TestMustJsonBody_UnregisteredType_PanicsBeforeTouchingBody(t *testing.T) {
+// TestMustJsonBody_MismatchedSchema_PanicsBeforeTouchingBody proves
+// resolveSchema panics (AD-019) when the *schema.Schema passed in was built
+// for a DIFFERENT type than T -- the modern equivalent of the old
+// registry-miss panic, now a compile-time-impossible-to-omit argument
+// instead of a runtime lookup failure.
+func TestMustJsonBody_MismatchedSchema_PanicsBeforeTouchingBody(t *testing.T) {
 	type NeverRegistered struct {
 		X string `json:"x"`
 	}
@@ -555,11 +565,11 @@ func TestMustJsonBody_UnregisteredType_PanicsBeforeTouchingBody(t *testing.T) {
 			t.Fatal("expected panic, got none")
 		}
 		if _, ok := r.(*exception.BadRequestException); ok {
-			t.Fatal("expected a plain string panic about missing schema, not a BadRequestException (proves body was never touched)")
+			t.Fatal("expected a plain string panic about schema mismatch, not a BadRequestException (proves body was never touched)")
 		}
 	}()
 
-	MustJsonBody[*NeverRegistered](ctx)
+	MustJsonBody[*NeverRegistered](ctx, userSchema) // userSchema was built for UserProperties, not NeverRegistered
 }
 
 func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.T) {
@@ -577,7 +587,7 @@ func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx)
+	MustJsonBody[*UserProperties](ctx, userSchema)
 }
 
 // --- real HTTP dispatch (L-012 precedent) -----------------------------------
@@ -596,7 +606,7 @@ func TestMustJsonBody_RealHTTPDispatch_HappyPath(t *testing.T) {
 				panic(r)
 			}
 		}()
-		result := MustJsonBody[*UserProperties](ctx)
+		result := MustJsonBody[*UserProperties](ctx, userSchema)
 		return c.JSON(map[string]any{"name": result.Name})
 	})
 
@@ -628,7 +638,7 @@ func TestMustJsonBody_RealHTTPDispatch_MultipleViolations(t *testing.T) {
 				panic(r)
 			}
 		}()
-		MustJsonBody[*UserProperties](ctx)
+		MustJsonBody[*UserProperties](ctx, userSchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -679,7 +689,7 @@ func TestMustJsonBody_RealHTTPDispatch_MalformedJSON(t *testing.T) {
 				panic(r)
 			}
 		}()
-		MustJsonBody[*UserProperties](ctx)
+		MustJsonBody[*UserProperties](ctx, userSchema)
 		return c.SendStatus(http.StatusOK)
 	})
 

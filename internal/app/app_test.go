@@ -608,7 +608,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*userIDParams](ctx)
+				p := validate.MustParams[*userIDParams](ctx, userIDParamsSchema)
 				u := userService.Get(p.UserID)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
@@ -626,7 +626,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
 			r.HttpCode(201)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*nameParams](ctx)
+				p := validate.MustParams[*nameParams](ctx, nameParamsSchema)
 				ctx.Status(r.Code()).Json(userService.Create(p.Name))
 			})
 		})
@@ -637,7 +637,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpPut, "/:user_id/:name", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*userIDNameParams](ctx)
+				p := validate.MustParams[*userIDNameParams](ctx, userIDNameParamsSchema)
 				u := userService.Update(p.UserID, p.Name)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
@@ -651,7 +651,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		c.Route(route.HttpDelete, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*userIDParams](ctx)
+				p := validate.MustParams[*userIDParams](ctx, userIDParamsSchema)
 				u := userService.Delete(p.UserID)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
@@ -1167,7 +1167,7 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*userIDParams](ctx)
+				p := validate.MustParams[*userIDParams](ctx, userIDParamsSchema)
 				u := userService.Get(p.UserID)
 				if u == nil {
 					ctx.Status(404).Json(map[string]string{"error": "not found"})
@@ -1188,7 +1188,7 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		c.Route(route.HttpPost, "/:name", func(r *route.Route) {
 			r.HttpCode(201)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*nameParams](ctx)
+				p := validate.MustParams[*nameParams](ctx, nameParamsSchema)
 				ctx.Status(r.Code()).Json(userService.Create(p.Name))
 			})
 		})

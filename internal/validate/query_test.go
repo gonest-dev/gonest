@@ -60,9 +60,10 @@ var customQueryFixtureSchema = func() *schema.Schema {
 	return m
 }()
 
-// UnregisteredQuery is deliberately never passed to schema.New/Register
-// -- used to prove MustQuery panics BEFORE reading any query value.
-type UnregisteredQuery struct {
+// MismatchedQuery is a type NO schema was ever built for -- used to prove
+// MustQuery panics BEFORE reading any query value when handed a schema
+// built for a DIFFERENT type (AD-019's resolveSchema check).
+type MismatchedQuery struct {
 	Id int64 `query:"id"`
 }
 
@@ -98,7 +99,7 @@ func TestMustQuery_HappyPath_TwoParams(t *testing.T) {
 		"page": "2",
 	})
 
-	result := MustQuery[*ListUsersQuery](ctx)
+	result := MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -139,7 +140,7 @@ func TestMustQuery_MissingRequiredAndOutOfRange_BothCollected(t *testing.T) {
 		}
 	}()
 
-	MustQuery[*ListUsersQuery](ctx)
+	MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
 }
 
 func TestMustQuery_WrongTypeParam_ProducesViolation(t *testing.T) {
@@ -160,13 +161,13 @@ func TestMustQuery_WrongTypeParam_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustQuery[*ListUsersQuery](ctx)
+	MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
 }
 
 func TestMustQuery_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	ctx := newQueryCtx(map[string]string{"code": "abc"})
 
-	result := MustQuery[*CustomQueryFixture](ctx)
+	result := MustQuery[*CustomQueryFixture](ctx, customQueryFixtureSchema)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -176,7 +177,7 @@ func TestMustQuery_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	}
 }
 
-func TestMustQuery_UnregisteredType_PanicsBeforeReadingAnyQuery(t *testing.T) {
+func TestMustQuery_MismatchedSchema_PanicsBeforeReadingAnyQuery(t *testing.T) {
 	ctx := newQueryCtx(map[string]string{"id": "5"})
 
 	defer func() {
@@ -193,7 +194,7 @@ func TestMustQuery_UnregisteredType_PanicsBeforeReadingAnyQuery(t *testing.T) {
 		}
 	}()
 
-	MustQuery[*UnregisteredQuery](ctx)
+	MustQuery[*MismatchedQuery](ctx, listUsersQuerySchema) // built for ListUsersQuery, not MismatchedQuery
 }
 
 // --- real HTTP dispatch ---------------------------------------------------
@@ -212,7 +213,7 @@ func TestMustQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustQuery[*ListUsersQuery](ctx)
+		result := MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
 		return c.JSON(map[string]any{"term": result.Term, "page": result.Page})
 	})
 
@@ -253,7 +254,7 @@ func TestMustQuery_RealHTTPDispatch_MissingRequiredAndOutOfRange(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		MustQuery[*ListUsersQuery](ctx)
+		MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -296,7 +297,7 @@ func TestMustQuery_RealHTTPDispatch_CustomFunc(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustQuery[*CustomQueryFixture](ctx)
+		result := MustQuery[*CustomQueryFixture](ctx, customQueryFixtureSchema)
 		return c.JSON(map[string]any{"code": result.Code})
 	})
 
