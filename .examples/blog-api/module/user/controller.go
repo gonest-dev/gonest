@@ -21,7 +21,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List users")
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
-		r.Handler(func(ctx *gonest.Context) {
+		r.Handler(func(ctx *gonest.RestContext) {
 			ctx.Json(service.List())
 		})
 	})
@@ -31,8 +31,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Params(paramsDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
-		r.Handler(func(ctx *gonest.Context) {
-			p := gonest.MustParams[*ParamsDTO](ctx, paramsDTOSchema)
+		r.Handler(func(ctx *gonest.RestContext) {
+			p := gonest.MustParseRestParams[*ParamsDTO](ctx, paramsDTOSchema)
 			u := service.Get(p.UserID)
 			if u == nil {
 				panic(gonest.NewNotFoundException(nil))
@@ -47,8 +47,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.RequestBody(createBodyDTOSchema)
 		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusConflict)
-		r.Handler(func(ctx *gonest.Context) {
-			body := gonest.MustJsonBody[*CreateBodyDTO](ctx, createBodyDTOSchema)
+		r.Handler(func(ctx *gonest.RestContext) {
+			body := gonest.MustParseRestJsonBody[*CreateBodyDTO](ctx, createBodyDTOSchema)
 			ctx.Status(http.StatusCreated).Json(service.Create(body.Name, body.Email))
 		})
 	})

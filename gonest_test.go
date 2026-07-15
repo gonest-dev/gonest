@@ -256,6 +256,47 @@ func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
 	validate.MustParams[*idParams](ctx, idParamsSchema)
 }
 
+// TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking proves
+// AD-021's non-panicking half of the family: ParseRestParams returns
+// (zero, non-nil error) on a validation failure instead of panicking, and
+// (populated T, nil) on success -- same underlying validation as
+// MustParseRestParams, just surfaced as a return value for callers that
+// want to handle it themselves.
+func TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking(t *testing.T) {
+	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+
+	t.Run("invalid", func(t *testing.T) {
+		res := newParamFakeResponder()
+		res.params["id"] = "not-a-number"
+		ctx := execution.New(res).WithRoute(r)
+
+		got, err := ParseRestParams[*idParams](ctx, idParamsSchema)
+		if err == nil {
+			t.Fatal("expected a non-nil error, got nil")
+		}
+		if _, ok := err.(*BadRequestException); !ok {
+			t.Fatalf("expected *BadRequestException, got %T: %v", err, err)
+		}
+		if got != nil {
+			t.Fatalf("expected nil T on error, got %v", got)
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		res := newParamFakeResponder()
+		res.params["id"] = "42"
+		ctx := execution.New(res).WithRoute(r)
+
+		got, err := ParseRestParams[*idParams](ctx, idParamsSchema)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if got.ID != 42 {
+			t.Fatalf("ID = %d, want %d", got.ID, 42)
+		}
+	})
+}
+
 // paramFakeResponder is a minimal test-only execution.Responder for exercising
 // MustParams[T] end to end (Context -> Route -> validate.MustParams).
 type paramFakeResponder struct {
@@ -391,8 +432,8 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/users/:user_id/orders", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				params := MustParams[*insightUserIdParams](ctx, insightUserIdParamsSchema)
-				query := MustQuery[*insightListUsersQuery](ctx, insightListUsersQuerySchema)
+				params := MustParseRestParams[*insightUserIdParams](ctx, insightUserIdParamsSchema)
+				query := MustParseRestQuery[*insightListUsersQuery](ctx, insightListUsersQuerySchema)
 				gotUserId = params.UserId
 				gotPage = query.Page
 				gotLimit = query.Limit
@@ -2135,7 +2176,7 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpPost, "/users", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				gotUser = MustJsonBody[*jsonBodyUserEntity](ctx, jsonBodyUserSchema)
+				gotUser = MustParseRestJsonBody[*jsonBodyUserEntity](ctx, jsonBodyUserSchema)
 				ctx.Json(gotUser)
 			})
 		})

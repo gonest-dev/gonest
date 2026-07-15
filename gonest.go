@@ -643,61 +643,85 @@ type ArraySchema = schema.ArraySchema
 // file rather than a separate schema.go).
 type ObjectSchema = schema.ObjectSchema
 
-// Context encapsulates the HTTP request/response for a single route
-// Handler -- long-standing gap closed here (see STATE.md's Deferred
-// Ideas): every route Handler signature in INSIGHT.md's own examples
-// already used *gonest.Context, but no feature before this had added the
-// root re-export (every internal call site used *execution.Context
-// directly instead). Because this is a true Go type alias, every method
-// on execution.Context (Json/Status/Header/SetHeader/Param/Body/Queries/
-// HTML/SendString/WithRoute/Route) is automatically visible on
-// gonest.Context with zero extra wrapper code.
-type Context = execution.Context
+// RestContext encapsulates the HTTP request/response for a single REST
+// route Handler -- named "Rest" (not plain "Context", AD-021) to leave room
+// for GraphQL/gRPC/messaging adapters to bring their own Context type later
+// without colliding on the same root name. Because this is a true Go type
+// alias, every method on execution.Context (Json/Status/Header/SetHeader/
+// Param/Body/Queries/HTML/SendString/WithRoute/Route) is automatically
+// visible on gonest.RestContext with zero extra wrapper code.
+type RestContext = execution.Context
 
 // ---------------------------------------------------------------------------
 // Validation (JSON Body Validation feature)
 // ---------------------------------------------------------------------------
 
-// MustJsonBody reads ctx's raw request body, validates it against m (the
-// *Schema built via NewSchema[T] for that same T, e.g. INSIGHT.md's
+// ParseRestJsonBody reads ctx's raw request body, validates it against m
+// (the *Schema built via NewSchema[T] for that same T, e.g. INSIGHT.md's
 // UserEntity example -- passed explicitly, AD-019: a caller can no longer
-// invoke MustJsonBody[T] without a real Schema value in hand, since there is
-// no longer a global lookup to fall back on), and returns a populated T. It
-// panics *BadRequestException (collecting EVERY violation found, not just
-// the first) if the body fails to parse as JSON or any field/array-item/
-// nested-object constraint is violated, and panics with a plain string if m
-// was not built for T. Go cannot re-export a generic function via var, so
-// this is a real wrapper calling the internal one (same pattern as
+// invoke ParseRestJsonBody[T] without a real Schema value in hand, since
+// there is no longer a global lookup to fall back on), and returns a
+// populated T. Returns a non-nil *BadRequestException (collecting EVERY
+// violation found, not just the first) as the error if the body fails to
+// parse as JSON or any field/array-item/nested-object constraint is
+// violated -- AD-021's non-panicking half of the family (see
+// MustParseRestJsonBody for the panicking twin). Still panics with a plain
+// string if m was not built for T (a coding-error class of failure, not a
+// request-validation one). Go cannot re-export a generic function via var,
+// so this is a real wrapper calling the internal one (same pattern as
 // MustInject/NewApp, see AD-004 in STATE.md).
-func MustJsonBody[T any](ctx *execution.Context, m *Schema) T {
+func ParseRestJsonBody[T any](ctx *RestContext, m *Schema) (T, error) {
+	return validate.ParseJsonBody[T](ctx, m)
+}
+
+// MustParseRestJsonBody is ParseRestJsonBody, panicking on any returned
+// error instead of returning it -- AD-021's panicking twin, for call sites
+// that don't want to handle the error themselves.
+func MustParseRestJsonBody[T any](ctx *RestContext, m *Schema) T {
 	return validate.MustJsonBody[T](ctx, m)
 }
 
-// MustParams reads ctx's current route's path params, validates every field
-// of T (dereferenced) against m (the *Schema built via NewSchema[T] for
-// that same T, matched via a `param:"name"` struct tag -- passed
-// explicitly, AD-019) and returns a populated T. It panics
+// ParseRestParams reads ctx's current route's path params, validates every
+// field of T (dereferenced) against m (the *Schema built via NewSchema[T]
+// for that same T, matched via a `param:"name"` struct tag -- passed
+// explicitly, AD-019) and returns a populated T. Returns a non-nil
 // *BadRequestException (collecting EVERY violation found, not just the
-// first) if a required param is missing or any param fails its declared
-// constraint, and panics with a plain string if m was not built for T. Go
-// cannot re-export a generic function via var, so this is a real wrapper
-// calling the internal one (same pattern as MustJsonBody, see AD-004 in
-// STATE.md).
-func MustParams[T any](ctx *execution.Context, m *Schema) T {
+// first) as the error if a required param is missing or any param fails
+// its declared constraint -- AD-021's non-panicking half of the family (see
+// MustParseRestParams for the panicking twin). Still panics with a plain
+// string if m was not built for T. Go cannot re-export a generic function
+// via var, so this is a real wrapper calling the internal one (same
+// pattern as ParseRestJsonBody, see AD-004 in STATE.md).
+func ParseRestParams[T any](ctx *RestContext, m *Schema) (T, error) {
+	return validate.ParseParams[T](ctx, m)
+}
+
+// MustParseRestParams is ParseRestParams, panicking on any returned error
+// instead of returning it -- AD-021's panicking twin, for call sites that
+// don't want to handle the error themselves.
+func MustParseRestParams[T any](ctx *RestContext, m *Schema) T {
 	return validate.MustParams[T](ctx, m)
 }
 
-// MustQuery reads ctx's request query string, validates every field of T
-// (dereferenced) against m (the *Schema built via NewSchema[T] for that
+// ParseRestQuery reads ctx's request query string, validates every field of
+// T (dereferenced) against m (the *Schema built via NewSchema[T] for that
 // same T, matched via a `query:"name"` struct tag -- passed explicitly,
-// AD-019) and returns a populated T. It panics *BadRequestException
-// (collecting EVERY violation found, not just the first) if a required
-// query param is missing or any query param fails its declared constraint,
-// and panics with a plain string if m was not built for T. Go cannot
-// re-export a generic function via var, so this is a real wrapper calling
-// the internal one (same pattern as MustJsonBody/MustParams, see AD-004 in
-// STATE.md).
-func MustQuery[T any](ctx *execution.Context, m *Schema) T {
+// AD-019) and returns a populated T. Returns a non-nil *BadRequestException
+// (collecting EVERY violation found, not just the first) as the error if a
+// required query param is missing or any query param fails its declared
+// constraint -- AD-021's non-panicking half of the family (see
+// MustParseRestQuery for the panicking twin). Still panics with a plain
+// string if m was not built for T. Go cannot re-export a generic function
+// via var, so this is a real wrapper calling the internal one (same
+// pattern as ParseRestJsonBody/ParseRestParams, see AD-004 in STATE.md).
+func ParseRestQuery[T any](ctx *RestContext, m *Schema) (T, error) {
+	return validate.ParseQuery[T](ctx, m)
+}
+
+// MustParseRestQuery is ParseRestQuery, panicking on any returned error
+// instead of returning it -- AD-021's panicking twin, for call sites that
+// don't want to handle the error themselves.
+func MustParseRestQuery[T any](ctx *RestContext, m *Schema) T {
 	return validate.MustQuery[T](ctx, m)
 }
 

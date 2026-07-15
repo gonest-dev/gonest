@@ -110,6 +110,15 @@ func (e HttpException) Details() any {
 	return e.details
 }
 
+// Error satisfies Go's stdlib error interface -- promoted onto every type
+// embedding HttpException by value (built-in and dev-defined alike), same
+// mechanism as Status/Name/Message/Details/MarshalJSON. Lets the non-
+// panicking ParseRest* family (internal/validate) return a *BadRequestException
+// etc. directly as a plain `error`, with no separate wrapper type needed.
+func (e HttpException) Error() string {
+	return e.message
+}
+
 // MarshalJSON encodes e as {"name","message","details"} -- deliberately
 // omitting status, which belongs on the HTTP response's status line/code,
 // not the JSON body. Because Go's encoding/json invokes a promoted

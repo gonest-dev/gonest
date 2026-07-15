@@ -11,12 +11,14 @@ import (
 	"github.com/gonest-dev/gonest/internal/schema"
 )
 
-// MustParams is the real implementation behind the public root
-// gonest.MustParams[T] wrapper (Go cannot re-export a generic function via
-// var, see AD-004). T is a pointer type at the call site (e.g.
-// MustParams[*UserIdParams]), and m must be the *schema.Schema built via
+// ParseParams is the real implementation behind the public root
+// gonest.ParseRestParams[T] wrapper (Go cannot re-export a generic function
+// via var, see AD-004). T is a pointer type at the call site (e.g.
+// ParseParams[*UserIdParams]), and m must be the *schema.Schema built via
 // NewSchema[T] for that same T (AD-019) -- resolveSchema panics if it
-// describes a different type.
+// describes a different type (a coding-error class of failure, distinct
+// from the request-validation failures below, which return as a plain
+// error instead of panicking -- AD-021).
 //
 // Unlike MustJsonBody (which validates a single JSON object payload),
 // MustParams validates every path param declared on m (via a
@@ -56,7 +58,7 @@ import (
 //  7. Otherwise: populate a fresh *structType field-by-field via the shared
 //     populate core (tag="param"), using the SAME raw/coerced value already
 //     produced during validation as the presence map's value.
-func MustParams[T any](ctx *execution.Context, m *schema.Schema) T {
+func ParseParams[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
 	resolveSchema(m, structType)
@@ -98,22 +100,33 @@ func MustParams[T any](ctx *execution.Context, m *schema.Schema) T {
 	}
 
 	if len(violations) > 0 {
-		panic(exception.NewBadRequestException(violations))
+		return zero, exception.NewBadRequestException(violations)
 	}
 
 	out := reflect.New(structType)
 	if err := populate(out.Elem(), presence, m, "param"); err != nil {
 		// Should be unreachable in practice, same rationale as
-		// MustJsonBody's own equivalent panic: the validate pass above
+		// ParseJsonBody's own equivalent case: the validate pass above
 		// already proved every present field's shape matches what T
-		// expects. Panicking here keeps failures loud instead of masking a
-		// genuine bug in the validation pass.
-		panic(exception.NewBadRequestException([]violation{
+		// expects. Returning an error here keeps failures loud instead of
+		// masking a genuine bug in the validation pass.
+		return zero, exception.NewBadRequestException([]violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate params: %v", err)},
-		}))
+		})
 	}
 
-	return out.Interface().(T)
+	return out.Interface().(T), nil
+}
+
+// MustParams is the real implementation behind gonest.MustParseRestParams[T]
+// -- ParseParams, panicking on any returned error (AD-021's panicking twin,
+// for call sites that don't want to handle the error themselves).
+func MustParams[T any](ctx *execution.Context, m *schema.Schema) T {
+	v, err := ParseParams[T](ctx, m)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // coerceParamString converts a raw path/query param string into the same

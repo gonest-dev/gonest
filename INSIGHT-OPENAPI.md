@@ -20,7 +20,7 @@ type UserEntity struct {
 // cada método é uma combinação type+format do OpenAPI 3.1 (achatado, sem tipo pai
 // tipo Number().Integer() — direto Integer(), Float(), Double(), Email(), Uuid() etc).
 // Required/Nullable/Description/Examples ficam na base, comuns a qualquer branch.
-// mesma declaração alimenta: schema OpenAPI (oas) + validação runtime (MustJsonBody/MustInject).
+// mesma declaração alimenta: schema OpenAPI (oas) + validação runtime (MustParseRestJsonBody/MustInject).
 var _ = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
   m.Description("Entidade de usuário")
   m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
@@ -265,7 +265,7 @@ var SystemController = gonest.NewController(func (controller *gonest.Controller)
 
   controller.Route(gonest.HttpGet, "/ping", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
+    route.Handler(func(ctx *gonest.RestContext) {
       ctx.Json(service.PingAll())
     })
   })
@@ -393,7 +393,7 @@ var HealthController = gonest.NewController(func (controller *gonest.Controller)
 
   // Readiness Probe (Padrão K8s: /readyz) - "Estou pronto pra receber tráfego?"
   controller.Route(gonest.HttpGet, "/readyz", func (route *gonest.Route) {
-    route.Handler(func(ctx *gonest.Context) {
+    route.Handler(func(ctx *gonest.RestContext) {
       results, status := make(map[string]string), gonest.HttpStatusOk
 
       for _, c := range pingables {
@@ -414,7 +414,7 @@ var HealthController = gonest.NewController(func (controller *gonest.Controller)
   // travar no Go, o servidor HTTP sequer conseguirá responder a esse request.
   controller.Route(gonest.HttpGet, "/livez", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
+    route.Handler(func(ctx *gonest.RestContext) {
       ctx.Status(gonest.HttpStatusOk).SendString("OK")
     })
   })
@@ -435,12 +435,12 @@ func main() {
 
 # exemplo de Param, Query e Header Validation + Swagger
 
-Path params, query string e headers seguem exatamente o mesmo mecanismo de `MustJsonBody`:
+Path params, query string e headers seguem exatamente o mesmo mecanismo de `MustParseRestJsonBody`:
 declara um struct pequeno, registra seu `Schema` via `NewSchema[T]`
 (usando as tags correspondentes: `param:"..."`, `query:"..."`, `header:"..."`), e
 o handler resolve o struct inteiro já validado de uma vez -- nunca campo a campo. 
 
-Além da validação em runtime (`MustParams`, `MustQuery`, `MustHeaders`), esse mesmíssimo
+Além da validação em runtime (`MustParseRestParams`, `MustParseRestQuery`, `MustParseRestHeaders`), esse mesmíssimo
 `Schema` é injetado no builder da Rota (`route.Params()`, `route.Query()`, `route.Headers()`)
 para compilar a documentação OpenAPI sem duplicar declarações.
 
@@ -494,13 +494,13 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     route.Params(userIdParamsSchema)
     route.Headers(customHeadersSchema)
 
-    route.Handler(func(ctx *gonest.Context) {
-      // MustParams e MustHeaders usam o MESMO Schema (passado explicitamente,
+    route.Handler(func(ctx *gonest.RestContext) {
+      // MustParseRestParams e MustParseRestHeaders usam o MESMO Schema (passado explicitamente,
       // não mais um lookup por tipo num registry global -- ver seção
       // "hipótese" mais abaixo, decisão tomada e já executada) para
       // Validação Runtime
-      params := gonest.MustParams[*UserIdParams](ctx, userIdParamsSchema)
-      headers := gonest.MustHeaders[*CustomHeaders](ctx, customHeadersSchema)
+      params := gonest.MustParseRestParams[*UserIdParams](ctx, userIdParamsSchema)
+      headers := gonest.MustParseRestHeaders[*CustomHeaders](ctx, customHeadersSchema)
       
       // ... uso ...
       ctx.Json(userService.Get(params.UserId))
@@ -513,9 +513,9 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     // Injeta o Schema na Rota para OpenAPI (Documentação)
     route.Query(listUsersQuerySchema)
 
-    route.Handler(func(ctx *gonest.Context) {
-      // MustQuery[T](ctx, schema) usa o MESMO Schema para Validação Runtime
-      query := gonest.MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      // MustParseRestQuery[T](ctx, schema) usa o MESMO Schema para Validação Runtime
+      query := gonest.MustParseRestQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
       
       ctx.Json(userService.List(query.Page, query.Limit))
     })
@@ -526,7 +526,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 Quando o vocabulário fixo de `Schema` (`Integer`/`String`/`Min`/`Max`/`Pattern`
 etc) não alcança um formato de domínio específico (ex: um ID exposto com
 prefixo, tipo `"usr_42"`), `PropertyBuilder.Custom(fn)` é a válvula de escape
--- funciona igual em `MustParams`/`MustQuery`/`MustJsonBody`, sempre recebendo
+-- funciona igual em `MustParseRestParams`/`MustParseRestQuery`/`MustParseRestJsonBody`, sempre recebendo
 o valor CRU (string, no caso de param/query) e devolvendo o valor Go final ou
 um `error` que vira violation. Ver a seção "exemplo de Middleware, Guard,
 Interceptor e Filter" acima (`PrefixedUserIdParam`) pro exemplo completo.
@@ -622,9 +622,9 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     route.Summary("Cria um novo usuário")
 
     // liga o corpo esperado a um *Schema JÁ registrado (mesmo valor que
-    // MustJsonBody[*UserProperties] vai usar dentro do Handler -- reusa a
+    // MustParseRestJsonBody[*UserProperties] vai usar dentro do Handler -- reusa a
     // MESMA declaração, não duplica). Schema Generation lê isso pra montar
-    // requestBody no OpenAPI; MustJsonBody continua sendo quem VALIDA em
+    // requestBody no OpenAPI; MustParseRestJsonBody continua sendo quem VALIDA em
     // runtime -- RequestBody() aqui é só DECLARATIVO/documental.
     route.RequestBody(userEntitySchema)
 
@@ -639,8 +639,8 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     })
 
     route.HttpCode(gonest.HttpStatusCreated)
-    route.Handler(func(ctx *gonest.Context) {
-      properties := gonest.MustJsonBody[*UserEntity](ctx, userEntitySchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      properties := gonest.MustParseRestJsonBody[*UserEntity](ctx, userEntitySchema)
       ctx.Json(userService.Create(properties))
     })
   })
@@ -648,7 +648,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.Summary("Busca um usuário por ID")
     // path params TAMBÉM documentados via Schema já registrada (mesma
-    // UserIdParams de MustParams) -- Schema Generation vira "parameters"
+    // UserIdParams de MustParseRestParams) -- Schema Generation vira "parameters"
     // (in: path) no OpenAPI a partir dela, sem redeclarar nada.
     route.Params(userIdParamsSchema)
     route.Response(gonest.HttpStatusOk, func (response *gonest.Response) {
@@ -660,8 +660,8 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     route.Response(gonest.HttpStatusNotFound) 
 
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
-      params := gonest.MustParams[*UserIdParams](ctx, userIdParamsSchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      params := gonest.MustParseRestParams[*UserIdParams](ctx, userIdParamsSchema)
       ctx.Json(userService.Get(params.UserId))
     })
   })
@@ -670,7 +670,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   controller.Route(gonest.HttpGet, "/_internal/debug", func (route *gonest.Route) {
     route.ExcludeFromDocs()
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) { ctx.Json(map[string]any{"ok": true}) })
+    route.Handler(func(ctx *gonest.RestContext) { ctx.Json(map[string]any{"ok": true}) })
   })
 })
 
@@ -727,9 +727,9 @@ introduziria ciclo de import na volta. O objetivo real (obrigar o Schema a
 existir e ficar por perto da rota, reforçando doc+validação como UMA coisa
 só) não depende de método -- basta o Schema ser um ARGUMENTO explícito.
 
-`MustParams`/`MustQuery`/`MustJsonBody` passam a receber o `*Schema` como
+`MustParseRestParams`/`MustParseRestQuery`/`MustParseRestJsonBody` passam a receber o `*Schema` como
 2º argumento em vez de fazer lookup por tipo num registry global -- não dá
-mais pra chamar `gonest.MustParams[*ParamsDTO](ctx)` sem ter, em mãos, o
+mais pra chamar `gonest.MustParseRestParams[*ParamsDTO](ctx)` sem ter, em mãos, o
 MESMO `*Schema` que `route.Params(...)` já usa pra documentação (`ParamsDTO`
 e `paramsDTOSchema`, por exemplo). Isso:
 
@@ -784,12 +784,12 @@ var controller = gonest.NewController(func(controller *gonest.Controller) {
     r.Summary("Get a user")
     r.Query(exQuerySchema)
     r.Params(exParamsSchema)
-    r.Handler(func(ctx *gonest.Context) {
+    r.Handler(func(ctx *gonest.RestContext) {
       // Schema passado explicitamente -- é o MESMO valor que route.Query/
       // route.Params já registraram acima, não um lookup escondido por T.
-      query := gonest.MustQuery[*exQuery](ctx, exQuerySchema)
-      params := gonest.MustParams[*exParams](ctx, exParamsSchema)
-      body := gonest.MustJsonBody[*exBody](ctx, exBodySchema)
+      query := gonest.MustParseRestQuery[*exQuery](ctx, exQuerySchema)
+      params := gonest.MustParseRestParams[*exParams](ctx, exParamsSchema)
+      body := gonest.MustParseRestJsonBody[*exBody](ctx, exBodySchema)
       // ...
     })
   })

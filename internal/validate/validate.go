@@ -60,33 +60,36 @@ func resolveSchema(m *schema.Schema, structType reflect.Type) *schema.Schema {
 	return m
 }
 
-// MustJsonBody is the real implementation behind gonest.MustJsonBody[T] (T
-// is a pointer type at the call site, e.g. MustJsonBody[*UserProperties]).
-// m must be the *schema.Schema built via NewSchema[T] for that same T
-// (AD-019) -- resolveSchema panics if it describes a different type.
+// ParseJsonBody is the real implementation behind gonest.ParseRestJsonBody[T]
+// (T is a pointer type at the call site, e.g.
+// ParseJsonBody[*UserProperties]). m must be the *schema.Schema built via
+// NewSchema[T] for that same T (AD-019) -- resolveSchema panics if it
+// describes a different type (a coding-error class of failure, distinct
+// from the request-validation failures below, which return as a plain
+// error instead of panicking -- AD-021).
 //
 // Steps (design.md's Components/"internal/validate" section):
 //  1. resolveSchema confirms m describes T, panicking immediately, BEFORE
 //     touching the body at all, otherwise.
 //  2. Unmarshal the raw body into `any` -- ground truth for BOTH JSON-key
 //     presence (Required checks) and JSON value TYPE checking
-//     (context.md's Decision 1). A parse failure here panics
-//     BadRequestException immediately with ONE violation (can't collect
-//     per-field violations if the JSON itself doesn't parse -- spec.md's
-//     P4.1). A body that parses but isn't a JSON object at the top level
-//     degrades to "every Required field missing" (design.md's Error
-//     Handling Strategy table) rather than crashing.
+//     (context.md's Decision 1). A parse failure here returns
+//     *exception.BadRequestException immediately with ONE violation (can't
+//     collect per-field violations if the JSON itself doesn't parse --
+//     spec.md's P4.1). A body that parses but isn't a JSON object at the
+//     top level degrades to "every Required field missing" (design.md's
+//     Error Handling Strategy table) rather than crashing.
 //  3. validateStruct walks every registered property recursively,
 //     collecting every violation (context.md's Decision 2 -- never stops
 //     at the first).
-//  4. If any violations were collected: panic
-//     exception.NewBadRequestException(violations).
+//  4. If any violations were collected: return
+//     exception.NewBadRequestException(violations) as the error.
 //  5. Otherwise: populate a fresh *structType field-by-field via the shared
 //     populate core (param-query-validation feature's P0 -- see that
 //     feature's context.md Decision 5) instead of a second opaque
 //     json.Unmarshal call, so Custom(fn)'s transformed value can actually
 //     reach the final result.
-func MustJsonBody[T any](ctx *execution.Context, m *schema.Schema) T {
+func ParseJsonBody[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
 	var zero T
 	structType := reflect.TypeOf(zero).Elem()
 	resolveSchema(m, structType)
@@ -95,9 +98,9 @@ func MustJsonBody[T any](ctx *execution.Context, m *schema.Schema) T {
 
 	var parsed any
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		panic(exception.NewBadRequestException([]violation{
+		return zero, exception.NewBadRequestException([]violation{
 			{Field: "", Message: fmt.Sprintf("invalid JSON: %v", err)},
-		}))
+		})
 	}
 
 	// presence may be nil if the top-level JSON value isn't an object (e.g.
@@ -108,22 +111,33 @@ func MustJsonBody[T any](ctx *execution.Context, m *schema.Schema) T {
 
 	violations := validateStruct(presence, m, "")
 	if len(violations) > 0 {
-		panic(exception.NewBadRequestException(violations))
+		return zero, exception.NewBadRequestException(violations)
 	}
 
 	out := reflect.New(structType)
 	if err := populate(out.Elem(), presence, m, "json"); err != nil {
 		// Should be unreachable in practice: pass 1 already proved body is
 		// valid JSON, and validation already proved every field's shape
-		// matches what T expects. Panicking here (rather than silently
-		// returning a zero T) keeps failures loud instead of masking a
-		// genuine bug in the validation pass above.
-		panic(exception.NewBadRequestException([]violation{
+		// matches what T expects. Returning an error here (rather than
+		// silently returning a zero T) keeps failures loud instead of
+		// masking a genuine bug in the validation pass above.
+		return zero, exception.NewBadRequestException([]violation{
 			{Field: "", Message: fmt.Sprintf("failed to decode request body: %v", err)},
-		}))
+		})
 	}
 
-	return out.Interface().(T)
+	return out.Interface().(T), nil
+}
+
+// MustJsonBody is the real implementation behind gonest.MustParseRestJsonBody[T]
+// -- ParseJsonBody, panicking on any returned error (AD-021's panicking
+// twin, for call sites that don't want to handle the error themselves).
+func MustJsonBody[T any](ctx *execution.Context, m *schema.Schema) T {
+	v, err := ParseJsonBody[T](ctx, m)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // tagKey returns the key p's field would be (un)marshaled under for the

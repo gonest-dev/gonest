@@ -52,15 +52,15 @@ var UserProvider = gonest.NewProvider(func (provider *gonest.Provider) {
 })
 
 // UserIdParam é o "whole-object" de um único path param -- mesmo mecanismo
-// de MustJsonBody, só que alimentado pelo segmento ":user_id" da rota em vez
+// de MustParseRestJsonBody, só que alimentado pelo segmento ":user_id" da rota em vez
 // do corpo JSON (ver "exemplo de Param/Query Validation" mais abaixo pro
 // detalhe completo, incluindo query string e Custom(fn)).
 type UserIdParam struct {
   UserId int64 `param:"user_id"`
 }
 
-// userIdParamSchema precisa de nome (não `var _ =`) -- todo MustParams/
-// MustQuery/MustJsonBody agora recebe o Schema explícito como argumento
+// userIdParamSchema precisa de nome (não `var _ =`) -- todo MustParseRestParams/
+// MustParseRestQuery/MustParseRestJsonBody agora recebe o Schema explícito como argumento
 // (ver seção "hipótese" mais abaixo, decisão tomada e já executada), não
 // existe mais lookup por tipo num registry global.
 var userIdParamSchema = gonest.NewSchema[UserIdParam](func (t *UserIdParam, m *gonest.Schema) {
@@ -77,36 +77,36 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   // rotas do controller
   controller.Route(gonest.HttpQuery, "/", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
+    route.Handler(func(ctx *gonest.RestContext) {
       ctx.Json(userService.List())
     })
   })
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
-      params := gonest.MustParams[*UserIdParam](ctx, userIdParamSchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
       ctx.Json(userService.Get(params.UserId))
     })
   })
   controller.Route(gonest.HttpPost, "/", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusCreated)
-    route.Handler(func(ctx *gonest.Context) {
-      properties := gonest.MustJsonBody[*UserProperties](ctx, userPropertiesSchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      properties := gonest.MustParseRestJsonBody[*UserProperties](ctx, userPropertiesSchema)
       ctx.Json(userService.Create(properties))
     })
   })
   controller.Route(gonest.HttpPut, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
-      params := gonest.MustParams[*UserIdParam](ctx, userIdParamSchema)
-      properties := gonest.MustJsonBody[*UserProperties](ctx, userPropertiesSchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
+      properties := gonest.MustParseRestJsonBody[*UserProperties](ctx, userPropertiesSchema)
       ctx.Json(userService.Update(params.UserId, properties))
     })
   })
   controller.Route(gonest.HttpDelete, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
-      params := gonest.MustParams[*UserIdParam](ctx, userIdParamSchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
       ctx.Json(userService.Delete(params.UserId))
     })
   })
@@ -192,7 +192,7 @@ import (
 // roda antes do roteamento (raw request/response), tipo express middleware.
 // não decide autorização, só observa/mutação de contexto (log, request-id etc).
 var RequestIdMiddleware = gonest.NewMiddleware(func (middleware *gonest.Middleware) {
-  middleware.Handler(func(ctx *gonest.Context, next gonest.Next) {
+  middleware.Handler(func(ctx *gonest.RestContext, next gonest.Next) {
     requestId, _ := uuid.NewV7()
     ctx.SetHeader("X-Request-Id", requestId.String())
     next(ctx)
@@ -205,7 +205,7 @@ var RequestIdMiddleware = gonest.NewMiddleware(func (middleware *gonest.Middlewa
 var AuthGuard = gonest.NewGuard(func (guard *gonest.Guard) {
   authService := gonest.MustInject[*AuthService](guard)
 
-  guard.Handler(func(ctx *gonest.Context) bool {
+  guard.Handler(func(ctx *gonest.RestContext) bool {
     token := ctx.Header("Authorization")
     if token == "" {
       panic(gonest.NewUnauthorizedException(nil))
@@ -220,7 +220,7 @@ var AuthGuard = gonest.NewGuard(func (guard *gonest.Guard) {
 var TimingInterceptor = gonest.NewInterceptor(func (interceptor *gonest.Interceptor) {
   logger := gonest.MustInject[*LoggerService](interceptor)
 
-  interceptor.Handler(func(ctx *gonest.Context, next gonest.Next) {
+  interceptor.Handler(func(ctx *gonest.RestContext, next gonest.Next) {
     start := time.Now()
     next(ctx)
     logger.Log("request took", time.Since(start))
@@ -231,7 +231,7 @@ var TimingInterceptor = gonest.NewInterceptor(func (interceptor *gonest.Intercep
 // captura exceptions específicas e customiza status/body da resposta.
 // exceptions não capturadas por nenhum filter caem no handler default (name/message/details).
 var FooExampleFilter = gonest.NewFilter(func (filter *gonest.Filter) {
-  filter.Catch(&FooExampleError{}, func(ctx *gonest.Context, exc *FooExampleError) {
+  filter.Catch(&FooExampleError{}, func(ctx *gonest.RestContext, exc *FooExampleError) {
     ctx.Status(gonest.HttpStatusTeapot).Json(map[string]any{
       "custom": true,
       "name":   exc.Name(),
@@ -277,11 +277,11 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   // rota recebe o ID no formato prefixado "usr_42" (Custom(fn) acima
   // decodifica pro int64 cru antes do handler rodar; violation -- prefixo
   // errado ou sufixo não-numérico -- vira 400 automático igual qualquer
-  // outro campo de MustParams).
+  // outro campo de MustParseRestParams).
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.Context) {
-      params := gonest.MustParams[*PrefixedUserIdParam](ctx, prefixedUserIdParamSchema)
+    route.Handler(func(ctx *gonest.RestContext) {
+      params := gonest.MustParseRestParams[*PrefixedUserIdParam](ctx, prefixedUserIdParamSchema)
       ctx.Json(userService.Get(params.UserId))
     })
   })
