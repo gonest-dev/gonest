@@ -19,7 +19,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
 		r.QueryParams(listQueryDTOSchema)
-		r.Response(http.StatusOK, Schema)
+		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Handler(func(ctx *gonest.Context) {
 			q := gonest.MustQuery[*ListQueryDTO](ctx)
 			ctx.Json(service.List(q.PostID, q.UserID))
@@ -30,7 +30,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Create a comment")
 		r.HttpCode(http.StatusCreated)
 		r.RequestBody(createBodyDTOSchema)
-		r.Response(http.StatusCreated, Schema)
+		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.Context) {
 			body := gonest.MustJsonBody[*CreateBodyDTO](ctx)

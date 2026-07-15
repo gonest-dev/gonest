@@ -13,12 +13,12 @@
 
 Explicitly excluded — present in INSIGHT.md's full bootstrap example but not part of this feature (either a later milestone, or not roadmapped at all yet):
 
-| Feature | Reason |
-| --- | --- |
-| `UseLogger(logger)`, real log emission gated by `LogLevels` | No `Logger` interface/implementation exists anywhere in ROADMAP.md yet — `AppOptions.LogLevels`/`BufferLogs` are captured as config (Nest parity for people porting bootstrap code) but do not drive any actual logging behavior in this feature. Precedent: T6's `Use`/`Guards`/`Interceptors`/`Filters` stubs (store-only, no-op) — same treatment here. |
-| `UseGlobalFilters`, `SetGlobalPrefix`, `EnableCors`, `Use(Helmet)` | Belong to Milestone 2 (Exceptions) / Milestone 3 (Middleware) per ROADMAP.md — not part of "App Bootstrap & Listen"'s stated scope (`NewApp`/`MustNewApp`, `AppOptions`, `MustListen`, `OnListen` only, see ROADMAP.md Milestone 1) |
-| `NewOpenApiDocument`/`SetupSwagger` | Milestone 7 |
-| `app.Close()`, `MustInject[T](app)` (App as an injection Owner) | Not mentioned in ROADMAP.md's scope line for this feature; App is not currently a `module.Owner` and making it one is a separate design decision with its own blast radius (would let arbitrary code resolve providers post-bootstrap outside any Controller/Provider builder fn) — deferred |
+| Feature                                                            | Reason                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UseLogger(logger)`, real log emission gated by `LogLevels`        | No `Logger` interface/implementation exists anywhere in ROADMAP.md yet — `AppOptions.LogLevels`/`BufferLogs` are captured as config (Nest parity for people porting bootstrap code) but do not drive any actual logging behavior in this feature. Precedent: T6's `Use`/`Guards`/`Interceptors`/`Filters` stubs (store-only, no-op) — same treatment here. |
+| `UseGlobalFilters`, `SetGlobalPrefix`, `EnableCors`, `Use(Helmet)` | Belong to Milestone 2 (Exceptions) / Milestone 3 (Middleware) per ROADMAP.md — not part of "App Bootstrap & Listen"'s stated scope (`NewApp`/`MustNewApp`, `AppOptions`, `MustListen`, `OnListen` only, see ROADMAP.md Milestone 1)                                                                                                                        |
+| `NewOpenAPI`/`SetupSwagger`                                        | Milestone 7                                                                                                                                                                                                                                                                                                                                                |
+| `app.Close()`, `MustInject[T](app)` (App as an injection Owner)    | Not mentioned in ROADMAP.md's scope line for this feature; App is not currently a `module.Owner` and making it one is a separate design decision with its own blast radius (would let arbitrary code resolve providers post-bootstrap outside any Controller/Provider builder fn) — deferred                                                               |
 
 ---
 
@@ -68,16 +68,16 @@ Explicitly excluded — present in INSIGHT.md's full bootstrap example but not p
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --- | --- | --- | --- |
-| BOOT-01 | P1: NewApp accepts AppOptions | Design | Pending |
-| BOOT-02 | P1: MustListen blocks, binds real adapter | Design | Pending |
-| BOOT-03 | P1: OnListen callback fires once, before block | Design | Pending |
-| BOOT-04 | P1: nil OnListen is a no-op | Design | Pending |
-| BOOT-05 | P1: bind failure panics clearly | Design | Pending |
-| BOOT-06 | P2: AppOptions{} zero value works | Design | Pending |
-| BOOT-07 | P2: AppOptions fields captured, inert | Design | Pending |
-| BOOT-08 | P2: LogLevel enum, HttpMethod-pattern | Design | Pending |
+| Requirement ID | Story                                          | Phase  | Status  |
+| -------------- | ---------------------------------------------- | ------ | ------- |
+| BOOT-01        | P1: NewApp accepts AppOptions                  | Design | Pending |
+| BOOT-02        | P1: MustListen blocks, binds real adapter      | Design | Pending |
+| BOOT-03        | P1: OnListen callback fires once, before block | Design | Pending |
+| BOOT-04        | P1: nil OnListen is a no-op                    | Design | Pending |
+| BOOT-05        | P1: bind failure panics clearly                | Design | Pending |
+| BOOT-06        | P2: AppOptions{} zero value works              | Design | Pending |
+| BOOT-07        | P2: AppOptions fields captured, inert          | Design | Pending |
+| BOOT-08        | P2: LogLevel enum, HttpMethod-pattern          | Design | Pending |
 
 **ID format:** `BOOT-[NUMBER]`
 

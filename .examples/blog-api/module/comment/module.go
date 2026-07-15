@@ -5,9 +5,9 @@ import (
 
 	"github.com/gonest-dev/gonest"
 
-	"blog-api/post"
+	"blog-api/module/post"
+	"blog-api/module/user"
 	"blog-api/shared"
-	"blog-api/user"
 )
 
 var Provider = gonest.NewProvider(func(provider *gonest.Provider) {

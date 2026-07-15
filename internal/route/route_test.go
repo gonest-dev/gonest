@@ -356,9 +356,10 @@ func TestRequestBody_NeverCalled_ReportsUnset(t *testing.T) {
 }
 
 // TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey proves Response
-// called with zero schema args documents status with no body -- but the
-// STATUS KEY itself exists in the returned map (nil value), distinguishing
-// "documented, no body" from "never documented at all" (spec.md AC3).
+// called with zero callback args documents status with no body -- but the
+// STATUS KEY itself exists in the returned map (an empty *Response),
+// distinguishing "documented, no body" from "never documented at all"
+// (spec.md AC3).
 func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
 	var got *Route
 	r := New(HttpDelete, "/users/:id", func(r *Route) {
@@ -370,12 +371,12 @@ func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
 	}
 
 	responses := r.Responses()
-	body, exists := responses[204]
+	resp, exists := responses[204]
 	if !exists {
 		t.Fatal("Responses()[204] key does not exist, want it to exist (documented, no body)")
 	}
-	if body != nil {
-		t.Fatalf("Responses()[204] = %v, want nil (no body documented)", body)
+	if _, hasSchema := resp.SchemaValue(); hasSchema {
+		t.Fatalf("Responses()[204].SchemaValue() = ok, want no body documented")
 	}
 
 	// A status never passed to Response at all must NOT have a key.
@@ -384,22 +385,25 @@ func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
 	}
 }
 
-// TestResponse_OneArg_StoresBody proves Response called with one schema
-// arg stores that body schema for the given status.
+// TestResponse_OneArg_StoresBody proves Response called with one callback
+// arg stores that callback's Schema for the given status.
 func TestResponse_OneArg_StoresBody(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, m)
+		r.Response(200, func(response *Response) {
+			response.Schema(m)
+		})
 	})
 
 	responses := r.Responses()
-	body, exists := responses[200]
+	resp, exists := responses[200]
 	if !exists {
 		t.Fatal("Responses()[200] key does not exist, want it to exist")
 	}
-	if body != m {
-		t.Fatalf("Responses()[200] = %v, want %v", body, m)
+	body, ok := resp.SchemaValue()
+	if !ok || body != m {
+		t.Fatalf("Responses()[200].SchemaValue() = %v, %v, want %v, true", body, ok, m)
 	}
 }
 
@@ -413,19 +417,19 @@ func TestResponse_DifferentStatuses_Accumulates(t *testing.T) {
 	errMeta := newTestSchemaFor(t, &errBody{})
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, okMeta)
-		r.Response(404, errMeta)
+		r.Response(200, func(response *Response) { response.Schema(okMeta) })
+		r.Response(404, func(response *Response) { response.Schema(errMeta) })
 	})
 
 	responses := r.Responses()
 	if len(responses) != 2 {
 		t.Fatalf("Responses() has %d entries, want 2", len(responses))
 	}
-	if responses[200] != okMeta {
-		t.Fatalf("Responses()[200] = %v, want %v", responses[200], okMeta)
+	if body, _ := responses[200].SchemaValue(); body != okMeta {
+		t.Fatalf("Responses()[200].SchemaValue() = %v, want %v", body, okMeta)
 	}
-	if responses[404] != errMeta {
-		t.Fatalf("Responses()[404] = %v, want %v", responses[404], errMeta)
+	if body, _ := responses[404].SchemaValue(); body != errMeta {
+		t.Fatalf("Responses()[404].SchemaValue() = %v, want %v", body, errMeta)
 	}
 }
 
@@ -439,16 +443,16 @@ func TestResponse_SameStatusTwice_Overwrites(t *testing.T) {
 	secondMeta := newTestSchemaFor(t, &secondBody{})
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, firstMeta)
-		r.Response(200, secondMeta)
+		r.Response(200, func(response *Response) { response.Schema(firstMeta) })
+		r.Response(200, func(response *Response) { response.Schema(secondMeta) })
 	})
 
 	responses := r.Responses()
 	if len(responses) != 1 {
 		t.Fatalf("Responses() has %d entries, want 1", len(responses))
 	}
-	if responses[200] != secondMeta {
-		t.Fatalf("Responses()[200] = %v, want %v (last write wins)", responses[200], secondMeta)
+	if body, _ := responses[200].SchemaValue(); body != secondMeta {
+		t.Fatalf("Responses()[200].SchemaValue() = %v, want %v (last write wins)", body, secondMeta)
 	}
 }
 
@@ -458,15 +462,15 @@ func TestResponses_ReturnsCopyNotInternalMap(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, m)
+		r.Response(200, func(response *Response) { response.Schema(m) })
 	})
 
 	got := r.Responses()
 	got[200] = nil
-	got[999] = m
+	got[999] = &Response{}
 
 	got2 := r.Responses()
-	if got2[200] != m {
+	if body, _ := got2[200].SchemaValue(); body != m {
 		t.Fatal("Responses() leaked mutable internal map: mutation of returned map affected subsequent call")
 	}
 	if _, exists := got2[999]; exists {

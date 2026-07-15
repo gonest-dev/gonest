@@ -11,7 +11,7 @@ type CreateBodyDTO struct {
 }
 
 var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, m *gonest.Schema) {
-	m.Title("post.CreateBodyDTO")
+	m.Title("PostCreateBodyDTO")
 	m.Property(&t.UserID).Integer().Min(1).Required()
 	m.Property(&t.Title).String().Min(1).Required()
 	m.Property(&t.Body).String().Min(1).Required()
@@ -22,7 +22,7 @@ type ParamsDTO struct {
 }
 
 var paramsDTOSchema = gonest.NewSchema(func(t *ParamsDTO, m *gonest.Schema) {
-	m.Title("post.ParamsDTO")
+	m.Title("PostParamsDTO")
 	m.Property(&t.PostID).Integer().Min(1).Required()
 })
 

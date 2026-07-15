@@ -2291,12 +2291,12 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 // OpenAPI (OpenAPI Document Builder feature)
 // ---------------------------------------------------------------------------
 
-// TestNewOpenApiDocument_RootAlias_InsightBootstrapExample reproduces
+// TestNewOpenAPI_RootAlias_InsightBootstrapExample reproduces
 // INSIGHT.md's own bootstrap example verbatim (the "# exemplo de bootstrap
-// completo" section's gonest.NewOpenApiDocument("3.1.0", func (b
-// *gonest.OpenApiDocument) {...}) call shape) through the root gonest
+// completo" section's gonest.NewOpenAPI("3.1.0", func (b
+// *gonest.OpenAPI) {...}) call shape) through the root gonest
 // package's aliases, asserting every field round-trips correctly.
-func TestNewOpenApiDocument_RootAlias_InsightBootstrapExample(t *testing.T) {
+func TestNewOpenAPI_RootAlias_InsightBootstrapExample(t *testing.T) {
 	type contactConfig struct {
 		Name  string
 		Url   string
@@ -2321,7 +2321,7 @@ func TestNewOpenApiDocument_RootAlias_InsightBootstrapExample(t *testing.T) {
 	config.OpenApi.Contact = contactConfig{Name: "Support Team", Url: "https://example.com", Email: "support@example.com"}
 	config.OpenApi.License = licenseConfig{Name: "MIT", Url: "https://opensource.org/licenses/MIT"}
 
-	doc := NewOpenApiDocument("3.1.0", func(b *OpenApiDocument) {
+	doc := NewOpenAPI("3.1.0", func(b *OpenAPI) {
 		b.Title(config.OpenApi.Title)
 		b.Description(config.OpenApi.Description)
 		b.Version(config.OpenApi.Version)
@@ -2331,7 +2331,7 @@ func TestNewOpenApiDocument_RootAlias_InsightBootstrapExample(t *testing.T) {
 	})
 
 	if doc == nil {
-		t.Fatal("NewOpenApiDocument() returned nil")
+		t.Fatal("NewOpenAPI() returned nil")
 	}
 	if got := doc.SpecVersion(); got != "3.1.0" {
 		t.Fatalf("SpecVersion() = %q, want %q", got, "3.1.0")
@@ -2413,7 +2413,7 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		c.Route(route.HttpGet, "/:user_id", func(r *Route) {
 			r.Summary("Busca um usuario por ID")
 			r.PathParams(userIdParamsSchema)
-			r.Response(http.StatusOK, userEntitySchema)
+			r.Response(http.StatusOK, func(response *Response) { response.Schema(userEntitySchema) })
 			r.Response(http.StatusNotFound)
 			r.HttpCode(http.StatusOK)
 			r.Handler(func(ctx *execution.Context) {
@@ -2439,7 +2439,7 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	doc := NewOpenApiDocument("3.1.0", func(b *OpenApiDocument) {
+	doc := NewOpenAPI("3.1.0", func(b *OpenAPI) {
 		b.Title("Example API")
 		b.Version("1.0.0")
 	})
@@ -2537,7 +2537,7 @@ func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 		_ = fiberAdapter.FiberApp().Shutdown()
 	})
 
-	doc := NewOpenApiDocument("3.1.0", func(b *OpenApiDocument) {
+	doc := NewOpenAPI("3.1.0", func(b *OpenAPI) {
 		b.Title("Example API")
 		b.Version("1.0.0")
 	})

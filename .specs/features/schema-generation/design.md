@@ -44,21 +44,21 @@ internal/route/route.go (existing, extended -- P1, NEW dependency on
 internal/openapi (existing package from "OpenAPI Document Builder" -- P2,
         BIG extension)
         │
-        ├── OpenApiDocument (existing) gains unexported `paths
+        ├── OpenAPI (existing) gains unexported `paths
         │      map[string]map[string]any` (outer key: full path string,
         │      inner key: lowercase HTTP method) and `schemas
         │      map[string]any` (components.schemas, keyed by schema name)
         │      -- both populated ONLY by Generate, never by hand-written
         │      builder calls (Title/Contact/etc stay exactly as they are)
         │
-        ├── func Generate(doc *OpenApiDocument, root *module.Module) --
+        ├── func Generate(doc *OpenAPI, root *module.Module) --
         │      NEW entry point, walks root + root.ImportedModules()
         │      (recursively, cycle-safe via a visited-module set --
         │      Modules CAN import each other in diamond shapes) + every
         │      Module's OwnControllers() + every Controller's OwnRoutes(),
         │      building doc.paths/doc.schemas as it goes
         │
-        ├── func (doc *OpenApiDocument) Document() map[string]any --
+        ├── func (doc *OpenAPI) Document() map[string]any --
         │      NEW, assembles the FULL OpenAPI 3.1 JSON-ready structure
         │      (openapi/info/paths/components/security from every field
         │      doc already holds, old AND new) -- THIS is what a future
@@ -120,21 +120,21 @@ This feature has 4 layers, roughly independent except the last: (P0) `App.Root()
 
 ### `internal/openapi.Generate` + the recursive schema core (P2)
 
-- **Location**: `internal/openapi/generate.go` (new file, same package as `OpenApiDocument`)
+- **Location**: `internal/openapi/generate.go` (new file, same package as `OpenAPI`)
 - **Interfaces**:
-  - `func Generate(doc *OpenApiDocument, root *module.Module)`
-  - unexported `walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *OpenApiDocument)`, `walkController(c *controller.Controller, doc *OpenApiDocument)`, `walkRoute(prefix string, c *controller.Controller, r *route.Route, doc *OpenApiDocument)`
-  - unexported `schemaFor(p *metadata.PropertyBuilder, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) map[string]any` -- the recursive core
-  - unexported `registerSchema(m *metadata.Metadata, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) string` -- ensures `m` has EXACTLY ONE entry in `doc.schemas` (dedup via a NEW `doc.schemaNames map[*metadata.Metadata]string` cache, pointer-keyed), returns the schema's name (for building a `$ref` string) -- called by `schemaFor` whenever it hits `ItemRef()`/`MetadataRef()`, and by `walkRoute` for `RequestBody`/`Response`/`PathParams`/`QueryParams`
-  - `func (doc *OpenApiDocument) Document() map[string]any`
+  - `func Generate(doc *OpenAPI, root *module.Module)`
+  - unexported `walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *OpenAPI)`, `walkController(c *controller.Controller, doc *OpenAPI)`, `walkRoute(prefix string, c *controller.Controller, r *route.Route, doc *OpenAPI)`
+  - unexported `schemaFor(p *metadata.PropertyBuilder, doc *OpenAPI, visiting map[*metadata.Metadata]bool) map[string]any` -- the recursive core
+  - unexported `registerSchema(m *metadata.Metadata, doc *OpenAPI, visiting map[*metadata.Metadata]bool) string` -- ensures `m` has EXACTLY ONE entry in `doc.schemas` (dedup via a NEW `doc.schemaNames map[*metadata.Metadata]string` cache, pointer-keyed), returns the schema's name (for building a `$ref` string) -- called by `schemaFor` whenever it hits `ItemRef()`/`MetadataRef()`, and by `walkRoute` for `RequestBody`/`Response`/`PathParams`/`QueryParams`
+  - `func (doc *OpenAPI) Document() map[string]any`
 
 ---
 
 ## Data Models
 
 ```go
-// internal/openapi/openapi.go, OpenApiDocument EXTENDED:
-type OpenApiDocument struct {
+// internal/openapi/openapi.go, OpenAPI EXTENDED:
+type OpenAPI struct {
     // ...existing fields (specVersion, title, description, version,
     // contactName/Url/Email, licenseName/Url, bearerAuth) unchanged
     paths       map[string]map[string]any // "path" -> "method" -> path item
@@ -178,22 +178,22 @@ map[string]any{ "type": "object", "additionalProperties": true }
 
 ## Error Handling Strategy
 
-| Scenario | Treatment | Impact |
-| --- | --- | --- |
-| `Custom(fn)`-only field (no `KindValue()`-derivable type) | `schemaFor` emits ONLY `description`/`examples` (if set) -- no `type`/`format`/validators -- documented limitation, not an error | spec.md's Edge Cases |
-| Two different `*Metadata` values whose Go type shares the same name AND neither sets `Title` | Both get registered under the literal SAME key in `doc.schemas` (last-registered wins the map slot) -- NOT defended against | spec.md's Edge Cases, "trust the caller" stance |
-| Circular module imports (`A` imports `B`, `B` imports `A`) | `walkModule`'s `visitedModules` set prevents infinite recursion -- each `*Module` walked AT MOST once regardless of how many times it's reachable | Not explicitly asked for by any spec.md story, but a correctness necessity given `ImportedModules()` existing without any acyclic guarantee documented elsewhere in this codebase |
+| Scenario                                                                                     | Treatment                                                                                                                                         | Impact                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Custom(fn)`-only field (no `KindValue()`-derivable type)                                    | `schemaFor` emits ONLY `description`/`examples` (if set) -- no `type`/`format`/validators -- documented limitation, not an error                  | spec.md's Edge Cases                                                                                                                                                              |
+| Two different `*Metadata` values whose Go type shares the same name AND neither sets `Title` | Both get registered under the literal SAME key in `doc.schemas` (last-registered wins the map slot) -- NOT defended against                       | spec.md's Edge Cases, "trust the caller" stance                                                                                                                                   |
+| Circular module imports (`A` imports `B`, `B` imports `A`)                                   | `walkModule`'s `visitedModules` set prevents infinite recursion -- each `*Module` walked AT MOST once regardless of how many times it's reachable | Not explicitly asked for by any spec.md story, but a correctness necessity given `ImportedModules()` existing without any acyclic guarantee documented elsewhere in this codebase |
 
 ---
 
 ## Tech Decisions (only non-obvious ones)
 
-| Decision | Choice | Rationale |
-| --- | --- | --- |
-| Schema Objects represented as `map[string]any`, not a typed Go struct hierarchy mirroring the full OpenAPI 3.1 spec | `map[string]any` throughout | A fully-typed OpenAPI struct library (Info/PathItem/Operation/Parameter/RequestBody/Response/Schema, each with dozens of optional fields) is a MUCH larger surface than anything this feature's spec.md actually asks for -- `map[string]any` is directly `json.Marshal`-able (future "Swagger UI Setup" feature's only real requirement), self-documenting via its own key strings, and avoids inventing struct fields for OpenAPI spec areas (`servers`, `callbacks`, etc) explicitly marked Out of Scope. If a future need for stricter typing appears, it can be layered on top without touching this feature's own logic. |
-| `doc.schemaNames map[*metadata.Metadata]string` is a NEW field on `OpenApiDocument`, not a field added to `Metadata` itself | Dedup cache lives on the DOCUMENT, not the Metadata | A single `*Metadata` could, in principle, be walked by TWO DIFFERENT `Generate` calls against two different `*OpenApiDocument`s (e.g. two separate API versions documented from overlapping metadata) -- caching the assigned schema NAME on `Metadata` itself would leak state across unrelated document generations. Keeping the cache document-scoped avoids that entirely, at the cost of one extra map per `Generate` call (negligible). |
-| `Route.Responses()` returns `map[int]*metadata.Metadata` (nil value = no-body), not `map[int][]*metadata.Metadata` | Single value per status, nil-able | spec.md's AC3 only requires distinguishing "no body" from "has body" per status, never asks for MULTIPLE alternative body schemas per status (that would be OpenAPI's `oneOf`/content-negotiation territory, well beyond anything requested) -- simpler shape, easier to walk, no behavior lost against the actual requirement |
-| `Tags`/`BearerAuth` override resolution happens INSIDE `walkRoute` (P2), not stored pre-resolved on `Route` itself during P1 | Resolution deferred to generation time | `Route` doesn't know about its owning `Controller` at declaration time (no back-reference) -- `Controller.OwnRoutes()` is how the relationship is discovered, only during the P2 walk, which is naturally the first point BOTH the controller's and the route's own state are simultaneously in scope to resolve "did the route override, or should it inherit" |
+| Decision                                                                                                                     | Choice                                              | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Schema Objects represented as `map[string]any`, not a typed Go struct hierarchy mirroring the full OpenAPI 3.1 spec          | `map[string]any` throughout                         | A fully-typed OpenAPI struct library (Info/PathItem/Operation/Parameter/RequestBody/Response/Schema, each with dozens of optional fields) is a MUCH larger surface than anything this feature's spec.md actually asks for -- `map[string]any` is directly `json.Marshal`-able (future "Swagger UI Setup" feature's only real requirement), self-documenting via its own key strings, and avoids inventing struct fields for OpenAPI spec areas (`servers`, `callbacks`, etc) explicitly marked Out of Scope. If a future need for stricter typing appears, it can be layered on top without touching this feature's own logic. |
+| `doc.schemaNames map[*metadata.Metadata]string` is a NEW field on `OpenAPI`, not a field added to `Metadata` itself          | Dedup cache lives on the DOCUMENT, not the Metadata | A single `*Metadata` could, in principle, be walked by TWO DIFFERENT `Generate` calls against two different `*OpenAPI`s (e.g. two separate API versions documented from overlapping metadata) -- caching the assigned schema NAME on `Metadata` itself would leak state across unrelated document generations. Keeping the cache document-scoped avoids that entirely, at the cost of one extra map per `Generate` call (negligible).                                                                                                                                                                                          |
+| `Route.Responses()` returns `map[int]*metadata.Metadata` (nil value = no-body), not `map[int][]*metadata.Metadata`           | Single value per status, nil-able                   | spec.md's AC3 only requires distinguishing "no body" from "has body" per status, never asks for MULTIPLE alternative body schemas per status (that would be OpenAPI's `oneOf`/content-negotiation territory, well beyond anything requested) -- simpler shape, easier to walk, no behavior lost against the actual requirement                                                                                                                                                                                                                                                                                                 |
+| `Tags`/`BearerAuth` override resolution happens INSIDE `walkRoute` (P2), not stored pre-resolved on `Route` itself during P1 | Resolution deferred to generation time              | `Route` doesn't know about its owning `Controller` at declaration time (no back-reference) -- `Controller.OwnRoutes()` is how the relationship is discovered, only during the P2 walk, which is naturally the first point BOTH the controller's and the route's own state are simultaneously in scope to resolve "did the route override, or should it inherit"                                                                                                                                                                                                                                                                |
 
 ---
 

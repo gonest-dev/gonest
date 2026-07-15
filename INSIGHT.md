@@ -361,7 +361,7 @@ func bootstrap() error {
     Origins: []string{"*"}, // "*" ou lista de origins
   })
 
-  doc := gonest.NewOpenApiDocument("3.1.0", func (b *gonest.OpenApiDocument) {
+  doc := gonest.NewOpenAPI("3.1.0", func (b *gonest.OpenAPI) {
     b.Title(config.OpenApi.Title)
     b.Description(config.OpenApi.Description)
     b.Version(config.OpenApi.Version)
@@ -391,7 +391,7 @@ Pontos que vieram direto dos exemplos reais e precisam existir na API:
 - `app.UseGlobalFilters(...)` — filtro de exception global (equivalente `DomainErrorFilter`),
   além dos filters por controller/módulo já vistos antes.
 - `app.SetGlobalPrefix` / `app.EnableCors` / `app.Use(Helmet)` — infra HTTP padrão.
-- `gonest.NewOpenApiDocument` + `gonest.SetupSwagger` — equivalente `DocumentBuilder`+`SwaggerModule`.
+- `gonest.NewOpenAPI` + `gonest.SetupSwagger` — equivalente `DocumentBuilder`+`SwaggerModule`.
 - `app.MustListen` bloqueia (Go idiomático, tipo `http.ListenAndServe`) — diferente do
   `await app.listen()` do Nest que retorna assim que o bind funciona. `gonest.OnListen(fn)`
   resolve isso: callback roda assim que o bind der certo, antes do bloqueio definitivo.
@@ -932,9 +932,9 @@ que Go não tem decorator):
   `Route.OperationId(s)`
 - `@ApiBody` -> `Route.RequestBody(schema)`
 - `@ApiResponse`/`@ApiOkResponse`/`@ApiCreatedResponse`/etc ->
-  `Route.Response(status, schema ...*gonest.Schema)` -- o `*Schema` é
-  opcional (variádico): zero args documenta o status sem body, um arg
-  documenta com body. Chamar de novo pro MESMO status sobrescreve; pra status
+  `Route.Response(status, func(response *gonest.Response))` -- o callback
+  é opcional (variádico): zero args documenta o status sem body, um arg
+  permite formatar a resposta (schema, description). Chamar de novo pro MESMO status sobrescreve; pra status
   DIFERENTES acumula.
 - `@ApiParam` -> `Route.PathParams(schema)`
 - `@ApiQuery` -> `Route.QueryParams(schema)`
@@ -982,8 +982,8 @@ var addressSchema = gonest.NewSchema[AddressEntity](func (t *AddressEntity, m *g
 // por identidade de ponteiro, não por nome (ver abaixo).
 var userEntitySchema = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
   m.Title("UserEntity") // nome do schema em components.schemas -- default é
-                         // o nome do tipo Go (reflect.Type.Name()), Title()
-                         // sobrescreve.
+                        // o nome do tipo Go (reflect.Type.Name()), Title()
+                        // sobrescreve.
   m.Property(&t.Id).Integer().Required()
   m.Property(&t.Name).String().Required()
   m.Property(&t.Address).Object(func (om *gonest.ObjectSchema) {
@@ -1018,8 +1018,13 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 
     // liga status HTTP -> *Schema da resposta. Múltiplas chamadas = múltiplos
     // status documentados (ex: 201 sucesso, 409 conflito reusando outra Schema).
-    route.Response(201, userEntitySchema)
-    route.Response(409) // sem body -- só documenta o status
+    route.Response(201, func (response *gonest.Response) {
+      response.Description("Usuário criado com sucesso")
+      response.Schema(userEntitySchema)
+    })
+    route.Response(409, func (response *gonest.Response) {
+      response.Description("Conflito: usuário já existe")
+    })
 
     route.HttpCode(201)
     route.Handler(func(ctx *gonest.Context) {
@@ -1034,8 +1039,13 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
     // UserIdParams de MustParams) -- Schema Generation vira "parameters"
     // (in: path) no OpenAPI a partir dela, sem redeclarar nada.
     route.PathParams(userIdParamsSchema)
-    route.Response(200, userEntitySchema)
-    route.Response(404) // sem body
+    route.Response(200, func (response *gonest.Response) {
+      response.Description("Usuário encontrado")
+      response.Schema(userEntitySchema)
+    })
+    // sem passar a função de construção da response então retorna um modelo padronizado
+    // seguindo as mensagens comuns em ingles e o formato do gonest.HttpException básico
+    route.Response(404) 
 
     route.HttpCode(200)
     route.Handler(func(ctx *gonest.Context) {
@@ -1058,7 +1068,7 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
 // exigir documentação explícita como pré-requisito pra aparecer.
 ```
 
-`gonest.GenerateOpenApiSchema(app *gonest.App, doc *gonest.OpenApiDocument)`
+`gonest.GenerateOpenApiSchema(app *gonest.App, doc *gonest.OpenAPI)`
 percorre `app`'s árvore de módulos inteira (root + `ImportedModules()`
 recursivo, cycle-safe) já montada pelo `NewApp` anterior, e popula
 `doc`'s `paths`/`components.schemas` a partir de TODO Controller/Route
@@ -1066,7 +1076,7 @@ registrado (chamado depois de `NewApp`, antes de servir o documento):
 
 ```go
 // (continuação do "exemplo de bootstrap completo" acima)
-doc := gonest.NewOpenApiDocument("3.1.0", func (b *gonest.OpenApiDocument) {
+doc := gonest.NewOpenAPI("3.1.0", func (b *gonest.OpenAPI) {
   b.Title("Example API")
   b.Version("1.0.0")
   b.BearerAuth()
@@ -1094,3 +1104,82 @@ ainda funciona em Schema Generation: o campo aparece no schema SEM
 type/format (só `description`/`examples`/`nullable`/`required` se setados) --
 limitação documentada, não erro.
 
+# reflexão: Suporte a GraphQL (Futuro)
+
+A adoção do sistema de builders e o uso de `gonest.Schema` (que hoje já consolida validação em runtime e geração de OpenAPI) criam um caminho extremamente natural e elegante para suportar **GraphQL** no futuro. Podemos reaproveitar quase toda a infraestrutura base do framework, mudando apenas a ponta de exposição e aproveitando o modelo mental que o próprio NestJS adotou para GraphQL: **Resolvers ao invés de Controllers**.
+
+No NestJS, o GraphQL é construído usando os decorators `@Resolver`, `@Query`, `@Mutation` e `@Args`. No Gonest, adotaríamos a mesma filosofia baseada em closures (builders) semânticos, mantendo a consistência do framework sem recorrer à pesada reflexão de anotações.
+
+## 1. Resolvers como Porteiros do GraphQL
+
+Um `Resolver` atuaria de forma análoga a um `Controller`. Ele pertenceria a um Módulo e consumiria suas dependências normalmente (via `MustInject`), sendo registrado via `module.Resolvers(...)`. 
+
+```go
+var UserResolver = gonest.NewResolver("User", func (r *gonest.Resolver) {
+  // Injeção de dependência funciona de forma idêntica a um Controller
+  userService := gonest.MustInject[*UserService](r)
+
+  // Equivalente ao @Query() do Nest
+  r.Query("getUser", func (q *gonest.Query) {
+    // Reutilizamos a MESMA gonest.Schema do OpenAPI/HTTP para validar argumentos!
+    q.Args(userIdParamsSchema) 
+    
+    // E reutilizamos para tipar o retorno no Schema do GraphQL
+    q.Returns(userEntitySchema) 
+
+    q.Resolve(func(ctx *gonest.Context) {
+      // MustArgs seria o equivalente GraphQL para MustParams / MustJsonBody
+      args := gonest.MustArgs[*UserIdParams](ctx)
+      
+      // ctx.Data ou ctx.GraphQL sinaliza o retorno final do resolver (sem response HTTP)
+      ctx.Data(userService.Get(args.UserId))
+    })
+  })
+
+  // Equivalente ao @Mutation() do Nest
+  r.Mutation("createUser", func (m *gonest.Mutation) {
+    // O mesmo schema do REST pode ser consumido como Input no GraphQL
+    m.Args(userEntitySchema) 
+    m.Returns(userEntitySchema)
+    
+    m.Resolve(func(ctx *gonest.Context) {
+      input := gonest.MustArgs[*UserEntity](ctx)
+      ctx.Data(userService.Create(input))
+    })
+  })
+})
+```
+
+## 2. Geração Code-First do Schema GraphQL (SDL)
+
+Como o `gonest.Schema` já retém nativamente os tipos fundamentais (`String`, `Integer`, `Array`, `Object`) e suas restrições lógicas (ex: `Required()`), nós podemos compilar automaticamente um **Schema GraphQL (SDL)** exatamente com a mesma inteligência do motor que usamos para a especificação do Swagger/OpenAPI.
+
+O framework leria o `userEntitySchema` (que validava os requests no REST) e o traduziria de forma 1:1 para os equivalentes em GraphQL:
+
+```graphql
+type UserEntity {
+  Id: Int!
+  Name: String!
+  Address: AddressEntity!
+  Addresses: [AddressEntity!]!
+}
+
+input UserEntityInput {
+  Id: Int!
+  Name: String!
+  # ...
+}
+```
+
+### Conclusão dessa reflexão
+
+Ao invés de criarmos tipos isolados, structs repetidas, e usar strings reflexivas apenas para o GraphQL (como é comum em bibliotecas genéricas de Go), a infraestrutura do Gonest transforma o `gonest.Schema` e os construtores de `Module/Provider/Resolver` em **Uma Única Fonte de Verdade**. 
+
+Você declararia a regra, a dependência e o modelo de dados uma única vez, e o Gonest orquestraria isso para servir 4 propósitos simultaneamente:
+
+1. Injeção de dependência universal (Providers independentes de HTTP/GQL)
+2. Validação unificada em runtime (`MustJsonBody`, `MustParams`, `MustArgs`)
+3. Geração Automática de Documentação OpenAPI (REST)
+4. Geração Automática de Schema SDL (GraphQL)
+
+Dessa forma, Controllers REST e Resolvers GraphQL seriam apenas "transportes/adaptadores", permitindo que uma aplicação escale para os dois mundos utilizando rigorosamente a mesma base de código de negócio e validação.

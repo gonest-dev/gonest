@@ -1,4 +1,4 @@
-// swagger.go serves an already-built *OpenApiDocument over HTTP: a JSON
+// swagger.go serves an already-built *OpenAPI over HTTP: a JSON
 // endpoint (doc.Document(), already json.Marshal-able per generate.go) plus
 // a minimal Swagger UI HTML page loading its assets from a CDN (no vendored
 // static assets -- see .specs/features/swagger-ui-setup/spec.md's Out of
@@ -50,7 +50,7 @@ type SwaggerOptions struct {
 // Intended to be called AFTER NewApp (so app.Adapter() exists) and BEFORE
 // app.MustListen/Listen -- both routes are reachable once the server starts,
 // per spec.md AC3.
-func SetupSwagger(a *app.App, uiPath string, doc *OpenApiDocument, options SwaggerOptions) error {
+func SetupSwagger(a *app.App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
 	adapter := a.Adapter()
 
 	if err := adapter.RegisterRoute(route.HttpGet, options.JsonDocumentUrl, func(ctx *execution.Context) {

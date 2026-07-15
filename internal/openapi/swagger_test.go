@@ -86,7 +86,7 @@ func TestSetupSwagger_RealHTTPDispatch(t *testing.T) {
 		_ = fiberAdapter.FiberApp().Shutdown()
 	})
 
-	doc := New("3.1.0", func(b *OpenApiDocument) {
+	doc := New("3.1.0", func(b *OpenAPI) {
 		b.Title("Example API")
 		b.Version("1.0.0")
 	})

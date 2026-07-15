@@ -25,10 +25,10 @@ package main
 import (
 	"github.com/gonest-dev/gonest"
 
-	"blog-api/comment"
-	"blog-api/post"
+	"blog-api/module/comment"
+	"blog-api/module/post"
+	"blog-api/module/user"
 	"blog-api/shared"
-	"blog-api/user"
 )
 
 var AppModule = gonest.NewModule(func(module *gonest.Module) {
@@ -43,7 +43,7 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 func main() {
 	app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
 
-	doc := gonest.NewOpenApiDocument("3.1.0", func(b *gonest.OpenApiDocument) {
+	doc := gonest.NewOpenAPI("3.1.0", func(b *gonest.OpenAPI) {
 		b.Title("Blog API")
 		b.Description("Dense gonest dogfood example: User/Post/Comment over SQLite")
 		b.Version("1.0.0")

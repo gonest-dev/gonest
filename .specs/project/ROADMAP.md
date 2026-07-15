@@ -148,12 +148,12 @@
 
 ## Milestone 7: OpenAPI Generation
 
-**Goal:** `NewOpenApiDocument` + `SetupSwagger` geram doc OpenAPI 3.1 a partir da mesma metadata, servido em path configurável.
+**Goal:** `NewOpenAPI` + `SetupSwagger` geram doc OpenAPI 3.1 a partir da mesma metadata, servido em path configurável.
 
 ### Features
 
 **OpenAPI Document Builder** - COMPLETE
-- `NewOpenApiDocument`/`OpenApiDocument` (`internal/openapi`, re-exportado na raiz), `Title`/`Description`/`Version`/`Contact`/`License`/`BearerAuth` -- builder mecânico, sem dependência de `internal/metadata`/`internal/route`
+- `NewOpenAPI`/`OpenAPI` (`internal/openapi`, re-exportado na raiz), `Title`/`Description`/`Version`/`Contact`/`License`/`BearerAuth` -- builder mecânico, sem dependência de `internal/metadata`/`internal/route`
 
 **Schema Generation from Metadata** - COMPLETE
 - `App.Root()` (novo, expõe árvore de módulo pós-bootstrap) + `Metadata.Title` + `Controller.Tags`/`BearerAuth` + `Route`'s 10 métodos de documentação (`Summary`/`Description`/`OperationId`/`Tags`/`BearerAuth`/`RequestBody`/`Response`/`PathParams`/`QueryParams`/`ExcludeFromDocs`/`Deprecated`) -- mapeamento direto de `@nestjs/swagger`'s `@Api*` decorators pra builder methods

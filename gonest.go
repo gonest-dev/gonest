@@ -640,17 +640,17 @@ func MustQuery[T any](ctx *execution.Context) T {
 // OpenAPI (OpenAPI Document Builder feature)
 // ---------------------------------------------------------------------------
 
-// OpenApiDocument holds every document-level field set via NewOpenApiDocument
+// OpenAPI holds every document-level field set via NewOpenAPI
 // (title, description, version, contact, license, bearer auth) --
 // INSIGHT.md's own bootstrap example (`# exemplo de bootstrap completo`):
-// `gonest.NewOpenApiDocument("3.1.0", func (b *gonest.OpenApiDocument) {
-// ... })`. See internal/openapi.OpenApiDocument's doc comment for the full
+// `gonest.NewOpenAPI("3.1.0", func (b *gonest.OpenAPI) {
+// ... })`. See internal/openapi.OpenAPI's doc comment for the full
 // contract. Serving it (SetupSwagger/SwaggerOptions) and generating
 // paths/schemas from registered routes/Schema are separate ROADMAP
 // features (spec.md's Out of Scope).
-type OpenApiDocument = openapi.OpenApiDocument
+type OpenAPI = openapi.OpenAPI
 
-// NewOpenApiDocument builds a *OpenApiDocument, storing specVersion (the
+// NewOpenAPI builds a *OpenAPI, storing specVersion (the
 // OpenAPI SPEC version, e.g. "3.1.0" -- distinct from the API's own
 // Version(s)) and running fn against it before returning it. Unlike
 // NewApp/NewSchema elsewhere in this package, New here is not generic, so
@@ -658,7 +658,7 @@ type OpenApiDocument = openapi.OpenApiDocument
 // is needed (same precedent as NewHttpException/NewMiddleware/NewGuard, see
 // AD-004 in STATE.md). See internal/openapi.New's doc comment for the full
 // contract.
-var NewOpenApiDocument = openapi.New
+var NewOpenAPI = openapi.New
 
 // Route holds one HTTP method+path registration (see Controller.Route)
 // plus the documentation builder methods a caller uses to describe it for
@@ -669,6 +669,16 @@ var NewOpenApiDocument = openapi.New
 // App/Module/Schema/etc above. See internal/route.Route's doc comment for
 // the full contract.
 type Route = route.Route
+
+// Response is the per-status response builder passed to Route.Response's
+// optional callback (`route.Response(201, func(response *gonest.Response) {
+// response.Schema(userEntitySchema) })`) -- lets a route configure that
+// status's documented body schema (Schema) and/or description
+// (Description) in one place. It is a true Go type alias, so both methods
+// are automatically visible on gonest.Response with zero extra wrapper
+// code, same as Route/Schema/etc above. See internal/route.Response's doc
+// comment for the full contract.
+type Response = route.Response
 
 // GenerateOpenApiSchema walks app's assembled module tree (via app.Root(),
 // recursing into every imported module -- see internal/app.App.Root's doc
@@ -688,14 +698,14 @@ type Route = route.Route
 // forwards app.Root() to internal/openapi.Generate. See
 // internal/openapi.Generate's doc comment for the full walking/dedup
 // contract.
-func GenerateOpenApiSchema(app *App, doc *OpenApiDocument) {
+func GenerateOpenApiSchema(app *App, doc *OpenAPI) {
 	openapi.Generate(doc, app.Root())
 }
 
 // SwaggerOptions is INSIGHT.md's exact field set for SetupSwagger's options
 // argument (JsonDocumentUrl/PersistAuth/DocExpansion). It is a true Go type
 // alias, so it round-trips through internal/openapi.SwaggerOptions with zero
-// extra wrapper code, same as OpenApiDocument above. See
+// extra wrapper code, same as OpenAPI above. See
 // internal/openapi.SwaggerOptions's doc comment for the full contract.
 type SwaggerOptions = openapi.SwaggerOptions
 
@@ -705,13 +715,13 @@ type SwaggerOptions = openapi.SwaggerOptions
 // serving a Swagger UI page (CDN-loaded, no vendored assets) configured from
 // options -- INSIGHT.md's own bootstrap example
 // (gonest.SetupSwagger(app, config.OpenApi.UiPath, doc, gonest.SwaggerOptions{...})).
-// Unlike NewOpenApiDocument elsewhere in this package, internal/openapi.SetupSwagger
+// Unlike NewOpenAPI elsewhere in this package, internal/openapi.SetupSwagger
 // takes *app.App (an internal-only concept gonest.go otherwise never exposes
 // as a caller-facing parameter type), so this is a real wrapper rather than a
 // plain var alias -- it forwards app straight through. See
 // internal/openapi.SetupSwagger's doc comment for the full registration
 // contract.
-func SetupSwagger(app *App, uiPath string, doc *OpenApiDocument, options SwaggerOptions) error {
+func SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
 	return openapi.SetupSwagger(app, uiPath, doc, options)
 }
 

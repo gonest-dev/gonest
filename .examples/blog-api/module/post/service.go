@@ -5,7 +5,7 @@ import (
 
 	"github.com/gonest-dev/gonest"
 
-	"blog-api/user"
+	"blog-api/module/user"
 )
 
 type Service struct {

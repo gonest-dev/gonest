@@ -2,7 +2,7 @@ package openapi
 
 import "testing"
 
-// TestNew_DefaultValues proves the zero-value *OpenApiDocument produced by
+// TestNew_DefaultValues proves the zero-value *OpenAPI produced by
 // New (when fn is a no-op) reports empty strings/false for every field --
 // spec.md's Edge Cases: "WHEN BearerAuth() is never called THEN
 // HasBearerAuth() SHALL report false -- no auth scheme by default", extended
@@ -39,13 +39,13 @@ func TestNew_DefaultValues(t *testing.T) {
 	}
 }
 
-// TestNew_RunsFn_WithSamePointerIdentity proves New builds a *OpenApiDocument,
+// TestNew_RunsFn_WithSamePointerIdentity proves New builds a *OpenAPI,
 // runs fn against it, and returns the SAME pointer fn received -- spec.md
-// OD-01 ("construct a *OpenApiDocument ... run fn(doc), and return doc").
+// OD-01 ("construct a *OpenAPI ... run fn(doc), and return doc").
 func TestNew_RunsFn_WithSamePointerIdentity(t *testing.T) {
-	var received *OpenApiDocument
+	var received *OpenAPI
 
-	doc := New("3.1.0", func(b *OpenApiDocument) {
+	doc := New("3.1.0", func(b *OpenAPI) {
 		received = b
 	})
 
@@ -203,7 +203,7 @@ func TestBearerAuth_SetsFlag(t *testing.T) {
 // exactly what was set, plus the OpenAPI spec version string passed to New
 // itself -- spec.md's "Independent Test" for the P1 user story.
 func TestNew_InsightBootstrapExample(t *testing.T) {
-	doc := New("3.1.0", func(b *OpenApiDocument) {
+	doc := New("3.1.0", func(b *OpenAPI) {
 		b.Title("Example API")
 		b.Description("An example API")
 		b.Version("1.2.3")

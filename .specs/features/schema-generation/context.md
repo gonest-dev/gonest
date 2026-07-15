@@ -4,18 +4,18 @@ User decisions captured via INSIGHT.md metacode iteration (2026-07-14, same patt
 
 ## Decision 1: `@nestjs/swagger` decorator → gonest builder method mapping (confirmed)
 
-| NestJS decorator | gonest equivalent |
-| --- | --- |
-| `@ApiTags(...)` | `Controller.Tags(...)` (inherited by every route) / `Route.Tags(...)` (override) |
-| `@ApiOperation({summary, description, operationId})` | `Route.Summary(s)` / `Route.Description(s)` / `Route.OperationId(s)` |
-| `@ApiBody({type})` | `Route.RequestBody(m *metadata.Metadata)` |
-| `@ApiResponse`/`@ApiOkResponse`/`@ApiCreatedResponse`/etc | `Route.Response(status int, m ...*metadata.Metadata)` |
-| `@ApiParam(...)` | `Route.PathParams(m *metadata.Metadata)` |
-| `@ApiQuery(...)` | `Route.QueryParams(m *metadata.Metadata)` |
-| `@ApiBearerAuth()`/`@ApiBasicAuth()` | `Controller.BearerAuth()` (inherited) / `Route.BearerAuth()` (override) |
-| `@ApiExcludeEndpoint()` | `Route.ExcludeFromDocs()` |
-| `@ApiDeprecated()` | `Route.Deprecated()` |
-| `@ApiProperty(...)` | Already covered -- `Property()`/`Description()`/`Examples()`/`Required()` on `Metadata`, no new API |
+| NestJS decorator                                          | gonest equivalent                                                                                   |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@ApiTags(...)`                                           | `Controller.Tags(...)` (inherited by every route) / `Route.Tags(...)` (override)                    |
+| `@ApiOperation({summary, description, operationId})`      | `Route.Summary(s)` / `Route.Description(s)` / `Route.OperationId(s)`                                |
+| `@ApiBody({type})`                                        | `Route.RequestBody(m *metadata.Metadata)`                                                           |
+| `@ApiResponse`/`@ApiOkResponse`/`@ApiCreatedResponse`/etc | `Route.Response(status int, m ...*metadata.Metadata)`                                               |
+| `@ApiParam(...)`                                          | `Route.PathParams(m *metadata.Metadata)`                                                            |
+| `@ApiQuery(...)`                                          | `Route.QueryParams(m *metadata.Metadata)`                                                           |
+| `@ApiBearerAuth()`/`@ApiBasicAuth()`                      | `Controller.BearerAuth()` (inherited) / `Route.BearerAuth()` (override)                             |
+| `@ApiExcludeEndpoint()`                                   | `Route.ExcludeFromDocs()`                                                                           |
+| `@ApiDeprecated()`                                        | `Route.Deprecated()`                                                                                |
+| `@ApiProperty(...)`                                       | Already covered -- `Property()`/`Description()`/`Examples()`/`Required()` on `Metadata`, no new API |
 
 **Override semantics (user confirmed)**: Route-level `Tags`/`BearerAuth` REPLACE the controller-level value entirely when set (route wins, does NOT merge/append) -- matches NestJS's own override behavior.
 
@@ -41,4 +41,4 @@ User decisions captured via INSIGHT.md metacode iteration (2026-07-14, same patt
 
 ## Scope boundary
 
-"Schema Generation from Metadata" (this feature) builds the WALKING + SCHEMA-BUILDING mechanism and the new `Route`/`Controller`/`Metadata` documentation-builder methods, producing the `paths`/`components.schemas` portions of an `*OpenApiDocument` (which "OpenAPI Document Builder", already shipped, only ever populated with document-LEVEL fields -- Title/Version/Contact/etc). Actually SERVING the document (`SetupSwagger`, Swagger UI HTML) is the separate "Swagger UI Setup" ROADMAP feature, built after this one.
+"Schema Generation from Metadata" (this feature) builds the WALKING + SCHEMA-BUILDING mechanism and the new `Route`/`Controller`/`Metadata` documentation-builder methods, producing the `paths`/`components.schemas` portions of an `*OpenAPI` (which "OpenAPI Document Builder", already shipped, only ever populated with document-LEVEL fields -- Title/Version/Contact/etc). Actually SERVING the document (`SetupSwagger`, Swagger UI HTML) is the separate "Swagger UI Setup" ROADMAP feature, built after this one.

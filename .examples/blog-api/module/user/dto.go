@@ -27,6 +27,6 @@ type ParamsDTO struct {
 }
 
 var paramsDTOSchema = gonest.NewSchema(func(t *ParamsDTO, m *gonest.Schema) {
-	m.Title("user.ParamsDTO")
+	m.Title("UserParamsDTO")
 	m.Property(&t.UserID).Integer().Min(1).Required()
 })

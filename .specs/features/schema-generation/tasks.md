@@ -85,12 +85,12 @@ Sequencial. T0/T1 são mecânicos e de baixo risco (getters/setters aditivos, me
 
 **What**: (ver design.md's Components/Data Models pra detalhe completo)
 
-- `OpenApiDocument` ganha campos novos: `paths map[string]map[string]any`, `schemas map[string]any`, `schemaNames map[*metadata.Metadata]string`
-- `func Generate(doc *OpenApiDocument, root *module.Module)` -- percorre `root` + `root.ImportedModules()` (recursivo, `visitedModules` pra evitar ciclo) + `Module.OwnControllers()` + `Controller.OwnRoutes()`, monta `doc.paths`/`doc.schemas`
+- `OpenAPI` ganha campos novos: `paths map[string]map[string]any`, `schemas map[string]any`, `schemaNames map[*metadata.Metadata]string`
+- `func Generate(doc *OpenAPI, root *module.Module)` -- percorre `root` + `root.ImportedModules()` (recursivo, `visitedModules` pra evitar ciclo) + `Module.OwnControllers()` + `Controller.OwnRoutes()`, monta `doc.paths`/`doc.schemas`
 - `walkController`/`walkRoute` (não-exportados) -- resolvem herança Tags/BearerAuth (controller vs override da rota, rota SEMPRE vence quando setada), montam path item por rota NÃO excluída (`ExcludeFromDocs()`)
-- `schemaFor(p *metadata.PropertyBuilder, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) map[string]any` -- núcleo recursivo, dispatcha por `p.KindValue()`, cobre TODAS as branch families (String/Numeric/Boolean/DateTime-Date/Array/Object), usa `ItemRef()`/`MetadataRef()` pra `$ref` em vez de inline
-- `registerSchema(m *metadata.Metadata, doc *OpenApiDocument, visiting map[*metadata.Metadata]bool) string` -- dedup via `doc.schemaNames` (pointer-keyed), nome default = nome do tipo Go, override via `TitleText()`
-- `func (doc *OpenApiDocument) Document() map[string]any` -- monta estrutura OpenAPI 3.1 completa (info/paths/components/security) a partir de TODOS os campos do doc (já existentes + novos)
+- `schemaFor(p *metadata.PropertyBuilder, doc *OpenAPI, visiting map[*metadata.Metadata]bool) map[string]any` -- núcleo recursivo, dispatcha por `p.KindValue()`, cobre TODAS as branch families (String/Numeric/Boolean/DateTime-Date/Array/Object), usa `ItemRef()`/`MetadataRef()` pra `$ref` em vez de inline
+- `registerSchema(m *metadata.Metadata, doc *OpenAPI, visiting map[*metadata.Metadata]bool) string` -- dedup via `doc.schemaNames` (pointer-keyed), nome default = nome do tipo Go, override via `TitleText()`
+- `func (doc *OpenAPI) Document() map[string]any` -- monta estrutura OpenAPI 3.1 completa (info/paths/components/security) a partir de TODOS os campos do doc (já existentes + novos)
 
 **Where**: `internal/openapi/generate.go` (novo), `internal/openapi/openapi.go` (estendido -- novos campos), `internal/openapi/generate_test.go` (novo)
 
@@ -127,7 +127,7 @@ Sequencial. T0/T1 são mecânicos e de baixo risco (getters/setters aditivos, me
 
 ### T3: Root re-exports + INSIGHT.md settle + reprodução end-to-end ✅ DONE (evaluator: PASS, commits `0d20a9c`/`b27f7b2` -- fechou débito antigo, `gonest.Route` alias faltava desde sempre)
 
-**What**: confirma `gonest.NewOpenApiDocument`/`OpenApiDocument` já re-exportados (T da feature anterior) ganham acesso aos novos métodos (`Document()`) automaticamente via alias. Adiciona `gonest.SetupSwagger`? NÃO -- isso é "Swagger UI Setup", feature separada; aqui só confirma que `openapi.Generate` está acessível de algum jeito pro dev chamar manualmente ainda que sem `SetupSwagger` (avaliar se precisa de um wrapper raiz tipo `gonest.GenerateOpenApiSchema(doc, app)` temporário, OU se isso fica pra "Swagger UI Setup" terminar de amarrar -- SE ficar pra depois, documentar isso claramente). Reescreve a seção "dúvida: Schema Generation from Metadata" do INSIGHT.md removendo o framing de dúvida, virando exemplo settled reproduzindo o fluxo completo (Controller.Tags/BearerAuth, Route.Summary/RequestBody/Response/PathParams/ExcludeFromDocs, Metadata.Title).
+**What**: confirma `gonest.NewOpenAPI`/`OpenAPI` já re-exportados (T da feature anterior) ganham acesso aos novos métodos (`Document()`) automaticamente via alias. Adiciona `gonest.SetupSwagger`? NÃO -- isso é "Swagger UI Setup", feature separada; aqui só confirma que `openapi.Generate` está acessível de algum jeito pro dev chamar manualmente ainda que sem `SetupSwagger` (avaliar se precisa de um wrapper raiz tipo `gonest.GenerateOpenApiSchema(doc, app)` temporário, OU se isso fica pra "Swagger UI Setup" terminar de amarrar -- SE ficar pra depois, documentar isso claramente). Reescreve a seção "dúvida: Schema Generation from Metadata" do INSIGHT.md removendo o framing de dúvida, virando exemplo settled reproduzindo o fluxo completo (Controller.Tags/BearerAuth, Route.Summary/RequestBody/Response/PathParams/ExcludeFromDocs, Metadata.Title).
 
 **Where**: `gonest.go` (se precisar de wrapper novo), `gonest_test.go` (novo teste), `INSIGHT.md` (reescrito)
 
@@ -165,22 +165,22 @@ Sequencial: T0 → T1 → T2 → T3
 
 ## Task Granularity Check
 
-| Task | Scope | Status |
-| --- | --- | --- |
-| T0: App.Root() | 1 método, trivial | ✅ Granular |
-| T1: Title/Tags/BearerAuth/documentation builder methods | 3 arquivos, mecânico (getters/setters aditivos) | ✅ Granular |
-| T2: Generate + schemaFor + Document() | 1 pacote, NÚCLEO real da feature, maior escopo aceitável | ✅ Granular (isolado, evaluator dedicado) |
-| T3: Root cleanup + INSIGHT.md | Mecânico + reprodução | ✅ Granular |
+| Task                                                    | Scope                                                    | Status                                   |
+| ------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------- |
+| T0: App.Root()                                          | 1 método, trivial                                        | ✅ Granular                               |
+| T1: Title/Tags/BearerAuth/documentation builder methods | 3 arquivos, mecânico (getters/setters aditivos)          | ✅ Granular                               |
+| T2: Generate + schemaFor + Document()                   | 1 pacote, NÚCLEO real da feature, maior escopo aceitável | ✅ Granular (isolado, evaluator dedicado) |
+| T3: Root cleanup + INSIGHT.md                           | Mecânico + reprodução                                    | ✅ Granular                               |
 
 ---
 
 ## Test Co-location Validation
 
-| Task | Code Layer | Matrix Requires | Task Says | Status |
-| --- | --- | --- | --- | --- |
-| T0 | Accessor puro | unit | unit | ✅ OK |
-| T1 | Getters/setters aditivos | unit | unit | ✅ OK |
-| T2 | Walker + geração de schema | unit + integration | unit + integration | ✅ OK |
-| T3 | Re-export + reprodução E2E | integration | integration | ✅ OK |
+| Task | Code Layer                 | Matrix Requires    | Task Says          | Status |
+| ---- | -------------------------- | ------------------ | ------------------ | ------ |
+| T0   | Accessor puro              | unit               | unit               | ✅ OK   |
+| T1   | Getters/setters aditivos   | unit               | unit               | ✅ OK   |
+| T2   | Walker + geração de schema | unit + integration | unit + integration | ✅ OK   |
+| T3   | Re-export + reprodução E2E | integration        | integration        | ✅ OK   |
 
 Nenhuma violação.

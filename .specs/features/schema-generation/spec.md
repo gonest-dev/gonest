@@ -17,12 +17,12 @@ Milestones 4-6 built a way to DECLARE (`NewMetadata[T]`) and VALIDATE (`MustJson
 
 ## Out of Scope
 
-| Feature | Reason |
-| --- | --- |
-| `SetupSwagger`, actually SERVING the generated document over HTTP, Swagger UI HTML | Separate ROADMAP feature ("Swagger UI Setup"), depends on this one existing first |
-| Inferring a schema shape from a `Custom(fn)` field's closure | Not mechanically possible -- `fn` is opaque Go code, no declarative metadata to read; documented limitation |
-| Full OpenAPI 3.1 spec coverage (`servers`, multiple security schemes beyond bearer, `callbacks`, `webhooks`, etc) | Nothing in INSIGHT.md or this feature's discussion asks for these; `OpenApiDocument` (already shipped) only covers what its own spec asked for |
-| Validating the GENERATED document against the OpenAPI 3.1 JSON Schema meta-schema | No requirement asks for this; the generator's own correctness is proven by targeted tests, not external spec validation |
+| Feature                                                                                                           | Reason                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `SetupSwagger`, actually SERVING the generated document over HTTP, Swagger UI HTML                                | Separate ROADMAP feature ("Swagger UI Setup"), depends on this one existing first                                                      |
+| Inferring a schema shape from a `Custom(fn)` field's closure                                                      | Not mechanically possible -- `fn` is opaque Go code, no declarative metadata to read; documented limitation                            |
+| Full OpenAPI 3.1 spec coverage (`servers`, multiple security schemes beyond bearer, `callbacks`, `webhooks`, etc) | Nothing in INSIGHT.md or this feature's discussion asks for these; `OpenAPI` (already shipped) only covers what its own spec asked for |
+| Validating the GENERATED document against the OpenAPI 3.1 JSON Schema meta-schema                                 | No requirement asks for this; the generator's own correctness is proven by targeted tests, not external spec validation                |
 
 ---
 
@@ -81,15 +81,15 @@ Milestones 4-6 built a way to DECLARE (`NewMetadata[T]`) and VALIDATE (`MustJson
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --- | --- | --- | --- |
-| SG-00 | P0: App exposes module tree, reachable via existing Own*/ImportedModules | Done | Done |
-| SG-01 | P1: Metadata.Title/TitleText | Done | Done |
-| SG-02 | P1: Controller.Tags/BearerAuth inherited, Route-level overrides replace | Done | Done |
-| SG-03 | P1: Route documentation builder methods (Summary/Description/OperationId/RequestBody/Response/PathParams/QueryParams/ExcludeFromDocs/Deprecated) | Done | Done |
-| SG-04 | P2: generator walks full module tree, produces paths for every non-excluded route | Done | Done |
-| SG-05 | P2: components.schemas deduped by Metadata pointer identity, $ref reuse | Done | Done |
-| SG-06 | P2: schema shape correct for every existing branch family | Done | Done |
+| Requirement ID | Story                                                                                                                                            | Phase | Status |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----- | ------ |
+| SG-00          | P0: App exposes module tree, reachable via existing Own*/ImportedModules                                                                         | Done  | Done   |
+| SG-01          | P1: Metadata.Title/TitleText                                                                                                                     | Done  | Done   |
+| SG-02          | P1: Controller.Tags/BearerAuth inherited, Route-level overrides replace                                                                          | Done  | Done   |
+| SG-03          | P1: Route documentation builder methods (Summary/Description/OperationId/RequestBody/Response/PathParams/QueryParams/ExcludeFromDocs/Deprecated) | Done  | Done   |
+| SG-04          | P2: generator walks full module tree, produces paths for every non-excluded route                                                                | Done  | Done   |
+| SG-05          | P2: components.schemas deduped by Metadata pointer identity, $ref reuse                                                                          | Done  | Done   |
+| SG-06          | P2: schema shape correct for every existing branch family                                                                                        | Done  | Done   |
 
 **ID format:** `SG-[NUMBER]`
 

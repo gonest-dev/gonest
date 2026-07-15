@@ -2,23 +2,23 @@
 
 ## Problem Statement
 
-Last piece of Milestone 7: `gonest.SetupSwagger(app, uiPath, doc, options)` (INSIGHT.md's own bootstrap example already specifies the full call shape) serves the already-generated `*OpenApiDocument` (via `doc.Document()`, already `json.Marshal`-able from "Schema Generation from Metadata") over HTTP -- a JSON endpoint plus a Swagger UI HTML page. This feature is purely SERVING/WIRING, no new generation logic.
+Last piece of Milestone 7: `gonest.SetupSwagger(app, uiPath, doc, options)` (INSIGHT.md's own bootstrap example already specifies the full call shape) serves the already-generated `*OpenAPI` (via `doc.Document()`, already `json.Marshal`-able from "Schema Generation from Metadata") over HTTP -- a JSON endpoint plus a Swagger UI HTML page. This feature is purely SERVING/WIRING, no new generation logic.
 
 ## Goals
 
 - [x] `Context` gains a way to send a raw HTML response (infra gap, same class as `Body()`/`Queries()` additions in prior features) -- `HTML(s string) error`
 - [x] `gonest.SwaggerOptions{JsonDocumentUrl string, PersistAuth bool, DocExpansion string}` -- INSIGHT.md's exact field set, nothing more
-- [x] `gonest.SetupSwagger(app *App, uiPath string, doc *OpenApiDocument, options SwaggerOptions)` -- registers TWO routes directly on the app's adapter (post-bootstrap, no DI/Module involvement -- same `app.Adapter().RegisterRoute(...)` mechanism `internal/app`'s own bootstrap already uses internally):
+- [x] `gonest.SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions)` -- registers TWO routes directly on the app's adapter (post-bootstrap, no DI/Module involvement -- same `app.Adapter().RegisterRoute(...)` mechanism `internal/app`'s own bootstrap already uses internally):
   - `GET {options.JsonDocumentUrl}` -- serves `doc.Document()` as JSON
   - `GET {uiPath}` -- serves an HTML page loading Swagger UI (via CDN, no vendored assets) configured to fetch the JSON from `options.JsonDocumentUrl`, with `persistAuthorization: options.PersistAuth` and `docExpansion: options.DocExpansion` baked into the UI's own JS initializer
 
 ## Out of Scope
 
-| Feature | Reason |
-| --- | --- |
-| Vendoring Swagger UI's static assets into the binary | No requirement asks for offline/vendored assets; CDN-loaded HTML is simpler and matches how most Go OpenAPI libraries (e.g. `swaggo`) offer a CDN-based minimal option |
-| Any `SwaggerOptions` field beyond `JsonDocumentUrl`/`PersistAuth`/`DocExpansion` | INSIGHT.md's own bootstrap example is the only concrete requirement source |
-| OAuth2/API-key-specific Swagger UI configuration beyond bearer auth (already covered by `Document()`'s `securitySchemes`) | Nothing asks for it |
+| Feature                                                                                                                   | Reason                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vendoring Swagger UI's static assets into the binary                                                                      | No requirement asks for offline/vendored assets; CDN-loaded HTML is simpler and matches how most Go OpenAPI libraries (e.g. `swaggo`) offer a CDN-based minimal option |
+| Any `SwaggerOptions` field beyond `JsonDocumentUrl`/`PersistAuth`/`DocExpansion`                                          | INSIGHT.md's own bootstrap example is the only concrete requirement source                                                                                             |
+| OAuth2/API-key-specific Swagger UI configuration beyond bearer auth (already covered by `Document()`'s `securitySchemes`) | Nothing asks for it                                                                                                                                                    |
 
 ---
 
@@ -47,11 +47,11 @@ Last piece of Milestone 7: `gonest.SetupSwagger(app, uiPath, doc, options)` (INS
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --- | --- | --- | --- |
-| SW-01 | P1: Context.HTML sends raw HTML response | Done | Done |
-| SW-02 | P1: SetupSwagger registers JSON endpoint serving doc.Document() | Done | Done |
-| SW-03 | P1: SetupSwagger registers UI endpoint serving configured Swagger UI HTML | Done | Done |
+| Requirement ID | Story                                                                     | Phase | Status |
+| -------------- | ------------------------------------------------------------------------- | ----- | ------ |
+| SW-01          | P1: Context.HTML sends raw HTML response                                  | Done  | Done   |
+| SW-02          | P1: SetupSwagger registers JSON endpoint serving doc.Document()           | Done  | Done   |
+| SW-03          | P1: SetupSwagger registers UI endpoint serving configured Swagger UI HTML | Done  | Done   |
 
 **ID format:** `SW-[NUMBER]`
 

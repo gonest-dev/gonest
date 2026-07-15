@@ -46,16 +46,11 @@ type Route struct {
 	bearerAuthSet   bool
 
 	requestBody *schema.Schema
-	// responses maps status code -> documented body schema. A nil value
-	// means "documented, no body" (Response(status) called with zero
-	// variadic args) -- the KEY's mere presence distinguishes "documented"
-	// from "never documented at all" (spec.md AC3).
-	responses map[int]*schema.Schema
-	// responseDescriptions maps status code -> a dev-supplied override for
-	// that response's description, set via ResponseDescription. Independent
-	// of responses itself (keyed the same, but not required to have a
-	// matching entry there).
-	responseDescriptions map[int]string
+	// responses maps status code -> the *Response built for it. The KEY's
+	// mere presence distinguishes "documented" from "never documented at
+	// all" (spec.md AC3) -- a *Response with no Schema() call still means
+	// "documented, no body".
+	responses map[int]*Response
 
 	pathParams  *schema.Schema
 	queryParams *schema.Schema
@@ -230,59 +225,34 @@ func (r *Route) RequestBodySchema() (*schema.Schema, bool) {
 }
 
 // Response documents status as one of this Route's possible responses. With
-// zero schema args, status is documented as having no body (the map key
-// still exists, with a nil value, distinguishing "documented, no body" from
-// "never documented" -- spec.md AC3). With one arg, status is documented
-// with that body schema. Calling Response again for the SAME status
-// overwrites that status's entry; calling it for a DIFFERENT status
-// accumulates alongside any previously documented statuses. Returns r so
-// calls can chain.
-func (r *Route) Response(status int, m ...*schema.Schema) *Route {
+// zero callback args, status is documented as having no body (the map key
+// still exists, pointing at an empty *Response, distinguishing "documented,
+// no body" from "never documented" -- spec.md AC3). With one callback arg,
+// it runs against a fresh *Response so the route can set that status's
+// Schema/Description in one place. Calling Response again for the SAME
+// status overwrites that status's entry entirely; calling it for a
+// DIFFERENT status accumulates alongside any previously documented
+// statuses. Returns r so calls can chain.
+func (r *Route) Response(status int, fn ...func(response *Response)) *Route {
 	if r.responses == nil {
-		r.responses = map[int]*schema.Schema{}
+		r.responses = map[int]*Response{}
 	}
-	if len(m) > 0 {
-		r.responses[status] = m[0]
-	} else {
-		r.responses[status] = nil
+	resp := &Response{}
+	if len(fn) > 0 && fn[0] != nil {
+		fn[0](resp)
 	}
+	r.responses[status] = resp
 	return r
 }
 
-// Responses returns a copy of the status -> body-schema map built via
+// Responses returns a copy of the status -> *Response map built via
 // Response. Read-only: mutating the returned map does not affect this
 // Route's internal state (same defensive-copy pattern as
 // Controller.OwnMiddleware/OwnTags).
-func (r *Route) Responses() map[int]*schema.Schema {
-	out := make(map[int]*schema.Schema, len(r.responses))
-	for status, m := range r.responses {
-		out[status] = m
-	}
-	return out
-}
-
-// ResponseDescription sets a custom description for status, overriding
-// whatever description generation would otherwise pick (empty string for a
-// schema-carrying Response, or the auto-derived http.StatusText for an
-// undocumented 4xx/5xx Response -- see internal/openapi's buildResponses).
-// Independent of Response itself: it can be called before or after
-// Response(status, ...) for the same status, in either order. Returns r so
-// calls can chain.
-func (r *Route) ResponseDescription(status int, description string) *Route {
-	if r.responseDescriptions == nil {
-		r.responseDescriptions = map[int]string{}
-	}
-	r.responseDescriptions[status] = description
-	return r
-}
-
-// ResponseDescriptions returns a copy of the status -> description map
-// built via ResponseDescription (same defensive-copy pattern as
-// Responses).
-func (r *Route) ResponseDescriptions() map[int]string {
-	out := make(map[int]string, len(r.responseDescriptions))
-	for status, desc := range r.responseDescriptions {
-		out[status] = desc
+func (r *Route) Responses() map[int]*Response {
+	out := make(map[int]*Response, len(r.responses))
+	for status, resp := range r.responses {
+		out[status] = resp
 	}
 	return out
 }

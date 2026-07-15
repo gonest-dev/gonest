@@ -17,7 +17,7 @@ type Entity struct {
 // generated docs actually describe the response body shape, not just the
 // bare path/summary.
 var Schema = gonest.NewSchema(func(t *Entity, m *gonest.Schema) {
-	m.Title("user.Entity")
+	m.Title("UserEntity")
 	m.Property(&t.ID).Integer().Required()
 	m.Property(&t.Name).String().Required()
 	m.Property(&t.Email).Email().Required()
