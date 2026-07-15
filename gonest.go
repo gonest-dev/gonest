@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"unsafe"
 
+	"github.com/gonest-dev/gonest/internal/adapter/fiber"
 	"github.com/gonest-dev/gonest/internal/app"
 	"github.com/gonest-dev/gonest/internal/controller"
 	"github.com/gonest-dev/gonest/internal/emitter"
@@ -160,6 +161,14 @@ type App = app.App
 // type argument -- e.g. FiberApp. See internal/app.HttpAdapter's doc
 // comment for the full contract (RegisterRoute, Listen, Init).
 type HttpAdapter = app.HttpAdapter
+
+// FiberApp is v1's only real HttpAdapter implementation -- the type
+// argument every INSIGHT.md example passes to NewApp[gonest.FiberApp]/
+// MustNewApp[gonest.FiberApp]. Long-standing gap closed here (see STATE.md's
+// Deferred Ideas): no feature before this had added the root re-export,
+// even though it was already used as a literal call-site example
+// throughout INSIGHT.md.
+type FiberApp = fiber.FiberApp
 
 // AppOptions is Nest-parity bootstrap config for NewApp/MustNewApp
 // (BufferLogs, LogLevels). See internal/app.AppOptions's doc comment for the
@@ -353,13 +362,15 @@ type Middleware = middleware.Middleware
 // Handler.
 type Next = middleware.Next
 
-// NewMiddleware creates a Middleware and runs fn on it immediately (unlike
-// Provider/Module/Controller/Pipe, which defer fn until bootstrap). Like
-// NewHttpException, New here is not generic, so Go allows aliasing the
-// plain func directly via var -- no wrapper function is needed (root
-// package is the only public door since Go blocks external import of
-// internal/*, per AD-004 in STATE.md). See internal/middleware.New's doc
-// comment for the full contract.
+// NewMiddleware creates a Middleware that defers fn until bootstrap runs it
+// (phase 3, per the "Test App Bootstrap" feature's 3-phase reorder --
+// AD-008 in STATE.md was REVERSED, this no longer runs fn immediately at
+// package-init time; MustInject/MustInjectAll now work inside fn, scoped to
+// the union of every referencing module). Like NewHttpException, New here
+// is not generic, so Go allows aliasing the plain func directly via var --
+// no wrapper function is needed (root package is the only public door
+// since Go blocks external import of internal/*, per AD-004 in STATE.md).
+// See internal/middleware.New's doc comment for the full contract.
 var NewMiddleware = middleware.New
 
 // ---------------------------------------------------------------------------
@@ -375,12 +386,11 @@ var NewMiddleware = middleware.New
 // for the full contract.
 type Guard = guard.Guard
 
-// NewGuard creates a Guard and runs fn on it immediately (unlike
-// Provider/Module/Controller/Pipe, which defer fn until bootstrap). This
-// feature deliberately has no MustInject support (AD-008 in STATE.md: a
-// *Guard can be attached to multiple controllers across different modules,
-// with no clean single "owner" to resolve MustInject against), so there is
-// no bootstrap stage left to usefully defer fn to. Like NewMiddleware/
+// NewGuard creates a Guard that defers fn until bootstrap runs it (phase 3
+// -- AD-008 in STATE.md was REVERSED: a *Guard attached to multiple
+// controllers across different modules now runs its own builder fn exactly
+// once, with a search scope equal to the union of every referencing
+// module, so MustInject/MustInjectAll work inside fn). Like NewMiddleware/
 // NewHttpException, New here is not generic, so Go allows aliasing the
 // plain func directly via var -- no wrapper function is needed (root
 // package is the only public door since Go blocks external import of
@@ -401,18 +411,26 @@ var NewGuard = guard.New
 // internal/interceptor.Interceptor's doc comment for the full contract.
 type Interceptor = interceptor.Interceptor
 
-// NewInterceptor creates an Interceptor and runs fn on it immediately
-// (unlike Provider/Module/Controller/Pipe, which defer fn until
-// bootstrap). This feature deliberately has no MustInject support (AD-008
-// in STATE.md: pipeline-stage types don't support MustInject in v1, same
-// reasoning as NewGuard/NewMiddleware), so there is no bootstrap stage
-// left to usefully defer fn to. Like NewGuard/NewMiddleware/
-// NewHttpException, New here is not generic, so Go allows aliasing the
-// plain func directly via var -- no wrapper function is needed (root
-// package is the only public door since Go blocks external import of
-// internal/*, per AD-004 in STATE.md). See internal/interceptor.New's doc
-// comment for the full contract.
+// NewInterceptor creates an Interceptor that defers fn until bootstrap
+// runs it (phase 3 -- AD-008 in STATE.md was REVERSED, same as
+// NewGuard/NewMiddleware/NewFilter: MustInject/MustInjectAll now work
+// inside fn, union-scoped across every referencing module). Like
+// NewGuard/NewMiddleware/NewHttpException, New here is not generic, so Go
+// allows aliasing the plain func directly via var -- no wrapper function
+// is needed (root package is the only public door since Go blocks
+// external import of internal/*, per AD-004 in STATE.md). See
+// internal/interceptor.New's doc comment for the full contract.
 var NewInterceptor = interceptor.New
+
+// InterceptorNext is interceptor.Next's own root alias -- a package-own
+// type (NOT gonest.Next/middleware.Next, even though both share the
+// identical underlying shape func(ctx *Context)) since internal/
+// interceptor and internal/middleware are parallel, conceptually
+// independent pipeline-stage packages. Long-standing gap closed here (see
+// STATE.md's Deferred Ideas) -- needed to write an Interceptor.Handler
+// callback using only the root gonest package, with no internal/
+// interceptor import.
+type InterceptorNext = interceptor.Next
 
 // ---------------------------------------------------------------------------
 // Filter (Filter feature)
@@ -425,18 +443,17 @@ var NewInterceptor = interceptor.New
 // See internal/filter.Filter's doc comment for the full contract.
 type Filter = filter.Filter
 
-// NewFilter creates a Filter and runs fn on it immediately (unlike
-// Provider/Module/Controller/Pipe, which defer fn until bootstrap). This
-// feature deliberately has no MustInject support (AD-008 in STATE.md:
-// pipeline-stage types don't support MustInject in v1, same reasoning as
-// NewGuard/NewMiddleware/NewInterceptor), so there is no bootstrap stage
-// left to usefully defer fn to. Like NewGuard/NewMiddleware/NewInterceptor/
-// NewHttpException, New here is not generic, so Go allows aliasing the plain
-// func directly via var -- no wrapper function is needed (root package is
-// the only public door since Go blocks external import of internal/*, per
-// AD-004 in STATE.md; see also AD-009 in STATE.md for why this section lives
-// in this consolidated file rather than a separate filter.go). See
-// internal/filter.New's doc comment for the full contract.
+// NewFilter creates a Filter that defers fn until bootstrap runs it (phase
+// 3 -- AD-008 in STATE.md was REVERSED, same as NewGuard/NewMiddleware/
+// NewInterceptor: MustInject/MustInjectAll now work inside fn, union-scoped
+// across every referencing module). Like NewGuard/NewMiddleware/
+// NewInterceptor/NewHttpException, New here is not generic, so Go allows
+// aliasing the plain func directly via var -- no wrapper function is
+// needed (root package is the only public door since Go blocks external
+// import of internal/*, per AD-004 in STATE.md; see also AD-009 in
+// STATE.md for why this section lives in this consolidated file rather
+// than a separate filter.go). See internal/filter.New's doc comment for
+// the full contract.
 var NewFilter = filter.New
 
 // ---------------------------------------------------------------------------
@@ -553,6 +570,17 @@ type ArrayMetadata = metadata.ArrayMetadata
 // file rather than a separate metadata.go).
 type ObjectMetadata = metadata.ObjectMetadata
 
+// Context encapsulates the HTTP request/response for a single route
+// Handler -- long-standing gap closed here (see STATE.md's Deferred
+// Ideas): every route Handler signature in INSIGHT.md's own examples
+// already used *gonest.Context, but no feature before this had added the
+// root re-export (every internal call site used *execution.Context
+// directly instead). Because this is a true Go type alias, every method
+// on execution.Context (Json/Status/Header/SetHeader/Param/Body/Queries/
+// HTML/SendString/WithRoute/Route) is automatically visible on
+// gonest.Context with zero extra wrapper code.
+type Context = execution.Context
+
 // ---------------------------------------------------------------------------
 // Validation (JSON Body Validation feature)
 // ---------------------------------------------------------------------------
@@ -565,9 +593,7 @@ type ObjectMetadata = metadata.ObjectMetadata
 // nested-object constraint is violated, and panics with a plain string if T
 // was never registered via NewMetadata[T]. Go cannot re-export a generic
 // function via var, so this is a real wrapper calling the internal one
-// (same pattern as MustInject/NewApp, see AD-004 in STATE.md). ctx is
-// *execution.Context directly -- no root Context alias exists yet (a
-// pre-existing gap from an earlier feature).
+// (same pattern as MustInject/NewApp, see AD-004 in STATE.md).
 func MustJsonBody[T any](ctx *execution.Context) T {
 	return validate.MustJsonBody[T](ctx)
 }
