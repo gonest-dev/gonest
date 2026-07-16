@@ -42,6 +42,9 @@ func TestRenderSwaggerUIHTML_InterpolatesOptions(t *testing.T) {
 	if !strings.Contains(html, "SwaggerUIBundle") {
 		t.Fatalf("expected rendered HTML to load Swagger UI's bundle, got:\n%s", html)
 	}
+	if !strings.Contains(html, "deepLinking: true") {
+		t.Fatalf("expected rendered HTML to enable deepLinking (operation/tag anchors + URL hash on click), got:\n%s", html)
+	}
 }
 
 // TestRenderSwaggerUIHTML_DifferentOptions_ProduceDifferentOutput proves the

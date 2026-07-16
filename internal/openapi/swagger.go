@@ -94,6 +94,7 @@ const swaggerUITemplate = `<!DOCTYPE html>
         dom_id: '#swagger-ui',
         persistAuthorization: {{.PersistAuth}},
         docExpansion: {{.DocExpansion}},
+        deepLinking: true,
         presets: [SwaggerUIBundle.presets.apis],
       });
     };
