@@ -137,7 +137,15 @@ func walkRoute(c routableController, r *route.Route, doc *OpenAPI) {
 		op["parameters"] = parameters
 	}
 
-	if reqBody, ok := r.RequestBodySchema(); ok {
+	if formBody, fileFields, ok := r.FormBodySchema(); ok {
+		op["requestBody"] = map[string]any{
+			"content": map[string]any{
+				"multipart/form-data": map[string]any{
+					"schema": formBodySchemaObject(formBody, fileFields, doc, visiting),
+				},
+			},
+		}
+	} else if reqBody, ok := r.RequestBodySchema(); ok {
 		op["requestBody"] = map[string]any{
 			"content": map[string]any{
 				"application/json": map[string]any{
@@ -493,6 +501,50 @@ func addDescriptionAndExamples(schema map[string]any, p *schema.PropertyBuilder)
 	if examples := p.ExamplesList(); len(examples) > 0 {
 		schema["examples"] = examples
 	}
+}
+
+// formBodySchemaObject builds an INLINE (never $ref/registered into
+// components.schemas -- unlike refSchema/registerSchema) OpenAPI object
+// schema for a multipart/form-data requestBody: m's own properties (keyed
+// by their "form" tag, NOT "json" -- unlike registerSchema's own
+// tagName(p, ""), a form:"..." field typically has no json tag at all, so
+// falling back through registerSchema's resolution would emit the bare Go
+// field name instead) plus one `{"type":"string","format":"binary"}`
+// property per name in fileFields -- OpenAPI 3.1's own convention for "this
+// property is an uploaded file" (there is no dedicated JSON Schema "file"
+// type). Inline rather than registered: combining m's validated fields with
+// synthetic file properties isn't a reusable named shape the way a JSON
+// body's whole schema is, it's specific to this one requestBody.
+func formBodySchemaObject(m *schema.Schema, fileFields []string, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
+	properties := map[string]any{}
+	var required []string
+
+	for _, p := range m.OwnProperties() {
+		key := tagName(p, "form")
+		properties[key] = schemaFor(p, doc, visiting)
+		if p.IsRequired() {
+			required = append(required, key)
+		}
+	}
+
+	for _, name := range fileFields {
+		properties[name] = map[string]any{
+			"type":   "string",
+			"format": "binary",
+		}
+	}
+
+	out := map[string]any{
+		"type":       "object",
+		"properties": properties,
+	}
+	if desc := m.DescriptionText(); desc != "" {
+		out["description"] = desc
+	}
+	if len(required) > 0 {
+		out["required"] = required
+	}
+	return out
 }
 
 // registerSchema ensures m has EXACTLY ONE entry in doc.schemas (dedup via

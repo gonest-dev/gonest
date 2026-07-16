@@ -933,3 +933,90 @@ func TestGenerate_ResponseDescription_OverridesDefault(t *testing.T) {
 		t.Fatalf("404 should still default to HttpException content, got %v", resp404)
 	}
 }
+
+// TestGenerate_FormBody_MultipartFormDataWithFileField proves Route.FormBody
+// documents the requestBody as multipart/form-data (not application/json,
+// unlike RequestBody) -- an object schema combining m's own properties
+// (keyed by their "form" tag) with one {"type":"string","format":"binary"}
+// property per fileFields entry, inline (never registered/$ref'd into
+// components.schemas, unlike a JSON body's whole schema).
+func TestGenerate_FormBody_MultipartFormDataWithFileField(t *testing.T) {
+	type uploadForm struct {
+		Description string `form:"description"`
+	}
+	var f uploadForm
+	m := schema.New(reflect.TypeOf(f), reflect.ValueOf(&f).Pointer())
+	t.Cleanup(func() { schema.Deregister(reflect.TypeOf(f)) })
+	m.Property(&f.Description).String().Required()
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Path("/posts")
+		c.Route(route.HttpPost, "/:post_id/attachment", func(r *route.Route) {
+			r.FormBody(m, "file")
+		})
+	})
+	c.Declare()
+
+	root := module.New(func(mod *module.Module) {
+		mod.Controllers(c)
+	})
+	if _, err := root.Assemble(); err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+
+	doc := New("3.1.0", nil)
+	Generate(doc, root)
+
+	op := doc.paths["/posts/:post_id/attachment"]["post"].(map[string]any)
+	reqBody, ok := op["requestBody"].(map[string]any)
+	if !ok {
+		t.Fatalf("requestBody missing, got %v", op)
+	}
+	content, ok := reqBody["content"].(map[string]any)
+	if !ok {
+		t.Fatalf("requestBody.content missing, got %v", reqBody)
+	}
+	multipart, ok := content["multipart/form-data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected multipart/form-data content, got %v", content)
+	}
+	if _, isJSON := content["application/json"]; isJSON {
+		t.Fatalf("expected NO application/json content alongside multipart/form-data, got %v", content)
+	}
+
+	bodySchema, ok := multipart["schema"].(map[string]any)
+	if !ok {
+		t.Fatalf("multipart/form-data.schema missing, got %v", multipart)
+	}
+	if bodySchema["type"] != "object" {
+		t.Fatalf("schema.type = %v, want %q", bodySchema["type"], "object")
+	}
+	properties, ok := bodySchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("schema.properties missing, got %v", bodySchema)
+	}
+
+	descProp, ok := properties["description"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected a %q property, got %v", "description", properties)
+	}
+	if descProp["type"] != "string" {
+		t.Fatalf("description.type = %v, want %q", descProp["type"], "string")
+	}
+
+	fileProp, ok := properties["file"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected a %q property, got %v", "file", properties)
+	}
+	if fileProp["type"] != "string" || fileProp["format"] != "binary" {
+		t.Fatalf("file property = %v, want {type: string, format: binary}", fileProp)
+	}
+
+	// The form schema must NOT have been registered into components.schemas
+	// -- it's inline, request-specific, unlike a JSON body's own $ref'd shape.
+	for name := range doc.schemas {
+		if name == "uploadForm" {
+			t.Fatalf("form body schema should not be registered into components.schemas, found %q", name)
+		}
+	}
+}

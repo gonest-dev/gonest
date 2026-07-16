@@ -243,6 +243,7 @@
 - `internal/validate.FormFile`/`ParseFormBody`/`MustFormBody` (novo, `form.go`) -- caminha o stream multipart uma única vez, despachando cada parte-arquivo pro callback `onFile` SINCRONAMENTE (streaming de verdade) e cada campo normal pra validação via nova tag `form:"..."` (mesmo mecanismo de `param`/`query`)
 - `gonest.ParseRestFormBody`/`MustParseRestFormBody`/`FormFile` (root, par Parse/Must igual AD-021)
 - Prova real de streaming: `TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering` (`gonest_test.go`) -- dial TCP real (não `app.Test`, que bufferiza a request inteira antes do fasthttp rodar, descoberto durante a execução) com arquivo dividido num `io.Pipe` gated, provando que `onFile` dispara ANTES da segunda metade (ainda represada) chegar
+- `Route.FormBody` (T7, pós-dogfooding) -- documenta `multipart/form-data` no OpenAPI (schema inline com `file` como `type: string, format: binary`), revertendo o "Out of Scope" original assim que o usuário reparou que a rota de upload aparecia no Swagger sem jeito de anexar arquivo (AD-023)
 
 ---
 

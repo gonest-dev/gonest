@@ -46,6 +46,11 @@ type Route struct {
 	bearerAuthSet   bool
 
 	requestBody *schema.Schema
+	// formBody/formBodyFileFields: multipart/form-data documentation,
+	// separate from requestBody (application/json) -- see FormBody's own
+	// doc comment.
+	formBody           *schema.Schema
+	formBodyFileFields []string
 	// responses maps status code -> the *Response built for it. The KEY's
 	// mere presence distinguishes "documented" from "never documented at
 	// all" (spec.md AC3) -- a *Response with no Schema() call still means
@@ -222,6 +227,27 @@ func (r *Route) RequestBody(m *schema.Schema) *Route {
 // documented" from "documented".
 func (r *Route) RequestBodySchema() (*schema.Schema, bool) {
 	return r.requestBody, r.requestBody != nil
+}
+
+// FormBody stores m as this Route's documented multipart/form-data request
+// body schema (for MustParseRestFormBody routes, Multipart Form Streaming
+// feature), plus fileFields -- the form field names that are FILES, not
+// covered by m's own Property declarations (a file part has no primitive
+// value to validate via Schema, only name/size/content-type -- see
+// FormFile/MustParseRestFormBody's own onFile callback). Returns r so
+// calls can chain. Calling FormBody more than once overwrites the previous
+// value (last-write-wins, same convention as RequestBody).
+func (r *Route) FormBody(m *schema.Schema, fileFields ...string) *Route {
+	r.formBody = m
+	r.formBodyFileFields = fileFields
+	return r
+}
+
+// FormBodySchema returns the *schema.Schema and file-field names set via
+// FormBody, and whether FormBody was ever called -- the bool distinguishes
+// "never documented" from "documented".
+func (r *Route) FormBodySchema() (*schema.Schema, []string, bool) {
+	return r.formBody, r.formBodyFileFields, r.formBody != nil
 }
 
 // Response documents status as one of this Route's possible responses. With

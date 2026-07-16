@@ -74,6 +74,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpPost, "/:post_id/attachment", func(r *gonest.Route) {
 		r.Summary("Upload an attachment for a post (multipart/form-data, streamed to disk)")
 		r.Params(paramsDTOSchema)
+		r.FormBody(uploadAttachmentFormDTOSchema, "file")
 		r.Response(http.StatusCreated)
 		r.Response(http.StatusNotFound, func(response *gonest.Response) {
 			response.Description("Cannot find a post using post_id")

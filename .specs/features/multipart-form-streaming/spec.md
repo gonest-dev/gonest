@@ -37,7 +37,6 @@ dependencies already in `go.mod`, no new dependency needed.
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Per-route toggle of streaming mode                                        | `StreamRequestBody`/`DisablePreParseMultipartForm` are `fasthttp.Server`-level (whole-process) settings -- Fiber has no per-route override. App-wide only (P1's Edge Cases documents the consequence).      |
 | Nested/repeated form fields (arrays, `foo[]=1&foo[]=2`, nested objects)    | Params/Query (the closest existing precedent) are flat single-value only; multipart form fields follow the same flat precedent for P1. Revisit only if a real need appears. |
-| OpenAPI/Swagger documentation of `multipart/form-data` request bodies     | Needs its own `internal/openapi` design (different media type, `type: string, format: binary` for file fields) -- separate follow-up feature, not blocking runtime behavior (same graceful-degradation precedent as `Custom(fn)` fields today). |
 | Multiple files under the SAME field name (`<input multiple>`)             | P1 ships one callback invocation per file PART regardless of field name repetition (the callback already fires once per file naturally) -- no special "grouping by field name" API. Revisit only if requested. |
 | Automatic upload-size enforcement per file                                | `fasthttp`'s existing `maxRequestBodySize`/`Server.MaxRequestBodySize` already caps the WHOLE request; a per-file cap would need to be enforced inside the dev's own `onFile` callback (they already control the `io.Reader`) -- no framework-level primitive added in P1. |
 
@@ -198,6 +197,7 @@ path.
 | MPF-05         | P1: Parse/MustParse root wrappers          | T4      | Verified |
 | MPF-06         | P2: onFile error -> BadRequestException    | T3      | Verified |
 | MPF-07         | P3: Custom(fn) on form fields              | T3      | Verified |
+| MPF-08         | P1.5: `Route.FormBody` OpenAPI documentation (multipart/form-data content, file fields as `type: string, format: binary`) -- added post-T6 after hands-on dogfooding in `.examples/blog-api` showed the upload route with no documented body at all, making it untestable from Swagger UI (originally scoped OUT, see AD-023 in STATE.md) | T7 | Verified |
 
 **ID format:** `MPF-[NUMBER]` (Multipart Form)
 

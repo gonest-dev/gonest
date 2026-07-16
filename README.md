@@ -379,6 +379,10 @@ var createPostFormSchema = gonest.NewSchema[CreatePostForm](func(t *CreatePostFo
 
 var PostController = gonest.NewController(func(controller *gonest.Controller) {
   controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
+    // Documents the requestBody as multipart/form-data (not application/json)
+    // -- "file" becomes {type: string, format: binary}, so Swagger UI renders
+    // a real file-upload widget for this route.
+    r.FormBody(createPostFormSchema, "file")
     r.Handler(func(ctx *gonest.RestContext) {
       form := gonest.MustParseRestFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *gonest.FormFile) error {
         // f.Reader() is the still-unconsumed part -- pipe it straight to S3/etc.

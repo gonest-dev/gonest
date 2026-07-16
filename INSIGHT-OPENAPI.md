@@ -571,6 +571,12 @@ var PostController = gonest.NewController(func (controller *gonest.Controller) {
 
   controller.Route(gonest.HttpPost, "/", func (route *gonest.Route) {
     route.Summary("Cria um post com anexo, repassando o arquivo pro S3 em streaming")
+    // route.FormBody documenta o requestBody como multipart/form-data (não
+    // application/json) -- schema normal (Title) + "file" como
+    // {type: string, format: binary}, a convenção OpenAPI 3.1 pra "isso é
+    // um arquivo". Sem isso, a rota aparece no Swagger sem jeito nenhum de
+    // anexar arquivo no corpo (achado real dogfooding .examples/blog-api).
+    route.FormBody(createPostFormSchema, "file")
     route.Handler(func(ctx *gonest.RestContext) {
       form := gonest.MustParseRestFormBody[*CreatePostForm](ctx, createPostFormSchema, func (f *gonest.FormFile) error {
         // f.Reader() é a parte AINDA não consumida do stream multipart --

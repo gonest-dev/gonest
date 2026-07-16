@@ -1,7 +1,31 @@
 # Multipart Form Streaming Tasks
 
 **Design**: `.specs/features/multipart-form-streaming/design.md`
-**Status**: Done (T1-T6, T6 satisfied by T3 -- AD-022 in STATE.md)
+**Status**: Done (T1-T7, T6 satisfied by T3 -- AD-022/AD-023 in STATE.md)
+
+---
+
+### T7: `Route.FormBody` -- OpenAPI documentation for multipart/form-data (added post-T6)
+
+**What**: `Route.FormBody(m *schema.Schema, fileFields ...string) *Route` + `FormBodySchema()` getter (`internal/route/route.go`); `internal/openapi/generate.go` builds an INLINE (never `$ref`'d into `components.schemas`) object schema when `FormBody` was called -- `m`'s own properties keyed by their `form` tag (`tagName(p, "form")`, not `tagName(p, "")`'s `json`-first resolution, which would fall back to the bare Go field name since a `form:"..."` field typically has no `json` tag at all) plus one `{"type":"string","format":"binary"}` property per `fileFields` entry, all under `content["multipart/form-data"]` instead of `content["application/json"]`.
+**Where**: `internal/route/route.go`, `internal/openapi/generate.go` (new `formBodySchemaObject` helper), `internal/openapi/generate_test.go`, `.examples/blog-api/module/post/controller.go` (wires `r.FormBody(uploadAttachmentFormDTOSchema, "file")` onto the upload route)
+**Depends on**: T1-T6 (the runtime side, `ParseRestFormBody`/`MustParseRestFormBody`, already existed -- this only adds documentation, no change to validation behavior)
+**Reuses**: `schemaFor`/`tagName` (unchanged, called with a new `"form"` context tag), same inline-vs-registered distinction `paramsToParameters` already established for path/query params (never `$ref`'d, request-specific)
+**Requirement**: MPF-08
+
+**Done when**:
+
+- [x] `Route.FormBody(m, fileFields...)` compiles, `FormBodySchema()` getter returns `(m, fileFields, true)`/`(nil, nil, false)`
+- [x] Generator emits `content["multipart/form-data"].schema` (object, `m`'s own `form`-tagged properties + file fields as `type: string, format: binary`) instead of `content["application/json"]` when `FormBody` was called
+- [x] The form schema is NEVER registered into `components.schemas` (inline only, proven by test)
+- [x] `.examples/blog-api`'s upload route documents `description`+`file`, confirmed live via `/openapi.json` (`curl`, manual inspection)
+- [x] Gate check passes: `go test ./... -race`
+- [x] Test count: baseline + `TestGenerate_FormBody_MultipartFormDataWithFileField`, passing
+
+**Tests**: unit (`internal/openapi/generate_test.go`, same tier as every other `Generate`-level test)
+**Gate**: quick (`go test ./... -race`)
+
+**Commit**: `feat(openapi): Route.FormBody documents multipart/form-data request bodies (T7)`
 
 ---
 
