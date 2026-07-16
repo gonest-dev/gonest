@@ -127,6 +127,56 @@ func main() {
 }
 ```
 
+# exemplo de Value[T] (PATCH / atualização parcial)
+
+`gonest.Value[T]` é um wrapper que rastreia se um campo foi explicitamente
+enviado no payload (dirty-tracking). Campos omitidos ficam `IsDirty() == false`
+-- o handler só aplica o que realmente chegou, sem precisar de heurísticas
+(`if name != "" { ... }` ou ponteiros opcionais como `*string`).
+
+```go
+package ex
+
+import "github.com/gonest-dev/gonest"
+
+// UserPatchDTO usa Value[T] nos campos mutáveis.
+// Campos omitidos no JSON ficam com IsDirty() == false e são ignorados.
+type UserPatchDTO struct {
+  Name gonest.Value[string] `json:"name"`
+  Age  gonest.Value[int]    `json:"age"`
+}
+
+var userPatchSchema = gonest.NewSchema[UserPatchDTO](func(t *UserPatchDTO, m *gonest.Schema) {
+  // As constraints só são verificadas se o campo vier no payload (dirty).
+  // Quando omitido, não existe violation de Required -- é um PATCH, não um PUT.
+  m.Property(&t.Name).String().Min(2)
+  m.Property(&t.Age).Integer().Min(0)
+})
+
+var _ = gonest.NewController(func(c *gonest.Controller) {
+  c.Route(gonest.HttpPatch, "/:user_id", func(r *gonest.Route) {
+    r.HttpCode(gonest.HttpStatusOk)
+    r.Params(userIdParamSchema)
+    r.RequestBody(userPatchSchema)
+    r.Handler(func(ctx *gonest.RestContext) {
+      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
+      patch  := gonest.MustParseRestJsonBody[*UserPatchDTO](ctx, userPatchSchema)
+
+      user := userService.Get(params.UserId)
+
+      // Cada campo só é aplicado se tiver sido enviado no payload.
+      patch.Name.OnDirty(func(name string) { user.Name = name })
+      patch.Age.Apply(&user.Age)
+
+      // Alternativa para ORMs que aceitam map (ex: GORM):
+      // db.Model(user).Updates(gonest.ValueToDirtyMap(patch))
+
+      ctx.Json(user)
+    })
+  })
+})
+```
+
 # exemplo de exceptions (erro no body: `{ name, message, details }`)
 
 ```go

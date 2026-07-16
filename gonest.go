@@ -36,6 +36,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/schema"
 	"github.com/gonest-dev/gonest/internal/scope"
 	"github.com/gonest-dev/gonest/internal/validate"
+	"github.com/gonest-dev/gonest/internal/value"
 )
 
 // ---------------------------------------------------------------------------
@@ -315,7 +316,7 @@ type TestApp = app.TestApp
 // wrapper calling the internal one (same pattern as MustInject/
 // MustInjectAll, see AD-004 in STATE.md).
 func MustOverride[T any](b *TestBuilder, mockValue T) {
-	app.MustOverride[T](b, mockValue)
+	app.MustOverride(b, mockValue)
 }
 
 // MustNewTestApp runs the same 3-phase bootstrap NewApp does, with an
@@ -718,6 +719,53 @@ type ObjectSchema = schema.ObjectSchema
 // Param/Body/Queries/HTML/SendString/WithRoute/Route) is automatically
 // visible on gonest.RestContext with zero extra wrapper code.
 type RestContext = execution.Context
+
+// ---------------------------------------------------------------------------
+// Value (dirty-tracking field wrapper)
+// ---------------------------------------------------------------------------
+
+// Value[T] is a generic field wrapper that tracks whether its value was
+// explicitly set (dirty-tracking). It is the canonical way to model
+// optional/partial updates in PATCH-style handlers: decode the JSON body
+// into a struct whose fields are Value[T]; only fields that were present in
+// the payload (including explicit null) are marked dirty -- omitted fields
+// stay clean and can be safely ignored when writing changes to a database.
+//
+// JSON is transparent: MarshalJSON emits T's value directly with no extra
+// wrapper in the wire format; UnmarshalJSON marks the field dirty whenever
+// it appears in the payload.
+//
+//	type UpdateUserDTO struct {
+//	  Name  gonest.Value[string] `json:"name"`
+//	  Email gonest.Value[string] `json:"email"`
+//	}
+//
+//	// PATCH /users/:id -- only sent fields are applied
+//	body := gonest.MustParseRestJsonBody[*UpdateUserDTO](ctx, updateUserSchema)
+//	body.Name.OnDirty(func(name string) { user.Name = name })
+//	body.Email.Apply(&user.Email)
+type Value[T any] = value.Value[T]
+
+// NewValue creates a Value[T]. If an initial value is provided it starts
+// dirty; the zero-arg form creates a clean (not-dirty) value.
+//
+//	name := gonest.NewValue("alice")  // dirty=true,  value="alice"
+//	age  := gonest.NewValue[int]()    // dirty=false, value=0
+func NewValue[T any](val ...T) Value[T] {
+	return value.New(val...)
+}
+
+// ValueToDirtyMap converts a struct (or pointer to struct) whose fields are
+// Value[T] into a map[string]any containing only the dirty fields, keyed
+// by their json struct tag (or field name when the tag is absent or "-").
+// Non-Value fields are always ignored. Useful for building partial-update
+// queries without reflection on the caller's side.
+//
+//	changes := gonest.ValueToDirtyMap(body)
+//	db.Model(&user).Updates(changes)
+func ValueToDirtyMap(obj any) map[string]any {
+	return value.ToDirtyMap(obj)
+}
 
 // ---------------------------------------------------------------------------
 // Validation (JSON Body Validation feature)
