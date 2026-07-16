@@ -304,14 +304,24 @@ type httpAdapterPtr[T any] interface {
 // supported; NewApp is meant to run once, synchronously, at process
 // startup.
 //
-// opts is a required second positional parameter (not optional/variadic --
-// ground truth is INSIGHT.md's own call sites, which always pass it, even
-// as a zero value AppOptions{}). It is stored on the returned *App after
-// every bootstrap stage above completes, and does not influence any of
-// them -- no Logger exists yet in this codebase to act on BufferLogs/
-// LogLevels (see AppOptions' doc comment in options.go).
-func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (*App, error) {
-	logger.Configure(opts.LogLevels)
+// opts is optional (variadic, at most one) -- callers with no need for
+// BufferLogs/LogLevels/EnableFormStreaming/etc can call NewApp[T](root) and
+// get the zero-value AppOptions{}, same as passing AppOptions{} explicitly.
+// Passing more than one opts panics -- there is no sane way to merge two
+// AppOptions, and silently taking the first (or last) would hide a caller
+// bug. It is stored on the returned *App after every bootstrap stage above
+// completes, and does not influence any of them -- no Logger exists yet in
+// this codebase to act on BufferLogs/LogLevels (see AppOptions' doc comment
+// in options.go).
+func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions) (*App, error) {
+	if len(opts) > 1 {
+		panic("gonest: NewApp accepts at most one AppOptions")
+	}
+	var opt AppOptions
+	if len(opts) == 1 {
+		opt = opts[0]
+	}
+	logger.Configure(opt.LogLevels)
 	inject.Reset()
 	registerFrameworkSingletons()
 
@@ -352,7 +362,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	ownership := discoverPipelineStageOwnership(modules)
 	declarePipelineStageTypes(ownership)
 
-	adapter := newAdapter[T, PT](opts)
+	adapter := newAdapter[T, PT](opt)
 	if err := registerRoutes(adapter, root, modules); err != nil {
 		return nil, err
 	}
@@ -361,7 +371,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) (
 	return &App{
 		root:            root,
 		adapter:         adapter,
-		opts:            opts,
+		opts:            opt,
 		moduleCount:     moduleCount,
 		controllerCount: controllerCount,
 		routeCount:      routeCount,
@@ -389,9 +399,10 @@ func countTree(modules []*module.Module) (moduleCount, controllerCount, routeCou
 }
 
 // MustNewApp calls NewApp and panics if it returns an error. Convenience
-// for callers (typically main) that treat bootstrap failure as fatal.
-func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts AppOptions) *App {
-	app, err := NewApp[T, PT](root, opts)
+// for callers (typically main) that treat bootstrap failure as fatal. opts
+// is optional, same contract as NewApp's.
+func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions) *App {
+	app, err := NewApp[T, PT](root, opts...)
 	if err != nil {
 		panic(err)
 	}

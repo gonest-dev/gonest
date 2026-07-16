@@ -286,21 +286,21 @@ type OnListen = app.OnListen
 // internal/app's httpAdapterPtr for why that extra parameter exists. See
 // internal/app.NewApp's doc comment for the full bootstrap contract.
 //
-// opts is threaded straight through to internal/app.NewApp -- this wrapper
-// does not interpret it.
+// opts is optional (at most one) and threaded straight through to
+// internal/app.NewApp -- this wrapper does not interpret it.
 func NewApp[T any, PT interface {
 	*T
 	HttpAdapter
-}](root *Module, opts AppOptions) (*App, error) {
-	return app.NewApp[T, PT](root, opts)
+}](root *Module, opts ...AppOptions) (*App, error) {
+	return app.NewApp[T, PT](root, opts...)
 }
 
 // MustNewApp calls NewApp and panics if it returns an error.
 func MustNewApp[T any, PT interface {
 	*T
 	HttpAdapter
-}](root *Module, opts AppOptions) *App {
-	return app.MustNewApp[T, PT](root, opts)
+}](root *Module, opts ...AppOptions) *App {
+	return app.MustNewApp[T, PT](root, opts...)
 }
 
 // ---------------------------------------------------------------------------

@@ -70,7 +70,7 @@ var UserModule = gonest.NewModule(func(module *gonest.Module) {
 })
 
 func main() {
-  app := gonest.MustNewApp[gonest.FiberApp](UserModule, gonest.AppOptions{})
+  app := gonest.MustNewApp[gonest.FiberApp](UserModule) // AppOptions is optional
   app.MustListen(":3000")
 }
 ```
@@ -183,9 +183,12 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 })
 ```
 
-`AppOptions` configures bootstrap: `BufferLogs`/`LogLevels` (real `internal/logger` wiring),
-`DisableBanner`/`DisableLoaded` (startup output), `EnableFormStreaming` (see
-[File upload](#file-upload-multipartform-data-streaming) below).
+`NewApp`/`MustNewApp` take `AppOptions` as an optional (variadic, at most one) argument --
+`NewApp[gonest.FiberApp](AppModule)` and `NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})`
+are equivalent; passing more than one `AppOptions` panics. It configures bootstrap:
+`BufferLogs`/`LogLevels` (real `internal/logger` wiring), `DisableBanner`/`DisableLoaded` (startup
+output), `EnableFormStreaming` (see [File upload](#file-upload-multipartform-data-streaming)
+below).
 
 `controller.Route(method, path, fn)` (still available, e.g. for a method chosen at runtime) takes
 any `gonest.HttpMethod` (`HttpGet`/`HttpPost`/`HttpPut`/`HttpPatch`/`HttpDelete`/`HttpHead`/

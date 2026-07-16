@@ -187,6 +187,51 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 	}
 }
 
+// TestNewApp_NoOptsArgument_BehavesLikeZeroValueAppOptions proves opts is
+// truly optional: calling NewApp with no AppOptions argument at all bootstraps
+// exactly like passing AppOptions{} explicitly (same zero-value default).
+func TestNewApp_NoOptsArgument_BehavesLikeZeroValueAppOptions(t *testing.T) {
+	root := module.New(func(m *module.Module) {})
+
+	app, err := NewApp[recordingFakeAdapter](root)
+	if err != nil {
+		t.Fatalf("NewApp() with no opts error = %v", err)
+	}
+	if app == nil {
+		t.Fatalf("NewApp() with no opts returned nil *App")
+	}
+	if app.opts.LogLevels != nil || app.opts.BufferLogs || app.opts.DisableBanner || app.opts.DisableLoaded || app.opts.EnableFormStreaming {
+		t.Fatalf("NewApp() with no opts stored non-zero opts = %+v, want zero-value AppOptions{}", app.opts)
+	}
+}
+
+// TestMustNewApp_NoOptsArgument_DoesNotPanic proves MustNewApp's opts is
+// also optional -- mirrors NewApp's own contract via the variadic pass-through.
+func TestMustNewApp_NoOptsArgument_DoesNotPanic(t *testing.T) {
+	root := module.New(func(m *module.Module) {})
+
+	app := MustNewApp[recordingFakeAdapter](root)
+	if app == nil {
+		t.Fatalf("MustNewApp() with no opts returned nil *App")
+	}
+}
+
+// TestNewApp_TwoOptsArguments_Panics proves passing more than one AppOptions
+// fails loud instead of silently picking one -- there is no sane way to
+// merge two AppOptions, so ambiguity is a caller bug, not a runtime choice.
+func TestNewApp_TwoOptsArguments_Panics(t *testing.T) {
+	root := module.New(func(m *module.Module) {})
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("NewApp() with 2 opts arguments did not panic")
+		}
+	}()
+
+	NewApp[recordingFakeAdapter](root, AppOptions{}, AppOptions{})
+}
+
 type consumerMarker struct{}
 
 func TestMustNewApp_PanicsOnAssembleError(t *testing.T) {
