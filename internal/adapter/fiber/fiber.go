@@ -94,12 +94,22 @@ func fiberMethod(method route.HttpMethod) string {
 		return fiber.MethodPost
 	case route.HttpPut:
 		return fiber.MethodPut
+	case route.HttpPatch:
+		return fiber.MethodPatch
 	case route.HttpDelete:
 		return fiber.MethodDelete
+	case route.HttpHead:
+		return fiber.MethodHead
+	case route.HttpOptions:
+		return fiber.MethodOptions
+	case route.HttpTrace:
+		return fiber.MethodTrace
+	case route.HttpConnect:
+		return fiber.MethodConnect
 	case route.HttpQuery:
-		return "QUERY"
+		return fiber.MethodQuery
 	default:
-		return fiber.MethodGet
+		panic("gonest: unknown HttpMethod " + method.String())
 	}
 }
 

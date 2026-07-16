@@ -126,6 +126,56 @@ func (c *Controller) Route(method route.HttpMethod, path string, fn func(*route.
 	c.routes = append(c.routes, route.New(method, path, fn))
 }
 
+// RouteGet is shorthand for Route(route.HttpGet, path, fn).
+func (c *Controller) RouteGet(path string, fn func(*route.Route)) {
+	c.Route(route.HttpGet, path, fn)
+}
+
+// RoutePost is shorthand for Route(route.HttpPost, path, fn).
+func (c *Controller) RoutePost(path string, fn func(*route.Route)) {
+	c.Route(route.HttpPost, path, fn)
+}
+
+// RoutePut is shorthand for Route(route.HttpPut, path, fn).
+func (c *Controller) RoutePut(path string, fn func(*route.Route)) {
+	c.Route(route.HttpPut, path, fn)
+}
+
+// RoutePatch is shorthand for Route(route.HttpPatch, path, fn).
+func (c *Controller) RoutePatch(path string, fn func(*route.Route)) {
+	c.Route(route.HttpPatch, path, fn)
+}
+
+// RouteDelete is shorthand for Route(route.HttpDelete, path, fn).
+func (c *Controller) RouteDelete(path string, fn func(*route.Route)) {
+	c.Route(route.HttpDelete, path, fn)
+}
+
+// RouteHead is shorthand for Route(route.HttpHead, path, fn).
+func (c *Controller) RouteHead(path string, fn func(*route.Route)) {
+	c.Route(route.HttpHead, path, fn)
+}
+
+// RouteOptions is shorthand for Route(route.HttpOptions, path, fn).
+func (c *Controller) RouteOptions(path string, fn func(*route.Route)) {
+	c.Route(route.HttpOptions, path, fn)
+}
+
+// RouteTrace is shorthand for Route(route.HttpTrace, path, fn).
+func (c *Controller) RouteTrace(path string, fn func(*route.Route)) {
+	c.Route(route.HttpTrace, path, fn)
+}
+
+// RouteConnect is shorthand for Route(route.HttpConnect, path, fn).
+func (c *Controller) RouteConnect(path string, fn func(*route.Route)) {
+	c.Route(route.HttpConnect, path, fn)
+}
+
+// RouteQuery is shorthand for Route(route.HttpQuery, path, fn).
+func (c *Controller) RouteQuery(path string, fn func(*route.Route)) {
+	c.Route(route.HttpQuery, path, fn)
+}
+
 // OwnRoutes returns a copy of the routes registered on this controller via
 // Route. Read-only: mutating the returned slice does not affect this
 // Controller's internal state (same defensive-copy pattern as

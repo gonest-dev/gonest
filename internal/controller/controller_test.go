@@ -127,6 +127,46 @@ func TestRoute_CreatesRouteAndAppendsToOwnRoutes(t *testing.T) {
 	}
 }
 
+// TestRouteXxx_AllVerbHelpers_DelegateToRouteWithMatchingMethod proves each
+// RouteGet/RoutePost/etc shorthand is equivalent to calling Route with the
+// matching route.HttpMethod -- no need to pass the method explicitly.
+func TestRouteXxx_AllVerbHelpers_DelegateToRouteWithMatchingMethod(t *testing.T) {
+	cases := []struct {
+		name   string
+		call   func(c *Controller)
+		method route.HttpMethod
+	}{
+		{"RouteGet", func(c *Controller) { c.RouteGet("/x", nil) }, route.HttpGet},
+		{"RoutePost", func(c *Controller) { c.RoutePost("/x", nil) }, route.HttpPost},
+		{"RoutePut", func(c *Controller) { c.RoutePut("/x", nil) }, route.HttpPut},
+		{"RoutePatch", func(c *Controller) { c.RoutePatch("/x", nil) }, route.HttpPatch},
+		{"RouteDelete", func(c *Controller) { c.RouteDelete("/x", nil) }, route.HttpDelete},
+		{"RouteHead", func(c *Controller) { c.RouteHead("/x", nil) }, route.HttpHead},
+		{"RouteOptions", func(c *Controller) { c.RouteOptions("/x", nil) }, route.HttpOptions},
+		{"RouteTrace", func(c *Controller) { c.RouteTrace("/x", nil) }, route.HttpTrace},
+		{"RouteConnect", func(c *Controller) { c.RouteConnect("/x", nil) }, route.HttpConnect},
+		{"RouteQuery", func(c *Controller) { c.RouteQuery("/x", nil) }, route.HttpQuery},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := New(tc.call)
+			c.Declare()
+
+			routes := c.OwnRoutes()
+			if len(routes) != 1 {
+				t.Fatalf("OwnRoutes() returned %d routes, want 1", len(routes))
+			}
+			if got := routes[0].Method(); got != tc.method {
+				t.Fatalf("%s registered method %v, want %v", tc.name, got, tc.method)
+			}
+			if got := routes[0].Path(); got != "/x" {
+				t.Fatalf("%s registered path %q, want \"/x\"", tc.name, got)
+			}
+		})
+	}
+}
+
 func TestOwnRoutes_ReturnsCopyNotInternalSlice(t *testing.T) {
 	c := New(func(c *Controller) {
 		c.Route(route.HttpGet, "/a", nil)

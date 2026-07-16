@@ -11,10 +11,19 @@ const (
 	HttpPost
 	// HttpPut corresponds to the HTTP PUT method.
 	HttpPut
+	// HttpPatch corresponds to the HTTP PATCH method.
+	HttpPatch
 	// HttpDelete corresponds to the HTTP DELETE method.
 	HttpDelete
-	// HttpQuery corresponds to the HTTP QUERY method, used for
-	// list/query endpoints (see INSIGHT.md).
+	// HttpHead corresponds to the HTTP HEAD method.
+	HttpHead
+	// HttpOptions corresponds to the HTTP OPTIONS method.
+	HttpOptions
+	// HttpTrace corresponds to the HTTP TRACE method.
+	HttpTrace
+	// HttpConnect corresponds to the HTTP CONNECT method.
+	HttpConnect
+	// HttpQuery corresponds to the HTTP QUERY method.
 	HttpQuery
 )
 
@@ -27,8 +36,18 @@ func (m HttpMethod) String() string {
 		return "POST"
 	case HttpPut:
 		return "PUT"
+	case HttpPatch:
+		return "PATCH"
 	case HttpDelete:
 		return "DELETE"
+	case HttpHead:
+		return "HEAD"
+	case HttpOptions:
+		return "OPTIONS"
+	case HttpTrace:
+		return "TRACE"
+	case HttpConnect:
+		return "CONNECT"
 	case HttpQuery:
 		return "QUERY"
 	default:

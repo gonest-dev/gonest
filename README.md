@@ -57,7 +57,7 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
   controller.Path("/users")
   userService := gonest.MustInject[*UserService](controller)
 
-  controller.Route(gonest.HttpGet, "/", func(route *gonest.Route) {
+  controller.RouteGet("/", func(route *gonest.Route) {
     route.Handler(func(ctx *gonest.RestContext) {
       ctx.Json(userService.List())
     })
@@ -166,7 +166,7 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
 
   userService := gonest.MustInject[*UserService](controller)
 
-  controller.Route(gonest.HttpGet, "/", func(route *gonest.Route) {
+  controller.RouteGet("/", func(route *gonest.Route) {
     route.Summary("List users")
     route.Handler(func(ctx *gonest.RestContext) { ctx.Json(userService.List()) })
   })
@@ -186,6 +186,13 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 `AppOptions` configures bootstrap: `BufferLogs`/`LogLevels` (real `internal/logger` wiring),
 `DisableBanner`/`DisableLoaded` (startup output), `EnableFormStreaming` (see
 [File upload](#file-upload-multipartform-data-streaming) below).
+
+`controller.Route(method, path, fn)` (still available, e.g. for a method chosen at runtime) takes
+any `gonest.HttpMethod` (`HttpGet`/`HttpPost`/`HttpPut`/`HttpPatch`/`HttpDelete`/`HttpHead`/
+`HttpOptions`/`HttpTrace`/`HttpConnect`/`HttpQuery`). Each verb also has a shorthand that skips the
+method argument: `controller.RouteGet(path, fn)`, `RoutePost`, `RoutePut`, `RoutePatch`,
+`RouteDelete`, `RouteHead`, `RouteOptions`, `RouteTrace`, `RouteConnect`, `RouteQuery` -- same
+registration, less repetition.
 
 ### Exceptions
 
@@ -336,7 +343,7 @@ var userIdParamsSchema = gonest.NewSchema[UserIdParams](func(t *UserIdParams, m 
 })
 
 var UserController = gonest.NewController(func(controller *gonest.Controller) {
-  controller.Route(gonest.HttpGet, "/:user_id", func(route *gonest.Route) {
+  controller.RouteGet("/:user_id", func(route *gonest.Route) {
     route.Params(userIdParamsSchema)                     // documents it in OpenAPI
     route.Response(gonest.HttpStatusOk, func(response *gonest.Response) {
       response.Schema(userEntitySchema)
@@ -378,7 +385,7 @@ var createPostFormSchema = gonest.NewSchema[CreatePostForm](func(t *CreatePostFo
 })
 
 var PostController = gonest.NewController(func(controller *gonest.Controller) {
-  controller.Route(gonest.HttpPost, "/", func(route *gonest.Route) {
+  controller.RoutePost("/", func(route *gonest.Route) {
     // Documents the requestBody as multipart/form-data (not application/json)
     // -- "file" becomes {type: string, format: binary}, so Swagger UI renders
     // a real file-upload widget for this route.
@@ -510,7 +517,7 @@ var HealthController = gonest.NewController(func(controller *gonest.Controller) 
   controller.Path("/health")
   pingables := gonest.MustInjectAll[Pingable](controller)
 
-  controller.Route(gonest.HttpGet, "/readyz", func(route *gonest.Route) {
+  controller.RouteGet("/readyz", func(route *gonest.Route) {
     route.Handler(func(ctx *gonest.RestContext) {
       status := gonest.HttpStatusOk
       for _, p := range pingables {

@@ -86,10 +86,19 @@ const (
 	HttpPost = route.HttpPost
 	// HttpPut corresponds to the HTTP PUT method.
 	HttpPut = route.HttpPut
+	// HttpPatch corresponds to the HTTP PATCH method.
+	HttpPatch = route.HttpPatch
 	// HttpDelete corresponds to the HTTP DELETE method.
 	HttpDelete = route.HttpDelete
-	// HttpQuery corresponds to the HTTP QUERY method, used for list/query
-	// endpoints (see INSIGHT.md).
+	// HttpHead corresponds to the HTTP HEAD method.
+	HttpHead = route.HttpHead
+	// HttpOptions corresponds to the HTTP OPTIONS method.
+	HttpOptions = route.HttpOptions
+	// HttpTrace corresponds to the HTTP TRACE method.
+	HttpTrace = route.HttpTrace
+	// HttpConnect corresponds to the HTTP CONNECT method.
+	HttpConnect = route.HttpConnect
+	// HttpQuery corresponds to the HTTP QUERY method.
 	HttpQuery = route.HttpQuery
 )
 

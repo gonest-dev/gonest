@@ -18,6 +18,70 @@ import (
 	"github.com/gonest-dev/gonest/internal/route"
 )
 
+// TestRegisterRoute_AllHttpMethods_DispatchToTheirOwnVerb proves fiberMethod
+// maps every route.HttpMethod (including Patch/Head/Options/Trace/Connect,
+// which used to silently fall through to GET before this test existed) to
+// its own real Fiber verb -- not just that registration doesn't error, but
+// that a request using the SAME verb actually reaches the handler.
+func TestRegisterRoute_AllHttpMethods_DispatchToTheirOwnVerb(t *testing.T) {
+	cases := []struct {
+		name     string
+		method   route.HttpMethod
+		httpVerb string
+	}{
+		{"Get", route.HttpGet, http.MethodGet},
+		{"Post", route.HttpPost, http.MethodPost},
+		{"Put", route.HttpPut, http.MethodPut},
+		{"Patch", route.HttpPatch, http.MethodPatch},
+		{"Delete", route.HttpDelete, http.MethodDelete},
+		{"Head", route.HttpHead, http.MethodHead},
+		{"Options", route.HttpOptions, http.MethodOptions},
+		{"Trace", route.HttpTrace, http.MethodTrace},
+		{"Connect", route.HttpConnect, http.MethodConnect},
+		{"Query", route.HttpQuery, "QUERY"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := New()
+			called := false
+			if err := app.RegisterRoute(tc.method, "/verb", func(ctx *execution.Context) {
+				called = true
+				ctx.Json(map[string]string{"ok": "true"})
+			}); err != nil {
+				t.Fatalf("RegisterRoute returned error: %v", err)
+			}
+
+			req := httptest.NewRequest(tc.httpVerb, "/verb", nil)
+			resp, err := app.FiberApp().Test(req)
+			if err != nil {
+				t.Fatalf("app.Test returned error: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if !called {
+				t.Fatalf("%s request did not reach the handler registered for route.%s -- fiberMethod likely mapped it to the wrong verb", tc.httpVerb, tc.name)
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("expected status 200, got %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestFiberMethod_UnknownHttpMethod_Panics proves an out-of-range
+// route.HttpMethod fails loud (panic) instead of silently registering as
+// GET -- the bug this test guards against before the fix.
+func TestFiberMethod_UnknownHttpMethod_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected fiberMethod to panic on an unknown HttpMethod, it did not")
+		}
+	}()
+
+	fiberMethod(route.HttpMethod(999))
+}
+
 // TestInit_ZeroValueFiberApp_BecomesUsable proves Init lazily sets up the
 // internal *fiber.App on a zero-value FiberApp{} (as reflect.New would
 // produce inside NewApp[T] in internal/app, T8) -- without Init, RegisterRoute
