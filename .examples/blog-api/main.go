@@ -37,7 +37,8 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 	// Global (root-only) registrations -- Middleware/Filter cascade to
 	// every route in the whole tree; Guard/Interceptor stay per-controller
 	// (no Module-level global registration exists for those 2 today).
-	module.Use(shared.RequestIDMiddleware)
+	module.Use(shared.RequestIDMiddleware())
+	module.Use(gonest.NewLoggerMiddleware())
 	module.Filters(shared.DomainFilter)
 })
 

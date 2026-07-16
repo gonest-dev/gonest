@@ -78,6 +78,9 @@ type queryFakeResponder struct {
 
 func (f *queryFakeResponder) JSON(v any) error                      { return nil }
 func (f *queryFakeResponder) SetStatus(code int)                    {}
+func (f *queryFakeResponder) GetStatus() int                        { return 200 }
+func (f *queryFakeResponder) GetMethod() string                     { return "GET" }
+func (f *queryFakeResponder) GetPath() string                       { return "" }
 func (f *queryFakeResponder) GetHeader(name string) string          { return "" }
 func (f *queryFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *queryFakeResponder) GetParam(name string) string           { return "" }

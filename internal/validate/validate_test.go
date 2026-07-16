@@ -104,6 +104,9 @@ type fakeResponder struct {
 
 func (f *fakeResponder) JSON(v any) error                      { return nil }
 func (f *fakeResponder) SetStatus(code int)                    {}
+func (f *fakeResponder) GetStatus() int                        { return 200 }
+func (f *fakeResponder) GetMethod() string                     { return "GET" }
+func (f *fakeResponder) GetPath() string                       { return "" }
 func (f *fakeResponder) GetHeader(name string) string          { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string)     {}
 func (f *fakeResponder) GetParam(name string) string           { return "" }
@@ -722,6 +725,9 @@ type httpFiberResponder struct {
 
 func (r *httpFiberResponder) JSON(v any) error                  { return r.c.JSON(v) }
 func (r *httpFiberResponder) SetStatus(code int)                { r.c.Status(code) }
+func (r *httpFiberResponder) GetStatus() int                    { return r.c.Response().StatusCode() }
+func (r *httpFiberResponder) GetMethod() string                 { return r.c.Method() }
+func (r *httpFiberResponder) GetPath() string                   { return r.c.Path() }
 func (r *httpFiberResponder) GetHeader(name string) string      { return r.c.Get(name) }
 func (r *httpFiberResponder) SetHeaderValue(name, value string) { r.c.Set(name, value) }
 func (r *httpFiberResponder) GetParam(name string) string       { return r.c.Params(name) }

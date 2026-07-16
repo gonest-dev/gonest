@@ -10,8 +10,10 @@ package gonest
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
+	"time"
 	"unsafe"
 
 	"github.com/gonest-dev/gonest/internal/adapter/fiber"
@@ -24,6 +26,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/guard"
 	"github.com/gonest-dev/gonest/internal/inject"
 	"github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/logger"
 	"github.com/gonest-dev/gonest/internal/middleware"
 	"github.com/gonest-dev/gonest/internal/module"
 	"github.com/gonest-dev/gonest/internal/openapi"
@@ -445,6 +448,70 @@ type Next = middleware.Next
 // since Go blocks external import of internal/*, per AD-004 in STATE.md).
 // See internal/middleware.New's doc comment for the full contract.
 var NewMiddleware = middleware.New
+
+// NewLoggerMiddleware creates a ready-made Middleware that logs one line per
+// request -- method, path, response status and duration -- once the rest of
+// the chain (any inner Middleware, Guards, Interceptors, and the route
+// Handler itself) has run, e.g.:
+//
+//	POST /auth/register 201 - 17ms
+//
+// Attach via Controller.Use/Module.Use like any other Middleware (e.g.
+// `root.Use(gonest.NewLoggerMiddleware())`). Uses internal/logger.Info, so
+// output is subject to AppOptions.LogLevels the same as gonest's own
+// startup logging.
+func NewLoggerMiddleware() *Middleware {
+	return middleware.New(func(m *Middleware) {
+		m.Handler(func(ctx *execution.Context, next Next) {
+			start := time.Now()
+			// A rejecting Guard/an exception.Exception thrown by the Handler
+			// unwinds via panic straight past next(ctx) below, without ever
+			// coming back here -- it is only turned into a status code
+			// FURTHER UP the stack, by filteredHandler/the adapter's own
+			// recover (internal/app/app.go, internal/adapter/fiber/fiber.go).
+			// This defer/recover mirrors that mapping (exception.Exception's
+			// own Status(), 500 for anything else) so the log line still
+			// reports the real status the caller will see, then re-panics
+			// unchanged so the existing Filter/default-formatting behavior
+			// is untouched.
+			r := recoverAfter(ctx, next)
+			status := r.status
+			duration := time.Since(start)
+
+			logger.Info(fmt.Sprintf("%s %s %d - %dms", ctx.Method(), ctx.Path(), status, duration.Milliseconds()))
+
+			if r.panicValue != nil {
+				panic(r.panicValue)
+			}
+		})
+	})
+}
+
+// loggerOutcome is NewLoggerMiddleware's own internal record of what
+// happened after calling next(ctx): the status to log, and (if next
+// panicked) the original panic value to re-panic once logging is done.
+type loggerOutcome struct {
+	status     int
+	panicValue any
+}
+
+// recoverAfter calls next(ctx), catching any panic so NewLoggerMiddleware
+// can log a line before re-propagating it unchanged.
+func recoverAfter(ctx *execution.Context, next Next) (outcome loggerOutcome) {
+	defer func() {
+		if r := recover(); r != nil {
+			outcome.panicValue = r
+			if exc, ok := r.(exception.Exception); ok {
+				outcome.status = exc.Status()
+			} else {
+				outcome.status = http.StatusInternalServerError
+			}
+		}
+	}()
+	next(ctx)
+	outcome.status = ctx.ResponseStatus()
+	return outcome
+}
 
 // ---------------------------------------------------------------------------
 // Guard (Guard feature)

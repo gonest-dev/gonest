@@ -220,6 +220,25 @@ func (r *fiberResponder) SetStatus(code int) {
 	r.c.Status(code)
 }
 
+// GetStatus returns the response status code currently set for this request
+// via Fiber's own Ctx.Response().StatusCode() -- fasthttp defaults this to
+// 200 until SetStatus/Ctx.Status changes it, so this is always meaningful
+// even if the Handler never calls Status explicitly.
+func (r *fiberResponder) GetStatus() int {
+	return r.c.Response().StatusCode()
+}
+
+// GetMethod returns the incoming request's HTTP method via Fiber's own
+// Ctx.Method.
+func (r *fiberResponder) GetMethod() string {
+	return r.c.Method()
+}
+
+// GetPath returns the incoming request's full path via Fiber's own Ctx.Path.
+func (r *fiberResponder) GetPath() string {
+	return r.c.Path()
+}
+
 // GetHeader returns the named request header's value via Fiber's Ctx.Get.
 func (r *fiberResponder) GetHeader(name string) string {
 	return r.c.Get(name)

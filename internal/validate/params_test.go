@@ -97,6 +97,9 @@ type paramFakeResponder struct {
 
 func (f *paramFakeResponder) JSON(v any) error                      { return nil }
 func (f *paramFakeResponder) SetStatus(code int)                    {}
+func (f *paramFakeResponder) GetStatus() int                        { return 200 }
+func (f *paramFakeResponder) GetMethod() string                     { return "GET" }
+func (f *paramFakeResponder) GetPath() string                       { return "" }
 func (f *paramFakeResponder) GetHeader(name string) string          { return "" }
 func (f *paramFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *paramFakeResponder) GetParam(name string) string           { return f.params[name] }

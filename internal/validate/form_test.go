@@ -60,6 +60,9 @@ type formFakeResponder struct {
 
 func (f *formFakeResponder) JSON(v any) error                  { return nil }
 func (f *formFakeResponder) SetStatus(code int)                {}
+func (f *formFakeResponder) GetStatus() int                    { return 200 }
+func (f *formFakeResponder) GetMethod() string                 { return "GET" }
+func (f *formFakeResponder) GetPath() string                   { return "" }
 func (f *formFakeResponder) GetHeader(name string) string      { return "" }
 func (f *formFakeResponder) SetHeaderValue(name, value string) {}
 func (f *formFakeResponder) GetParam(name string) string       { return "" }

@@ -19,6 +19,9 @@ import "io"
 type Responder interface {
 	JSON(v any) error
 	SetStatus(code int)
+	GetStatus() int
+	GetMethod() string
+	GetPath() string
 	GetHeader(name string) string
 	SetHeaderValue(name, value string)
 	GetParam(name string) string
@@ -86,6 +89,31 @@ func (ctx *Context) Json(value any) error {
 func (ctx *Context) Status(code int) *Context {
 	ctx.res.SetStatus(code)
 	return ctx
+}
+
+// ResponseStatus returns the response status code currently set on this
+// request -- the underlying HTTP framework's own default (200) if Status
+// was never called. Used by a Logger middleware (gonest.NewLoggerMiddleware)
+// to read back the status AFTER next(ctx) runs the rest of the chain, since
+// Status/SetStatus are otherwise write-only.
+func (ctx *Context) ResponseStatus() int {
+	return ctx.res.GetStatus()
+}
+
+// Method returns the actual incoming request's HTTP method (e.g. "POST"),
+// as reported by the underlying HTTP framework -- not the route's own
+// declared method (route.Route.Method), so it stays correct even if a
+// Middleware runs before/without a *route.Route ever being attached.
+func (ctx *Context) Method() string {
+	return ctx.res.GetMethod()
+}
+
+// Path returns the actual incoming request's full path (e.g.
+// "/auth/register/otp"), as reported by the underlying HTTP framework -- not
+// the route's own declared pattern (route.Route.Path, which is relative to
+// its controller's prefix and may contain ":param" placeholders).
+func (ctx *Context) Path() string {
+	return ctx.res.GetPath()
 }
 
 // Header returns the value of the named request/response header.

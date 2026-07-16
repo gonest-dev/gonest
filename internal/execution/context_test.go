@@ -17,6 +17,8 @@ type fakeResponder struct {
 	queries    map[string]string
 	htmlValue  string
 	htmlErr    error
+	method     string
+	path       string
 }
 
 func newFakeResponder() *fakeResponder {
@@ -33,6 +35,18 @@ func (f *fakeResponder) JSON(v any) error {
 
 func (f *fakeResponder) SetStatus(code int) {
 	f.statusCode = code
+}
+
+func (f *fakeResponder) GetStatus() int {
+	return f.statusCode
+}
+
+func (f *fakeResponder) GetMethod() string {
+	return f.method
+}
+
+func (f *fakeResponder) GetPath() string {
+	return f.path
 }
 
 func (f *fakeResponder) GetHeader(name string) string {

@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/gonest-dev/gonest/internal/adapter/fiber"
 	"github.com/gonest-dev/gonest/internal/execution"
 	interceptorpkg "github.com/gonest-dev/gonest/internal/interceptor"
+	"github.com/gonest-dev/gonest/internal/logger"
 	"github.com/gonest-dev/gonest/internal/route"
 	"github.com/gonest-dev/gonest/internal/validate"
 	"github.com/google/uuid"
@@ -311,6 +313,9 @@ func newParamFakeResponder() *paramFakeResponder {
 
 func (f *paramFakeResponder) JSON(v any) error                      { return nil }
 func (f *paramFakeResponder) SetStatus(code int)                    {}
+func (f *paramFakeResponder) GetStatus() int                        { return 200 }
+func (f *paramFakeResponder) GetMethod() string                     { return "GET" }
+func (f *paramFakeResponder) GetPath() string                       { return "" }
 func (f *paramFakeResponder) GetHeader(name string) string          { return "" }
 func (f *paramFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *paramFakeResponder) GetParam(name string) string           { return f.params[name] }
@@ -680,6 +685,123 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 	}
 	if _, err := uuid.Parse(requestId); err != nil {
 		t.Fatalf("X-Request-Id header = %q is not a valid UUID: %v", requestId, err)
+	}
+}
+
+// TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration
+// proves gonest.NewLoggerMiddleware() logs one line per request -- method,
+// full path, response status and duration -- through a REAL app.Test
+// dispatch, same rigor as TestRequestIdMiddleware_RootAlias_InsightCallShape
+// above.
+func TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration(t *testing.T) {
+	var buf bytes.Buffer
+	logger.SetOutput(&buf)
+	t.Cleanup(func() { logger.SetOutput(os.Stdout) })
+
+	controller := NewController(func(c *Controller) {
+		c.Use(NewLoggerMiddleware())
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Status(http.StatusTeapot)
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusTeapot {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusTeapot)
+	}
+
+	logged := buf.String()
+	if !strings.Contains(logged, "GET /ping 418 - ") {
+		t.Fatalf("expected log output to contain %q, got:\n%s", "GET /ping 418 - ", logged)
+	}
+	if !strings.Contains(logged, "ms") {
+		t.Fatalf("expected log output to report a duration in ms, got:\n%s", logged)
+	}
+}
+
+// TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects
+// proves the log line still reports the REAL status (403, from
+// exception.NewForbiddenException) even though a rejecting Guard panics --
+// that panic unwinds straight past NewLoggerMiddleware's own next(ctx) call,
+// so without its own recover the request would go completely unlogged.
+func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *testing.T) {
+	var buf bytes.Buffer
+	logger.SetOutput(&buf)
+	t.Cleanup(func() { logger.SetOutput(os.Stdout) })
+
+	rejectingGuard := NewGuard(func(g *Guard) {
+		g.Handler(func(ctx *execution.Context) bool {
+			return false
+		})
+	})
+
+	controller := NewController(func(c *Controller) {
+		c.Use(NewLoggerMiddleware())
+		c.Guards(rejectingGuard)
+		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
+			r.Handler(func(ctx *execution.Context) {
+				ctx.Json(map[string]string{"ok": "true"})
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	logged := buf.String()
+	if !strings.Contains(logged, "GET /ping 403 - ") {
+		t.Fatalf("expected log output to contain %q despite the Guard rejecting, got:\n%s", "GET /ping 403 - ", logged)
 	}
 }
 

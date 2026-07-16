@@ -23,6 +23,9 @@ func newFakeResponder() *fakeResponder {
 
 func (f *fakeResponder) JSON(v any) error                      { return nil }
 func (f *fakeResponder) SetStatus(code int)                    {}
+func (f *fakeResponder) GetStatus() int                        { return 200 }
+func (f *fakeResponder) GetMethod() string                     { return "GET" }
+func (f *fakeResponder) GetPath() string                       { return "" }
 func (f *fakeResponder) GetHeader(name string) string          { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string)     {}
 func (f *fakeResponder) GetParam(name string) string           { return f.params[name] }
