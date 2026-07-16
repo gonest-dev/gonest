@@ -10,6 +10,9 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" />
   </a>
+  <a href="https://gonest.dev">
+    <img src="https://img.shields.io/badge/docs-gonest.dev-14A9BE.svg" alt="Documentation" />
+  </a>
 </div>
 
 <br/>
@@ -81,7 +84,8 @@ func main() {
 See [`.examples/simple-todo`](.examples/simple-todo) for a minimal MVC example (no external
 dependencies) and [`.examples/blog-api`](.examples/blog-api) for a denser one (guards,
 interceptors, middleware, filters, OpenAPI/Swagger, SQLite persistence, a real 3-module domain).
-See [Documentation](#documentation) below for the full API.
+See [Documentation](#documentation) below for the full API, or [gonest.dev](https://gonest.dev) for the
+full docs site.
 
 ---
 
