@@ -30,7 +30,7 @@
   - [File upload (multipart/form-data streaming)](#file-upload-multipartform-data-streaming)
   - [OpenAPI / Swagger](#openapi--swagger)
   - [Event Emitter](#event-emitter)
-  - [Scheduler (Cron/Interval/Timeout)](#scheduler-croninterval-timeout)
+  - [Scheduler (Cron/Interval/Timeout)](#scheduler-cronintervaltimeout)
   - [Health checks (Terminus)](#health-checks-terminus)
   - [Testing](#testing)
 - [Contributors](#contributors)
@@ -57,8 +57,8 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
   controller.Path("/users")
   userService := gonest.MustInject[*UserService](controller)
 
-  controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
-    r.Handler(func(ctx *gonest.RestContext) {
+  controller.Route(gonest.HttpGet, "/", func(route *gonest.Route) {
+    route.Handler(func(ctx *gonest.RestContext) {
       ctx.Json(userService.List())
     })
   })
@@ -166,9 +166,9 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
 
   userService := gonest.MustInject[*UserService](controller)
 
-  controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
-    r.Summary("List users")
-    r.Handler(func(ctx *gonest.RestContext) { ctx.Json(userService.List()) })
+  controller.Route(gonest.HttpGet, "/", func(route *gonest.Route) {
+    route.Summary("List users")
+    route.Handler(func(ctx *gonest.RestContext) { ctx.Json(userService.List()) })
   })
 })
 
@@ -336,13 +336,13 @@ var userIdParamsSchema = gonest.NewSchema[UserIdParams](func(t *UserIdParams, m 
 })
 
 var UserController = gonest.NewController(func(controller *gonest.Controller) {
-  controller.Route(gonest.HttpGet, "/:user_id", func(r *gonest.Route) {
-    r.Params(userIdParamsSchema)                     // documents it in OpenAPI
-    r.Response(gonest.HttpStatusOk, func(response *gonest.Response) {
+  controller.Route(gonest.HttpGet, "/:user_id", func(route *gonest.Route) {
+    route.Params(userIdParamsSchema)                     // documents it in OpenAPI
+    route.Response(gonest.HttpStatusOk, func(response *gonest.Response) {
       response.Schema(userEntitySchema)
     })
 
-    r.Handler(func(ctx *gonest.RestContext) {
+    route.Handler(func(ctx *gonest.RestContext) {
       // MustParseRestParams uses the SAME Schema for runtime validation --
       // the Schema value must be passed explicitly (a compile-time guarantee
       // that it's never forgotten, not a hidden global-registry lookup).
@@ -378,12 +378,12 @@ var createPostFormSchema = gonest.NewSchema[CreatePostForm](func(t *CreatePostFo
 })
 
 var PostController = gonest.NewController(func(controller *gonest.Controller) {
-  controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
+  controller.Route(gonest.HttpPost, "/", func(route *gonest.Route) {
     // Documents the requestBody as multipart/form-data (not application/json)
     // -- "file" becomes {type: string, format: binary}, so Swagger UI renders
     // a real file-upload widget for this route.
-    r.FormBody(createPostFormSchema, "file")
-    r.Handler(func(ctx *gonest.RestContext) {
+    route.FormBody(createPostFormSchema, "file")
+    route.Handler(func(ctx *gonest.RestContext) {
       form := gonest.MustParseRestFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *gonest.FormFile) error {
         // f.Reader() is the still-unconsumed part -- pipe it straight to S3/etc.
         return uploadToS3(f.Filename(), f.ContentType(), f.Reader())
@@ -510,8 +510,8 @@ var HealthController = gonest.NewController(func(controller *gonest.Controller) 
   controller.Path("/health")
   pingables := gonest.MustInjectAll[Pingable](controller)
 
-  controller.Route(gonest.HttpGet, "/readyz", func(r *gonest.Route) {
-    r.Handler(func(ctx *gonest.RestContext) {
+  controller.Route(gonest.HttpGet, "/readyz", func(route *gonest.Route) {
+    route.Handler(func(ctx *gonest.RestContext) {
       status := gonest.HttpStatusOk
       for _, p := range pingables {
         if p.Ping(context.Background()) != nil {
