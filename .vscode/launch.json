@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "app/ts:server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm dev",
+      "cwd": "${workspaceFolder}/app/ts/${input:app_ts}"
+    },
+    {
+      "name": "app/ts:client",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000"
+    },
+    {
+      "name": "app/ts:full",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm dev",
+      "cwd": "${workspaceFolder}/app/ts/${input:app_ts}",
+      "serverReadyAction": {
+        "pattern": "started server on .+, url: (https?://localhost:[0-9]+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "app_ts",
+      "type": "pickString",
+      "description": "Select the application to debug",
+      "options": [
+        {
+          "label": "identity",
+          "value": "identity"
+        }
+      ],
+      "default": "identity"
+    }
+  ]
+}

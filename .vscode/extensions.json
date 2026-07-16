@@ -1,0 +1,19 @@
+{
+  "recommendations": [
+    "aaron-bond.better-comments",
+    "vadimcn.vscode-lldb",
+    "ms-azuretools.vscode-containers",
+    "fill-labs.dependi",
+    "ms-azuretools.vscode-docker",
+    "github.vscode-github-actions",
+    "github.gitlens",
+    "golang.go",
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-mermaid",
+    "unifiedjs.vscode-mdx",
+    "bierner.markdown-mermaid-syntax-highlighting",
+    "peterj.proto",
+    "rust-lang.rust-analyzer",
+    "vscode-icons-team.vscode-icons",
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  //#region editor
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnSaveMode": "file",
+  "editor.formatOnType": true,
+  "editor.detectIndentation": false,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.rulers": [
+    80,
+    100,
+    120
+  ],
+  //#endregion
+  //#region files
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/.gemini": true,
+    "**/.gocache": true,
+    "**/.turbo": true,
+    "**/Thumbs.db": true,
+    "**/flutter/ephemeral": true,
+    "**/Flutter/ephemeral": true,
+    "**/.symlinks": true,
+    "**/.plugin_symlinks": true,
+    "**/*.exe": true,
+    "**/*.exe*": true,
+    "**/proto/**/*.go": true
+  },
+  //#endregion
+  //#region docker
+  "[dockerfile]": {
+    "editor.quickSuggestions": {
+      "strings": true,
+    },
+    "editor.tabSize": 4
+  },
+  "[dockercompose]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.autoIndent": "advanced",
+    "editor.formatOnSave": false,
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": true
+    }
+  },
+  //#endregion
+  // #region css
+  "css.lint.unknownAtRules": "ignore",
+  "[css]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
+  },
+  // #endregion
+  // #region go
+  "[go]": {
+    "editor.foldingStrategy": "indentation",
+  }
+  // #endregion
+}
