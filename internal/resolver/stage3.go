@@ -7,9 +7,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/scope"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/scope"
 )
 
 // constructable is satisfied by *provider.Provider. It is declared here

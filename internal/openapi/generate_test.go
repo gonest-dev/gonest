@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gonest-dev/gonest/internal/controller"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/route"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/controller"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // --- fixtures -------------------------------------------------------------

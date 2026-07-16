@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/exception"
 )
 
 // builtinCase describes one built-in exception constructor under test: the

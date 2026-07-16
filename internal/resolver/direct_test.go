@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/provider"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
 )
 
 // fakeResolvedProvider extends fakeProvider (resolver_test.go) with a

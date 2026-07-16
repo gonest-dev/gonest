@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/module"
 )
 
 // fakeControllerOwner is a minimal module.Owner stand-in for

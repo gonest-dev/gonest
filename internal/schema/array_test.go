@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // arrayEntity exercises Array() against real slice-typed fields, plus a

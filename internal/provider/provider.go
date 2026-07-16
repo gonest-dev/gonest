@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/scope"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/scope"
 )
 
 // contextType and errorType are used to validate Constructor's accepted

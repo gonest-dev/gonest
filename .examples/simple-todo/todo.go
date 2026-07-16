@@ -3,7 +3,7 @@ package main
 import (
 	"sync"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 // TodoService holds todos in memory -- no database, no external

@@ -19,7 +19,7 @@
 package main
 
 import (
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 func main() {

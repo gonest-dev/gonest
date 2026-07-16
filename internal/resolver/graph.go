@@ -1,8 +1,8 @@
 package resolver
 
 import (
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/module"
 )
 
 // BuildGraph combines the pending edges recorded by internal/inject (every

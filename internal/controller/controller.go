@@ -10,13 +10,13 @@ package controller
 import (
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/filter"
-	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/middleware"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolver"
-	"github.com/gonest-dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/filter"
+	"gonest.dev/gonest/internal/guard"
+	"gonest.dev/gonest/internal/interceptor"
+	"gonest.dev/gonest/internal/middleware"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/resolver"
+	"gonest.dev/gonest/internal/route"
 )
 
 // Controller represents a declarative unit that consumes providers via

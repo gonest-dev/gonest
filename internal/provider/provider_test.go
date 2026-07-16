@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/scope"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/scope"
 )
 
 type fakeService struct{}

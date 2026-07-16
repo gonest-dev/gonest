@@ -3,7 +3,7 @@ module blog-api
 go 1.25.0
 
 require (
-	github.com/gonest-dev/gonest v0.0.0
+	gonest.dev/gonest v0.0.0
 	modernc.org/sqlite v1.53.0
 )
 
@@ -34,4 +34,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/gonest-dev/gonest => ../..
+replace gonest.dev/gonest => ../..

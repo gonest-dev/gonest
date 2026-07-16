@@ -3,7 +3,7 @@ package shared
 import (
 	"net/http"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 // DuplicateEmailException is a dev-defined exception (INSIGHT.md's own

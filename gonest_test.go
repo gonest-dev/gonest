@@ -16,12 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gonest-dev/gonest/internal/adapter/fiber"
-	"github.com/gonest-dev/gonest/internal/execution"
-	interceptorpkg "github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/logger"
-	"github.com/gonest-dev/gonest/internal/route"
-	"github.com/gonest-dev/gonest/internal/validate"
+	"gonest.dev/gonest/internal/adapter/fiber"
+	"gonest.dev/gonest/internal/execution"
+	interceptorpkg "gonest.dev/gonest/internal/interceptor"
+	"gonest.dev/gonest/internal/logger"
+	"gonest.dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/validate"
 	"github.com/google/uuid"
 )
 

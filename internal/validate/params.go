@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/route"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // ParseParams is the real implementation behind the public root

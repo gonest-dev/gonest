@@ -24,7 +24,7 @@
 package main
 
 import (
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 
 	"blog-api/module/comment"
 	"blog-api/module/post"

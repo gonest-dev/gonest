@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // objectEntity mirrors INSIGHT.md's UserEntity shape for the two Object()

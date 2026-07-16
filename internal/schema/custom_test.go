@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // customEntity is a minimal fixture for exercising Custom/CustomFunc in

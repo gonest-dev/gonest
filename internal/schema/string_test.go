@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // stringBranchEntity exercises all 10 string-family branches on distinct

@@ -7,9 +7,9 @@ package guard
 import (
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolver"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/resolver"
 )
 
 // Guard represents a single authorization-check unit: it holds the

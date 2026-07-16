@@ -5,7 +5,7 @@
 package comment
 
 import (
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 type Entity struct {

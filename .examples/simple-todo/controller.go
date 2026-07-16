@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 type createTodoBody struct {

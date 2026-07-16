@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 var requestCounter atomic.Int64

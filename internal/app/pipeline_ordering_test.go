@@ -8,17 +8,17 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/controller"
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/filter"
-	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/interceptor"
-	"github.com/gonest-dev/gonest/internal/middleware"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/route"
-	"github.com/gonest-dev/gonest/internal/schema"
-	"github.com/gonest-dev/gonest/internal/validate"
+	"gonest.dev/gonest/internal/controller"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/filter"
+	"gonest.dev/gonest/internal/guard"
+	"gonest.dev/gonest/internal/interceptor"
+	"gonest.dev/gonest/internal/middleware"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/validate"
 )
 
 // --- "Pipeline Ordering" T1 (Milestone 3 closing task) ---

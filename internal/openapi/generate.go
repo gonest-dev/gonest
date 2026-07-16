@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/route"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // routableController is a locally-declared interface used to type-assert

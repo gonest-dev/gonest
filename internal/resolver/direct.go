@@ -3,7 +3,7 @@ package resolver
 import (
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/module"
 )
 
 // resolvedGetter is satisfied by *provider.Provider (its ResolvedValue

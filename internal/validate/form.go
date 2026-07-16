@@ -6,9 +6,9 @@ import (
 	"mime/multipart"
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // FormFile is one file part from a multipart/form-data stream, still

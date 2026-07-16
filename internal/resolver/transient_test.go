@@ -5,10 +5,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/provider"
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/scope"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/scope"
 )
 
 // --- fixtures ---------------------------------------------------------

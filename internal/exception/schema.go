@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // schemaShape mirrors HttpException.MarshalJSON's own output shape

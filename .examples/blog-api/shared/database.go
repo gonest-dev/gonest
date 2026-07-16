@@ -8,7 +8,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 const schema = `

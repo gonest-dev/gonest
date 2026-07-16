@@ -4,9 +4,9 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolver"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/resolver"
 )
 
 // Listener represents a single unit of event-handling registration: its

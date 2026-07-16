@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/provider"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
 )
 
 // fakeService/otherService are placeholder targets for MustInject[T] in

@@ -6,7 +6,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // userEntity reproduces INSIGHT.md's 7-field UserEntity example verbatim

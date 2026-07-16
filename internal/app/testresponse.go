@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/route"
 )
 
 // TestResponse wraps the *http.Response MustRequest dispatched, exposing

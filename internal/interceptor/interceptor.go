@@ -8,9 +8,9 @@ package interceptor
 import (
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolver"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/resolver"
 )
 
 // Next represents the continuation of the interceptor chain: calling it runs

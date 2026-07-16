@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/gonest-dev/gonest/internal/logger"
+	"gonest.dev/gonest/internal/logger"
 )
 
 // Emitter holds every registered listener (via MustOn), keyed by the exact

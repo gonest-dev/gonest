@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/filter"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/filter"
 )
 
 // fakeResponder is a minimal test-only execution.Responder, mirroring the one

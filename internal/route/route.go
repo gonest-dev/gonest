@@ -3,8 +3,8 @@ package route
 import (
 	"strings"
 
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // defaultHttpCode is the status code a Route uses when HttpCode is never

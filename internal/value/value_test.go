@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/value"
+	"gonest.dev/gonest/internal/value"
 )
 
 // --- Value[T] core behaviour ---

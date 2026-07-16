@@ -1,6 +1,6 @@
 package route
 
-import "github.com/gonest-dev/gonest/internal/schema"
+import "gonest.dev/gonest/internal/schema"
 
 // Response is the per-status response builder passed to Route.Response's
 // optional callback -- lets a route configure that status's documented

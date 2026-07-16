@@ -6,8 +6,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // fakeResponder is a minimal test-only execution.Responder, mirroring the one

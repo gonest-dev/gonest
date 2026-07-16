@@ -1,6 +1,6 @@
 package shared
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 // AuthGuard demonstrates a Guard shared across multiple controllers/
 // modules (attached to user/post/comment's write routes below) -- a

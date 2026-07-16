@@ -16,9 +16,9 @@ import (
 	"reflect"
 	"regexp"
 
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // violation is one field-level validation failure -- the shape every

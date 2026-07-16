@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/module"
 )
 
 // color tracks DFS visitation state for 3-color cycle detection: white

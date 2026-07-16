@@ -10,7 +10,7 @@ import (
 
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/module"
 )
 
 // ModuleName returns a debug-friendly identifier for m, reusing

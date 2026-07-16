@@ -3,7 +3,7 @@ package comment
 import (
 	"database/sql"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 
 	"blog-api/module/post"
 	"blog-api/module/user"

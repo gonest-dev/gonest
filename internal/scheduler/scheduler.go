@@ -14,9 +14,9 @@ import (
 
 	cronlib "github.com/robfig/cron/v3"
 
-	"github.com/gonest-dev/gonest/internal/logger"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolver"
+	"gonest.dev/gonest/internal/logger"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/resolver"
 )
 
 // jobHandle backs one named Cron/Interval/Timeout registration -- Stop

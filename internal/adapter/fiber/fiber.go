@@ -14,10 +14,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/gonest-dev/gonest/internal/appoptions"
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/appoptions"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/route"
 )
 
 // FiberApp wraps a real *fiber.App and satisfies the minimal httpAdapter

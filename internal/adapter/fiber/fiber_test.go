@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gonest-dev/gonest/internal/appoptions"
-	"github.com/gonest-dev/gonest/internal/exception"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/appoptions"
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/route"
 )
 
 // TestRegisterRoute_AllHttpMethods_DispatchToTheirOwnVerb proves fiberMethod

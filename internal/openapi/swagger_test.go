@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/adapter/fiber"
-	"github.com/gonest-dev/gonest/internal/app"
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/adapter/fiber"
+	"gonest.dev/gonest/internal/app"
+	"gonest.dev/gonest/internal/module"
 )
 
 // --- renderSwaggerUIHTML (unit) --------------------------------------------

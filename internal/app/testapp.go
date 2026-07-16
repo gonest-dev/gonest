@@ -4,10 +4,10 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/gonest-dev/gonest/internal/adapter/fiber"
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/resolver"
+	"gonest.dev/gonest/internal/adapter/fiber"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/resolver"
 )
 
 // TestBuilder collects overrides for MustNewTestApp's provider substitution

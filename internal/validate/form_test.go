@@ -9,8 +9,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // --- P0/P1 fixtures ---------------------------------------------------------

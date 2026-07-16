@@ -10,9 +10,9 @@ import (
 	"html/template"
 	"strings"
 
-	"github.com/gonest-dev/gonest/internal/app"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/app"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/route"
 )
 
 // SwaggerOptions is INSIGHT.md's exact field set for SetupSwagger's options

@@ -6,7 +6,7 @@ package ex
 import (
   "time"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type UserProperties struct {
@@ -137,7 +137,7 @@ enviado no payload (dirty-tracking). Campos omitidos ficam `IsDirty() == false`
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 // UserPatchDTO usa Value[T] nos campos mutáveis.
 // Campos omitidos no JSON ficam com IsDirty() == false e são ignorados.
@@ -183,7 +183,7 @@ var _ = gonest.NewController(func(c *gonest.Controller) {
 package ex
 
 import (
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // exceptions built-in do framework (todas embedam HttpException)
@@ -234,7 +234,7 @@ import (
   "strings"
   "time"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
   "github.com/google/uuid"
 )
 
@@ -394,7 +394,7 @@ package main
 import (
   "fmt"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/module"
 )
 
 // fakeDirectOwner is a minimal module.Owner + directResolver test double,

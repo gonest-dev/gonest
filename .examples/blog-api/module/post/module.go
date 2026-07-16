@@ -3,7 +3,7 @@ package post
 import (
 	"database/sql"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 
 	"blog-api/module/user"
 	"blog-api/shared"

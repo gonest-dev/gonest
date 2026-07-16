@@ -16,7 +16,7 @@
 // internal/app itself needed to change.
 package appoptions
 
-import "github.com/gonest-dev/gonest/internal/logger"
+import "gonest.dev/gonest/internal/logger"
 
 // AppOptions is Nest-parity bootstrap config for NewApp/MustNewApp
 // (BufferLogs, LogLevels), matching INSIGHT.md's literal call sites

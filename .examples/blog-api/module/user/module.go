@@ -4,7 +4,7 @@ import (
 	"blog-api/shared"
 	"database/sql"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 var Provider = gonest.NewProvider(func(provider *gonest.Provider) {

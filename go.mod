@@ -1,4 +1,4 @@
-module github.com/gonest-dev/gonest
+module gonest.dev/gonest
 
 go 1.25.0
 

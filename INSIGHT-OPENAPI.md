@@ -4,7 +4,7 @@
 package ex
 
 import (
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type UserEntity struct {
@@ -56,7 +56,7 @@ var _ = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
 package ex
 
 import (
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type AddressEntity struct {
@@ -151,7 +151,7 @@ package ex_test
 import (
   "testing"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // pré-requisito pra mock funcionar: dependência tem que ser injetada por INTERFACE,
@@ -217,7 +217,7 @@ de notificação, múltiplos validators customizados etc).
 package ex
 
 import (
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // Connectable é a interface -- múltiplos providers podem satisfazer a mesma.
@@ -285,7 +285,7 @@ package ex
 import (
   "context"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // evento tipado por struct — mesma filosofia do MustCatch (sem string solta tipo "user.created").
@@ -340,7 +340,7 @@ import (
   "context"
   "time"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 var CleanupScheduler = gonest.NewScheduler(func (scheduler *gonest.Scheduler) {
@@ -372,7 +372,7 @@ package ex
 import (
   "context"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // Pingable é a interface que toda dependência checável implementa -- nome
@@ -448,7 +448,7 @@ para compilar a documentação OpenAPI sem duplicar declarações.
 package ex
 
 import (
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // path params: struct + tag `param:"..."`, um campo por segmento ":name" da rota.
@@ -555,7 +555,7 @@ package ex
 import (
   "io"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type CreatePostForm struct {
@@ -644,7 +644,7 @@ que Go não tem decorator):
 package ex
 
 import (
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type AddressEntity struct {
@@ -834,7 +834,7 @@ e `paramsDTOSchema`, por exemplo). Isso:
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type exQuery struct {
   Limit  int64 `query:"limit"`

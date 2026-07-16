@@ -1,6 +1,6 @@
 package app
 
-import "github.com/gonest-dev/gonest/internal/appoptions"
+import "gonest.dev/gonest/internal/appoptions"
 
 // AppOptions/LogLevel/OnListen (and the LogLevelXxx consts) are plain type
 // aliases of internal/appoptions's own definitions -- moved out of this

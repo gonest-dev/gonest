@@ -2,7 +2,7 @@ module simple-todo
 
 go 1.25.0
 
-require github.com/gonest-dev/gonest v0.0.0
+require gonest.dev/gonest v0.0.0
 
 require (
 	github.com/andybalholm/brotli v1.2.2 // indirect
@@ -25,4 +25,4 @@ require (
 	golang.org/x/text v0.38.0 // indirect
 )
 
-replace github.com/gonest-dev/gonest => ../..
+replace gonest.dev/gonest => ../..

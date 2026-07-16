@@ -12,7 +12,7 @@
 // routes/Schema are separate ROADMAP features (spec.md's Out of Scope).
 package openapi
 
-import "github.com/gonest-dev/gonest/internal/schema"
+import "gonest.dev/gonest/internal/schema"
 
 // OpenAPI holds every document-level field INSIGHT.md's bootstrap
 // example sets. specVersion is the OpenAPI SPEC version passed to New (e.g.

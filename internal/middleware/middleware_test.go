@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/execution"
 )
 
 // fakeResponder is a minimal test-only execution.Responder, mirroring the one

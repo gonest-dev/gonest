@@ -6,7 +6,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gonest-dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/schema"
 )
 
 // kindEntity exercises every branch family (String/Numeric/Boolean/

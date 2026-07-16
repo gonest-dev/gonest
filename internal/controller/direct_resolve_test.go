@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/provider"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
 )
 
 // resolvedProvider builds a *provider.Provider whose Constructor resolves T

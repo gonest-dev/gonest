@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/gonest-dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/module"
 )
 
 // PendingEdge records that Owner requested resolution of TargetType via

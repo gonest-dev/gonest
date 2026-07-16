@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 )
 
 // TimingInterceptor logs how long each request took, wrapping the route

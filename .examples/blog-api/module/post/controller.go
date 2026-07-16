@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 
 	"blog-api/shared"
 )

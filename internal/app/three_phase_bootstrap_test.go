@@ -4,13 +4,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gonest-dev/gonest/internal/controller"
-	"github.com/gonest-dev/gonest/internal/execution"
-	"github.com/gonest-dev/gonest/internal/guard"
-	"github.com/gonest-dev/gonest/internal/inject"
-	"github.com/gonest-dev/gonest/internal/module"
-	"github.com/gonest-dev/gonest/internal/provider"
-	"github.com/gonest-dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/controller"
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/guard"
+	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
+	"gonest.dev/gonest/internal/route"
 )
 
 // orderLog is a mutex-protected append-only log, shared across concurrent

@@ -4,8 +4,8 @@
 </div>
 
 <div align="center">
-  <a href="https://pkg.go.dev/github.com/gonest-dev/gonest">
-    <img src="https://pkg.go.dev/badge/github.com/gonest-dev/gonest.svg" alt="Go Reference" />
+  <a href="https://pkg.go.dev/gonest.dev/gonest">
+    <img src="https://pkg.go.dev/badge/gonest.dev/gonest.svg" alt="Go Reference" />
   </a>
 </div>
 
@@ -43,7 +43,7 @@
 ```go
 package main
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type UserService struct{}
 
@@ -149,7 +149,7 @@ history of design decisions.
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type UserService struct{ db *sql.DB }
 
@@ -205,7 +205,7 @@ package ex
 import (
   "net/http"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 // Built-in exceptions (all embed HttpException):
@@ -240,7 +240,7 @@ just for a status code.
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 // Middleware: runs before routing (raw request/response), like Express middleware.
 var RequestIdMiddleware = gonest.NewMiddleware(func(middleware *gonest.Middleware) {
@@ -291,7 +291,7 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type Connectable interface{ Ping() bool }
 
@@ -309,7 +309,7 @@ var SystemController = gonest.NewController(func(controller *gonest.Controller) 
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type UserEntity struct {
   Id    int64  `json:"id"`
@@ -335,7 +335,7 @@ hatch for domain-specific formats the fixed vocabulary doesn't cover.
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type UserIdParams struct {
   UserId int64 `param:"user_id"`
@@ -377,7 +377,7 @@ forwarding bytes to S3 (or any `io.Writer`) without ever buffering the whole fil
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 type CreatePostForm struct {
   Title string `form:"title"`
@@ -416,7 +416,7 @@ func main() {
 ```go
 package ex
 
-import "github.com/gonest-dev/gonest"
+import "gonest.dev/gonest"
 
 func main() {
   app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
@@ -445,7 +445,7 @@ package ex
 import (
   "context"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type UserCreatedEvent struct{ UserID int64 }
@@ -480,7 +480,7 @@ import (
   "context"
   "time"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 var CleanupScheduler = gonest.NewScheduler(func(scheduler *gonest.Scheduler) {
@@ -508,7 +508,7 @@ package ex
 import (
   "context"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 type Pingable interface {
@@ -542,7 +542,7 @@ package ex_test
 import (
   "testing"
 
-  "github.com/gonest-dev/gonest"
+  "gonest.dev/gonest"
 )
 
 func TestUserController_Get(t *testing.T) {

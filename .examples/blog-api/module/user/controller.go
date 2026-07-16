@@ -3,7 +3,7 @@ package user
 import (
 	"net/http"
 
-	"github.com/gonest-dev/gonest"
+	"gonest.dev/gonest"
 
 	"blog-api/shared"
 )
