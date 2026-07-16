@@ -7,6 +7,9 @@
   <a href="https://pkg.go.dev/gonest.dev/gonest">
     <img src="https://pkg.go.dev/badge/gonest.dev/gonest.svg" alt="Go Reference" />
   </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" />
+  </a>
 </div>
 
 <br/>
@@ -571,4 +574,4 @@ Thanks to all the people who contribute!
 
 ## License
 
-No `LICENSE` file exists yet -- to be added before the first tagged release.
+[MIT](LICENSE)
