@@ -103,7 +103,7 @@ func (f *paramFakeResponder) GetPath() string                       { return "" 
 func (f *paramFakeResponder) GetHeader(name string) string          { return "" }
 func (f *paramFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *paramFakeResponder) GetParam(name string) string           { return f.params[name] }
-func (f *paramFakeResponder) Body() []byte                          { return nil }
+func (f *paramFakeResponder) RawBody() []byte                          { return nil }
 func (f *paramFakeResponder) Queries() map[string]string            { return nil }
 func (f *paramFakeResponder) HTML(s string) error                   { return nil }
 func (f *paramFakeResponder) SendString(s string) error             { return nil }
@@ -126,11 +126,8 @@ func TestMustParams_HappyPath_TwoParams(t *testing.T) {
 		"order_id": "20",
 	})
 
-	result := MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
+	result := mustParseParams[UserOrderParams](ctx, userOrderParamsSchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.UserId != 10 {
 		t.Fatalf("expected UserId 10, got %d", result.UserId)
 	}
@@ -159,7 +156,7 @@ func TestMustParams_FieldWithNoRouteMatch_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOnlyParams](ctx, userOnlyParamsSchema)
+	mustParseParams[UserOnlyParams](ctx, userOnlyParamsSchema)
 }
 
 func TestMustParams_PresentButInvalid_ProducesViolation(t *testing.T) {
@@ -181,7 +178,7 @@ func TestMustParams_PresentButInvalid_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
+	mustParseParams[UserOrderParams](ctx, userOrderParamsSchema)
 }
 
 func TestMustParams_WrongTypeParam_ProducesViolation(t *testing.T) {
@@ -202,7 +199,7 @@ func TestMustParams_WrongTypeParam_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
+	mustParseParams[UserOrderParams](ctx, userOrderParamsSchema)
 }
 
 func TestMustParams_TwoSimultaneousViolations_BothCollected(t *testing.T) {
@@ -232,17 +229,14 @@ func TestMustParams_TwoSimultaneousViolations_BothCollected(t *testing.T) {
 		}
 	}()
 
-	MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
+	mustParseParams[UserOrderParams](ctx, userOrderParamsSchema)
 }
 
 func TestMustParams_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	ctx := newParamCtx("/codes/:code", map[string]string{"code": "abc"})
 
-	result := MustParams[*CustomParamFixture](ctx, customParamFixtureSchema)
+	result := mustParseParams[CustomParamFixture](ctx, customParamFixtureSchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.Code != "CODE:abc" {
 		t.Fatalf("expected Custom-decoded Code %q, got %q", "CODE:abc", result.Code)
 	}
@@ -271,7 +265,7 @@ func TestMustParams_MismatchedSchema_PanicsBeforeReadingAnyParam(t *testing.T) {
 		}
 	}()
 
-	MustParams[*MismatchedParams](ctx, userOrderParamsSchema) // built for UserOrderParams, not MismatchedParams
+	mustParseParams[MismatchedParams](ctx, userOrderParamsSchema) // built for UserOrderParams, not MismatchedParams
 }
 
 // --- real HTTP dispatch ---------------------------------------------------
@@ -291,7 +285,7 @@ func TestMustParams_RealHTTPDispatch_HappyPath(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
+		result := mustParseParams[UserOrderParams](ctx, userOrderParamsSchema)
 		return c.JSON(map[string]any{"userId": result.UserId, "orderId": result.OrderId})
 	})
 
@@ -333,7 +327,7 @@ func TestMustParams_RealHTTPDispatch_InvalidOneParam(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		MustParams[*UserOrderParams](ctx, userOrderParamsSchema)
+		mustParseParams[UserOrderParams](ctx, userOrderParamsSchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -374,7 +368,7 @@ func TestMustParams_RealHTTPDispatch_CustomFunc(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustParams[*CustomParamFixture](ctx, customParamFixtureSchema)
+		result := mustParseParams[CustomParamFixture](ctx, customParamFixtureSchema)
 		return c.JSON(map[string]any{"code": result.Code})
 	})
 

@@ -18,7 +18,6 @@ import (
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/route"
 	"gonest.dev/gonest/internal/schema"
-	"gonest.dev/gonest/internal/validate"
 )
 
 // --- "Pipeline Ordering" T1 (Milestone 3 closing task) ---
@@ -123,7 +122,7 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 		c.Route(route.HttpGet, "/pipeline/:id", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
 				*order = append(*order, "handler-before-pipe")
-				p := validate.MustParams[*pipelineIDParams](ctx, pipelineIDParamsSchema)
+				p := mustParse[pipelineIDParams](ctx.Params(), pipelineIDParamsSchema)
 				*order = append(*order, "pipe")
 				ctx.Json(map[string]any{"id": p.ID})
 			})

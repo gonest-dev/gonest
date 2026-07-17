@@ -45,7 +45,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/:id", func(r *gonest.Route) {
 		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParseRestParams[*todoIDParams](ctx, todoIDParamsSchema)
+			p := gonest.MustParse[todoIDParams](ctx.Params(), todoIDParamsSchema)
 			todo := service.Get(p.ID)
 			if todo == nil {
 				panic(gonest.NewNotFoundException(nil))
@@ -57,15 +57,15 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.HttpCode(http.StatusCreated)
 		r.Handler(func(ctx *gonest.RestContext) {
-			body := gonest.MustParseRestJsonBody[*createTodoBody](ctx, createTodoBodySchema)
+			body := gonest.MustParse[createTodoBody](ctx.Body().Json(), createTodoBodySchema)
 			ctx.Status(http.StatusCreated).Json(service.Create(body.Title))
 		})
 	})
 
 	controller.Route(gonest.HttpPut, "/:id", func(r *gonest.Route) {
 		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParseRestParams[*todoIDParams](ctx, todoIDParamsSchema)
-			body := gonest.MustParseRestJsonBody[*updateTodoBody](ctx, updateTodoBodySchema)
+			p := gonest.MustParse[todoIDParams](ctx.Params(), todoIDParamsSchema)
+			body := gonest.MustParse[updateTodoBody](ctx.Body().Json(), updateTodoBodySchema)
 			todo := service.Update(p.ID, body.Title, body.Done)
 			if todo == nil {
 				panic(gonest.NewNotFoundException(nil))
@@ -77,7 +77,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpDelete, "/:id", func(r *gonest.Route) {
 		r.HttpCode(http.StatusNoContent)
 		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParseRestParams[*todoIDParams](ctx, todoIDParamsSchema)
+			p := gonest.MustParse[todoIDParams](ctx.Params(), todoIDParamsSchema)
 			if !service.Delete(p.ID) {
 				panic(gonest.NewNotFoundException(nil))
 			}

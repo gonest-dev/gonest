@@ -38,7 +38,7 @@ var listQueryDTOSchema = gonest.NewSchema(func(t *ListQueryDTO, m *gonest.Schema
 // UploadAttachmentFormDTO is the multipart/form-data TEXT field validated
 // alongside the file part -- the file itself has no "value" to check via
 // Schema (only name/size/content-type), so it's handled separately by
-// MustParseRestFormBody's own onFile callback (see controller.go).
+// gonest.MustParse[T](ctx.Body().Form(onFile))'s own onFile callback (see controller.go).
 type UploadAttachmentFormDTO struct {
 	Description string `form:"description"`
 }

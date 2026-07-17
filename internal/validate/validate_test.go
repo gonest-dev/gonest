@@ -110,7 +110,7 @@ func (f *fakeResponder) GetPath() string                       { return "" }
 func (f *fakeResponder) GetHeader(name string) string          { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string)     {}
 func (f *fakeResponder) GetParam(name string) string           { return "" }
-func (f *fakeResponder) Body() []byte                          { return f.body }
+func (f *fakeResponder) RawBody() []byte                          { return f.body }
 func (f *fakeResponder) Queries() map[string]string            { return nil }
 func (f *fakeResponder) HTML(s string) error                   { return nil }
 func (f *fakeResponder) SendString(s string) error             { return nil }
@@ -169,11 +169,8 @@ func validBody() []byte {
 func TestMustJsonBody_HappyPath_ReturnsPopulatedValue(t *testing.T) {
 	ctx := newCtx(validBody())
 
-	result := MustJsonBody[*UserProperties](ctx, userSchema)
+	result := mustParseJSON[UserProperties](ctx, userSchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.Name != "John Doe" {
 		t.Fatalf("expected Name %q, got %q", "John Doe", result.Name)
 	}
@@ -208,7 +205,7 @@ func TestMustJsonBody_MalformedJSON_PanicsWithOneViolation(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_EmptyBody_TreatedAsParseFailure(t *testing.T) {
@@ -222,7 +219,7 @@ func TestMustJsonBody_EmptyBody_TreatedAsParseFailure(t *testing.T) {
 		expectBadRequest(t, r)
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_MissingRequiredField_RecordsViolation(t *testing.T) {
@@ -249,7 +246,7 @@ func TestMustJsonBody_MissingRequiredField_RecordsViolation(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_OutOfRangeValue_RecordsViolation(t *testing.T) {
@@ -276,7 +273,7 @@ func TestMustJsonBody_OutOfRangeValue_RecordsViolation(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_FractionalValueOnIntegerField_RecordsViolation(t *testing.T) {
@@ -307,7 +304,7 @@ func TestMustJsonBody_FractionalValueOnIntegerField_RecordsViolation(t *testing.
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_MultipleViolations_AllCollected(t *testing.T) {
@@ -340,7 +337,7 @@ func TestMustJsonBody_MultipleViolations_AllCollected(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_NullableRequiredField_NullAccepted(t *testing.T) {
@@ -352,11 +349,8 @@ func TestMustJsonBody_NullableRequiredField_NullAccepted(t *testing.T) {
 	// primitive. See nullableRequiredFixture below.
 	ctx := newCtx(nullableRequiredValidBody())
 
-	result := MustJsonBody[*NullableRequiredFixture](ctx, nullableRequiredFixtureSchema)
+	result := mustParseJSON[NullableRequiredFixture](ctx, nullableRequiredFixtureSchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.Nickname != nil {
 		t.Fatalf("expected Nickname to remain nil, got %v", *result.Nickname)
 	}
@@ -396,7 +390,7 @@ func TestMustJsonBody_RequiredNotNullable_NullRejected(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*RequiredNotNullableFixture](ctx, requiredNotNullableFixtureSchema)
+	mustParseJSON[RequiredNotNullableFixture](ctx, requiredNotNullableFixtureSchema)
 }
 
 type RequiredNotNullableFixture struct {
@@ -442,7 +436,7 @@ func TestMustJsonBody_ArrayItemViolation_IdentifiesIndex(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_ArrayQuantityViolation_IdentifiesField(t *testing.T) {
@@ -470,7 +464,7 @@ func TestMustJsonBody_ArrayQuantityViolation_IdentifiesField(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_ObjectRefViolation_IdentifiesNestedPath(t *testing.T) {
@@ -497,7 +491,7 @@ func TestMustJsonBody_ObjectRefViolation_IdentifiesNestedPath(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_AdditionalProperties_NoStructuralValidation(t *testing.T) {
@@ -513,11 +507,7 @@ func TestMustJsonBody_AdditionalProperties_NoStructuralValidation(t *testing.T) 
 	})
 	ctx := newCtx(body)
 
-	result := MustJsonBody[*UserProperties](ctx, userSchema)
-
-	if result == nil {
-		t.Fatal("expected non-nil result (AdditionalProperties should not fail structural validation)")
-	}
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 func TestMustJsonBody_CombinedArrayAndObjectViolations_BothReported(t *testing.T) {
@@ -548,7 +538,7 @@ func TestMustJsonBody_CombinedArrayAndObjectViolations_BothReported(t *testing.T
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 // --- Edge cases --------------------------------------------------------
@@ -574,7 +564,7 @@ func TestMustJsonBody_MismatchedSchema_PanicsBeforeTouchingBody(t *testing.T) {
 		}
 	}()
 
-	MustJsonBody[*NeverRegistered](ctx, userSchema) // userSchema was built for UserProperties, not NeverRegistered
+	mustParseJSON[NeverRegistered](ctx, userSchema) // userSchema was built for UserProperties, not NeverRegistered
 }
 
 func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.T) {
@@ -592,7 +582,7 @@ func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.
 		}
 	}()
 
-	MustJsonBody[*UserProperties](ctx, userSchema)
+	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
 // --- real HTTP dispatch (L-012 precedent) -----------------------------------
@@ -611,7 +601,7 @@ func TestMustJsonBody_RealHTTPDispatch_HappyPath(t *testing.T) {
 				panic(r)
 			}
 		}()
-		result := MustJsonBody[*UserProperties](ctx, userSchema)
+		result := mustParseJSON[UserProperties](ctx, userSchema)
 		return c.JSON(map[string]any{"name": result.Name})
 	})
 
@@ -643,7 +633,7 @@ func TestMustJsonBody_RealHTTPDispatch_MultipleViolations(t *testing.T) {
 				panic(r)
 			}
 		}()
-		MustJsonBody[*UserProperties](ctx, userSchema)
+		mustParseJSON[UserProperties](ctx, userSchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -694,7 +684,7 @@ func TestMustJsonBody_RealHTTPDispatch_MalformedJSON(t *testing.T) {
 				panic(r)
 			}
 		}()
-		MustJsonBody[*UserProperties](ctx, userSchema)
+		mustParseJSON[UserProperties](ctx, userSchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -731,7 +721,7 @@ func (r *httpFiberResponder) GetPath() string                   { return r.c.Pat
 func (r *httpFiberResponder) GetHeader(name string) string      { return r.c.Get(name) }
 func (r *httpFiberResponder) SetHeaderValue(name, value string) { r.c.Set(name, value) }
 func (r *httpFiberResponder) GetParam(name string) string       { return r.c.Params(name) }
-func (r *httpFiberResponder) Body() []byte                      { return r.c.Body() }
+func (r *httpFiberResponder) RawBody() []byte                   { return r.c.Body() }
 func (r *httpFiberResponder) Queries() map[string]string        { return r.c.Queries() }
 func (r *httpFiberResponder) HTML(s string) error {
 	r.c.Type("html")

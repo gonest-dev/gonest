@@ -422,7 +422,7 @@ func TestListen_NilOnListen_DoesNotPanicAndBlocksNormally(t *testing.T) {
 }
 
 // TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes proves the
-// fiber.Ctx-backed Responder's Body() is wired to Fiber's own Ctx.Body(),
+// fiber.Ctx-backed Responder's RawBody() is wired to Fiber's own Ctx.Body(),
 // via a real HTTP dispatch (app.Test) posting a JSON body -- per L-009's
 // precedent, body-reading through fasthttp/fiber has real footguns
 // (zero-copy buffer reuse) that only surface through a real request, not a
@@ -433,7 +433,7 @@ func TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes(t *testing.T) {
 	want := `{"name":"Ada","age":36}`
 	var got string
 	if err := app.RegisterRoute(route.HttpPost, "/echo", func(ctx *execution.Context) {
-		got = string(ctx.Body())
+		got = string(ctx.RawBody())
 		ctx.Status(200).Json(map[string]string{"ok": "true"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)

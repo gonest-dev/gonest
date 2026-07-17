@@ -66,7 +66,7 @@ func (f *formFakeResponder) GetPath() string                   { return "" }
 func (f *formFakeResponder) GetHeader(name string) string      { return "" }
 func (f *formFakeResponder) SetHeaderValue(name, value string) {}
 func (f *formFakeResponder) GetParam(name string) string       { return "" }
-func (f *formFakeResponder) Body() []byte                      { return nil }
+func (f *formFakeResponder) RawBody() []byte                      { return nil }
 func (f *formFakeResponder) Queries() map[string]string        { return nil }
 func (f *formFakeResponder) HTML(s string) error               { return nil }
 func (f *formFakeResponder) SendString(s string) error         { return nil }
@@ -121,7 +121,7 @@ func TestParseFormBody_HappyPath_FieldAndFile(t *testing.T) {
 
 	var gotFilename string
 	var gotContent []byte
-	result, err := ParseFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *FormFile) error {
+	result, err := parseForm[CreatePostForm](ctx, createPostFormSchema, func(f *execution.FormFile) error {
 		gotFilename = f.Filename()
 		b, readErr := io.ReadAll(f.Reader())
 		if readErr != nil {
@@ -149,7 +149,7 @@ func TestParseFormBody_MissingRequiredField_ReturnsViolation(t *testing.T) {
 	body, boundary := buildMultipartBody(t, map[string]string{}, map[string]string{})
 	ctx := newFormCtx(body, boundary)
 
-	_, err := ParseFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *FormFile) error {
+	_, err := parseForm[CreatePostForm](ctx, createPostFormSchema, func(f *execution.FormFile) error {
 		t.Fatal("onFile should not be called -- no file part in this body")
 		return nil
 	})
@@ -168,7 +168,7 @@ func TestParseFormBody_OnFileError_AbortsWithBadRequest(t *testing.T) {
 	)
 	ctx := newFormCtx(body, boundary)
 
-	_, err := ParseFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *FormFile) error {
+	_, err := parseForm[CreatePostForm](ctx, createPostFormSchema, func(f *execution.FormFile) error {
 		return errors.New("file too large")
 	})
 
@@ -192,7 +192,7 @@ func TestParseFormBody_MalformedMultipartBody_ReturnsOneViolation(t *testing.T) 
 	// A body that is NOT valid multipart at all for the given boundary.
 	ctx := newFormCtx(bytes.NewBufferString("not a real multipart body"), "some-boundary")
 
-	_, err := ParseFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *FormFile) error {
+	_, err := parseForm[CreatePostForm](ctx, createPostFormSchema, func(f *execution.FormFile) error {
 		t.Fatal("onFile should not be called for a malformed body")
 		return nil
 	})
@@ -208,7 +208,7 @@ func TestParseFormBody_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	body, boundary := buildMultipartBody(t, map[string]string{"code": "abc"}, map[string]string{})
 	ctx := newFormCtx(body, boundary)
 
-	result, err := ParseFormBody[*CustomFormFixture](ctx, customFormFixtureSchema, func(f *FormFile) error {
+	result, err := parseForm[CustomFormFixture](ctx, customFormFixtureSchema, func(f *execution.FormFile) error {
 		t.Fatal("onFile should not be called -- no file part in this body")
 		return nil
 	})
@@ -233,7 +233,7 @@ func TestMustFormBody_PanicsOnError(t *testing.T) {
 		expectBadRequest(t, r)
 	}()
 
-	MustFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *FormFile) error {
+	mustParseForm[CreatePostForm](ctx, createPostFormSchema, func(f *execution.FormFile) error {
 		return nil
 	})
 }
@@ -255,7 +255,7 @@ func TestParseFormBody_StreamUnavailable_Panics(t *testing.T) {
 		}
 	}()
 
-	ParseFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *FormFile) error {
+	parseForm[CreatePostForm](ctx, createPostFormSchema, func(f *execution.FormFile) error {
 		t.Fatal("onFile should not be called -- stream never became available")
 		return nil
 	})

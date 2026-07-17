@@ -61,7 +61,7 @@ func (f *fakeResponder) GetParam(name string) string {
 	return f.params[name]
 }
 
-func (f *fakeResponder) Body() []byte {
+func (f *fakeResponder) RawBody() []byte {
 	return f.body
 }
 
@@ -159,31 +159,40 @@ func TestContext_Param_ReadsFromResponder(t *testing.T) {
 	}
 }
 
-// TestContext_Body_ReadsFromResponder proves Body() returns exactly the
-// bytes the underlying Responder provides, unchanged -- same one-line
+// TestContext_RawBody_ReadsFromResponder proves RawBody() returns exactly
+// the bytes the underlying Responder provides, unchanged -- same one-line
 // delegation pattern as every other Context method.
-func TestContext_Body_ReadsFromResponder(t *testing.T) {
+func TestContext_RawBody_ReadsFromResponder(t *testing.T) {
 	fake := newFakeResponder()
 	fake.body = []byte(`{"name":"gonest"}`)
 	ctx := New(fake)
 
-	got := ctx.Body()
+	got := ctx.RawBody()
 
 	if string(got) != `{"name":"gonest"}` {
-		t.Fatalf("expected Body() to return %q, got %q", fake.body, got)
+		t.Fatalf("expected RawBody() to return %q, got %q", fake.body, got)
 	}
 }
 
-// TestContext_Body_EmptyByDefault proves Body() returns whatever the
+// TestContext_RawBody_EmptyByDefault proves RawBody() returns whatever the
 // Responder reports for an unset body (nil/empty), not a panic -- the fake's
 // zero value for body is nil.
-func TestContext_Body_EmptyByDefault(t *testing.T) {
+func TestContext_RawBody_EmptyByDefault(t *testing.T) {
 	fake := newFakeResponder()
 	ctx := New(fake)
 
-	if got := ctx.Body(); len(got) != 0 {
-		t.Fatalf("expected Body() to be empty by default, got %q", got)
+	if got := ctx.RawBody(); len(got) != 0 {
+		t.Fatalf("expected RawBody() to be empty by default, got %q", got)
 	}
+}
+
+// TestContext_Body_ReturnsBodySource proves the repurposed Body() returns a
+// BodySource (unified-parse-api feature) rather than raw bytes.
+func TestContext_Body_ReturnsBodySource(t *testing.T) {
+	fake := newFakeResponder()
+	ctx := New(fake)
+
+	var _ BodySource = ctx.Body()
 }
 
 // TestContext_Queries_ReadsFromResponder proves Queries() returns exactly

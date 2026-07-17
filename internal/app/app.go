@@ -26,6 +26,7 @@ import (
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 	"gonest.dev/gonest/internal/route"
+	"gonest.dev/gonest/internal/validate"
 	"gonest.dev/gonest/internal/version"
 )
 
@@ -520,6 +521,27 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				currentRoute := r
 				withRoute := func(ctx *execution.Context) {
 					ctx.WithRoute(currentRoute)
+					// Wires the unified-parse-api's Parseable sources onto
+					// ctx BEFORE the composed handler chain runs, so a
+					// Handler calling ctx.Params()/ctx.Query()/ctx.Headers()/
+					// ctx.Body().Json()/ctx.Body().Form(onFile) always gets a
+					// real, non-nil Parseable back. internal/app is the
+					// bridge point (imports both execution and validate)
+					// because execution can never import validate itself
+					// (validate already imports execution -- see
+					// execution.Parseable/BodySource's own doc comments for
+					// why this cycle constraint shapes the whole feature).
+					ctx.WithSources(
+						validate.NewParamsSource(ctx),
+						validate.NewQuerySource(ctx),
+						validate.NewHeadersSource(ctx),
+						execution.NewBodySource(
+							func() execution.Parseable { return validate.NewJSONBodySource(ctx) },
+							func(onFile func(*execution.FormFile) error) execution.Parseable {
+								return validate.NewFormBodySource(ctx, onFile)
+							},
+						),
+					)
 					composedHandler(ctx)
 				}
 				// filteredHandler is the NEW outermost layer of all: it wraps

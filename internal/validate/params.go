@@ -11,27 +11,29 @@ import (
 	"gonest.dev/gonest/internal/schema"
 )
 
-// ParseParams is the real implementation behind the public root
-// gonest.ParseRestParams[T] wrapper (Go cannot re-export a generic function
-// via var, see AD-004). T is a pointer type at the call site (e.g.
-// ParseParams[*UserIdParams]), and m must be the *schema.Schema built via
-// NewSchema[T] for that same T (AD-019) -- resolveSchema panics if it
-// describes a different type (a coding-error class of failure, distinct
-// from the request-validation failures below, which return as a plain
-// error instead of panicking -- AD-021).
+// paramsSource is the Parseable implementation behind ctx.Params()
+// (unified-parse-api feature). Validates every path param declared on the
+// schema (via a `param:"name"` struct tag, same tag-resolution convention
+// jsonBodySource uses for `json:"..."`) against the CURRENT route's actual
+// ":name" segments -- reusing validateValue/populate UNCHANGED once each
+// param's raw string is coerced into the same any-shape (string/float64/
+// bool) JSON decoding already produces (design.md's Tech Decisions:
+// "coerce-then-reuse, not a parallel validation path").
+type paramsSource struct {
+	ctx *execution.Context
+}
+
+// NewParamsSource builds a Parseable for ctx's path params. Exported so
+// internal/app can wire one into a Context per-request.
+func NewParamsSource(ctx *execution.Context) execution.Parseable {
+	return &paramsSource{ctx: ctx}
+}
+
+// ParseInto reads s.ctx's path params into dst (a *T) via T's `param:"name"`
+// struct tags, validating against schema (a *schema.Schema) first.
 //
-// Unlike MustJsonBody (which validates a single JSON object payload),
-// MustParams validates every path param declared on m (via a
-// `param:"name"` struct tag, same tag-resolution convention MustJsonBody
-// uses for `json:"..."`) against the CURRENT route's actual ":name"
-// segments -- reusing validateValue/populate UNCHANGED once each param's
-// raw string is coerced into the same any-shape (string/float64/bool) JSON
-// decoding already produces (design.md's Tech Decisions: "coerce-then-reuse,
-// not a parallel validation path").
-//
-// Steps (design.md's Architecture Overview, "MustParams" section):
-//  1. resolveSchema confirms m describes T, panicking immediately, BEFORE
-//     reading any param at all, otherwise.
+//  1. resolveSchema confirms schema describes T, panicking immediately,
+//     BEFORE reading any param at all, otherwise.
 //  2. Resolve ctx's currently-attached *route.Route (via ctx.Route(), an
 //     `any` type-asserted back to *route.Route -- see execution.Context's
 //     WithRoute/Route doc comment for why the link is untyped at the
@@ -52,18 +54,18 @@ import (
 //     (the value couldn't become the right shape to check Min/Max/Pattern
 //     against).
 //  5. Collect ALL violations across every field (same collect-all behavior
-//     as MustJsonBody, context.md's Decision 2 -- never stop early).
-//  6. If any violations were collected: panic
+//     as jsonBodySource, context.md's Decision 2 -- never stop early).
+//  6. If any violations were collected: return
 //     exception.NewBadRequestException(violations).
-//  7. Otherwise: populate a fresh *structType field-by-field via the shared
-//     populate core (tag="param"), using the SAME raw/coerced value already
-//     produced during validation as the presence map's value.
-func ParseParams[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
-	var zero T
-	structType := reflect.TypeOf(zero).Elem()
-	resolveSchema(m, structType)
+//  7. Otherwise: populate dst field-by-field via the shared populate core
+//     (tag="param"), using the SAME raw/coerced value already produced
+//     during validation as the presence map's value.
+func (s *paramsSource) ParseInto(dst any, schemaArg any) error {
+	m := schemaArg.(*schema.Schema)
+	dstVal := reflect.ValueOf(dst).Elem()
+	resolveSchema(m, dstVal.Type())
 
-	r, hasRoute := ctx.Route().(*route.Route)
+	r, hasRoute := s.ctx.Route().(*route.Route)
 
 	var violations []violation
 	presence := map[string]any{}
@@ -81,7 +83,7 @@ func ParseParams[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
 			continue
 		}
 
-		raw := ctx.Param(key)
+		raw := s.ctx.Param(key)
 
 		if _, isCustom := p.CustomFunc(); isCustom {
 			violations = append(violations, validateValue(raw, p, key)...)
@@ -100,33 +102,21 @@ func ParseParams[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
 	}
 
 	if len(violations) > 0 {
-		return zero, exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException(violations)
 	}
 
-	out := reflect.New(structType)
-	if err := populate(out.Elem(), presence, m, "param"); err != nil {
+	if err := populate(dstVal, presence, m, "param"); err != nil {
 		// Should be unreachable in practice, same rationale as
-		// ParseJsonBody's own equivalent case: the validate pass above
+		// jsonBodySource's own equivalent case: the validate pass above
 		// already proved every present field's shape matches what T
 		// expects. Returning an error here keeps failures loud instead of
 		// masking a genuine bug in the validation pass.
-		return zero, exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException([]violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate params: %v", err)},
 		})
 	}
 
-	return out.Interface().(T), nil
-}
-
-// MustParams is the real implementation behind gonest.MustParseRestParams[T]
-// -- ParseParams, panicking on any returned error (AD-021's panicking twin,
-// for call sites that don't want to handle the error themselves).
-func MustParams[T any](ctx *execution.Context, m *schema.Schema) T {
-	v, err := ParseParams[T](ctx, m)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return nil
 }
 
 // coerceParamString converts a raw path/query param string into the same

@@ -16,13 +16,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"gonest.dev/gonest/internal/adapter/fiber"
 	"gonest.dev/gonest/internal/execution"
 	interceptorpkg "gonest.dev/gonest/internal/interceptor"
 	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/route"
 	"gonest.dev/gonest/internal/validate"
-	"github.com/google/uuid"
 )
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ func TestMustParams_RootPackage_HappyPath(t *testing.T) {
 	res.params["id"] = "42"
 	ctx := execution.New(res).WithRoute(r)
 
-	got := validate.MustParams[*idParams](ctx, idParamsSchema)
+	got := MustParse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
 	if got.ID != 42 {
 		t.Fatalf("MustParams[*idParams](ctx).ID = %d, want %d", got.ID, 42)
 	}
@@ -235,7 +235,7 @@ func TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) 
 		}
 	}()
 
-	validate.MustParams[*idParams](ctx, idParamsSchema)
+	MustParse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
 }
 
 // TestMustParams_RootPackage_PanicsOnConversionFailure proves the
@@ -257,7 +257,7 @@ func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
 		}
 	}()
 
-	validate.MustParams[*idParams](ctx, idParamsSchema)
+	MustParse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
 }
 
 // TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking proves
@@ -274,15 +274,15 @@ func TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking(t *testing.T
 		res.params["id"] = "not-a-number"
 		ctx := execution.New(res).WithRoute(r)
 
-		got, err := ParseRestParams[*idParams](ctx, idParamsSchema)
+		got, err := Parse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
 		if err == nil {
 			t.Fatal("expected a non-nil error, got nil")
 		}
 		if _, ok := err.(*BadRequestException); !ok {
 			t.Fatalf("expected *BadRequestException, got %T: %v", err, err)
 		}
-		if got != nil {
-			t.Fatalf("expected nil T on error, got %v", got)
+		if got != (idParams{}) {
+			t.Fatalf("expected zero-value T on error, got %v", got)
 		}
 	})
 
@@ -291,7 +291,7 @@ func TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking(t *testing.T
 		res.params["id"] = "42"
 		ctx := execution.New(res).WithRoute(r)
 
-		got, err := ParseRestParams[*idParams](ctx, idParamsSchema)
+		got, err := Parse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -319,7 +319,7 @@ func (f *paramFakeResponder) GetPath() string                       { return "" 
 func (f *paramFakeResponder) GetHeader(name string) string          { return "" }
 func (f *paramFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *paramFakeResponder) GetParam(name string) string           { return f.params[name] }
-func (f *paramFakeResponder) Body() []byte                          { return nil }
+func (f *paramFakeResponder) RawBody() []byte                          { return nil }
 func (f *paramFakeResponder) Queries() map[string]string            { return nil }
 func (f *paramFakeResponder) HTML(s string) error                   { return nil }
 func (f *paramFakeResponder) SendString(s string) error             { return nil }
@@ -338,7 +338,7 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*idParams](ctx, idParamsSchema)
+				p := MustParse[idParams](ctx.Params(), idParamsSchema)
 				gotID = p.ID
 				handlerRan = true
 				ctx.Json(map[string]int{"id": gotID})
@@ -440,8 +440,8 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/users/:user_id/orders", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				params := MustParseRestParams[*insightUserIdParams](ctx, insightUserIdParamsSchema)
-				query := MustParseRestQuery[*insightListUsersQuery](ctx, insightListUsersQuerySchema)
+				params := MustParse[insightUserIdParams](ctx.Params(), insightUserIdParamsSchema)
+				query := MustParse[insightListUsersQuery](ctx.Query(), insightListUsersQuerySchema)
 				gotUserId = params.UserId
 				gotPage = query.Page
 				gotLimit = query.Limit
@@ -2301,7 +2301,8 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpPost, "/users", func(r *route.Route) {
 			r.Handler(func(ctx *execution.Context) {
-				gotUser = MustParseRestJsonBody[*jsonBodyUserEntity](ctx, jsonBodyUserSchema)
+				v := MustParse[jsonBodyUserEntity](ctx.Body().Json(), jsonBodyUserSchema)
+				gotUser = &v
 				ctx.Json(gotUser)
 			})
 		})
@@ -2990,7 +2991,7 @@ func newInsightTestUserModule() *Module {
 		controller.Route(route.HttpGet, "/:id", func(r *route.Route) {
 			r.HttpCode(http.StatusOK)
 			r.Handler(func(ctx *execution.Context) {
-				p := validate.MustParams[*insightTestUserIDParam](ctx, insightTestUserIDParamSchema)
+				p := MustParse[insightTestUserIDParam](ctx.Params(), insightTestUserIDParamSchema)
 				ctx.Json(userService.Get(p.ID))
 			})
 		})
@@ -3531,7 +3532,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 		controller.Path("/upload")
 		controller.Route(HttpPost, "/", func(r *Route) {
 			r.Handler(func(ctx *RestContext) {
-				result := MustParseRestFormBody[*uploadForm](ctx, uploadSchema, func(f *FormFile) error {
+				result := MustParse[uploadForm](ctx.Body().Form(func(f *FormFile) error {
 					close(onFileReached)
 					gotFilename = f.Filename()
 					b, err := io.ReadAll(f.Reader())
@@ -3540,7 +3541,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 					}
 					gotContent = b
 					return nil
-				})
+				}), uploadSchema)
 				ctx.Json(map[string]string{"title": result.Title})
 			})
 		})

@@ -7,6 +7,70 @@ package execution
 
 import "io"
 
+// Parseable is the single contract every HTTP data source (params, query,
+// headers, JSON body, form body) satisfies -- unified-parse-api feature's
+// gonest.Parse[T]/gonest.MustParse[T] are source-agnostic and only ever call
+// ParseInto on whatever Parseable value ctx.Params()/ctx.Query()/etc. hand
+// them.
+//
+// SPEC_DEVIATION (context.md wanted a single UNEXPORTED method so only
+// internal/validate's source structs could implement it): Go's spec makes
+// two unexported identifiers "different" whenever they're declared in
+// different packages, even if spelled identically -- an unexported method
+// named e.g. "parse" declared HERE (package execution) can never be
+// satisfied by a method also named "parse" declared in internal/validate,
+// because that's a distinct identifier in Go's eyes. Since every concrete
+// Parseable implementation must live in internal/validate (to reuse
+// resolveSchema/validateValue/populate/etc. without duplicating that logic
+// here or introducing an execution->validate cycle), the method must be
+// EXPORTED so validate's types can actually satisfy this interface. The
+// concrete struct types themselves (paramsSource, querySource, ...) stay
+// unexported in validate, and are only ever handed out via constructor
+// functions returning Parseable -- so external callers still cannot
+// construct or type-assert a custom source without deliberately choosing to
+// implement ParseInto themselves (context.md's Deferred Ideas already
+// anticipates this exact scenario).
+type Parseable interface {
+	ParseInto(dst any, schema any) error
+}
+
+// BodySource is the intermediate type ctx.Body() returns, letting the
+// request body's FORMAT be picked explicitly and discoverably
+// (ctx.Body().Json(), ctx.Body().Form(onFile)) instead of one function per
+// source (spec.md's Goals).
+//
+// jsonFn/formFn are opaque closures rather than direct fields of a
+// validate-package type: internal/validate already imports internal/execution
+// (for *Context), so execution can never import validate back without an
+// import cycle. The closures are populated once, per-request, by whichever
+// package bridges both (internal/app, at dispatch time) via NewBodySource --
+// same "opaque carrier" trick Context.WithRoute already uses for the same
+// reason (see WithRoute's doc comment).
+type BodySource struct {
+	jsonFn func() Parseable
+	formFn func(onFile func(*FormFile) error) Parseable
+}
+
+// NewBodySource builds a BodySource around the two source-constructing
+// closures. Exported so internal/app (which imports both execution and
+// validate) can wire a real BodySource into a Context per-request without
+// execution ever needing to know internal/validate exists.
+func NewBodySource(jsonFn func() Parseable, formFn func(onFile func(*FormFile) error) Parseable) BodySource {
+	return BodySource{jsonFn: jsonFn, formFn: formFn}
+}
+
+// Json returns a Parseable for this request's JSON body.
+func (b BodySource) Json() Parseable {
+	return b.jsonFn()
+}
+
+// Form returns a Parseable for this request's multipart/form-data body.
+// onFile is invoked for each file part encountered during parsing; nil means
+// file parts are silently skipped (spec.md's Edge Cases).
+func (b BodySource) Form(onFile func(*FormFile) error) Parseable {
+	return b.formFn(onFile)
+}
+
 // Responder is the minimal surface Context needs to serve its request/response
 // methods. A fake implementation is used in tests; a Fiber-backed
 // implementation is added in a later task.
@@ -25,7 +89,7 @@ type Responder interface {
 	GetHeader(name string) string
 	SetHeaderValue(name, value string)
 	GetParam(name string) string
-	Body() []byte
+	RawBody() []byte
 	Queries() map[string]string
 	HTML(s string) error
 	SendString(s string) error
@@ -46,6 +110,11 @@ type Responder interface {
 type Context struct {
 	res   Responder
 	route any
+
+	paramsSource  Parseable
+	querySource   Parseable
+	headersSource Parseable
+	bodySource    BodySource
 }
 
 // New builds a Context around the given Responder. Exported so other
@@ -131,19 +200,64 @@ func (ctx *Context) Param(name string) string {
 	return ctx.res.GetParam(name)
 }
 
-// Body returns the raw request body bytes.
+// RawBody returns the raw request body bytes (renamed from Body() --
+// unified-parse-api feature -- so ctx.Body() can be repurposed to return a
+// BodySource instead, see below).
 //
 // The returned slice must NOT be retained past synchronous use within the
 // same request/handler execution -- no defensive copy is made here, unlike
 // Param's GetParam (see L-009 in STATE.md, which DOES clone). This is safe
-// because Body() is expected to be consumed synchronously (e.g. passed
+// because RawBody() is expected to be consumed synchronously (e.g. passed
 // straight into json.Unmarshal, which copies data into the destination
 // values during decode rather than retaining the input slice); a caller
 // that stores the raw []byte in a struct field or otherwise reads it after
 // the handler returns risks seeing it corrupted/overwritten by a later
 // request reusing the same underlying buffer, exactly like L-009's bug.
-func (ctx *Context) Body() []byte {
-	return ctx.res.Body()
+func (ctx *Context) RawBody() []byte {
+	return ctx.res.RawBody()
+}
+
+// Body returns a BodySource -- an intermediate type exposing .Json() and
+// .Form(onFile) so the request body's FORMAT is explicit and
+// autocomplete-discoverable at the call site (spec.md's Goals). The
+// returned BodySource is whatever was wired in via WithSources for this
+// request; a Context built directly without WithSources (e.g. in a test that
+// doesn't exercise body parsing) returns a zero BodySource whose Json()/
+// Form() would nil-panic if called -- callers that need body parsing always
+// go through real request dispatch (internal/app), which always wires this.
+func (ctx *Context) Body() BodySource {
+	return ctx.bodySource
+}
+
+// Params returns a Parseable for this request's path params -- wired in via
+// WithSources at dispatch time (unified-parse-api feature).
+func (ctx *Context) Params() Parseable {
+	return ctx.paramsSource
+}
+
+// Query returns a Parseable for this request's query string -- wired in via
+// WithSources at dispatch time (unified-parse-api feature).
+func (ctx *Context) Query() Parseable {
+	return ctx.querySource
+}
+
+// Headers returns a Parseable for this request's HTTP headers -- wired in
+// via WithSources at dispatch time (unified-parse-api feature; a net-new
+// capability, no equivalent existed before this feature).
+func (ctx *Context) Headers() Parseable {
+	return ctx.headersSource
+}
+
+// WithSources attaches the per-request Parseable/BodySource values that
+// Params()/Query()/Headers()/Body() return, and returns ctx for chaining --
+// same pattern as WithRoute. Called once per request by internal/app (the
+// package that bridges execution and validate) right after WithRoute.
+func (ctx *Context) WithSources(params, query, headers Parseable, body BodySource) *Context {
+	ctx.paramsSource = params
+	ctx.querySource = query
+	ctx.headersSource = headers
+	ctx.bodySource = body
+	return ctx
 }
 
 // Queries returns the raw query-string params as a map, exactly as reported

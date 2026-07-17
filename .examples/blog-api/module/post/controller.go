@@ -16,7 +16,7 @@ import (
 // disk via io.Copy, one write at a time, never buffered whole in memory
 // first (Multipart Form Streaming feature). A real deployment would swap
 // this for an S3 (or similar) io.Writer instead; the gonest-facing code
-// (MustParseRestFormBody's onFile callback below) would look identical.
+// (gonest.MustParse[T](ctx.Body().Form(onFile))'s onFile callback below) would look identical.
 const uploadsDir = "uploads"
 
 var Controller = gonest.NewController(func(controller *gonest.Controller) {
@@ -32,7 +32,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Query(listQueryDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Handler(func(ctx *gonest.RestContext) {
-			q := gonest.MustParseRestQuery[*ListQueryDTO](ctx, listQueryDTOSchema)
+			q := gonest.MustParse[ListQueryDTO](ctx.Query(), listQueryDTOSchema)
 			ctx.Json(service.List(q.UserID))
 		})
 	})
@@ -45,7 +45,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			response.Description("Cannot find a post using post_id")
 		})
 		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParseRestParams[*ParamsDTO](ctx, paramsDTOSchema)
+			p := gonest.MustParse[ParamsDTO](ctx.Params(), paramsDTOSchema)
 			post := service.Get(p.PostID)
 			if post == nil {
 				panic(gonest.NewNotFoundException(nil))
@@ -61,12 +61,12 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.RestContext) {
-			body := gonest.MustParseRestJsonBody[*CreateBodyDTO](ctx, createBodyDTOSchema)
+			body := gonest.MustParse[CreateBodyDTO](ctx.Body().Json(), createBodyDTOSchema)
 			ctx.Status(http.StatusCreated).Json(service.Create(body.UserID, body.Title, body.Body))
 		})
 	})
 
-	// Real usage of MustParseRestFormBody (Multipart Form Streaming feature):
+	// Real usage of gonest.MustParse[T](ctx.Body().Form(onFile)) (Multipart Form Streaming feature):
 	// the uploaded file is streamed straight to disk via io.Copy as its bytes
 	// arrive -- onFile fires before the rest of the multipart body is even
 	// read, so gonest never buffers the whole file in memory first. Requires
@@ -80,14 +80,14 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			response.Description("Cannot find a post using post_id")
 		})
 		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParseRestParams[*ParamsDTO](ctx, paramsDTOSchema)
+			p := gonest.MustParse[ParamsDTO](ctx.Params(), paramsDTOSchema)
 			if service.Get(p.PostID) == nil {
 				panic(gonest.NewNotFoundException(nil))
 			}
 
 			var savedFilename string
 			var savedSize int64
-			form := gonest.MustParseRestFormBody[*UploadAttachmentFormDTO](ctx, uploadAttachmentFormDTOSchema, func(f *gonest.FormFile) error {
+			form := gonest.MustParse[UploadAttachmentFormDTO](ctx.Body().Form(func(f *gonest.FormFile) error {
 				if err := os.MkdirAll(uploadsDir, 0o755); err != nil {
 					return err
 				}
@@ -101,7 +101,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 				n, err := io.Copy(dst, f.Reader())
 				savedSize = n
 				return err
-			})
+			}), uploadAttachmentFormDTOSchema)
 
 			ctx.Status(http.StatusCreated).Json(map[string]any{
 				"filename":    savedFilename,

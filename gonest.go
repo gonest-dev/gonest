@@ -35,7 +35,6 @@ import (
 	"gonest.dev/gonest/internal/scheduler"
 	"gonest.dev/gonest/internal/schema"
 	"gonest.dev/gonest/internal/scope"
-	"gonest.dev/gonest/internal/validate"
 	"gonest.dev/gonest/internal/value"
 )
 
@@ -777,114 +776,59 @@ func ValueToDirtyMap(obj any) map[string]any {
 }
 
 // ---------------------------------------------------------------------------
-// Validation (JSON Body Validation feature)
+// Validation (Unified Parse API feature)
 // ---------------------------------------------------------------------------
 
-// ParseRestJsonBody reads ctx's raw request body, validates it against m
-// (the *Schema built via NewSchema[T] for that same T, e.g. INSIGHT.md's
-// UserEntity example -- passed explicitly, AD-019: a caller can no longer
-// invoke ParseRestJsonBody[T] without a real Schema value in hand, since
-// there is no longer a global lookup to fall back on), and returns a
-// populated T. Returns a non-nil *BadRequestException (collecting EVERY
-// violation found, not just the first) as the error if the body fails to
-// parse as JSON or any field/array-item/nested-object constraint is
-// violated -- AD-021's non-panicking half of the family (see
-// MustParseRestJsonBody for the panicking twin). Still panics with a plain
-// string if m was not built for T (a coding-error class of failure, not a
-// request-validation one). Go cannot re-export a generic function via var,
-// so this is a real wrapper calling the internal one (same pattern as
-// MustInject/NewApp, see AD-004 in STATE.md).
-func ParseRestJsonBody[T any](ctx *RestContext, m *Schema) (T, error) {
-	return validate.ParseJsonBody[T](ctx, m)
-}
-
-// MustParseRestJsonBody is ParseRestJsonBody, panicking on any returned
-// error instead of returning it -- AD-021's panicking twin, for call sites
-// that don't want to handle the error themselves.
-func MustParseRestJsonBody[T any](ctx *RestContext, m *Schema) T {
-	return validate.MustJsonBody[T](ctx, m)
-}
-
-// ParseRestParams reads ctx's current route's path params, validates every
-// field of T (dereferenced) against m (the *Schema built via NewSchema[T]
-// for that same T, matched via a `param:"name"` struct tag -- passed
-// explicitly, AD-019) and returns a populated T. Returns a non-nil
-// *BadRequestException (collecting EVERY violation found, not just the
-// first) as the error if a required param is missing or any param fails
-// its declared constraint -- AD-021's non-panicking half of the family (see
-// MustParseRestParams for the panicking twin). Still panics with a plain
-// string if m was not built for T. Go cannot re-export a generic function
-// via var, so this is a real wrapper calling the internal one (same
-// pattern as ParseRestJsonBody, see AD-004 in STATE.md).
-func ParseRestParams[T any](ctx *RestContext, m *Schema) (T, error) {
-	return validate.ParseParams[T](ctx, m)
-}
-
-// MustParseRestParams is ParseRestParams, panicking on any returned error
-// instead of returning it -- AD-021's panicking twin, for call sites that
-// don't want to handle the error themselves.
-func MustParseRestParams[T any](ctx *RestContext, m *Schema) T {
-	return validate.MustParams[T](ctx, m)
-}
-
-// ParseRestQuery reads ctx's request query string, validates every field of
-// T (dereferenced) against m (the *Schema built via NewSchema[T] for that
-// same T, matched via a `query:"name"` struct tag -- passed explicitly,
-// AD-019) and returns a populated T. Returns a non-nil *BadRequestException
-// (collecting EVERY violation found, not just the first) as the error if a
-// required query param is missing or any query param fails its declared
-// constraint -- AD-021's non-panicking half of the family (see
-// MustParseRestQuery for the panicking twin). Still panics with a plain
-// string if m was not built for T. Go cannot re-export a generic function
-// via var, so this is a real wrapper calling the internal one (same
-// pattern as ParseRestJsonBody/ParseRestParams, see AD-004 in STATE.md).
-func ParseRestQuery[T any](ctx *RestContext, m *Schema) (T, error) {
-	return validate.ParseQuery[T](ctx, m)
-}
-
-// MustParseRestQuery is ParseRestQuery, panicking on any returned error
-// instead of returning it -- AD-021's panicking twin, for call sites that
-// don't want to handle the error themselves.
-func MustParseRestQuery[T any](ctx *RestContext, m *Schema) T {
-	return validate.MustQuery[T](ctx, m)
-}
+// Parseable is the opaque value every ctx.Params()/ctx.Query()/ctx.Headers()/
+// ctx.Body().Json()/ctx.Body().Form(onFile) call returns -- it carries its
+// own parse logic alongside whatever state it needs to execute it. Devusers
+// never implement Parseable directly; they only receive values of it from
+// RestContext methods and pass them straight into Parse[T]/MustParse[T].
+// See execution.Parseable's own doc comment for why its one method is
+// exported despite being meant as a sealed contract.
+type Parseable = execution.Parseable
 
 // FormFile is one file part from a multipart/form-data stream, still
-// un-consumed at the moment ParseRestFormBody's onFile callback runs --
+// un-consumed at the moment Body().Form(onFile)'s onFile callback runs --
 // reading FormFile.Reader() consumes the underlying multipart stream in
 // real time (Multipart Form Streaming feature, AD-022 in STATE.md). Not
-// safe to retain past onFile's own call. See internal/validate.FormFile's
-// doc comment for the full contract.
-type FormFile = validate.FormFile
+// safe to retain past onFile's own call. See execution.FormFile's doc
+// comment for the full contract.
+type FormFile = execution.FormFile
 
-// ParseRestFormBody walks ctx's raw multipart/form-data request body
-// EXACTLY ONCE, dispatching each part as it's encountered: a part with a
-// filename invokes onFile synchronously (true streaming -- a caller can
-// pipe file.Reader() straight to S3/etc from inside onFile, before the
-// next part is even read), while a regular field is validated against m
-// (the *Schema built via NewSchema[T] for that same T, matched via a
-// `form:"name"` struct tag -- passed explicitly, AD-019) exactly like
-// ParseRestParams/ParseRestQuery validate their own fields. Requires the
-// app to have been built with AppOptions.EnableFormStreaming AND the
-// request's Content-Type to genuinely be multipart/form-data -- panics
-// with a plain string otherwise (a coding/config error, not a request-
-// validation failure, so unlike the violations below it is never returned
-// via the error return). Returns a non-nil *BadRequestException (collecting
-// EVERY violation found -- missing required field, onFile's own returned
-// error, or a malformed multipart stream) as the error otherwise -- AD-021's
-// non-panicking half of the family (see MustParseRestFormBody for the
-// panicking twin). Go cannot re-export a generic function via var, so this
-// is a real wrapper calling the internal one (same pattern as
-// ParseRestJsonBody/ParseRestParams/ParseRestQuery, see AD-004 in STATE.md).
-func ParseRestFormBody[T any](ctx *RestContext, m *Schema, onFile func(*FormFile) error) (T, error) {
-	return validate.ParseFormBody[T](ctx, m, onFile)
+// Parse reads and validates src (one of ctx.Params(), ctx.Query(),
+// ctx.Headers(), ctx.Body().Json(), ctx.Body().Form(onFile)) against m (the
+// *Schema built via NewSchema[T] for that same T -- passed explicitly,
+// AD-019) and returns a populated T. Returns a non-nil *BadRequestException
+// (collecting EVERY violation found, not just the first) as the error on
+// any validation failure -- AD-021's non-panicking half of the family (see
+// MustParse for the panicking twin). Still panics with a plain string if m
+// was not built for T (a coding-error class of failure, not a
+// request-validation one) -- src.ParseInto itself calls resolveSchema
+// before touching anything else.
+//
+// Parse/MustParse contain NO source-specific logic: they declare `var zero
+// T`, call src.ParseInto(&zero, m), and return -- every ctx method
+// (unified-parse-api feature) hands back a Parseable that already knows how
+// to read and validate its own source, so adding a new source later (e.g.
+// ctx.Body().Xml()) never touches these two functions.
+func Parse[T any](src Parseable, m *Schema) (T, error) {
+	var zero T
+	if err := src.ParseInto(&zero, m); err != nil {
+		return zero, err
+	}
+	return zero, nil
 }
 
-// MustParseRestFormBody is ParseRestFormBody, panicking on any returned
-// error instead of returning it -- AD-021's panicking twin, for call sites
-// that don't want to handle the error themselves.
-func MustParseRestFormBody[T any](ctx *RestContext, m *Schema, onFile func(*FormFile) error) T {
-	return validate.MustFormBody[T](ctx, m, onFile)
+// MustParse is Parse, panicking on any returned error instead of returning
+// it -- AD-021's panicking twin, for call sites that don't want to handle
+// the error themselves.
+func MustParse[T any](src Parseable, m *Schema) T {
+	v, err := Parse[T](src, m)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // ---------------------------------------------------------------------------
@@ -999,7 +943,7 @@ var NewListener = emitter.NewListener
 // function via var, so this is a real wrapper calling the internal one
 // (same pattern as MustInject/MustInjectAll, see AD-004 in STATE.md).
 func MustOn[EventType any](listener *Listener, handler func(ctx context.Context, event EventType)) {
-	emitter.MustOn[EventType](listener, handler)
+	emitter.MustOn(listener, handler)
 }
 
 // ---------------------------------------------------------------------------

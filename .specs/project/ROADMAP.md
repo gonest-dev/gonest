@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** none -- v1 roadmap COMPLETE
-**Status:** Milestones 1-11 COMPLETE
+**Current Milestone:** 14 (Request/Response Split) -- specified, aguardando design/tasks
+**Status:** Milestones 1-13 COMPLETE, Milestone 14 SPECIFIED
 
 ---
 
@@ -247,8 +247,44 @@
 
 ---
 
+## Milestone 13: Unified Parse API
+
+**Goal:** Substituir os 8 pares `MustParseRest*`/`ParseRest*` por dois entry points genéricos unificados (`Parse[T]`/`MustParse[T]`) que recebem um `Parseable` — opaque value retornado por `ctx.Params()`, `ctx.Query()`, `ctx.Headers()`, `ctx.Body().Json()`, `ctx.Body().Form(onFile)`. Breaking change aceita: remoção imediata dos legados.
+**Status:** COMPLETE (2026-07-17, T1-T13 -- suite inteira `go test ./... -race` verde, 23 pacotes, `.examples/*` migrados)
+
+### Features
+
+**Unified Parse API** - COMPLETE
+- `gonest.Parse[T](src Parseable, schema *Schema) (T, error)` + `gonest.MustParse[T](src Parseable, schema *Schema) T`
+- `ctx.Body() BodySource` (novo) / `ctx.RawBody() []byte` (era `ctx.Body() []byte`) / `ctx.Body().Json() Parseable` / `ctx.Body().Form(onFile) Parseable`
+- `ctx.Params() Parseable` / `ctx.Query() Parseable` / `ctx.Headers() Parseable` (headers parsing é novo — sem equivalente today)
+- Remoção de: `MustParseRestJsonBody`, `ParseRestJsonBody`, `MustParseRestParams`, `ParseRestParams`, `MustParseRestQuery`, `ParseRestQuery`, `MustParseRestFormBody`, `ParseRestFormBody`
+- Ver AD-025 (STATE.md) para decisões arquiteturais (Parseable em `execution`, wiring em `adapter/fiber`)
+- Ver `.specs/features/unified-parse-api/tasks.md` para breakdown das 13 tasks
+
+---
+
+## Milestone 14: Request/Response Split
+
+**Goal:** Substituir `*RestContext` único por dois tipos concretos `*Request`/`*Response`, espelhando o padrão `(req, res)` de Express/NestJS — motivo de produto (adoção de devusers vindos do Node), não só técnico. Framework pré-1.0, breaking change aceita.
+**Status:** TASKS BREAKDOWN READY (spec.md + context.md + tasks.md prontos, 18 tasks — execução pendente)
+
+### Features
+
+**Request/Response Split** - TASKS BREAKDOWN READY
+- `internal/execution.Context` → `Request`/`Response`, `Response` guarda `*Request` internamente
+- Migra `Handler`/`Guard`/`Middleware`/`Interceptor`/`Filter` (17 arquivos internos identificados) + `next(req, res)`
+- `Request.Body()` ganha `.Raw()`/`.Text()` (consolida o `RawBody()` avulso da feature anterior)
+- `Response.Html`/`.Text`/`.Json` cada um força seu Content-Type; `SendString` removido
+- `Response.Status(code)`/`StatusCode()` substitui `Status`/`ResponseStatus`
+- Ver `.specs/features/request-response-split/{spec,context,tasks}.md` — decidido via `superpowers:brainstorming` conduzido só na conversa (usuário pediu sem gerar `docs/superpowers/specs/*.md`); tasks.md é a primeira feature a seguir o padrão de 3 papéis de subagente (Planner/Implementer/Evaluator, ver STATE.md's "Subagent workflow convention")
+
+---
+
 ## Future Considerations
 
 - Abstração multi-adapter HTTP (net/http, Echo, Gin) — v1 é só Fiber
 - CLI de scaffolding (equivalente `nest new`/`nest generate`)
 - Microservices/transport layer (equivalente `@nestjs/microservices`)
+- XML body parsing via `ctx.Body().Xml()` — arquitetura `Parseable` suporta como drop-in, sem tocar `Parse[T]`/`MustParse[T]`
+

@@ -32,7 +32,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
 		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParseRestParams[*ParamsDTO](ctx, paramsDTOSchema)
+			p := gonest.MustParse[ParamsDTO](ctx.Params(), paramsDTOSchema)
 			u := service.Get(p.UserID)
 			if u == nil {
 				panic(gonest.NewNotFoundException(nil))
@@ -48,7 +48,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusConflict)
 		r.Handler(func(ctx *gonest.RestContext) {
-			body := gonest.MustParseRestJsonBody[*CreateBodyDTO](ctx, createBodyDTOSchema)
+			body := gonest.MustParse[CreateBodyDTO](ctx.Body().Json(), createBodyDTOSchema)
 			ctx.Status(http.StatusCreated).Json(service.Create(body.Name, body.Email))
 		})
 	})

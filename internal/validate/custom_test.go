@@ -78,7 +78,7 @@ func TestMustJsonBody_CustomFunc_DecodesCustomFormat_EndToEnd(t *testing.T) {
 				panic(r)
 			}
 		}()
-		result := MustJsonBody[*CustomCodeFixture](ctx, customCodeFixtureSchema)
+		result := mustParseJSON[CustomCodeFixture](ctx, customCodeFixtureSchema)
 		return c.JSON(map[string]any{"code": result.Code, "name": result.Name})
 	})
 
@@ -139,7 +139,7 @@ func TestMustJsonBody_CustomFunc_ReturningError_ProducesViolation_CollectedWithO
 		}
 	}()
 
-	MustJsonBody[*CustomCodeFixture](ctx, customCodeFixtureSchema)
+	mustParseJSON[CustomCodeFixture](ctx, customCodeFixtureSchema)
 }
 
 // --- Custom(fn) returning a value of the wrong Go type -----------------
@@ -175,7 +175,7 @@ func TestMustJsonBody_CustomFunc_WrongGoType_ProducesViolation_NeverPanics(t *te
 		}
 	}()
 
-	MustJsonBody[*CustomWrongTypeFixture](ctx, customWrongTypeFixtureSchema)
+	mustParseJSON[CustomWrongTypeFixture](ctx, customWrongTypeFixtureSchema)
 }
 
 // --- regression: field WITHOUT Custom still populates correctly --------
@@ -188,11 +188,8 @@ func TestMustJsonBody_CustomFunc_WrongGoType_ProducesViolation_NeverPanics(t *te
 func TestMustJsonBody_FieldWithoutCustom_PopulatesExactlyAsBefore(t *testing.T) {
 	ctx := newCtx(mustMarshal(map[string]any{"code": "v1:7", "name": "gizmo"}))
 
-	result := MustJsonBody[*CustomCodeFixture](ctx, customCodeFixtureSchema)
+	result := mustParseJSON[CustomCodeFixture](ctx, customCodeFixtureSchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.Code != 7 {
 		t.Fatalf("expected Custom-decoded Code 7, got %d", result.Code)
 	}

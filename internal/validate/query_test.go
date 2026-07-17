@@ -84,7 +84,7 @@ func (f *queryFakeResponder) GetPath() string                       { return "" 
 func (f *queryFakeResponder) GetHeader(name string) string          { return "" }
 func (f *queryFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *queryFakeResponder) GetParam(name string) string           { return "" }
-func (f *queryFakeResponder) Body() []byte                          { return nil }
+func (f *queryFakeResponder) RawBody() []byte                          { return nil }
 func (f *queryFakeResponder) Queries() map[string]string            { return f.queries }
 func (f *queryFakeResponder) HTML(s string) error                   { return nil }
 func (f *queryFakeResponder) SendString(s string) error             { return nil }
@@ -104,11 +104,8 @@ func TestMustQuery_HappyPath_TwoParams(t *testing.T) {
 		"page": "2",
 	})
 
-	result := MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
+	result := mustParseQuery[ListUsersQuery](ctx, listUsersQuerySchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.Term != "gonest" {
 		t.Fatalf("expected Term %q, got %q", "gonest", result.Term)
 	}
@@ -145,7 +142,7 @@ func TestMustQuery_MissingRequiredAndOutOfRange_BothCollected(t *testing.T) {
 		}
 	}()
 
-	MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
+	mustParseQuery[ListUsersQuery](ctx, listUsersQuerySchema)
 }
 
 func TestMustQuery_WrongTypeParam_ProducesViolation(t *testing.T) {
@@ -166,17 +163,14 @@ func TestMustQuery_WrongTypeParam_ProducesViolation(t *testing.T) {
 		}
 	}()
 
-	MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
+	mustParseQuery[ListUsersQuery](ctx, listUsersQuerySchema)
 }
 
 func TestMustQuery_CustomFunc_ReceivesRawString_NotCoerced(t *testing.T) {
 	ctx := newQueryCtx(map[string]string{"code": "abc"})
 
-	result := MustQuery[*CustomQueryFixture](ctx, customQueryFixtureSchema)
+	result := mustParseQuery[CustomQueryFixture](ctx, customQueryFixtureSchema)
 
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
 	if result.Code != "CODE:abc" {
 		t.Fatalf("expected Custom-decoded Code %q, got %q", "CODE:abc", result.Code)
 	}
@@ -199,7 +193,7 @@ func TestMustQuery_MismatchedSchema_PanicsBeforeReadingAnyQuery(t *testing.T) {
 		}
 	}()
 
-	MustQuery[*MismatchedQuery](ctx, listUsersQuerySchema) // built for ListUsersQuery, not MismatchedQuery
+	mustParseQuery[MismatchedQuery](ctx, listUsersQuerySchema) // built for ListUsersQuery, not MismatchedQuery
 }
 
 // --- real HTTP dispatch ---------------------------------------------------
@@ -218,7 +212,7 @@ func TestMustQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
+		result := mustParseQuery[ListUsersQuery](ctx, listUsersQuerySchema)
 		return c.JSON(map[string]any{"term": result.Term, "page": result.Page})
 	})
 
@@ -259,7 +253,7 @@ func TestMustQuery_RealHTTPDispatch_MissingRequiredAndOutOfRange(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		MustQuery[*ListUsersQuery](ctx, listUsersQuerySchema)
+		mustParseQuery[ListUsersQuery](ctx, listUsersQuerySchema)
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -302,7 +296,7 @@ func TestMustQuery_RealHTTPDispatch_CustomFunc(t *testing.T) {
 				panic(rec)
 			}
 		}()
-		result := MustQuery[*CustomQueryFixture](ctx, customQueryFixtureSchema)
+		result := mustParseQuery[CustomQueryFixture](ctx, customQueryFixtureSchema)
 		return c.JSON(map[string]any{"code": result.Code})
 	})
 
