@@ -30,10 +30,11 @@ var OrderConsumer = gonest.NewConsumer(func(c *gonest.Consumer) {
     m.Payload(createOrderSchema)
     
     m.Handler(func(ctx *gonest.MicroserviceContext) {
-      // MustMessagePayload extrai e valida os dados do MicroserviceContext 
-      // (que implementa a interface PayloadCarrier), exigindo o schema explicitamente
-      payload := gonest.MustMessagePayload[*CreateOrderDTO](ctx, createOrderSchema)
-      
+      // ctx.Payload() devolve um Parseable, consumido pela MESMA
+      // gonest.MustParse[T] já usada em REST/GraphQL/gRPC (unified-parse-api
+      // feature) -- nenhuma função MustXxx nova por transporte.
+      payload := gonest.MustParse[CreateOrderDTO](ctx.Payload(), createOrderSchema)
+
       // ctx.Reply envia o retorno de volta pelo broker (RPC)
       ctx.Reply(orderService.Create(payload))
     })
@@ -44,7 +45,7 @@ var OrderConsumer = gonest.NewConsumer(func(c *gonest.Consumer) {
     e.Payload(paymentEventSchema)
     
     e.Handler(func(ctx *gonest.MicroserviceContext) {
-      payload := gonest.MustMessagePayload[*PaymentEventDTO](ctx, paymentEventSchema)
+      payload := gonest.MustParse[PaymentEventDTO](ctx.Payload(), paymentEventSchema)
       orderService.UpdateStatus(payload.OrderId, payload.Status)
       
       // Sem ctx.Reply(), pois é apenas um evento Pub/Sub
@@ -53,11 +54,14 @@ var OrderConsumer = gonest.NewConsumer(func(c *gonest.Consumer) {
 })
 ```
 
-## 2. Abstração de Contexto (O triunfo das Interfaces)
+## 2. Abstração de Contexto (O triunfo do Parseable já existente)
 
-Conforme discutido no suporte a GraphQL e gRPC, o Gonest usaria a interface `PayloadCarrier` para reaproveitar os Schemas de validação.
+Conforme discutido no suporte a GraphQL e gRPC, o Gonest reaproveitaria a
+interface `gonest.Parseable` que já existe hoje (unified-parse-api feature)
+para compartilhar os Schemas de validação -- nenhuma interface nova por
+transporte, só mais um método (`ctx.Payload()`) devolvendo um `Parseable`.
 
-O `*gonest.MicroserviceContext` saberia exatamente como fazer o "unmarshal" da mensagem (seja ela JSON vindo do Redis ou do RabbitMQ, ou Binário vindo do Kafka) e entregaria o dado para o `gonest.Schema` rodar suas restrições (`Required`, `Min`, `Max`).
+O `*gonest.MicroserviceContext` saberia exatamente como fazer o "unmarshal" da mensagem (seja ela JSON vindo do Redis ou do RabbitMQ, ou Binário vindo do Kafka) e entregaria o dado para o `gonest.Schema` rodar suas restrições (`Required`, `Min`, `Max`) por trás de `ctx.Payload().ParseInto(...)`, exatamente como `jsonBodySource`/`formBodySource` já fazem para REST.
 
 Se um dado inválido chegar pelo broker, a camada do Gonest rejeita a mensagem automaticamente, disparando um `BadRequestException` (RPC Exception) de volta para o chamador, sem que o `orderService` seja sequer acionado.
 
