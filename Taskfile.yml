@@ -1,0 +1,60 @@
+version: "3"
+
+vars:
+  EXAMPLES:
+    - .examples/simple-todo
+    - .examples/blog-api
+
+tasks:
+  default:
+    desc: Build + vet + test (same as CI gate)
+    cmds:
+      - task: build
+      - task: vet
+      - task: test
+
+  build:
+    desc: Build the whole module
+    cmds:
+      - go build ./...
+
+  vet:
+    desc: Run go vet on the whole module
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: Run the full test suite
+    cmds:
+      - go test ./...
+
+  test:race:
+    desc: Run the full test suite with -race, no cache
+    cmds:
+      - go clean -testcache
+      - go test ./... -race
+
+  test:pkg:
+    desc: 'Run tests for one package, e.g. task test:pkg -- ./internal/validate/...'
+    cmds:
+      - go test {{.CLI_ARGS}}
+
+  examples:
+    desc: Build both .examples/* modules (each has its own go.mod with a replace directive)
+    cmds:
+      - for:
+          var: EXAMPLES
+        cmd: cd {{.ITEM}} && go build ./...
+
+  gate:
+    desc: Full pre-commit gate -- build, vet, race test, examples
+    cmds:
+      - task: build
+      - task: vet
+      - task: test:race
+      - task: examples
+
+  fmt:
+    desc: gofmt every tracked .go file
+    cmds:
+      - gofmt -l -w .

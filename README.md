@@ -569,6 +569,19 @@ func TestUserController_Get(t *testing.T) {
 `*struct`'s behavior at runtime with no vtable) -- see [`.examples`](.examples) for both a minimal
 and a denser full example app.
 
+### Development
+
+This repo uses [`Taskfile.yml`](Taskfile.yml) ([go-task](https://taskfile.dev)) for the common
+commands:
+
+```sh
+task           # build + vet + test
+task test:race # full suite, -race, no cache
+task examples  # build both .examples/* modules
+task gate      # everything above, the full pre-commit check
+task --list    # see all tasks
+```
+
 ---
 
 ## Contributors
