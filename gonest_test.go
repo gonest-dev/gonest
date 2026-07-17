@@ -192,7 +192,7 @@ type idParams struct {
 	ID int `param:"id"`
 }
 
-var idParamsSchema = NewSchema[idParams](func(t *idParams, m *Schema) {
+var idParamsSchema = NewSchema(func(t *idParams, m *Schema) {
 	m.Property(&t.ID).Integer().Required()
 })
 
@@ -412,7 +412,7 @@ type insightUserIdParams struct {
 	UserId int64 `param:"user_id"`
 }
 
-var insightUserIdParamsSchema = NewSchema[insightUserIdParams](func(t *insightUserIdParams, m *Schema) {
+var insightUserIdParamsSchema = NewSchema(func(t *insightUserIdParams, m *Schema) {
 	m.Property(&t.UserId).Integer().Min(1).Required()
 })
 
@@ -423,7 +423,7 @@ type insightListUsersQuery struct {
 	Limit int `query:"limit"`
 }
 
-var insightListUsersQuerySchema = NewSchema[insightListUsersQuery](func(t *insightListUsersQuery, m *Schema) {
+var insightListUsersQuerySchema = NewSchema(func(t *insightListUsersQuery, m *Schema) {
 	m.Property(&t.Page).Integer().Min(1).Required()
 	m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
 })
@@ -1289,7 +1289,7 @@ func TestNewSchema_RootAlias_TypeCheck(t *testing.T) {
 		Id int64
 	}
 
-	m := NewSchema[minimalEntity](func(t *minimalEntity, m *Schema) {
+	m := NewSchema(func(t *minimalEntity, m *Schema) {
 		var _ *PropertyBuilder = m.Property(&t.Id)
 	})
 	if m == nil {
@@ -1318,7 +1318,7 @@ func TestNewSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	now := time.Now()
 
-	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	m := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário")
 		m.Property(&t.Id).Required().Description("ID do usuário").Examples(int64(1))
 		m.Property(&t.Name).Required().Description("Nome do usuário").Examples("John Doe")
@@ -1417,7 +1417,7 @@ func TestStringSchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var sm *StringSchema
-	m := NewSchema[minimalEntity](func(t *minimalEntity, m *Schema) {
+	m := NewSchema(func(t *minimalEntity, m *Schema) {
 		sm = m.Property(&t.Name).String().Required().Min(1).Max(50).Pattern(`^\w+$`).
 			Description("a name").Examples("John")
 	})
@@ -1473,7 +1473,7 @@ func TestStringSchema_RootAlias_AddressEntityInsightCallShape(t *testing.T) {
 		Zip    string `json:"zip"`
 	}
 
-	m := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
+	m := NewSchema(func(t *AddressEntity, m *Schema) {
 		m.Description("Endereço")
 		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
@@ -1555,7 +1555,7 @@ func TestPropertyBuilder_RootAlias_EmailInsightCallShape(t *testing.T) {
 		Email string `json:"email"`
 	}
 
-	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	m := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("john@example.com")
 	})
 
@@ -1591,7 +1591,7 @@ func TestStringSchema_RootAlias_RemainingSevenBranches(t *testing.T) {
 	}
 
 	var m *Schema
-	m = NewSchema[entity](func(t *entity, m *Schema) {
+	m = NewSchema(func(t *entity, m *Schema) {
 		m.Property(&t.Uuid).Uuid()
 		m.Property(&t.Uri).Uri()
 		m.Property(&t.Hostname).Hostname()
@@ -1645,7 +1645,7 @@ func TestNumericSchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var nm *NumericSchema
-	m := NewSchema[minimalEntity](func(t *minimalEntity, m *Schema) {
+	m := NewSchema(func(t *minimalEntity, m *Schema) {
 		nm = m.Property(&t.Age).Integer().Required().Min(0).Max(150).
 			Description("an age").Examples(int64(30))
 	})
@@ -1694,7 +1694,7 @@ func TestNumericSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		IsActive bool  `json:"isActive"`
 	}
 
-	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	m := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário")
 		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 		m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
@@ -1760,7 +1760,7 @@ func TestNumericSchema_RootAlias_RemainingThreeBranches(t *testing.T) {
 		DoubleField float64
 	}
 
-	m := NewSchema[entity](func(t *entity, m *Schema) {
+	m := NewSchema(func(t *entity, m *Schema) {
 		m.Property(&t.Int32Field).Int32()
 		m.Property(&t.FloatField).Float()
 		m.Property(&t.DoubleField).Double()
@@ -1807,7 +1807,7 @@ func TestDateTime_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	now := time.Now()
 
-	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	m := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(now)
 		m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(now)
 		m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
@@ -1854,7 +1854,7 @@ func TestDate_RootAlias_TypeCheck(t *testing.T) {
 		BirthDate time.Time
 	}
 
-	m := NewSchema[entity](func(t *entity, m *Schema) {
+	m := NewSchema(func(t *entity, m *Schema) {
 		m.Property(&t.BirthDate).Date().Required()
 	})
 
@@ -1888,7 +1888,7 @@ func TestArraySchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var identity *ArraySchema
-	m := NewSchema[entity](func(t *entity, m *Schema) {
+	m := NewSchema(func(t *entity, m *Schema) {
 		am := m.Property(&t.Tags).Array()
 		var _ *ArraySchema = am
 		am.Items(func(m *ArraySchema) {
@@ -1959,14 +1959,14 @@ func TestArraySchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		Addresses []AddressEntity `json:"addresses"`
 	}
 
-	addressSchema := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
+	addressSchema := NewSchema(func(t *AddressEntity, m *Schema) {
 		m.Description("Endereço")
 		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
 		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	m := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário com campos aninhados")
 		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
@@ -2065,7 +2065,7 @@ func TestObjectSchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var insideIdentity *ObjectSchema
-	m := NewSchema[entity](func(t *entity, m *Schema) {
+	m := NewSchema(func(t *entity, m *Schema) {
 		om := m.Property(&t.Inside).Object(func(m *ObjectSchema) {
 			insideIdentity = m
 			m.AdditionalProperties()
@@ -2157,14 +2157,14 @@ func TestObjectSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		Schema  map[string]any `json:"schema"`
 	}
 
-	addressSchema := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
+	addressSchema := NewSchema(func(t *AddressEntity, m *Schema) {
 		m.Description("Endereço")
 		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
 		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	m := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	m := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Description("Entidade de usuário com campos aninhados")
 		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
@@ -2262,14 +2262,14 @@ type jsonBodyUserEntity struct {
 // registration for the same reflect.Type -- T1), via a package-level init
 // mirroring INSIGHT.md's own top-level `var _ = gonest.NewSchema[...]`
 // call shape.
-var jsonBodyAddressSchema = NewSchema[jsonBodyAddressEntity](func(t *jsonBodyAddressEntity, m *Schema) {
+var jsonBodyAddressSchema = NewSchema(func(t *jsonBodyAddressEntity, m *Schema) {
 	m.Description("Endereço")
 	m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
 	m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
 	m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 })
 
-var jsonBodyUserSchema = NewSchema[jsonBodyUserEntity](func(t *jsonBodyUserEntity, m *Schema) {
+var jsonBodyUserSchema = NewSchema(func(t *jsonBodyUserEntity, m *Schema) {
 	m.Description("Entidade de usuário com campos aninhados")
 	m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 	m.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
@@ -2576,16 +2576,16 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		Addresses []AddressEntity
 	}
 
-	addressSchema := NewSchema[AddressEntity](func(t *AddressEntity, m *Schema) {
+	addressSchema := NewSchema(func(t *AddressEntity, m *Schema) {
 		m.Property(&t.City).String().Required()
 		m.Property(&t.Zip).String().Required()
 	})
 
-	userIdParamsSchema := NewSchema[UserIdParams](func(t *UserIdParams, m *Schema) {
+	userIdParamsSchema := NewSchema(func(t *UserIdParams, m *Schema) {
 		m.Property(&t.UserId).String().Required()
 	})
 
-	userEntitySchema := NewSchema[UserEntity](func(t *UserEntity, m *Schema) {
+	userEntitySchema := NewSchema(func(t *UserEntity, m *Schema) {
 		m.Title("UserEntity")
 		m.Property(&t.Id).String().Required()
 		m.Property(&t.Name).String().Required()
@@ -2990,7 +2990,7 @@ type insightTestUserIDParam struct {
 	ID int64 `param:"id"`
 }
 
-var insightTestUserIDParamSchema = NewSchema[insightTestUserIDParam](func(t *insightTestUserIDParam, m *Schema) {
+var insightTestUserIDParamSchema = NewSchema(func(t *insightTestUserIDParam, m *Schema) {
 	m.Property(&t.ID).Integer().Required()
 })
 
@@ -3545,7 +3545,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 	type uploadForm struct {
 		Title string `form:"title"`
 	}
-	uploadSchema := NewSchema[uploadForm](func(t *uploadForm, m *Schema) {
+	uploadSchema := NewSchema(func(t *uploadForm, m *Schema) {
 		m.Property(&t.Title).String().Required()
 	})
 

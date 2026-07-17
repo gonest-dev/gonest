@@ -10,7 +10,7 @@ type createTodoBody struct {
 	Title string `json:"title"`
 }
 
-var createTodoBodySchema = gonest.NewSchema[createTodoBody](func(t *createTodoBody, m *gonest.Schema) {
+var createTodoBodySchema = gonest.NewSchema(func(t *createTodoBody, m *gonest.Schema) {
 	m.Property(&t.Title).String().Min(1).Required()
 })
 
@@ -19,7 +19,7 @@ type updateTodoBody struct {
 	Done  bool   `json:"done"`
 }
 
-var updateTodoBodySchema = gonest.NewSchema[updateTodoBody](func(t *updateTodoBody, m *gonest.Schema) {
+var updateTodoBodySchema = gonest.NewSchema(func(t *updateTodoBody, m *gonest.Schema) {
 	m.Property(&t.Title).String().Min(1).Required()
 	m.Property(&t.Done).Boolean()
 })
@@ -28,7 +28,7 @@ type todoIDParams struct {
 	ID int64 `param:"id"`
 }
 
-var todoIDParamsSchema = gonest.NewSchema[todoIDParams](func(t *todoIDParams, m *gonest.Schema) {
+var todoIDParamsSchema = gonest.NewSchema(func(t *todoIDParams, m *gonest.Schema) {
 	m.Property(&t.ID).Integer().Min(1).Required()
 })
 
