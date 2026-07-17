@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	app, err := gonest.NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{})
+	app, err := gonest.NewApp[gonest.FiberApp](AppModule)
 	if err != nil {
 		panic(err)
 	}
