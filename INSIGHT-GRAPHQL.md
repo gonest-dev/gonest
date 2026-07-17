@@ -21,16 +21,18 @@ var UserResolver = gonest.NewResolver(func (resolver *gonest.Resolver) {
     // E reutilizamos para tipar o retorno no Schema do GraphQL
     query.Returns(userEntitySchema) 
 
-    query.Resolve(func(req *gonest.GraphRequest, res *gonest.GraphResponse) {
+    query.Handler(func(ctx *gonest.GraphqlContext) any {
       // Reaproveita a MESMA API unificada do REST (gonest.MustParse[T] +
-      // Parseable, unified-parse-api/request-response-split features) --
-      // GraphRequest só precisa expor Args() Parseable, igual gonest.Request
-      // (REST) expõe Params()/Query()/Headers()/Body() hoje. São tipos
-      // DIFERENTES (GraphQL não é HTTP), mas satisfazem o mesmo contrato.
-      args := gonest.MustParse[UserIdParams](req.Args(), userIdParamsSchema)
+      // Parseable, unified-parse-api feature) -- GraphqlContext só precisa
+      // expor Args() Parseable, igual gonest.Request (REST) expõe
+      // Params()/Query()/Headers()/Body() hoje. É um tipo DIFERENTE
+      // (GraphQL não é HTTP), mas satisfaz o mesmo contrato Parseable.
+      args := gonest.MustParse[UserIdParams](ctx.Args(), userIdParamsSchema)
 
-      // res.Data sinaliza o retorno final do resolver (sem response HTTP)
-      res.Data(userService.Get(args.UserId))
+      // O valor retornado (any) já É o data do resolver -- igual ao NestJS,
+      // sem precisar de um res.Data()/Response separado (GraphQL não tem
+      // status/headers para justificar um write-side rico como o REST tem).
+      return userService.Get(args.UserId)
     })
   })
 
@@ -40,9 +42,9 @@ var UserResolver = gonest.NewResolver(func (resolver *gonest.Resolver) {
     mutation.Args(userEntitySchema) 
     mutation.Returns(userEntitySchema)
     
-    mutation.Resolve(func(req *gonest.GraphRequest, res *gonest.GraphResponse) {
-      input := gonest.MustParse[UserEntity](req.Args(), userEntitySchema)
-      res.Data(userService.Create(input))
+    mutation.Handler(func(ctx *gonest.GraphqlContext) any {
+      input := gonest.MustParse[UserEntity](ctx.Args(), userEntitySchema)
+      return userService.Create(input)
     })
   })
 })
@@ -76,7 +78,7 @@ Ao invés de criarmos tipos isolados, structs repetidas, e usar strings reflexiv
 Você declararia a regra, a dependência e o modelo de dados uma única vez, e o Gonest orquestraria isso para servir 4 propósitos simultaneamente:
 
 1. Injeção de dependência universal (Providers independentes de HTTP/GQL)
-2. Validação unificada em runtime -- a MESMA dupla `gonest.Parse[T]`/`gonest.MustParse[T]` que já existe para REST hoje (unified-parse-api feature), agora também alimentada por `req.Args()` no lugar de `req.Params()`/`req.Query()`/`req.Body().Json()`
+2. Validação unificada em runtime -- a MESMA dupla `gonest.Parse[T]`/`gonest.MustParse[T]` que já existe para REST hoje (unified-parse-api feature), agora também alimentada por `ctx.Args()` no lugar de `req.Params()`/`req.Query()`/`req.Body().Json()`
 3. Geração Automática de Documentação OpenAPI (REST)
 4. Geração Automática de Schema SDL (GraphQL)
 
