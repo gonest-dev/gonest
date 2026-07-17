@@ -106,8 +106,9 @@ func buildMultipartBody(t *testing.T, fields map[string]string, files map[string
 	return body, mw.Boundary()
 }
 
-func newFormCtx(body *bytes.Buffer, boundary string) *execution.Context {
-	return execution.New(&formFakeResponder{stream: body, boundary: boundary})
+func newFormCtx(body *bytes.Buffer, boundary string) *execution.Request {
+	req, _ := execution.New(&formFakeResponder{stream: body, boundary: boundary})
+	return req
 }
 
 // --- unit tests --------------------------------------------------------
@@ -239,7 +240,7 @@ func TestMustFormBody_PanicsOnError(t *testing.T) {
 }
 
 func TestParseFormBody_StreamUnavailable_Panics(t *testing.T) {
-	ctx := execution.New(&formFakeResponder{}) // stream == nil -> BodyStream() reports ok=false
+	ctx, _ := execution.New(&formFakeResponder{}) // stream == nil -> BodyStream() reports ok=false
 
 	defer func() {
 		r := recover()

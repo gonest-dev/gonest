@@ -81,27 +81,27 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 	t.Helper()
 
 	globalMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *execution.Context, next middleware.Next) {
+		m.Handler(func(req *execution.Request, res *execution.Response, next middleware.Next) {
 			*order = append(*order, "global-middleware")
-			next(ctx)
+			next(req, res)
 		})
 	})
 	controllerMw := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *execution.Context, next middleware.Next) {
+		m.Handler(func(req *execution.Request, res *execution.Response, next middleware.Next) {
 			*order = append(*order, "controller-middleware")
-			next(ctx)
+			next(req, res)
 		})
 	})
 	g := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *execution.Context) bool {
+		g.Handler(func(req *execution.Request, res *execution.Response) bool {
 			*order = append(*order, "guard")
 			return guardAllows
 		})
 	})
 	it := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
+		i.Handler(func(req *execution.Request, res *execution.Response, next interceptor.Next) {
 			*order = append(*order, "interceptor-before")
-			next(ctx)
+			next(req, res)
 			*order = append(*order, "interceptor-after")
 		})
 	})
@@ -112,19 +112,19 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 		c.Interceptors(it)
 		if withFilter {
 			f := filter.New(func(f *filter.Filter) {
-				f.Catch(&exception.BadRequestException{}, func(ctx *execution.Context, exc *exception.BadRequestException) {
+				f.Catch(&exception.BadRequestException{}, func(req *execution.Request, res *execution.Response, exc *exception.BadRequestException) {
 					*order = append(*order, "filter")
-					ctx.Status(400).Json(map[string]string{"caught": "pipeline-filter"})
+					res.Status(400).Json(map[string]string{"caught": "pipeline-filter"})
 				})
 			})
 			c.Filters(f)
 		}
 		c.Route(route.HttpGet, "/pipeline/:id", func(r *route.Route) {
-			r.Handler(func(ctx *execution.Context) {
+			r.Handler(func(req *execution.Request, res *execution.Response) {
 				*order = append(*order, "handler-before-pipe")
-				p := mustParse[pipelineIDParams](ctx.Params(), pipelineIDParamsSchema)
+				p := mustParse[pipelineIDParams](req.Params(), pipelineIDParamsSchema)
 				*order = append(*order, "pipe")
-				ctx.Json(map[string]any{"id": p.ID})
+				res.Json(map[string]any{"id": p.ID})
 			})
 		})
 	})

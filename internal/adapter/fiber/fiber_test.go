@@ -45,9 +45,9 @@ func TestRegisterRoute_AllHttpMethods_DispatchToTheirOwnVerb(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			app := New()
 			called := false
-			if err := app.RegisterRoute(tc.method, "/verb", func(ctx *execution.Context) {
+			if err := app.RegisterRoute(tc.method, "/verb", func(req *execution.Request, res *execution.Response) {
 				called = true
-				ctx.Json(map[string]string{"ok": "true"})
+				res.Json(map[string]string{"ok": "true"})
 			}); err != nil {
 				t.Fatalf("RegisterRoute returned error: %v", err)
 			}
@@ -91,8 +91,8 @@ func TestInit_ZeroValueFiberApp_BecomesUsable(t *testing.T) {
 
 	app.Init(appoptions.AppOptions{})
 
-	if err := app.RegisterRoute(route.HttpGet, "/ping", func(ctx *execution.Context) {
-		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	if err := app.RegisterRoute(route.HttpGet, "/ping", func(req *execution.Request, res *execution.Response) {
+		res.Status(200).Json(map[string]string{"ok": "true"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error after Init: %v", err)
 	}
@@ -130,8 +130,8 @@ func TestInit_CalledTwice_DoesNotResetExistingApp(t *testing.T) {
 func TestNew_RegisterRoute_NoError(t *testing.T) {
 	app := New()
 
-	err := app.RegisterRoute(route.HttpGet, "/ping", func(ctx *execution.Context) {
-		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	err := app.RegisterRoute(route.HttpGet, "/ping", func(req *execution.Request, res *execution.Response) {
+		res.Status(200).Json(map[string]string{"ok": "true"})
 	})
 
 	if err != nil {
@@ -147,9 +147,9 @@ func TestRegisterRoute_RealDispatch_RunsGonestHandler(t *testing.T) {
 	app := New()
 
 	called := false
-	if err := app.RegisterRoute(route.HttpGet, "/ping", func(ctx *execution.Context) {
+	if err := app.RegisterRoute(route.HttpGet, "/ping", func(req *execution.Request, res *execution.Response) {
 		called = true
-		ctx.Json(map[string]string{"pong": "true"})
+		res.Json(map[string]string{"pong": "true"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestRegisterRoute_RealDispatch_RunsGonestHandler(t *testing.T) {
 func TestRegisterRoute_HandlerPanics_Responds500(t *testing.T) {
 	app := New()
 
-	if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *execution.Context) {
+	if err := app.RegisterRoute(route.HttpGet, "/boom", func(req *execution.Request, res *execution.Response) {
 		panic("something went wrong")
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
@@ -196,15 +196,15 @@ func TestRegisterRoute_HandlerPanics_Responds500(t *testing.T) {
 	}
 }
 
-// TestRegisterRoute_JsonLandsInRealResponseBody proves ctx.Json(value)
+// TestRegisterRoute_JsonLandsInRealResponseBody proves res.Json(value)
 // serializes correctly into the real HTTP response body as observed by
 // app.Test -- the Responder implementation actually bridges to fiber.Ctx's
 // JSON, not just to a fake in a unit test.
 func TestRegisterRoute_JsonLandsInRealResponseBody(t *testing.T) {
 	app := New()
 
-	if err := app.RegisterRoute(route.HttpGet, "/greeting", func(ctx *execution.Context) {
-		ctx.Json(map[string]string{"message": "hello"})
+	if err := app.RegisterRoute(route.HttpGet, "/greeting", func(req *execution.Request, res *execution.Response) {
+		res.Json(map[string]string{"message": "hello"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -225,13 +225,13 @@ func TestRegisterRoute_JsonLandsInRealResponseBody(t *testing.T) {
 	}
 }
 
-// TestRegisterRoute_StatusLandsInRealResponse proves ctx.Status(code)
+// TestRegisterRoute_StatusLandsInRealResponse proves res.Status(code)
 // lands as the real HTTP response status code as observed by app.Test.
 func TestRegisterRoute_StatusLandsInRealResponse(t *testing.T) {
 	app := New()
 
-	if err := app.RegisterRoute(route.HttpPost, "/created", func(ctx *execution.Context) {
-		ctx.Status(201).Json(map[string]string{"id": "1"})
+	if err := app.RegisterRoute(route.HttpPost, "/created", func(req *execution.Request, res *execution.Response) {
+		res.Status(201).Json(map[string]string{"id": "1"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestRegisterRoute_StatusLandsInRealResponse(t *testing.T) {
 	}
 }
 
-// TestRegisterRoute_HtmlLandsInRealResponse proves ctx.HTML(s) sets a real
+// TestRegisterRoute_HtmlLandsInRealResponse proves res.Html(s) sets a real
 // text/html Content-Type response header and writes s verbatim as the
 // response body, as observed by app.Test -- the fiberResponder.HTML
 // implementation actually bridges to fiber.Ctx's Type/SendString, not just a
@@ -256,8 +256,8 @@ func TestRegisterRoute_StatusLandsInRealResponse(t *testing.T) {
 func TestRegisterRoute_HtmlLandsInRealResponse(t *testing.T) {
 	app := New()
 
-	if err := app.RegisterRoute(route.HttpGet, "/page", func(ctx *execution.Context) {
-		ctx.HTML("<h1>hello</h1>")
+	if err := app.RegisterRoute(route.HttpGet, "/page", func(req *execution.Request, res *execution.Response) {
+		res.Html("<h1>hello</h1>")
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -293,9 +293,9 @@ func TestRegisterRoute_ParamReachesHandler(t *testing.T) {
 	app := New()
 
 	var gotID string
-	if err := app.RegisterRoute(route.HttpGet, "/users/:id", func(ctx *execution.Context) {
-		gotID = ctx.Param("id")
-		ctx.Json(map[string]string{"id": gotID})
+	if err := app.RegisterRoute(route.HttpGet, "/users/:id", func(req *execution.Request, res *execution.Response) {
+		gotID = req.Param("id")
+		res.Json(map[string]string{"id": gotID})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -432,9 +432,10 @@ func TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes(t *testing.T) {
 
 	want := `{"name":"Ada","age":36}`
 	var got string
-	if err := app.RegisterRoute(route.HttpPost, "/echo", func(ctx *execution.Context) {
-		got = string(ctx.RawBody())
-		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	if err := app.RegisterRoute(route.HttpPost, "/echo", func(req *execution.Request, res *execution.Response) {
+		req.WithSources(nil, nil, nil, execution.NewBodySource(req, nil, nil))
+		got = string(req.Body().Raw())
+		res.Status(200).Json(map[string]string{"ok": "true"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -454,16 +455,16 @@ func TestRegisterRoute_BodyReachesHandler_WithRealPostedBytes(t *testing.T) {
 
 // TestRegisterRoute_QueriesReachHandler_WithRealQueryString proves the
 // fiber.Ctx-backed Responder's Queries() is wired to Fiber's own
-// Ctx.Queries(), via a real HTTP dispatch (app.Test) with a real query
+// req.Queries(), via a real HTTP dispatch (app.Test) with a real query
 // string -- not just that a fake Responder in a unit test returns whatever
 // map it was handed.
 func TestRegisterRoute_QueriesReachHandler_WithRealQueryString(t *testing.T) {
 	app := New()
 
 	var got map[string]string
-	if err := app.RegisterRoute(route.HttpGet, "/search", func(ctx *execution.Context) {
-		got = ctx.Queries()
-		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	if err := app.RegisterRoute(route.HttpGet, "/search", func(req *execution.Request, res *execution.Response) {
+		got = req.Queries()
+		res.Status(200).Json(map[string]string{"ok": "true"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -487,9 +488,9 @@ func TestRegisterRoute_QueriesEmpty_WithNoQueryString(t *testing.T) {
 	app := New()
 
 	var got map[string]string
-	if err := app.RegisterRoute(route.HttpGet, "/search", func(ctx *execution.Context) {
-		got = ctx.Queries()
-		ctx.Status(200).Json(map[string]string{"ok": "true"})
+	if err := app.RegisterRoute(route.HttpGet, "/search", func(req *execution.Request, res *execution.Response) {
+		got = req.Queries()
+		res.Status(200).Json(map[string]string{"ok": "true"})
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}
@@ -582,7 +583,7 @@ func TestRegisterRoute_HandlerPanicsWithException_RespondsWithStructuredBody(t *
 		t.Run(tc.name, func(t *testing.T) {
 			app := New()
 
-			if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *execution.Context) {
+			if err := app.RegisterRoute(route.HttpGet, "/boom", func(req *execution.Request, res *execution.Response) {
 				panic(tc.panicValue)
 			}); err != nil {
 				t.Fatalf("RegisterRoute returned error: %v", err)
@@ -639,7 +640,7 @@ func TestRegisterRoute_HandlerPanicsWithException_RespondsWithStructuredBody(t *
 func TestRegisterRoute_ExceptionWithNilDetails_SerializesDetailsAsJsonNull(t *testing.T) {
 	app := New()
 
-	if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *execution.Context) {
+	if err := app.RegisterRoute(route.HttpGet, "/boom", func(req *execution.Request, res *execution.Response) {
 		panic(exception.NewNotFoundException(nil))
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
@@ -716,7 +717,7 @@ func TestRegisterRoute_HandlerPanicsWithNonException_StillRespondsGeneric500(t *
 		t.Run(tc.name, func(t *testing.T) {
 			app := New()
 
-			if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *execution.Context) {
+			if err := app.RegisterRoute(route.HttpGet, "/boom", func(req *execution.Request, res *execution.Response) {
 				tc.makePanic()
 			}); err != nil {
 				t.Fatalf("RegisterRoute returned error: %v", err)
@@ -761,7 +762,7 @@ func TestRegisterRoute_HandlerPanicsWithNonException_StillRespondsGeneric500(t *
 func TestRegisterRoute_HandlerPanicsWithNil_FallsThroughToGeneric500(t *testing.T) {
 	app := New()
 
-	if err := app.RegisterRoute(route.HttpGet, "/boom", func(ctx *execution.Context) {
+	if err := app.RegisterRoute(route.HttpGet, "/boom", func(req *execution.Request, res *execution.Response) {
 		panic(nil)
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)

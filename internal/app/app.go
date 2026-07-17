@@ -224,7 +224,7 @@ type HttpAdapter interface {
 	// RegisterRoute wires one route (method + full path) onto the real
 	// underlying HTTP engine, translating h into whatever handler shape
 	// that engine expects.
-	RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error
+	RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error
 	// Listen starts the underlying HTTP engine serving on addr, blocking
 	// until it stops. onListen, if non-nil, is invoked exactly once, after
 	// the underlying engine has successfully bound addr but before Listen's
@@ -476,7 +476,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	type collected struct {
 		method  route.HttpMethod
 		path    string
-		handler func(ctx *execution.Context)
+		handler func(req *execution.Request, res *execution.Response)
 	}
 
 	var routes []collected
@@ -519,30 +519,31 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				// route, to avoid shadowing the internal/route package
 				// import used elsewhere in this function/file.
 				currentRoute := r
-				withRoute := func(ctx *execution.Context) {
-					ctx.WithRoute(currentRoute)
+				withRoute := func(req *execution.Request, res *execution.Response) {
+					req.WithRoute(currentRoute)
 					// Wires the unified-parse-api's Parseable sources onto
-					// ctx BEFORE the composed handler chain runs, so a
-					// Handler calling ctx.Params()/ctx.Query()/ctx.Headers()/
-					// ctx.Body().Json()/ctx.Body().Form(onFile) always gets a
+					// req BEFORE the composed handler chain runs, so a
+					// Handler calling req.Params()/req.Query()/req.Headers()/
+					// req.Body().Json()/req.Body().Form(onFile) always gets a
 					// real, non-nil Parseable back. internal/app is the
 					// bridge point (imports both execution and validate)
 					// because execution can never import validate itself
 					// (validate already imports execution -- see
 					// execution.Parseable/BodySource's own doc comments for
 					// why this cycle constraint shapes the whole feature).
-					ctx.WithSources(
-						validate.NewParamsSource(ctx),
-						validate.NewQuerySource(ctx),
-						validate.NewHeadersSource(ctx),
+					req.WithSources(
+						validate.NewParamsSource(req),
+						validate.NewQuerySource(req),
+						validate.NewHeadersSource(req),
 						execution.NewBodySource(
-							func() execution.Parseable { return validate.NewJSONBodySource(ctx) },
+							req,
+							func() execution.Parseable { return validate.NewJSONBodySource(req) },
 							func(onFile func(*execution.FormFile) error) execution.Parseable {
-								return validate.NewFormBodySource(ctx, onFile)
+								return validate.NewFormBodySource(req, onFile)
 							},
 						),
 					)
-					composedHandler(ctx)
+					composedHandler(req, res)
 				}
 				// filteredHandler is the NEW outermost layer of all: it wraps
 				// withRoute (which already wraps everything else) in its own
@@ -582,8 +583,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 // error, panic(nil)'s *runtime.PanicNilError, etc.) is re-panicked
 // immediately, without ever consulting any Filter's Catch map -- Filters only
 // ever catch structured exception.Exception values.
-func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next func(ctx *execution.Context)) func(ctx *execution.Context) {
-	return func(ctx *execution.Context) {
+func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
+	return func(req *execution.Request, res *execution.Response) {
 		defer func() {
 			r := recover()
 			if r == nil {
@@ -592,18 +593,18 @@ func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next fun
 			if exc, ok := r.(exception.Exception); ok {
 				excType := reflect.TypeOf(exc)
 				if h, found := findCatch(controllerFilters, excType); found {
-					h.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
+					h.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
 					return
 				}
 				if h, found := findCatch(globalFilters, excType); found {
-					h.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
+					h.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
 					return
 				}
 			}
 			panic(r) // not caught by any Filter -- re-panic, the adapter's
 			// own EXISTING recover (unchanged) applies the default formatting
 		}()
-		next(ctx)
+		next(req, res)
 	}
 }
 
@@ -637,14 +638,14 @@ func findCatch(filters []*filter.Filter, excType reflect.Type) (reflect.Value, b
 // controllerGuards is empty, the loop runs zero iterations and routeHandler
 // runs immediately -- behaviorally identical to calling routeHandler
 // directly (zero regression for controllers that never call Guards).
-func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *execution.Context)) func(ctx *execution.Context) {
-	return func(ctx *execution.Context) {
+func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
+	return func(req *execution.Request, res *execution.Response) {
 		for _, g := range controllerGuards {
-			if !g.HandlerFunc()(ctx) {
+			if !g.HandlerFunc()(req, res) {
 				panic(exception.NewForbiddenException(nil))
 			}
 		}
-		routeHandler(ctx)
+		routeHandler(req, res)
 	}
 }
 
@@ -668,15 +669,15 @@ func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(ctx *execut
 // is empty, the loop runs zero iterations and the returned func behaves
 // identically to calling routeHandler directly -- zero regression for
 // controllers that never call Interceptors.
-func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(ctx *execution.Context)) func(ctx *execution.Context) {
+func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
 	next := interceptor.Next(routeHandler)
 	for i := len(controllerInterceptors) - 1; i >= 0; i-- {
 		it := controllerInterceptors[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
-		next = func(ctx *execution.Context) { it.HandlerFunc()(ctx, captured) }
+		next = func(req *execution.Request, res *execution.Response) { it.HandlerFunc()(req, res, captured) }
 	}
 
-	return func(ctx *execution.Context) { next(ctx) }
+	return func(req *execution.Request, res *execution.Response) { next(req, res) }
 }
 
 // composeHandler builds the final handler for one route: global middleware
@@ -688,17 +689,17 @@ func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, route
 // Use() calls anywhere), the loop body never runs and the returned func
 // behaves identically to registering handler directly -- zero regression
 // per design.md's Error Handling Strategy table.
-func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(ctx *execution.Context)) func(ctx *execution.Context) {
+func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
 	chain := append(append([]*middleware.Middleware{}, globalMiddleware...), controllerMiddleware...)
 
 	next := middleware.Next(handler)
 	for i := len(chain) - 1; i >= 0; i-- {
 		mw := chain[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
-		next = func(ctx *execution.Context) { mw.HandlerFunc()(ctx, captured) }
+		next = func(req *execution.Request, res *execution.Response) { mw.HandlerFunc()(req, res, captured) }
 	}
 
-	return func(ctx *execution.Context) { next(ctx) }
+	return func(req *execution.Request, res *execution.Response) { next(req, res) }
 }
 
 // asMiddleware converts root's []module.MiddlewareRef (module stores these

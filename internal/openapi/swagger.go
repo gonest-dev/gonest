@@ -53,15 +53,15 @@ type SwaggerOptions struct {
 func SetupSwagger(a *app.App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
 	adapter := a.Adapter()
 
-	if err := adapter.RegisterRoute(route.HttpGet, options.JsonDocumentUrl, func(ctx *execution.Context) {
-		ctx.Json(doc.Document()) //nolint:errcheck // best-effort write, mirrors other Handler bodies in this codebase
+	if err := adapter.RegisterRoute(route.HttpGet, options.JsonDocumentUrl, func(req *execution.Request, res *execution.Response) {
+		res.Json(doc.Document()) //nolint:errcheck // best-effort write, mirrors other Handler bodies in this codebase
 	}); err != nil {
 		return err
 	}
 
 	html := renderSwaggerUIHTML(options)
-	if err := adapter.RegisterRoute(route.HttpGet, uiPath, func(ctx *execution.Context) {
-		ctx.HTML(html) //nolint:errcheck // best-effort write, mirrors other Handler bodies in this codebase
+	if err := adapter.RegisterRoute(route.HttpGet, uiPath, func(req *execution.Request, res *execution.Response) {
+		res.Html(html) //nolint:errcheck // best-effort write, mirrors other Handler bodies in this codebase
 	}); err != nil {
 		return err
 	}

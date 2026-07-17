@@ -19,10 +19,10 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
 		r.Query(listQueryDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
-		r.Handler(func(ctx *gonest.RestContext) {
-			q := gonest.MustParse[ListQueryDTO](ctx.Query(), listQueryDTOSchema)
-			ctx.Json(service.List(q.PostID, q.UserID))
+		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(Schema) })
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			q := gonest.MustParse[ListQueryDTO](req.Query(), listQueryDTOSchema)
+			res.Json(service.List(q.PostID, q.UserID))
 		})
 	})
 
@@ -30,11 +30,11 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Create a comment")
 		r.HttpCode(http.StatusCreated)
 		r.RequestBody(createBodyDTOSchema)
-		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
+		r.Response(http.StatusCreated, func(response *gonest.RouteResponse) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
-		r.Handler(func(ctx *gonest.RestContext) {
-			body := gonest.MustParse[CreateBodyDTO](ctx.Body().Json(), createBodyDTOSchema)
-			ctx.Status(http.StatusCreated).Json(service.Create(body.PostID, body.UserID, body.Body))
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			body := gonest.MustParse[CreateBodyDTO](req.Body().Json(), createBodyDTOSchema)
+			res.Status(http.StatusCreated).Json(service.Create(body.PostID, body.UserID, body.Body))
 		})
 	})
 })

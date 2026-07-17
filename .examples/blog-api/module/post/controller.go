@@ -30,27 +30,27 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List posts, optionally filtered by user_id")
 		r.Query(listQueryDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
-		r.Handler(func(ctx *gonest.RestContext) {
-			q := gonest.MustParse[ListQueryDTO](ctx.Query(), listQueryDTOSchema)
-			ctx.Json(service.List(q.UserID))
+		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(Schema) })
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			q := gonest.MustParse[ListQueryDTO](req.Query(), listQueryDTOSchema)
+			res.Json(service.List(q.UserID))
 		})
 	})
 
 	controller.Route(gonest.HttpGet, "/:post_id", func(r *gonest.Route) {
 		r.Summary("Get a post by id")
 		r.Params(paramsDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
-		r.Response(http.StatusNotFound, func(response *gonest.Response) {
+		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(Schema) })
+		r.Response(http.StatusNotFound, func(response *gonest.RouteResponse) {
 			response.Description("Cannot find a post using post_id")
 		})
-		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParse[ParamsDTO](ctx.Params(), paramsDTOSchema)
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
 			post := service.Get(p.PostID)
 			if post == nil {
 				panic(gonest.NewNotFoundException(nil))
 			}
-			ctx.Json(post)
+			res.Json(post)
 		})
 	})
 
@@ -58,11 +58,11 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Create a post")
 		r.HttpCode(http.StatusCreated)
 		r.RequestBody(createBodyDTOSchema)
-		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
+		r.Response(http.StatusCreated, func(response *gonest.RouteResponse) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
-		r.Handler(func(ctx *gonest.RestContext) {
-			body := gonest.MustParse[CreateBodyDTO](ctx.Body().Json(), createBodyDTOSchema)
-			ctx.Status(http.StatusCreated).Json(service.Create(body.UserID, body.Title, body.Body))
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			body := gonest.MustParse[CreateBodyDTO](req.Body().Json(), createBodyDTOSchema)
+			res.Status(http.StatusCreated).Json(service.Create(body.UserID, body.Title, body.Body))
 		})
 	})
 
@@ -76,18 +76,18 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Params(paramsDTOSchema)
 		r.FormBody(uploadAttachmentFormDTOSchema, "file")
 		r.Response(http.StatusCreated)
-		r.Response(http.StatusNotFound, func(response *gonest.Response) {
+		r.Response(http.StatusNotFound, func(response *gonest.RouteResponse) {
 			response.Description("Cannot find a post using post_id")
 		})
-		r.Handler(func(ctx *gonest.RestContext) {
-			p := gonest.MustParse[ParamsDTO](ctx.Params(), paramsDTOSchema)
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
 			if service.Get(p.PostID) == nil {
 				panic(gonest.NewNotFoundException(nil))
 			}
 
 			var savedFilename string
 			var savedSize int64
-			form := gonest.MustParse[UploadAttachmentFormDTO](ctx.Body().Form(func(f *gonest.FormFile) error {
+			form := gonest.MustParse[UploadAttachmentFormDTO](req.Body().Form(func(f *gonest.FormFile) error {
 				if err := os.MkdirAll(uploadsDir, 0o755); err != nil {
 					return err
 				}
@@ -103,7 +103,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 				return err
 			}), uploadAttachmentFormDTOSchema)
 
-			ctx.Status(http.StatusCreated).Json(map[string]any{
+			res.Status(http.StatusCreated).Json(map[string]any{
 				"filename":    savedFilename,
 				"size":        savedSize,
 				"description": form.Description,

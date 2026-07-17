@@ -12,9 +12,9 @@ import (
 // attached per-controller (Interceptor has no Module-level global
 // registration, unlike Middleware/Filter).
 var TimingInterceptor = gonest.NewInterceptor(func(interceptor *gonest.Interceptor) {
-	interceptor.Handler(func(ctx *gonest.RestContext, next gonest.InterceptorNext) {
+	interceptor.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.InterceptorNext) {
 		start := time.Now()
-		next(ctx)
+		next(req, res)
 		fmt.Printf("[timing] request took %s\n", time.Since(start))
 	})
 })

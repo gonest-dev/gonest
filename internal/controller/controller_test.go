@@ -227,15 +227,15 @@ func TestUse_StoresMiddlewareInRegistrationOrder(t *testing.T) {
 	var order []string
 
 	m1 := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *execution.Context, next middleware.Next) {
+		m.Handler(func(req *execution.Request, res *execution.Response, next middleware.Next) {
 			order = append(order, "m1")
-			next(ctx)
+			next(req, res)
 		})
 	})
 	m2 := middleware.New(func(m *middleware.Middleware) {
-		m.Handler(func(ctx *execution.Context, next middleware.Next) {
+		m.Handler(func(req *execution.Request, res *execution.Response, next middleware.Next) {
 			order = append(order, "m2")
-			next(ctx)
+			next(req, res)
 		})
 	})
 
@@ -275,13 +275,13 @@ func TestGuards_StoresGuardsInRegistrationOrder(t *testing.T) {
 	var order []string
 
 	g1 := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *execution.Context) bool {
+		g.Handler(func(req *execution.Request, res *execution.Response) bool {
 			order = append(order, "g1")
 			return true
 		})
 	})
 	g2 := guard.New(func(g *guard.Guard) {
-		g.Handler(func(ctx *execution.Context) bool {
+		g.Handler(func(req *execution.Request, res *execution.Response) bool {
 			order = append(order, "g2")
 			return true
 		})
@@ -323,15 +323,15 @@ func TestInterceptors_StoresInterceptorsInRegistrationOrder(t *testing.T) {
 	var order []string
 
 	i1 := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
+		i.Handler(func(req *execution.Request, res *execution.Response, next interceptor.Next) {
 			order = append(order, "i1")
-			next(ctx)
+			next(req, res)
 		})
 	})
 	i2 := interceptor.New(func(i *interceptor.Interceptor) {
-		i.Handler(func(ctx *execution.Context, next interceptor.Next) {
+		i.Handler(func(req *execution.Request, res *execution.Response, next interceptor.Next) {
 			order = append(order, "i2")
-			next(ctx)
+			next(req, res)
 		})
 	})
 

@@ -15,17 +15,17 @@ import (
 // Next represents the continuation of the middleware chain: calling it runs
 // whatever comes after the current middleware (the next middleware, or
 // eventually the route's own Handler). Its underlying type
-// (func(ctx *execution.Context)) is IDENTICAL in shape to a route Handler --
-// this is what lets internal/app's Stage 2.5 wrap a route's Handler as the
-// innermost Next with a direct assignment, no conversion shim needed (see
-// design.md's Data Models "Relationships").
-type Next func(ctx *execution.Context)
+// (func(req *execution.Request, res *execution.Response)) is IDENTICAL in
+// shape to a route Handler -- this is what lets internal/app's Stage 2.5
+// wrap a route's Handler as the innermost Next with a direct assignment, no
+// conversion shim needed (see design.md's Data Models "Relationships").
+type Next func(req *execution.Request, res *execution.Response)
 
-// Middleware represents a single middleware unit: it holds the (ctx, next)
-// handler function registered via Handler.
+// Middleware represents a single middleware unit: it holds the (req, res,
+// next) handler function registered via Handler.
 type Middleware struct {
 	fn      func(*Middleware)
-	handler func(ctx *execution.Context, next Next)
+	handler func(req *execution.Request, res *execution.Response, next Next)
 
 	scope    []*module.Module
 	declared bool
@@ -83,13 +83,13 @@ func (m *Middleware) ResolveDirectAll(t reflect.Type) []reflect.Value {
 	return resolver.FindDirectAll(m.scope, t)
 }
 
-// Handler stores h as this Middleware's (ctx, next) handler function.
-func (m *Middleware) Handler(h func(ctx *execution.Context, next Next)) {
+// Handler stores h as this Middleware's (req, res, next) handler function.
+func (m *Middleware) Handler(h func(req *execution.Request, res *execution.Response, next Next)) {
 	m.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors pipe.Pipe.HandlerFunc()'s zero-value contract).
-func (m *Middleware) HandlerFunc() func(ctx *execution.Context, next Next) {
+func (m *Middleware) HandlerFunc() func(req *execution.Request, res *execution.Response, next Next) {
 	return m.handler
 }

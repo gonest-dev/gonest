@@ -1,7 +1,7 @@
 // Package validate is the real implementation behind the public root
 // gonest.MustJsonBody[T] wrapper (Go cannot re-export a generic function via
 // var, see AD-004 -- same reasoning as inject.MustInject). It reads
-// *execution.Context's raw request body, validates it against T's
+// *execution.Request's raw request body, validates it against T's
 // registered *schema.Schema (internal/schema), and panics
 // *exception.BadRequestException on any violation -- this package is a thin
 // cross-cutting layer over internal/execution + internal/schema +
@@ -66,17 +66,17 @@ func resolveSchema(m *schema.Schema, structType reflect.Type) *schema.Schema {
 // *T (dst) instead of allocating+returning one, since gonest.Parse[T]/
 // MustParse[T] already own that `var zero T` allocation.
 type jsonBodySource struct {
-	ctx *execution.Context
+	req *execution.Request
 }
 
 // NewJSONBodySource builds a Parseable for ctx's JSON body. Exported so
 // internal/app (the package that bridges execution and validate) can wire
 // one into a Context's BodySource per-request.
-func NewJSONBodySource(ctx *execution.Context) execution.Parseable {
-	return &jsonBodySource{ctx: ctx}
+func NewJSONBodySource(req *execution.Request) execution.Parseable {
+	return &jsonBodySource{req: req}
 }
 
-// ParseInto reads s.ctx's raw JSON body into dst (a *T), validating against
+// ParseInto reads s.req's raw JSON body into dst (a *T), validating against
 // schema (a *schema.Schema) first.
 //
 // Steps (design.md's Components/"internal/validate" section):
@@ -104,10 +104,10 @@ func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 	dstVal := reflect.ValueOf(dst).Elem()
 	resolveSchema(m, dstVal.Type())
 
-	body := s.ctx.RawBody()
+	bodyRaw := s.req.Body().Raw()
 
 	var parsed any
-	if err := json.Unmarshal(body, &parsed); err != nil {
+	if err := json.Unmarshal(bodyRaw, &parsed); err != nil {
 		return exception.NewBadRequestException([]violation{
 			{Field: "", Message: fmt.Sprintf("invalid JSON: %v", err)},
 		})

@@ -109,13 +109,13 @@ func (f *paramFakeResponder) HTML(s string) error                   { return nil
 func (f *paramFakeResponder) SendString(s string) error             { return nil }
 func (f *paramFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
-// newParamCtx builds a *execution.Context carrying params and attached to a
+// newParamCtx builds a *execution.Request carrying params and attached to a
 // *route.Route built from pathPattern (e.g. "/user/:user_id/order/:order_id"),
-// mirroring how a real dispatched request would look (Context.WithRoute).
-func newParamCtx(pathPattern string, params map[string]string) *execution.Context {
+// mirroring how a real dispatched request would look (Request.WithRoute).
+func newParamCtx(pathPattern string, params map[string]string) *execution.Request {
 	r := route.New(route.HttpGet, pathPattern, func(r *route.Route) {})
-	ctx := execution.New(&paramFakeResponder{params: params})
-	return ctx.WithRoute(r)
+	req, _ := execution.New(&paramFakeResponder{params: params})
+	return req.WithRoute(r)
 }
 
 // --- unit tests --------------------------------------------------------
@@ -274,7 +274,9 @@ func TestMustParams_RealHTTPDispatch_HappyPath(t *testing.T) {
 	app := fiber.New()
 	r := route.New(route.HttpGet, "/user/:user_id/order/:order_id", func(r *route.Route) {})
 	app.Get("/user/:user_id/order/:order_id", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c}).WithRoute(r)
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
+		ctx = ctx.WithRoute(r)
 		defer func() {
 			if rec := recover(); rec != nil {
 				if exc, ok := rec.(*exception.BadRequestException); ok {
@@ -316,7 +318,9 @@ func TestMustParams_RealHTTPDispatch_InvalidOneParam(t *testing.T) {
 	app := fiber.New()
 	r := route.New(route.HttpGet, "/user/:user_id/order/:order_id", func(r *route.Route) {})
 	app.Get("/user/:user_id/order/:order_id", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c}).WithRoute(r)
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
+		ctx = ctx.WithRoute(r)
 		defer func() {
 			if rec := recover(); rec != nil {
 				if exc, ok := rec.(*exception.BadRequestException); ok {
@@ -357,7 +361,9 @@ func TestMustParams_RealHTTPDispatch_CustomFunc(t *testing.T) {
 	app := fiber.New()
 	r := route.New(route.HttpGet, "/codes/:code", func(r *route.Route) {})
 	app.Get("/codes/:code", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c}).WithRoute(r)
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
+		ctx = ctx.WithRoute(r)
 		defer func() {
 			if rec := recover(); rec != nil {
 				if exc, ok := rec.(*exception.BadRequestException); ok {

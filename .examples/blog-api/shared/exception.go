@@ -30,7 +30,7 @@ func NewDuplicateEmailException(email string) *DuplicateEmailException {
 // MarshalJSON (promoted through embedding), no manual field mapping
 // needed.
 var DomainFilter = gonest.NewFilter(func(filter *gonest.Filter) {
-	filter.Catch(&DuplicateEmailException{}, func(ctx *gonest.RestContext, err *DuplicateEmailException) {
-		ctx.Status(err.Status()).Json(err)
+	filter.Catch(&DuplicateEmailException{}, func(req *gonest.Request, res *gonest.Response, err *DuplicateEmailException) {
+		res.Status(err.Status()).Json(err)
 	})
 })

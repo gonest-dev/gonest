@@ -20,22 +20,22 @@ import (
 // bool) JSON decoding already produces (design.md's Tech Decisions:
 // "coerce-then-reuse, not a parallel validation path").
 type paramsSource struct {
-	ctx *execution.Context
+	req *execution.Request
 }
 
 // NewParamsSource builds a Parseable for ctx's path params. Exported so
 // internal/app can wire one into a Context per-request.
-func NewParamsSource(ctx *execution.Context) execution.Parseable {
-	return &paramsSource{ctx: ctx}
+func NewParamsSource(req *execution.Request) execution.Parseable {
+	return &paramsSource{req: req}
 }
 
-// ParseInto reads s.ctx's path params into dst (a *T) via T's `param:"name"`
+// ParseInto reads s.req's path params into dst (a *T) via T's `param:"name"`
 // struct tags, validating against schema (a *schema.Schema) first.
 //
 //  1. resolveSchema confirms schema describes T, panicking immediately,
 //     BEFORE reading any param at all, otherwise.
 //  2. Resolve ctx's currently-attached *route.Route (via ctx.Route(), an
-//     `any` type-asserted back to *route.Route -- see execution.Context's
+//     `any` type-asserted back to *route.Route -- see execution.Request's
 //     WithRoute/Route doc comment for why the link is untyped at the
 //     execution layer).
 //  3. For each of T's own registered properties: resolve its key via
@@ -65,7 +65,7 @@ func (s *paramsSource) ParseInto(dst any, schemaArg any) error {
 	dstVal := reflect.ValueOf(dst).Elem()
 	resolveSchema(m, dstVal.Type())
 
-	r, hasRoute := s.ctx.Route().(*route.Route)
+	r, hasRoute := s.req.Route().(*route.Route)
 
 	var violations []violation
 	presence := map[string]any{}
@@ -83,7 +83,7 @@ func (s *paramsSource) ParseInto(dst any, schemaArg any) error {
 			continue
 		}
 
-		raw := s.ctx.Param(key)
+		raw := s.req.Param(key)
 
 		if _, isCustom := p.CustomFunc(); isCustom {
 			violations = append(violations, validateValue(raw, p, key)...)

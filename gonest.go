@@ -471,11 +471,11 @@ var NewMiddleware = middleware.New
 // startup logging.
 func NewLoggerMiddleware() *Middleware {
 	return middleware.New(func(m *Middleware) {
-		m.Handler(func(ctx *execution.Context, next Next) {
+		m.Handler(func(req *Request, res *Response, next Next) {
 			start := time.Now()
 			// A rejecting Guard/an exception.Exception thrown by the Handler
-			// unwinds via panic straight past next(ctx) below, without ever
-			// coming back here -- it is only turned into a status code
+			// unwinds via panic straight past next(req, res) below, without
+			// ever coming back here -- it is only turned into a status code
 			// FURTHER UP the stack, by filteredHandler/the adapter's own
 			// recover (internal/app/app.go, internal/adapter/fiber/fiber.go).
 			// This defer/recover mirrors that mapping (exception.Exception's
@@ -483,11 +483,11 @@ func NewLoggerMiddleware() *Middleware {
 			// reports the real status the caller will see, then re-panics
 			// unchanged so the existing Filter/default-formatting behavior
 			// is untouched.
-			r := recoverAfter(ctx, next)
+			r := recoverAfter(req, res, next)
 			status := r.status
 			duration := time.Since(start)
 
-			logger.Info(fmt.Sprintf("%s %s %d - %dms", ctx.Method(), ctx.Path(), status, duration.Milliseconds()))
+			logger.Info(fmt.Sprintf("%s %s %d - %dms", req.Method(), req.Path(), status, duration.Milliseconds()))
 
 			if r.panicValue != nil {
 				panic(r.panicValue)
@@ -497,16 +497,16 @@ func NewLoggerMiddleware() *Middleware {
 }
 
 // loggerOutcome is NewLoggerMiddleware's own internal record of what
-// happened after calling next(ctx): the status to log, and (if next
+// happened after calling next(req, res): the status to log, and (if next
 // panicked) the original panic value to re-panic once logging is done.
 type loggerOutcome struct {
 	status     int
 	panicValue any
 }
 
-// recoverAfter calls next(ctx), catching any panic so NewLoggerMiddleware
-// can log a line before re-propagating it unchanged.
-func recoverAfter(ctx *execution.Context, next Next) (outcome loggerOutcome) {
+// recoverAfter calls next(req, res), catching any panic so
+// NewLoggerMiddleware can log a line before re-propagating it unchanged.
+func recoverAfter(req *Request, res *Response, next Next) (outcome loggerOutcome) {
 	defer func() {
 		if r := recover(); r != nil {
 			outcome.panicValue = r
@@ -517,8 +517,8 @@ func recoverAfter(ctx *execution.Context, next Next) (outcome loggerOutcome) {
 			}
 		}
 	}()
-	next(ctx)
-	outcome.status = ctx.ResponseStatus()
+	next(req, res)
+	outcome.status = res.StatusCode()
 	return outcome
 }
 
@@ -719,14 +719,22 @@ type ArraySchema = schema.ArraySchema
 // file rather than a separate schema.go).
 type ObjectSchema = schema.ObjectSchema
 
-// RestContext encapsulates the HTTP request/response for a single REST
-// route Handler -- named "Rest" (not plain "Context", AD-021) to leave room
-// for GraphQL/gRPC/messaging adapters to bring their own Context type later
-// without colliding on the same root name. Because this is a true Go type
-// alias, every method on execution.Context (Json/Status/Header/SetHeader/
-// Param/Body/Queries/HTML/SendString/WithRoute/Route) is automatically
-// visible on gonest.RestContext with zero extra wrapper code.
-type RestContext = execution.Context
+// Request encapsulates the READ side of a single REST route Handler's
+// request/response cycle -- request-response-split feature, replaces the
+// single RestContext type (AD-021) with a (req, res) pair mirroring the
+// Express/NestJS convention gonest's target devuser already knows (see
+// context.md's "Motivação de Produto"). Because this is a true Go type
+// alias, every method on execution.Request (Method/Path/Header/Param/
+// Params/Query/Headers/Body/Route/WithRoute/WithSources/Queries/FormStream)
+// is automatically visible on gonest.Request with zero extra wrapper code.
+type Request = execution.Request
+
+// Response encapsulates the WRITE side of a single REST route Handler's
+// request/response cycle -- request-response-split feature. Because this is
+// a true Go type alias, every method on execution.Response (Status/
+// StatusCode/SetHeader/Json/Html/Text/Request) is automatically visible on
+// gonest.Response with zero extra wrapper code.
+type Response = execution.Response
 
 // ---------------------------------------------------------------------------
 // Value (dirty-tracking field wrapper)
@@ -779,11 +787,11 @@ func ValueToDirtyMap(obj any) map[string]any {
 // Validation (Unified Parse API feature)
 // ---------------------------------------------------------------------------
 
-// Parseable is the opaque value every ctx.Params()/ctx.Query()/ctx.Headers()/
-// ctx.Body().Json()/ctx.Body().Form(onFile) call returns -- it carries its
+// Parseable is the opaque value every req.Params()/req.Query()/req.Headers()/
+// req.Body().Json()/req.Body().Form(onFile) call returns -- it carries its
 // own parse logic alongside whatever state it needs to execute it. Devusers
 // never implement Parseable directly; they only receive values of it from
-// RestContext methods and pass them straight into Parse[T]/MustParse[T].
+// Request methods and pass them straight into Parse[T]/MustParse[T].
 // See execution.Parseable's own doc comment for why its one method is
 // exported despite being meant as a sealed contract.
 type Parseable = execution.Parseable
@@ -865,15 +873,17 @@ var NewOpenAPI = openapi.New
 // the full contract.
 type Route = route.Route
 
-// Response is the per-status response builder passed to Route.Response's
-// optional callback (`route.Response(201, func(response *gonest.Response) {
+// RouteResponse is the per-status response builder passed to Route.Response's
+// optional callback (`route.Response(201, func(response *gonest.RouteResponse) {
 // response.Schema(userEntitySchema) })`) -- lets a route configure that
 // status's documented body schema (Schema) and/or description
 // (Description) in one place. It is a true Go type alias, so both methods
-// are automatically visible on gonest.Response with zero extra wrapper
-// code, same as Route/Schema/etc above. See internal/route.Response's doc
-// comment for the full contract.
-type Response = route.Response
+// are automatically visible on gonest.RouteResponse with zero extra wrapper
+// code, same as Route/Schema/etc above. See internal/route.RouteResponse's
+// doc comment for the full contract. Named RouteResponse (not plain
+// Response) since request-response-split feature claimed gonest.Response
+// for the write-side of the (req, res) HTTP pair.
+type RouteResponse = route.RouteResponse
 
 // GenerateOpenApiSchema walks app's assembled module tree (via app.Root(),
 // recursing into every imported module -- see internal/app.App.Root's doc

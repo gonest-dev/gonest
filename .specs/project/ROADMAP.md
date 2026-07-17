@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 14 (Request/Response Split) -- specified, aguardando design/tasks
-**Status:** Milestones 1-13 COMPLETE, Milestone 14 SPECIFIED
+**Current Milestone:** none -- v1 + Milestones 12-14 roadmap COMPLETE
+**Status:** Milestones 1-14 COMPLETE
 
 ---
 
@@ -267,11 +267,11 @@
 ## Milestone 14: Request/Response Split
 
 **Goal:** Substituir `*RestContext` único por dois tipos concretos `*Request`/`*Response`, espelhando o padrão `(req, res)` de Express/NestJS — motivo de produto (adoção de devusers vindos do Node), não só técnico. Framework pré-1.0, breaking change aceita.
-**Status:** TASKS BREAKDOWN READY (spec.md + context.md + tasks.md prontos, 18 tasks — execução pendente)
+**Status:** COMPLETE (2026-07-17, T1-T18 -- suite inteira `go test ./... -race` verde, 23 pacotes, `.examples/*` migrados, README.md + INSIGHT-*.md atualizados, todos via subagentes Planner/Implementer/Evaluator)
 
 ### Features
 
-**Request/Response Split** - TASKS BREAKDOWN READY
+**Request/Response Split** - COMPLETE
 - `internal/execution.Context` → `Request`/`Response`, `Response` guarda `*Request` internamente
 - Migra `Handler`/`Guard`/`Middleware`/`Interceptor`/`Filter` (17 arquivos internos identificados) + `next(req, res)`
 - `Request.Body()` ganha `.Raw()`/`.Text()` (consolida o `RawBody()` avulso da feature anterior)

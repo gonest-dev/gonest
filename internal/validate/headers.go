@@ -20,16 +20,16 @@ import (
 // validateValue/populate unchanged (design.md's Tech Decisions:
 // "coerce-then-reuse, not a parallel validation path").
 type headersSource struct {
-	ctx *execution.Context
+	req *execution.Request
 }
 
 // NewHeadersSource builds a Parseable for ctx's HTTP headers. Exported so
 // internal/app can wire one into a Context per-request.
-func NewHeadersSource(ctx *execution.Context) execution.Parseable {
-	return &headersSource{ctx: ctx}
+func NewHeadersSource(req *execution.Request) execution.Parseable {
+	return &headersSource{req: req}
 }
 
-// ParseInto reads s.ctx's headers into dst (a *T) via T's `header:"name"`
+// ParseInto reads s.req's headers into dst (a *T) via T's `header:"name"`
 // struct tags, validating against schema (a *schema.Schema) first.
 //
 //  1. resolveSchema confirms schema describes T, panicking immediately,
@@ -65,7 +65,7 @@ func (s *headersSource) ParseInto(dst any, schemaArg any) error {
 			continue
 		}
 
-		raw := s.ctx.Header(key)
+		raw := s.req.Header(key)
 		if raw == "" {
 			if p.IsRequired() {
 				violations = append(violations, violation{Field: key, Message: "required"})

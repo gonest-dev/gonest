@@ -2,12 +2,16 @@ package route
 
 import "gonest.dev/gonest/internal/schema"
 
-// Response is the per-status response builder passed to Route.Response's
+// RouteResponse is the per-status response builder passed to Route.Response's
 // optional callback -- lets a route configure that status's documented
 // body schema and/or description in one place (INSIGHT.md's
-// `route.Response(201, func(response *gonest.Response) { response.Schema(...) })`
-// shape), instead of two unrelated method calls per status.
-type Response struct {
+// `route.Response(201, func(response *gonest.RouteResponse) { response.Schema(...) })`
+// shape), instead of two unrelated method calls per status. Named
+// RouteResponse (not plain Response) since request-response-split feature
+// claimed gonest.Response for the write-side of the (req, res) HTTP pair --
+// this type is unrelated to that one, purely an OpenAPI documentation
+// builder.
+type RouteResponse struct {
 	schemaValue *schema.Schema
 
 	description    string
@@ -16,7 +20,7 @@ type Response struct {
 
 // Schema sets this response's documented body schema and returns r so
 // calls can chain.
-func (r *Response) Schema(m *schema.Schema) *Response {
+func (r *RouteResponse) Schema(m *schema.Schema) *RouteResponse {
 	r.schemaValue = m
 	return r
 }
@@ -24,7 +28,7 @@ func (r *Response) Schema(m *schema.Schema) *Response {
 // SchemaValue returns the schema set via Schema, and whether Schema was
 // ever called -- the bool distinguishes "documented, no body" from
 // "documented with a body".
-func (r *Response) SchemaValue() (*schema.Schema, bool) {
+func (r *RouteResponse) SchemaValue() (*schema.Schema, bool) {
 	return r.schemaValue, r.schemaValue != nil
 }
 
@@ -33,7 +37,7 @@ func (r *Response) SchemaValue() (*schema.Schema, bool) {
 // a schema-carrying response, or the auto-derived http.StatusText default
 // for an undocumented 4xx/5xx response -- see internal/openapi's
 // buildResponses/defaultErrorResponse). Returns r so calls can chain.
-func (r *Response) Description(s string) *Response {
+func (r *RouteResponse) Description(s string) *RouteResponse {
 	r.description = s
 	r.descriptionSet = true
 	return r
@@ -41,6 +45,6 @@ func (r *Response) Description(s string) *Response {
 
 // DescriptionText returns the description set via Description, and
 // whether Description was ever called.
-func (r *Response) DescriptionText() (string, bool) {
+func (r *RouteResponse) DescriptionText() (string, bool) {
 	return r.description, r.descriptionSet
 }

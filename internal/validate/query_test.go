@@ -90,10 +90,11 @@ func (f *queryFakeResponder) HTML(s string) error                   { return nil
 func (f *queryFakeResponder) SendString(s string) error             { return nil }
 func (f *queryFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
-// newQueryCtx builds a *execution.Context carrying the given query map,
+// newQueryCtx builds a *execution.Request carrying the given query map,
 // mirroring how a real dispatched request would look.
-func newQueryCtx(queries map[string]string) *execution.Context {
-	return execution.New(&queryFakeResponder{queries: queries})
+func newQueryCtx(queries map[string]string) *execution.Request {
+	req, _ := execution.New(&queryFakeResponder{queries: queries})
+	return req
 }
 
 // --- unit tests --------------------------------------------------------
@@ -201,7 +202,8 @@ func TestMustQuery_MismatchedSchema_PanicsBeforeReadingAnyQuery(t *testing.T) {
 func TestMustQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 	app := fiber.New()
 	app.Get("/users", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if rec := recover(); rec != nil {
 				if exc, ok := rec.(*exception.BadRequestException); ok {
@@ -242,7 +244,8 @@ func TestMustQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 func TestMustQuery_RealHTTPDispatch_MissingRequiredAndOutOfRange(t *testing.T) {
 	app := fiber.New()
 	app.Get("/users", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if rec := recover(); rec != nil {
 				if exc, ok := rec.(*exception.BadRequestException); ok {
@@ -285,7 +288,8 @@ func TestMustQuery_RealHTTPDispatch_MissingRequiredAndOutOfRange(t *testing.T) {
 func TestMustQuery_RealHTTPDispatch_CustomFunc(t *testing.T) {
 	app := fiber.New()
 	app.Get("/codes", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if rec := recover(); rec != nil {
 				if exc, ok := rec.(*exception.BadRequestException); ok {

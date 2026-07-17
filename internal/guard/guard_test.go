@@ -87,14 +87,16 @@ func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
 
 // TestHandler_HandlerFunc_RoundTrip_True proves Handler stores the given
 // function and HandlerFunc returns exactly that function, genuinely callable
-// with ctx reaching the handler body and the handler's own `true` decision
-// coming back out unchanged.
+// with req/res reaching the handler body and the handler's own `true`
+// decision coming back out unchanged.
 func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
-	var gotCtx *execution.Context
+	var gotReq *execution.Request
+	var gotRes *execution.Response
 
 	g := New(func(g *Guard) {
-		g.Handler(func(ctx *execution.Context) bool {
-			gotCtx = ctx
+		g.Handler(func(req *execution.Request, res *execution.Response) bool {
+			gotReq = req
+			gotRes = res
 			return true
 		})
 	})
@@ -105,11 +107,14 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 		t.Fatal("expected HandlerFunc to return the function stored via Handler, got nil")
 	}
 
-	ctx := execution.New(newFakeResponder())
-	got := fn(ctx)
+	req, res := execution.New(newFakeResponder())
+	got := fn(req, res)
 
-	if gotCtx != ctx {
-		t.Fatal("expected ctx passed to the returned handler to reach the handler body unchanged")
+	if gotReq != req {
+		t.Fatal("expected req passed to the returned handler to reach the handler body unchanged")
+	}
+	if gotRes != res {
+		t.Fatal("expected res passed to the returned handler to reach the handler body unchanged")
 	}
 	if got != true {
 		t.Fatal("expected the returned bool to genuinely reflect the handler's own true decision")
@@ -120,11 +125,13 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 // above but for a handler whose own logic decides false, confirming the
 // returned bool is not hardcoded/always-true.
 func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
-	var gotCtx *execution.Context
+	var gotReq *execution.Request
+	var gotRes *execution.Response
 
 	g := New(func(g *Guard) {
-		g.Handler(func(ctx *execution.Context) bool {
-			gotCtx = ctx
+		g.Handler(func(req *execution.Request, res *execution.Response) bool {
+			gotReq = req
+			gotRes = res
 			return false
 		})
 	})
@@ -135,11 +142,14 @@ func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
 		t.Fatal("expected HandlerFunc to return the function stored via Handler, got nil")
 	}
 
-	ctx := execution.New(newFakeResponder())
-	got := fn(ctx)
+	req, res := execution.New(newFakeResponder())
+	got := fn(req, res)
 
-	if gotCtx != ctx {
-		t.Fatal("expected ctx passed to the returned handler to reach the handler body unchanged")
+	if gotReq != req {
+		t.Fatal("expected req passed to the returned handler to reach the handler body unchanged")
+	}
+	if gotRes != res {
+		t.Fatal("expected res passed to the returned handler to reach the handler body unchanged")
 	}
 	if got != false {
 		t.Fatal("expected the returned bool to genuinely reflect the handler's own false decision")

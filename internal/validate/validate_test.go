@@ -94,8 +94,10 @@ func init() {
 
 // --- test helpers ---------------------------------------------------------
 
-func newCtx(body []byte) *execution.Context {
-	return execution.New(&fakeResponder{body: body})
+func newCtx(body []byte) *execution.Request {
+	req, _ := execution.New(&fakeResponder{body: body})
+	req.WithSources(nil, nil, nil, execution.NewBodySource(req, nil, nil))
+	return req
 }
 
 type fakeResponder struct {
@@ -590,7 +592,8 @@ func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.
 func TestMustJsonBody_RealHTTPDispatch_HappyPath(t *testing.T) {
 	app := fiber.New()
 	app.Post("/users", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if r := recover(); r != nil {
 				if exc, ok := r.(*exception.BadRequestException); ok {
@@ -622,7 +625,8 @@ func TestMustJsonBody_RealHTTPDispatch_HappyPath(t *testing.T) {
 func TestMustJsonBody_RealHTTPDispatch_MultipleViolations(t *testing.T) {
 	app := fiber.New()
 	app.Post("/users", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if r := recover(); r != nil {
 				if exc, ok := r.(*exception.BadRequestException); ok {
@@ -673,7 +677,8 @@ func TestMustJsonBody_RealHTTPDispatch_MultipleViolations(t *testing.T) {
 func TestMustJsonBody_RealHTTPDispatch_MalformedJSON(t *testing.T) {
 	app := fiber.New()
 	app.Post("/users", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if r := recover(); r != nil {
 				if exc, ok := r.(*exception.BadRequestException); ok {

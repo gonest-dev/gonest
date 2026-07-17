@@ -87,15 +87,17 @@ func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
 
 // TestHandler_HandlerFunc_RoundTrip proves Handler stores the given function
 // and HandlerFunc returns exactly that function, genuinely callable with
-// both ctx and next parameters reaching the handler body correctly.
+// req, res, and next parameters reaching the handler body correctly.
 func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
-	var gotCtx *execution.Context
+	var gotReq *execution.Request
+	var gotRes *execution.Response
 	nextCalled := false
 
 	i := New(func(i *Interceptor) {
-		i.Handler(func(ctx *execution.Context, next Next) {
-			gotCtx = ctx
-			next(ctx)
+		i.Handler(func(req *execution.Request, res *execution.Response, next Next) {
+			gotReq = req
+			gotRes = res
+			next(req, res)
 		})
 	})
 	i.Declare(nil)
@@ -105,13 +107,16 @@ func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
 		t.Fatal("expected HandlerFunc to return the function stored via Handler, got nil")
 	}
 
-	ctx := execution.New(newFakeResponder())
-	fn(ctx, func(ctx *execution.Context) {
+	req, res := execution.New(newFakeResponder())
+	fn(req, res, func(req *execution.Request, res *execution.Response) {
 		nextCalled = true
 	})
 
-	if gotCtx != ctx {
-		t.Fatal("expected ctx passed to the returned handler to reach the handler body unchanged")
+	if gotReq != req {
+		t.Fatal("expected req passed to the returned handler to reach the handler body unchanged")
+	}
+	if gotRes != res {
+		t.Fatal("expected res passed to the returned handler to reach the handler body unchanged")
 	}
 	if !nextCalled {
 		t.Fatal("expected next passed to the returned handler to be callable and reach the handler body")
@@ -131,22 +136,23 @@ func TestHandlerFunc_NilWhenNeverCalled(t *testing.T) {
 }
 
 // TestNext_TypeIdentityWithRouteHandlerSignature proves a plain
-// func(ctx *execution.Context) value is directly assignable to a Next
-// variable with zero conversion code -- the type-identity design.md relies
-// on for composing interceptedHandler out of gatedHandler with no adapter
-// code (same proof internal/middleware's own T1 already made for its own
-// Next).
+// func(req *execution.Request, res *execution.Response) value is directly
+// assignable to a Next variable with zero conversion code -- the
+// type-identity design.md relies on for composing interceptedHandler out of
+// gatedHandler with no adapter code (same proof internal/middleware's own T1
+// already made for its own Next).
 func TestNext_TypeIdentityWithRouteHandlerSignature(t *testing.T) {
 	called := false
-	someFunc := func(ctx *execution.Context) {
+	someFunc := func(req *execution.Request, res *execution.Response) {
 		called = true
 	}
 
 	var n Next = someFunc
 
-	n(execution.New(newFakeResponder()))
+	req, res := execution.New(newFakeResponder())
+	n(req, res)
 
 	if !called {
-		t.Fatal("expected Next-typed variable assigned from a plain func(ctx *execution.Context) to be callable")
+		t.Fatal("expected Next-typed variable assigned from a plain func(req *execution.Request, res *execution.Response) to be callable")
 	}
 }

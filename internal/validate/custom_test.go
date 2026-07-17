@@ -67,7 +67,8 @@ var customCodeFixtureSchema = func() *schema.Schema {
 func TestMustJsonBody_CustomFunc_DecodesCustomFormat_EndToEnd(t *testing.T) {
 	app := fiber.New()
 	app.Post("/codes", func(c fiber.Ctx) (err error) {
-		ctx := execution.New(&httpFiberResponder{c: c})
+		ctx, _ := execution.New(&httpFiberResponder{c: c})
+		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
 		defer func() {
 			if r := recover(); r != nil {
 				if exc, ok := r.(*exception.BadRequestException); ok {

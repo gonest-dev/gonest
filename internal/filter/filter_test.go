@@ -102,7 +102,7 @@ func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
 // recoverable via HandlerFor using reflect.TypeOf(exemplar), ok=true.
 func TestCatch_HandlerFor_RoundTrip(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {})
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {})
 	})
 	f.Declare(nil)
 
@@ -119,7 +119,7 @@ func TestCatch_HandlerFor_RoundTrip(t *testing.T) {
 // type that was never registered via Catch on this Filter.
 func TestHandlerFor_MissReturnsFalse(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {})
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {})
 	})
 	f.Declare(nil)
 
@@ -133,8 +133,8 @@ func TestHandlerFor_MissReturnsFalse(t *testing.T) {
 // distinct exemplar types, each independently recoverable via HandlerFor.
 func TestCatch_MultipleDistinctTypes(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {})
-		f.Catch(&barExampleError{}, func(ctx *execution.Context, exc *barExampleError) {})
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {})
+		f.Catch(&barExampleError{}, func(req *execution.Request, res *execution.Response, exc *barExampleError) {})
 	})
 	f.Declare(nil)
 
@@ -151,15 +151,17 @@ func TestCatch_MultipleDistinctTypes(t *testing.T) {
 
 // TestCatch_HandlerFor_GenuineCallRoundTrip proves the handler recovered via
 // HandlerFor is genuinely callable via reflect.Call -- the call reaches the
-// original handler body with both ctx and the typed exception value intact,
+// original handler body with req, res, and the typed exception value intact,
 // not just "returned something non-nil".
 func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
-	var gotCtx *execution.Context
+	var gotReq *execution.Request
+	var gotRes *execution.Response
 	var gotExc *fooExampleError
 
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) {
-			gotCtx = ctx
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {
+			gotReq = req
+			gotRes = res
 			gotExc = exc
 		})
 	})
@@ -170,13 +172,16 @@ func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
 		t.Fatal("expected HandlerFor to find the registered handler")
 	}
 
-	ctx := execution.New(newFakeResponder())
+	req, res := execution.New(newFakeResponder())
 	exc := &fooExampleError{Code: "boom"}
 
-	fn.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
+	fn.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
 
-	if gotCtx != ctx {
-		t.Fatal("expected ctx passed via reflect.Call to reach the handler body unchanged")
+	if gotReq != req {
+		t.Fatal("expected req passed via reflect.Call to reach the handler body unchanged")
+	}
+	if gotRes != res {
+		t.Fatal("expected res passed via reflect.Call to reach the handler body unchanged")
 	}
 	if gotExc != exc {
 		t.Fatal("expected the typed exception value passed via reflect.Call to reach the handler body unchanged")
@@ -187,7 +192,7 @@ func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
 }
 
 // TestCatch_PanicsOnWrongParamCount proves Catch panics at registration time
-// (clear message) when handler doesn't take exactly (ctx, exc).
+// (clear message) when handler doesn't take exactly (req, res, exc).
 func TestCatch_PanicsOnWrongParamCount(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -197,12 +202,12 @@ func TestCatch_PanicsOnWrongParamCount(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context) {})
+		f.Catch(&fooExampleError{}, func(req *execution.Request) {})
 	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongFirstParamType proves Catch panics when the first
-// parameter isn't *execution.Context.
+// parameter isn't *execution.Request.
 func TestCatch_PanicsOnWrongFirstParamType(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -212,12 +217,12 @@ func TestCatch_PanicsOnWrongFirstParamType(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(exc *fooExampleError, ctx *execution.Context) {})
+		f.Catch(&fooExampleError{}, func(exc *fooExampleError, req *execution.Request, res *execution.Response) {})
 	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongSecondParamType proves Catch panics when the second
-// parameter's type doesn't exactly match reflect.TypeOf(exemplar).
+// parameter isn't *execution.Response.
 func TestCatch_PanicsOnWrongSecondParamType(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -227,7 +232,22 @@ func TestCatch_PanicsOnWrongSecondParamType(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *barExampleError) {})
+		f.Catch(&fooExampleError{}, func(req *execution.Request, exc *fooExampleError, res *execution.Response) {})
+	}).Declare(nil)
+}
+
+// TestCatch_PanicsOnWrongThirdParamType proves Catch panics when the third
+// parameter's type doesn't exactly match reflect.TypeOf(exemplar).
+func TestCatch_PanicsOnWrongThirdParamType(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for invalid Catch handler signature (wrong third param type), got none")
+		}
+	}()
+
+	filter.New(func(f *filter.Filter) {
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *barExampleError) {})
 	}).Declare(nil)
 }
 
@@ -243,7 +263,7 @@ func TestCatch_PanicsOnWrongReturnCount(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(ctx *execution.Context, exc *fooExampleError) error {
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) error {
 			return nil
 		})
 	}).Declare(nil)

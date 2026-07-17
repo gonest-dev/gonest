@@ -15,7 +15,7 @@ import (
 // instead of hand-rolling `var zero Foo; NewXSource(ctx).ParseInto(&zero, m)`
 // at every call site.
 
-func mustParseParams[T any](ctx *execution.Context, m *schema.Schema) T {
+func mustParseParams[T any](ctx *execution.Request, m *schema.Schema) T {
 	v, err := parseParams[T](ctx, m)
 	if err != nil {
 		panic(err)
@@ -23,13 +23,13 @@ func mustParseParams[T any](ctx *execution.Context, m *schema.Schema) T {
 	return v
 }
 
-func parseParams[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
+func parseParams[T any](ctx *execution.Request, m *schema.Schema) (T, error) {
 	var zero T
 	err := NewParamsSource(ctx).ParseInto(&zero, m)
 	return zero, err
 }
 
-func mustParseQuery[T any](ctx *execution.Context, m *schema.Schema) T {
+func mustParseQuery[T any](ctx *execution.Request, m *schema.Schema) T {
 	v, err := parseQuery[T](ctx, m)
 	if err != nil {
 		panic(err)
@@ -37,13 +37,13 @@ func mustParseQuery[T any](ctx *execution.Context, m *schema.Schema) T {
 	return v
 }
 
-func parseQuery[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
+func parseQuery[T any](ctx *execution.Request, m *schema.Schema) (T, error) {
 	var zero T
 	err := NewQuerySource(ctx).ParseInto(&zero, m)
 	return zero, err
 }
 
-func mustParseHeaders[T any](ctx *execution.Context, m *schema.Schema) T {
+func mustParseHeaders[T any](ctx *execution.Request, m *schema.Schema) T {
 	v, err := parseHeaders[T](ctx, m)
 	if err != nil {
 		panic(err)
@@ -51,13 +51,13 @@ func mustParseHeaders[T any](ctx *execution.Context, m *schema.Schema) T {
 	return v
 }
 
-func parseHeaders[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
+func parseHeaders[T any](ctx *execution.Request, m *schema.Schema) (T, error) {
 	var zero T
 	err := NewHeadersSource(ctx).ParseInto(&zero, m)
 	return zero, err
 }
 
-func mustParseJSON[T any](ctx *execution.Context, m *schema.Schema) T {
+func mustParseJSON[T any](ctx *execution.Request, m *schema.Schema) T {
 	v, err := parseJSON[T](ctx, m)
 	if err != nil {
 		panic(err)
@@ -65,13 +65,13 @@ func mustParseJSON[T any](ctx *execution.Context, m *schema.Schema) T {
 	return v
 }
 
-func parseJSON[T any](ctx *execution.Context, m *schema.Schema) (T, error) {
+func parseJSON[T any](ctx *execution.Request, m *schema.Schema) (T, error) {
 	var zero T
 	err := NewJSONBodySource(ctx).ParseInto(&zero, m)
 	return zero, err
 }
 
-func mustParseForm[T any](ctx *execution.Context, m *schema.Schema, onFile func(*execution.FormFile) error) T {
+func mustParseForm[T any](ctx *execution.Request, m *schema.Schema, onFile func(*execution.FormFile) error) T {
 	v, err := parseForm[T](ctx, m, onFile)
 	if err != nil {
 		panic(err)
@@ -79,7 +79,7 @@ func mustParseForm[T any](ctx *execution.Context, m *schema.Schema, onFile func(
 	return v
 }
 
-func parseForm[T any](ctx *execution.Context, m *schema.Schema, onFile func(*execution.FormFile) error) (T, error) {
+func parseForm[T any](ctx *execution.Request, m *schema.Schema, onFile func(*execution.FormFile) error) (T, error) {
 	var zero T
 	err := NewFormBodySource(ctx, onFile).ParseInto(&zero, m)
 	return zero, err

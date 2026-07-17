@@ -23,7 +23,7 @@ import (
 // coding/config error, not a request-validation failure, so it is NOT
 // returned via the error return below -- spec.md's P.5).
 type formBodySource struct {
-	ctx    *execution.Context
+	req    *execution.Request
 	onFile func(*execution.FormFile) error
 }
 
@@ -31,11 +31,11 @@ type formBodySource struct {
 // onFile is invoked for each file part; nil means file parts are silently
 // skipped (spec.md's Edge Cases). Exported so internal/app can wire one into
 // a Context's BodySource per-request.
-func NewFormBodySource(ctx *execution.Context, onFile func(*execution.FormFile) error) execution.Parseable {
-	return &formBodySource{ctx: ctx, onFile: onFile}
+func NewFormBodySource(req *execution.Request, onFile func(*execution.FormFile) error) execution.Parseable {
+	return &formBodySource{req: req, onFile: onFile}
 }
 
-// ParseInto walks s.ctx's raw multipart stream exactly ONCE
+// ParseInto walks s.req's raw multipart stream exactly ONCE
 // (mime/multipart.NewReader, NextPart() until io.EOF), since form fields and
 // file parts can be interleaved in any order the client actually sent them
 // (Multipart Form Streaming design.md's Architecture Overview), populating
@@ -71,7 +71,7 @@ func (s *formBodySource) ParseInto(dst any, schemaArg any) error {
 	dstVal := reflect.ValueOf(dst).Elem()
 	resolveSchema(m, dstVal.Type())
 
-	stream, boundary, ok := s.ctx.FormStream()
+	stream, boundary, ok := s.req.FormStream()
 	if !ok {
 		panic("gonest: form stream unavailable -- enable AppOptions.EnableFormStreaming when building the app, and ensure the request's Content-Type is multipart/form-data with a boundary")
 	}

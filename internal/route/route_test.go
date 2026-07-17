@@ -82,7 +82,7 @@ func TestHttpCode_DefaultsTo200(t *testing.T) {
 func TestHandler_StoresFn(t *testing.T) {
 	called := false
 	r := New(HttpGet, "/users", func(r *Route) {
-		r.Handler(func(ctx *execution.Context) {
+		r.Handler(func(req *execution.Request, res *execution.Response) {
 			called = true
 		})
 	})
@@ -396,7 +396,7 @@ func TestResponse_OneArg_StoresBody(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, func(response *Response) {
+		r.Response(200, func(response *RouteResponse) {
 			response.Schema(m)
 		})
 	})
@@ -422,8 +422,8 @@ func TestResponse_DifferentStatuses_Accumulates(t *testing.T) {
 	errMeta := newTestSchemaFor(t, &errBody{})
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, func(response *Response) { response.Schema(okMeta) })
-		r.Response(404, func(response *Response) { response.Schema(errMeta) })
+		r.Response(200, func(response *RouteResponse) { response.Schema(okMeta) })
+		r.Response(404, func(response *RouteResponse) { response.Schema(errMeta) })
 	})
 
 	responses := r.Responses()
@@ -448,8 +448,8 @@ func TestResponse_SameStatusTwice_Overwrites(t *testing.T) {
 	secondMeta := newTestSchemaFor(t, &secondBody{})
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, func(response *Response) { response.Schema(firstMeta) })
-		r.Response(200, func(response *Response) { response.Schema(secondMeta) })
+		r.Response(200, func(response *RouteResponse) { response.Schema(firstMeta) })
+		r.Response(200, func(response *RouteResponse) { response.Schema(secondMeta) })
 	})
 
 	responses := r.Responses()
@@ -467,12 +467,12 @@ func TestResponses_ReturnsCopyNotInternalMap(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	r := New(HttpGet, "/users/:id", func(r *Route) {
-		r.Response(200, func(response *Response) { response.Schema(m) })
+		r.Response(200, func(response *RouteResponse) { response.Schema(m) })
 	})
 
 	got := r.Responses()
 	got[200] = nil
-	got[999] = &Response{}
+	got[999] = &RouteResponse{}
 
 	got2 := r.Responses()
 	if body, _ := got2[200].SchemaValue(); body != m {

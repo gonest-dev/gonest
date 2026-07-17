@@ -190,14 +190,14 @@ escrever texto puro" ter uma resposta ambígua (`SendString` vs `HTML`).
 
 | Requirement ID | Story                                         | Phase    | Status  |
 | -------------- | ---------------------------------------------- | -------- | ------- |
-| REQRES-01      | P1: Split Request/Response — Handler            | Specify  | Pending |
-| REQRES-02      | P1: Split Request/Response — Guard/Middleware/Interceptor/Filter | Specify | Pending |
-| REQRES-03      | P1: Split Request/Response — next(req,res)      | Specify  | Pending |
-| REQRES-04      | P1: Split Request/Response — Response.Request() | Specify  | Pending |
-| REQRES-05      | P1: Request.Body().Raw()/.Text()                | Specify  | Pending |
-| REQRES-06      | P1: Response.Html/Text content-type forçado     | Specify  | Pending |
-| REQRES-07      | P1: Remoção de SendString                       | Specify  | Pending |
-| REQRES-08      | P1: Response.Status(code)/StatusCode()          | Specify  | Pending |
+| REQRES-01      | P1: Split Request/Response — Handler            | Execute  | Verified |
+| REQRES-02      | P1: Split Request/Response — Guard/Middleware/Interceptor/Filter | Execute  | Verified |
+| REQRES-03      | P1: Split Request/Response — next(req,res)      | Execute  | Verified |
+| REQRES-04      | P1: Split Request/Response — Response.Request() | Execute  | Verified |
+| REQRES-05      | P1: Request.Body().Raw()/.Text()                | Execute  | Verified |
+| REQRES-06      | P1: Response.Html/Text content-type forçado     | Execute  | Verified |
+| REQRES-07      | P1: Remoção de SendString                       | Execute  | Verified |
+| REQRES-08      | P1: Response.Status(code)/StatusCode()          | Execute  | Verified |
 
 ---
 

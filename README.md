@@ -64,8 +64,8 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
   userService := gonest.MustInject[*UserService](controller)
 
   controller.RouteGet("/", func(route *gonest.Route) {
-    route.Handler(func(ctx *gonest.RestContext) {
-      ctx.Json(userService.List())
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      res.Json(userService.List())
     })
   })
 })
@@ -96,13 +96,13 @@ full docs site.
 - [x] M3 - Request Pipeline (`Middleware`, `Guard`, `Interceptor`, `Filter`)
 - [x] M4 - Schema Builder — Primitives (`NewSchema[T]`, `String`/`Integer`/`Boolean`/etc branches)
 - [x] M5 - Schema Builder — Array & Object (nested schemas, `$ref`-style reuse)
-- [x] M6 - Runtime Validation (`MustParseRestJsonBody`, `MustParseRestParams`, `MustParseRestQuery`, `Custom(fn)`)
+- [x] M6 - Runtime Validation (`gonest.Parse[T]`/`gonest.MustParse[T]`, `Custom(fn)`)
 - [x] M7 - OpenAPI Generation (`GenerateOpenApiSchema`, `SetupSwagger`)
 - [x] M8 - Testing Helpers (`MustNewTestApp`, `MustOverride`, `MustRequest`)
 - [x] M9 - Event Emitter (`gonest.Emitter`, `NewListener`, `MustOn`)
 - [x] M10 - Scheduler (`Cron`/`Interval`/`Timeout`, `Stop`)
 - [x] M11 - Terminus / health checks (`MustInjectAll[Pingable]` pattern, no dedicated bootstrap type needed)
-- [x] M12 - Multipart Form Streaming (`MustParseRestFormBody`, true streaming file upload -- see below)
+- [x] M12 - Multipart Form Streaming (`req.Body().Form(onFile)`, true streaming file upload -- see below)
 
 See `.specs/project/ROADMAP.md` for the full milestone breakdown and `.specs/project/STATE.md` for
 the history of architecture decisions (AD-001 through AD-022 so far).
@@ -141,7 +141,7 @@ real `HttpAdapter`: `gonest.FiberApp`, backed by [Fiber v3](https://github.com/g
 
 Request validation (path params, query string, JSON body, multipart form fields) and OpenAPI schema
 generation are driven by the exact same declaration: `NewSchema[T]` builds a `*Schema` once, and
-that same value is what both `MustParseRestXxx`/`Route.RequestBody`/`Route.Response` consume --
+that same value is what both `gonest.Parse[T]`/`Route.RequestBody`/`Route.Response` consume --
 no second, parallel declaration to keep in sync.
 
 See `.specs/project/PROJECT.md` for the full vision/scope and `.specs/project/STATE.md` for the
@@ -175,7 +175,7 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
 
   controller.RouteGet("/", func(route *gonest.Route) {
     route.Summary("List users")
-    route.Handler(func(ctx *gonest.RestContext) { ctx.Json(userService.List()) })
+    route.Handler(func(req *gonest.Request, res *gonest.Response) { res.Json(userService.List()) })
   })
 })
 
@@ -251,31 +251,31 @@ import "gonest.dev/gonest"
 
 // Middleware: runs before routing (raw request/response), like Express middleware.
 var RequestIdMiddleware = gonest.NewMiddleware(func(middleware *gonest.Middleware) {
-  middleware.Handler(func(ctx *gonest.RestContext, next gonest.Next) {
-    ctx.SetHeader("X-Request-Id", "...")
-    next(ctx)
+  middleware.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.Next) {
+    res.SetHeader("X-Request-Id", "...")
+    next(req, res)
   })
 })
 
 // Guard: decides whether the request proceeds. false = automatic 403 Forbidden;
 // panic with an Exception for a custom message instead.
 var AuthGuard = gonest.NewGuard(func(guard *gonest.Guard) {
-  guard.Handler(func(ctx *gonest.RestContext) bool {
-    return ctx.Header("Authorization") != ""
+  guard.Handler(func(req *gonest.Request, res *gonest.Response) bool {
+    return req.Header("Authorization") != ""
   })
 })
 
 // Interceptor: wraps the handler's execution (before/after), like AOP.
 var TimingInterceptor = gonest.NewInterceptor(func(interceptor *gonest.Interceptor) {
-  interceptor.Handler(func(ctx *gonest.RestContext, next gonest.InterceptorNext) {
-    next(ctx)
+  interceptor.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.InterceptorNext) {
+    next(req, res)
   })
 })
 
 // Filter: catches specific exception types and customizes the response.
 var FooFilter = gonest.NewFilter(func(filter *gonest.Filter) {
-  filter.Catch(&FooError{}, func(ctx *gonest.RestContext, exc *FooError) {
-    ctx.Status(http.StatusTeapot).Json(map[string]any{"custom": true})
+  filter.Catch(&FooError{}, func(req *gonest.Request, res *gonest.Response, exc *FooError) {
+    res.Status(http.StatusTeapot).Json(map[string]any{"custom": true})
   })
 })
 
@@ -355,23 +355,24 @@ var userIdParamsSchema = gonest.NewSchema[UserIdParams](func(t *UserIdParams, m 
 var UserController = gonest.NewController(func(controller *gonest.Controller) {
   controller.RouteGet("/:user_id", func(route *gonest.Route) {
     route.Params(userIdParamsSchema)                     // documents it in OpenAPI
-    route.Response(gonest.HttpStatusOk, func(response *gonest.Response) {
+    route.Response(gonest.HttpStatusOk, func(response *gonest.RouteResponse) {
       response.Schema(userEntitySchema)
     })
 
-    route.Handler(func(ctx *gonest.RestContext) {
-      // MustParseRestParams uses the SAME Schema for runtime validation --
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      // gonest.MustParse uses the SAME Schema for runtime validation --
       // the Schema value must be passed explicitly (a compile-time guarantee
       // that it's never forgotten, not a hidden global-registry lookup).
-      params := gonest.MustParseRestParams[*UserIdParams](ctx, userIdParamsSchema)
-      ctx.Json(params)
+      params := gonest.MustParse[UserIdParams](req.Params(), userIdParamsSchema)
+      res.Json(params)
     })
   })
 })
 ```
 
-`param:"..."`/`query:"..."`/`json:"..."` are separate tag families (one per source). Every
-`MustParseRestXxx[T](ctx, schema)` has a non-panicking `ParseRestXxx[T](ctx, schema) (T, error)`
+`param:"..."`/`query:"..."`/`json:"..."` are separate tag families (one per source), each read via
+`req.Params()`/`req.Query()`/`req.Body().Json()` (a `Parseable`). Every
+`gonest.MustParse[T](src, schema)` has a non-panicking `gonest.Parse[T](src, schema) (T, error)`
 twin for callers that want to handle the error themselves.
 
 ### File upload (multipart/form-data streaming)
@@ -400,12 +401,12 @@ var PostController = gonest.NewController(func(controller *gonest.Controller) {
     // -- "file" becomes {type: string, format: binary}, so Swagger UI renders
     // a real file-upload widget for this route.
     route.FormBody(createPostFormSchema, "file")
-    route.Handler(func(ctx *gonest.RestContext) {
-      form := gonest.MustParseRestFormBody[*CreatePostForm](ctx, createPostFormSchema, func(f *gonest.FormFile) error {
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      form := gonest.MustParse[CreatePostForm](req.Body().Form(func(f *gonest.FormFile) error {
         // f.Reader() is the still-unconsumed part -- pipe it straight to S3/etc.
         return uploadToS3(f.Filename(), f.ContentType(), f.Reader())
-      })
-      ctx.Json(map[string]string{"title": form.Title})
+      }), createPostFormSchema)
+      res.Json(map[string]string{"title": form.Title})
     })
   })
 })
@@ -528,14 +529,14 @@ var HealthController = gonest.NewController(func(controller *gonest.Controller) 
   pingables := gonest.MustInjectAll[Pingable](controller)
 
   controller.RouteGet("/readyz", func(route *gonest.Route) {
-    route.Handler(func(ctx *gonest.RestContext) {
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
       status := gonest.HttpStatusOk
       for _, p := range pingables {
         if p.Ping(context.Background()) != nil {
           status = gonest.HttpStatusServiceUnavailable
         }
       }
-      ctx.Status(status).Json(map[string]string{"status": "ok"})
+      res.Status(status).Json(map[string]string{"status": "ok"})
     })
   })
 })

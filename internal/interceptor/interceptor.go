@@ -1,6 +1,6 @@
 // Package interceptor implements the declarative Interceptor API: the
 // reusable before/after-Handler-execution unit with a continuation-passing
-// (ctx, next) shape, wrapping a route's Handler for AOP-style
+// (req, res, next) shape, wrapping a route's Handler for AOP-style
 // pre/post-processing (timing, transformation, caching, etc.), mirroring
 // Nest interceptors. See design.md's "Next / Interceptor" component.
 package interceptor
@@ -17,22 +17,22 @@ import (
 // whatever comes after the current interceptor (the next interceptor, or
 // eventually the already-guard-gated route Handler). This is a package-own
 // type -- NOT reused from internal/middleware.Next -- even though both share
-// the identical underlying shape (func(ctx *execution.Context)). See
-// design.md's Tech Decisions: internal/interceptor and internal/middleware
-// are parallel, conceptually independent pipeline-stage packages (different
-// composition position, different semantic framing) that only coincide in
-// shape today; coupling one to the other just to reuse a 12-character
-// one-liner type declaration would be an artificial dependency for no
-// runtime benefit (Go's structural function-type compatibility already
-// makes both Next types freely interchangeable at the underlying-function
-// level for composition purposes).
-type Next func(ctx *execution.Context)
+// the identical underlying shape (func(req *execution.Request, res
+// *execution.Response)). See design.md's Tech Decisions: internal/interceptor
+// and internal/middleware are parallel, conceptually independent
+// pipeline-stage packages (different composition position, different
+// semantic framing) that only coincide in shape today; coupling one to the
+// other just to reuse a one-liner type declaration would be an artificial
+// dependency for no runtime benefit (Go's structural function-type
+// compatibility already makes both Next types freely interchangeable at the
+// underlying-function level for composition purposes).
+type Next func(req *execution.Request, res *execution.Response)
 
-// Interceptor represents a single interceptor unit: it holds the (ctx, next)
-// handler function registered via Handler.
+// Interceptor represents a single interceptor unit: it holds the (req, res,
+// next) handler function registered via Handler.
 type Interceptor struct {
 	fn      func(*Interceptor)
-	handler func(ctx *execution.Context, next Next)
+	handler func(req *execution.Request, res *execution.Response, next Next)
 
 	scope    []*module.Module
 	declared bool
@@ -81,14 +81,14 @@ func (i *Interceptor) ResolveDirectAll(t reflect.Type) []reflect.Value {
 	return resolver.FindDirectAll(i.scope, t)
 }
 
-// Handler stores h as this Interceptor's (ctx, next) handler function.
-func (i *Interceptor) Handler(h func(ctx *execution.Context, next Next)) {
+// Handler stores h as this Interceptor's (req, res, next) handler function.
+func (i *Interceptor) Handler(h func(req *execution.Request, res *execution.Response, next Next)) {
 	i.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors middleware.Middleware.HandlerFunc()'s zero-value
 // contract).
-func (i *Interceptor) HandlerFunc() func(ctx *execution.Context, next Next) {
+func (i *Interceptor) HandlerFunc() func(req *execution.Request, res *execution.Response, next Next) {
 	return i.handler
 }

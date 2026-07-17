@@ -11,9 +11,12 @@ import (
 	"gonest.dev/gonest/internal/resolver"
 )
 
-// contextType is used to validate Catch's accepted handler signature via
-// reflect.
-var contextType = reflect.TypeOf((*execution.Context)(nil))
+// requestType and responseType are used to validate Catch's accepted handler
+// signature via reflect.
+var (
+	requestType  = reflect.TypeOf((*execution.Request)(nil))
+	responseType = reflect.TypeOf((*execution.Response)(nil))
+)
 
 // Filter represents a reusable set of per-exception-type response handlers,
 // registered via Catch and keyed by the exact exception type via
@@ -91,20 +94,20 @@ func (f *Filter) ResolveDirectAll(t reflect.Type) []reflect.Value {
 // concrete type is EXACTLY reflect.TypeOf(exemplar). handler must have the
 // signature:
 //
-//	func(ctx *execution.Context, exc T)
+//	func(req *execution.Request, res *execution.Response, exc T)
 //
 // where T is exactly reflect.TypeOf(exemplar) -- for any other signature,
 // Catch panics with a clear message at registration time (reflect-validated,
 // same "fail fast with a clear message" convention as Pipe.Handler). Unlike
 // Pipe.Handler (which returns T), a Catch handler returns nothing: it acts
-// by mutating ctx (writing the response), not by producing a value for a
+// by mutating res (writing the response), not by producing a value for a
 // caller to use.
 func (f *Filter) Catch(exemplar any, handler any) {
 	excType := reflect.TypeOf(exemplar)
 
 	v := reflect.ValueOf(handler)
 	if v.Kind() != reflect.Func || !isValidCatchSignature(v.Type(), excType) {
-		panic("gonest: invalid Filter.Catch handler signature, expected func(ctx *execution.Context, exc " + excType.String() + ")")
+		panic("gonest: invalid Filter.Catch handler signature, expected func(req *execution.Request, res *execution.Response, exc " + excType.String() + ")")
 	}
 
 	f.catches[excType] = v
@@ -120,13 +123,13 @@ func (f *Filter) HandlerFor(excType reflect.Type) (reflect.Value, bool) {
 }
 
 // isValidCatchSignature reports whether t matches the single accepted Catch
-// handler signature: func(ctx *execution.Context, exc excType), returning
-// nothing.
+// handler signature: func(req *execution.Request, res *execution.Response,
+// exc excType), returning nothing.
 func isValidCatchSignature(t reflect.Type, excType reflect.Type) bool {
-	if t.NumIn() != 2 {
+	if t.NumIn() != 3 {
 		return false
 	}
-	if t.In(0) != contextType || t.In(1) != excType {
+	if t.In(0) != requestType || t.In(1) != responseType || t.In(2) != excType {
 		return false
 	}
 	return t.NumOut() == 0

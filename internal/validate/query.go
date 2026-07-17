@@ -14,21 +14,21 @@ import (
 //
 // It is the SAME shape as paramsSource (internal/validate/params.go), except
 // presence/raw values come from ctx.Queries() (a plain map[string]string
-// sourced from the request's query string, see execution.Context.Queries)
+// sourced from the request's query string, see execution.Request.Queries)
 // instead of route.HasParam/ctx.Param. Reuses coerceParamString/populate/
 // validateValue/tagKey exactly, unchanged -- design.md's Tech Decisions:
 // "coerce-then-reuse, not a parallel validation path".
 type querySource struct {
-	ctx *execution.Context
+	req *execution.Request
 }
 
 // NewQuerySource builds a Parseable for ctx's query string. Exported so
 // internal/app can wire one into a Context per-request.
-func NewQuerySource(ctx *execution.Context) execution.Parseable {
-	return &querySource{ctx: ctx}
+func NewQuerySource(req *execution.Request) execution.Parseable {
+	return &querySource{req: req}
 }
 
-// ParseInto reads s.ctx's query string into dst (a *T) via T's
+// ParseInto reads s.req's query string into dst (a *T) via T's
 // `query:"name"` struct tags, validating against schema (a *schema.Schema)
 // first.
 //
@@ -59,7 +59,7 @@ func (s *querySource) ParseInto(dst any, schemaArg any) error {
 	dstVal := reflect.ValueOf(dst).Elem()
 	resolveSchema(m, dstVal.Type())
 
-	queries := s.ctx.Queries()
+	queries := s.req.Queries()
 
 	var violations []violation
 	presence := map[string]any{}

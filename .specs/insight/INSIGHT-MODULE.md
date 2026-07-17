@@ -32,17 +32,35 @@ type UserService struct {
   index int
   list  []*UserEntity
 }
-func (t *UserService) List() []*UserEntity { /* ... */ }
+func (t *UserService) List() []*UserEntity { return t.list }
 func (t *UserService) Get(userId int64) *UserEntity {
-  user := /* busca... */
-  if user == nil {
-    panic(gonest.NewNotFoundException(map[string]any{"userId": userId}))
+  for _, user := range t.list {
+    if user.ID == userId {
+      return user
+    }
   }
-  return user
+  panic(gonest.NewNotFoundException(map[string]any{"userId": userId}))
 }
-func (t *UserService) Create(properties UserProperties) *UserEntity { /* ...; panica se der erro */ }
-func (t *UserService) Update(userId int64, properties UserProperties) *UserEntity { /* ...; panica se der erro */ }
-func (t *UserService) Delete(userId int64) *UserEntity { /* ...; panica se der erro */ }
+func (t *UserService) Create(properties UserProperties) *UserEntity {
+  t.index++
+  entity := &UserEntity{UserProperties: properties, ID: int64(t.index)}
+  t.list = append(t.list, entity)
+  return entity
+}
+func (t *UserService) Update(userId int64, properties UserProperties) *UserEntity {
+  entity := t.Get(userId) // panica com NotFoundException se não existir
+  entity.UserProperties = properties
+  return entity
+}
+func (t *UserService) Delete(userId int64) *UserEntity {
+  for i, user := range t.list {
+    if user.ID == userId {
+      t.list = append(t.list[:i], t.list[i+1:]...)
+      return user
+    }
+  }
+  panic(gonest.NewNotFoundException(map[string]any{"userId": userId}))
+}
 
 var UserProvider = gonest.NewProvider(func (provider *gonest.Provider) {
   provider.Scope(gonest.ScopeSingleton)
@@ -52,17 +70,18 @@ var UserProvider = gonest.NewProvider(func (provider *gonest.Provider) {
 })
 
 // UserIdParam é o "whole-object" de um único path param -- mesmo mecanismo
-// de MustParseRestJsonBody, só que alimentado pelo segmento ":user_id" da rota em vez
-// do corpo JSON (ver "exemplo de Param/Query Validation" mais abaixo pro
-// detalhe completo, incluindo query string e Custom(fn)).
+// de gonest.MustParse(req.Body().Json(), ...), só que alimentado pelo segmento
+// ":user_id" da rota em vez do corpo JSON (ver "exemplo de Param/Query
+// Validation" mais abaixo pro detalhe completo, incluindo query string e
+// Custom(fn)).
 type UserIdParam struct {
   UserId int64 `param:"user_id"`
 }
 
-// userIdParamSchema precisa de nome (não `var _ =`) -- todo MustParseRestParams/
-// MustParseRestQuery/MustParseRestJsonBody agora recebe o Schema explícito como argumento
-// (ver seção "hipótese" mais abaixo, decisão tomada e já executada), não
-// existe mais lookup por tipo num registry global.
+// userIdParamSchema precisa de nome (não `var _ =`) -- todo gonest.MustParse/
+// gonest.Parse agora recebe o Schema explícito como argumento (ver seção
+// "hipótese" mais abaixo, decisão tomada e já executada), não existe mais
+// lookup por tipo num registry global.
 var userIdParamSchema = gonest.NewSchema[UserIdParam](func (t *UserIdParam, m *gonest.Schema) {
   m.Property(&t.UserId).Integer().Min(1).Required()
 })
@@ -77,37 +96,37 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   // rotas do controller
   controller.Route(gonest.HttpQuery, "/", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.RestContext) {
-      ctx.Json(userService.List())
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      res.Json(userService.List())
     })
   })
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.RestContext) {
-      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
-      ctx.Json(userService.Get(params.UserId))
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      params := gonest.MustParse[UserIdParam](req.Params(), userIdParamSchema)
+      res.Json(userService.Get(params.UserId))
     })
   })
   controller.Route(gonest.HttpPost, "/", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusCreated)
-    route.Handler(func(ctx *gonest.RestContext) {
-      properties := gonest.MustParseRestJsonBody[*UserProperties](ctx, userPropertiesSchema)
-      ctx.Json(userService.Create(properties))
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      properties := gonest.MustParse[UserProperties](req.Body().Json(), userPropertiesSchema)
+      res.Json(userService.Create(properties))
     })
   })
   controller.Route(gonest.HttpPut, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.RestContext) {
-      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
-      properties := gonest.MustParseRestJsonBody[*UserProperties](ctx, userPropertiesSchema)
-      ctx.Json(userService.Update(params.UserId, properties))
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      params := gonest.MustParse[UserIdParam](req.Params(), userIdParamSchema)
+      properties := gonest.MustParse[UserProperties](req.Body().Json(), userPropertiesSchema)
+      res.Json(userService.Update(params.UserId, properties))
     })
   })
   controller.Route(gonest.HttpDelete, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.RestContext) {
-      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
-      ctx.Json(userService.Delete(params.UserId))
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      params := gonest.MustParse[UserIdParam](req.Params(), userIdParamSchema)
+      res.Json(userService.Delete(params.UserId))
     })
   })
 })
@@ -154,13 +173,16 @@ var userPatchSchema = gonest.NewSchema[UserPatchDTO](func(t *UserPatchDTO, m *go
 })
 
 var _ = gonest.NewController(func(c *gonest.Controller) {
+  // userService já resolvido pelo DI (mesmo UserProvider do exemplo acima).
+  userService := gonest.MustInject[*UserService](c)
+
   c.Route(gonest.HttpPatch, "/:user_id", func(r *gonest.Route) {
     r.HttpCode(gonest.HttpStatusOk)
     r.Params(userIdParamSchema)
     r.RequestBody(userPatchSchema)
-    r.Handler(func(ctx *gonest.RestContext) {
-      params := gonest.MustParseRestParams[*UserIdParam](ctx, userIdParamSchema)
-      patch  := gonest.MustParseRestJsonBody[*UserPatchDTO](ctx, userPatchSchema)
+    r.Handler(func(req *gonest.Request, res *gonest.Response) {
+      params := gonest.MustParse[UserIdParam](req.Params(), userIdParamSchema)
+      patch  := gonest.MustParse[UserPatchDTO](req.Body().Json(), userPatchSchema)
 
       user := userService.Get(params.UserId)
 
@@ -171,7 +193,7 @@ var _ = gonest.NewController(func(c *gonest.Controller) {
       // Alternativa para ORMs que aceitam map (ex: GORM):
       // db.Model(user).Updates(gonest.ValueToDirtyMap(patch))
 
-      ctx.Json(user)
+      res.Json(user)
     })
   })
 })
@@ -238,14 +260,42 @@ import (
   "github.com/google/uuid"
 )
 
+// AuthService/LoggerService são serviços de domínio já registrados em algum
+// Provider do módulo (omitidos aqui por brevidade) -- só a assinatura importa
+// pro exemplo de Guard/Interceptor abaixo.
+type AuthService struct{}
+func (s *AuthService) Validate(token string) bool { return token != "" }
+
+type LoggerService struct{}
+func (l *LoggerService) Log(args ...any) {}
+
+// UserEntity/UserService (mesmos do "exemplo mais simples" acima, repetidos
+// aqui só pra este bloco ficar completo e compilável isoladamente).
+type UserEntity struct {
+  ID   int64  `json:"id"`
+  Name string `json:"name"`
+}
+type UserService struct{ list []*UserEntity }
+func (t *UserService) Get(userId int64) *UserEntity {
+  for _, user := range t.list {
+    if user.ID == userId {
+      return user
+    }
+  }
+  panic(gonest.NewNotFoundException(map[string]any{"userId": userId}))
+}
+
+// FooExampleError (mesma exception do "exemplo de exceptions" acima).
+type FooExampleError struct{ gonest.HttpException }
+
 // ---------- Middleware ----------
 // roda antes do roteamento (raw request/response), tipo express middleware.
-// não decide autorização, só observa/mutação de contexto (log, request-id etc).
+// não decide autorização, só observa/mutação de request/response (log, request-id etc).
 var RequestIdMiddleware = gonest.NewMiddleware(func (middleware *gonest.Middleware) {
-  middleware.Handler(func(ctx *gonest.RestContext, next gonest.Next) {
+  middleware.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.Next) {
     requestId, _ := uuid.NewV7()
-    ctx.SetHeader("X-Request-Id", requestId.String())
-    next(ctx)
+    res.SetHeader("X-Request-Id", requestId.String())
+    next(req, res)
   })
 })
 
@@ -255,8 +305,8 @@ var RequestIdMiddleware = gonest.NewMiddleware(func (middleware *gonest.Middlewa
 var AuthGuard = gonest.NewGuard(func (guard *gonest.Guard) {
   authService := gonest.MustInject[*AuthService](guard)
 
-  guard.Handler(func(ctx *gonest.RestContext) bool {
-    token := ctx.Header("Authorization")
+  guard.Handler(func(req *gonest.Request, res *gonest.Response) bool {
+    token := req.Header("Authorization")
     if token == "" {
       panic(gonest.NewUnauthorizedException(nil))
     }
@@ -270,9 +320,9 @@ var AuthGuard = gonest.NewGuard(func (guard *gonest.Guard) {
 var TimingInterceptor = gonest.NewInterceptor(func (interceptor *gonest.Interceptor) {
   logger := gonest.MustInject[*LoggerService](interceptor)
 
-  interceptor.Handler(func(ctx *gonest.RestContext, next gonest.Next) {
+  interceptor.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.InterceptorNext) {
     start := time.Now()
-    next(ctx)
+    next(req, res)
     logger.Log("request took", time.Since(start))
   })
 })
@@ -281,8 +331,8 @@ var TimingInterceptor = gonest.NewInterceptor(func (interceptor *gonest.Intercep
 // captura exceptions específicas e customiza status/body da resposta.
 // exceptions não capturadas por nenhum filter caem no handler default (name/message/details).
 var FooExampleFilter = gonest.NewFilter(func (filter *gonest.Filter) {
-  filter.Catch(&FooExampleError{}, func(ctx *gonest.RestContext, exc *FooExampleError) {
-    ctx.Status(gonest.HttpStatusTeapot).Json(map[string]any{
+  filter.Catch(&FooExampleError{}, func(req *gonest.Request, res *gonest.Response, exc *FooExampleError) {
+    res.Status(gonest.HttpStatusTeapot).Json(map[string]any{
       "custom": true,
       "name":   exc.Name(),
     })
@@ -327,14 +377,20 @@ var UserController = gonest.NewController(func (controller *gonest.Controller) {
   // rota recebe o ID no formato prefixado "usr_42" (Custom(fn) acima
   // decodifica pro int64 cru antes do handler rodar; violation -- prefixo
   // errado ou sufixo não-numérico -- vira 400 automático igual qualquer
-  // outro campo de MustParseRestParams).
+  // outro campo de gonest.MustParse).
   controller.Route(gonest.HttpGet, "/:user_id", func (route *gonest.Route) {
     route.HttpCode(gonest.HttpStatusOk)
-    route.Handler(func(ctx *gonest.RestContext) {
-      params := gonest.MustParseRestParams[*PrefixedUserIdParam](ctx, prefixedUserIdParamSchema)
-      ctx.Json(userService.Get(params.UserId))
+    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+      params := gonest.MustParse[PrefixedUserIdParam](req.Params(), prefixedUserIdParamSchema)
+      res.Json(userService.Get(params.UserId))
     })
   })
+})
+
+// UserModule (mesmo módulo do "exemplo mais simples" acima, repetido aqui só
+// pra este bloco ficar completo e compilável isoladamente).
+var UserModule = gonest.NewModule(func (module *gonest.Module) {
+  module.Controllers(UserController)
 })
 
 // ---------- aplicando globalmente (todos os controllers/módulos) ----------

@@ -1,9 +1,10 @@
 // Package fiber is the adapter that translates gonest's HTTP-agnostic
-// Route/Context abstractions into a real Fiber v3 application. Together with
-// internal/execution, it is one of only two packages in this codebase allowed
-// to import Fiber directly (see design.md's "FiberApp (adapter)" component)
-// -- every other package (internal/route, internal/controller, internal/validate)
-// only ever sees the Fiber-agnostic *execution.Context.
+// Route/Request/Response abstractions into a real Fiber v3 application.
+// Together with internal/execution, it is one of only two packages in this
+// codebase allowed to import Fiber directly (see design.md's "FiberApp
+// (adapter)" component) -- every other package (internal/route,
+// internal/controller, internal/validate) only ever sees the Fiber-agnostic
+// *execution.Request/*execution.Response.
 package fiber
 
 import (
@@ -114,16 +115,17 @@ func fiberMethod(method route.HttpMethod) string {
 }
 
 // RegisterRoute registers a real route on the internal *fiber.App. The
-// handler Fiber invokes is a thin wrapper: it builds a *execution.Context
-// around a fiberResponder for this specific request/response pair, then
-// runs the gonest Handler inside the wrapper's OWN recover() -- per
-// design.md's Tech Decisions, this deliberately does NOT use Fiber's
-// error-return contract (func(fiber.Ctx) error) as the panic-propagation
-// path, and does NOT install Fiber's `recover` middleware. gonest's Handler
-// signature is func(ctx *execution.Context) with no return value -- panic is
-// the only way a Handler signals failure, consistent with how
-// Constructor/MustInject already work elsewhere in this framework (see
-// internal/provider, param.go).
+// handler Fiber invokes is a thin wrapper: it builds a *execution.Request/
+// *execution.Response pair around a fiberResponder for this specific
+// request/response pair, then runs the gonest Handler inside the wrapper's
+// OWN recover() -- per design.md's Tech Decisions, this deliberately does
+// NOT use Fiber's error-return contract (func(fiber.Ctx) error) as the
+// panic-propagation path, and does NOT install Fiber's `recover` middleware.
+// gonest's Handler signature is func(req *execution.Request, res
+// *execution.Response) with no return value -- panic is the only way a
+// Handler signals failure, consistent with how Constructor/MustInject
+// already work elsewhere in this framework (see internal/provider,
+// param.go).
 //
 // The recover branch first type-asserts the recovered value against
 // exception.Exception -- an interface satisfied structurally by anything
@@ -133,26 +135,26 @@ func fiberMethod(method route.HttpMethod) string {
 // type (INSIGHT.md's `type FooExampleError struct { gonest.HttpException }`
 // pattern) must be recognized identically to a built-in, with zero
 // awareness on this package's part of what concrete types exist. When the
-// assertion succeeds, the response is built via ctx.Json -- the SAME
-// *execution.Context already constructed above for the Handler call -- so the
-// Exception branch goes through the one Fiber-agnostic path every other
+// assertion succeeds, the response is built via res.Json -- the SAME
+// *execution.Response already constructed above for the Handler call -- so
+// the Exception branch goes through the one Fiber-agnostic path every other
 // gonest response does, rather than reaching for raw fiber.Ctx calls. A
 // panic value that does NOT satisfy Exception (including panic(nil), which
 // Go 1.21+ turns into a non-nil *runtime.PanicNilError rather than a nil
 // recover() -- see https://go.dev/doc/go1.21#runtime) falls through to the
 // pre-existing generic-500 fallback UNCHANGED: that fallback intentionally
-// keeps using raw fiber.Ctx calls (not ctx.Json) because it is a
+// keeps using raw fiber.Ctx calls (not res.Json) because it is a
 // last-resort, best-effort write for a case where we deliberately know
 // nothing about the panic value and must not risk it leaking into the
 // response -- it never crashes the process and leaks no internal detail.
-func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(ctx *execution.Context)) error {
+func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
 	wrapped := func(c fiber.Ctx) error {
-		ctx := execution.New(&fiberResponder{c: c})
+		req, res := execution.New(&fiberResponder{c: c})
 
 		defer func() {
 			if r := recover(); r != nil {
 				if exc, ok := r.(exception.Exception); ok {
-					ctx.Status(exc.Status()).Json(map[string]any{ //nolint:errcheck // best-effort write on an already-failed request
+					res.Status(exc.Status()).Json(map[string]any{ //nolint:errcheck // best-effort write on an already-failed request
 						"name":    exception.EffectiveName(exc),
 						"message": exc.Message(),
 						"details": exc.Details(),
@@ -163,7 +165,7 @@ func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(ct
 			}
 		}()
 
-		h(ctx)
+		h(req, res)
 		return nil
 	}
 
@@ -287,13 +289,13 @@ func (r *fiberResponder) GetParam(name string) string {
 // Unlike GetParam above, this deliberately does NOT defensively copy (see
 // L-009 in STATE.md, which is why GetParam clones): L-009's bug was about a
 // value RETAINED past the request (stored in a struct field, read later by
-// some other request). execution.Context.RawBody()'s own doc comment
-// documents the same constraint on ITS callers -- MustParseRestJsonBody
-// calls json.Unmarshal on the body synchronously, within the same handler
-// execution RawBody() is called in, and encoding/json copies string/byte
-// data into the destination values during decode rather than retaining the
-// input slice. As long as no future caller stores the raw []byte past the
-// synchronous validation call, there is no reuse-corruption risk.
+// some other request). BodySource.Raw()'s own doc comment documents the
+// same constraint on ITS callers -- jsonBodySource calls json.Unmarshal on
+// the body synchronously, within the same handler execution RawBody() is
+// called in, and encoding/json copies string/byte data into the destination
+// values during decode rather than retaining the input slice. As long as no
+// future caller stores the raw []byte past the synchronous validation call,
+// there is no reuse-corruption risk.
 func (r *fiberResponder) RawBody() []byte {
 	return r.c.Body()
 }

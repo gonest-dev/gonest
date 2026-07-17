@@ -202,10 +202,10 @@ func TestGenerate_SharedSchema_RegisteredExactlyOnce(t *testing.T) {
 		c.Path("/users")
 		c.Route(route.HttpPost, "/", func(r *route.Route) {
 			r.RequestBody(userMeta)
-			r.Response(201, func(response *route.Response) { response.Schema(userMeta) })
+			r.Response(201, func(response *route.RouteResponse) { response.Schema(userMeta) })
 		})
 		c.Route(route.HttpGet, "/address", func(r *route.Route) {
-			r.Response(200, func(response *route.Response) { response.Schema(addressMeta) })
+			r.Response(200, func(response *route.RouteResponse) { response.Schema(addressMeta) })
 		})
 	})
 	c.Declare()
@@ -702,11 +702,11 @@ func TestGenerate_UserEntityAddressEntity_FullReproduction(t *testing.T) {
 		c.Route(route.HttpPost, "/", func(r *route.Route) {
 			r.Summary("Create user")
 			r.RequestBody(userMeta)
-			r.Response(201, func(response *route.Response) { response.Schema(userMeta) })
+			r.Response(201, func(response *route.RouteResponse) { response.Schema(userMeta) })
 			r.Response(400)
 		})
 		c.Route(route.HttpGet, "/:id/address", func(r *route.Route) {
-			r.Response(200, func(response *route.Response) { response.Schema(addressMeta) })
+			r.Response(200, func(response *route.RouteResponse) { response.Schema(addressMeta) })
 		})
 	})
 	c.Declare()
@@ -790,7 +790,7 @@ func TestDocument_ProducesValidJSONMarshalableOutput(t *testing.T) {
 		c.BearerAuth()
 		c.Route(route.HttpPost, "/", func(r *route.Route) {
 			r.RequestBody(userMeta)
-			r.Response(201, func(response *route.Response) { response.Schema(userMeta) })
+			r.Response(201, func(response *route.RouteResponse) { response.Schema(userMeta) })
 		})
 	})
 	c.Declare()
@@ -896,11 +896,11 @@ func TestGenerate_ResponseDescription_OverridesDefault(t *testing.T) {
 	c := controller.New(func(c *controller.Controller) {
 		c.Path("/posts")
 		c.Route(route.HttpGet, "/:post_id", func(r *route.Route) {
-			r.Response(200, func(response *route.Response) {
+			r.Response(200, func(response *route.RouteResponse) {
 				response.Schema(okSchema)
 				response.Description("The post")
 			})
-			r.Response(404, func(response *route.Response) {
+			r.Response(404, func(response *route.RouteResponse) {
 				response.Description("Cannot find a post using post_id")
 			})
 		})
