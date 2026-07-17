@@ -1,0 +1,28 @@
+# Configurations for automation of Git Hooks
+# Documentation: https://lefthook.dev/configuration
+
+# Hook executado antes do commit
+pre-commit:
+  commands:
+    # formata todo o módulo antes de commitar
+    fmt:
+      run: task fmt
+
+    # go vet no módulo inteiro
+    vet:
+      run: task vet
+
+    # garante que tudo ainda compila
+    build:
+      run: task build
+
+# Hook executado antes do push
+pre-push:
+  commands:
+    # suite completa com -race, sem cache
+    test:
+      run: task test:race
+
+    # ambos os módulos de exemplo (.examples/*) continuam buildando
+    examples:
+      run: task examples

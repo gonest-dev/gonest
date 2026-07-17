@@ -66,7 +66,7 @@ func (f *formFakeResponder) GetPath() string                   { return "" }
 func (f *formFakeResponder) GetHeader(name string) string      { return "" }
 func (f *formFakeResponder) SetHeaderValue(name, value string) {}
 func (f *formFakeResponder) GetParam(name string) string       { return "" }
-func (f *formFakeResponder) RawBody() []byte                      { return nil }
+func (f *formFakeResponder) RawBody() []byte                   { return nil }
 func (f *formFakeResponder) Queries() map[string]string        { return nil }
 func (f *formFakeResponder) HTML(s string) error               { return nil }
 func (f *formFakeResponder) SendString(s string) error         { return nil }

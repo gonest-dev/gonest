@@ -84,7 +84,7 @@ func (f *queryFakeResponder) GetPath() string                       { return "" 
 func (f *queryFakeResponder) GetHeader(name string) string          { return "" }
 func (f *queryFakeResponder) SetHeaderValue(name, value string)     {}
 func (f *queryFakeResponder) GetParam(name string) string           { return "" }
-func (f *queryFakeResponder) RawBody() []byte                          { return nil }
+func (f *queryFakeResponder) RawBody() []byte                       { return nil }
 func (f *queryFakeResponder) Queries() map[string]string            { return f.queries }
 func (f *queryFakeResponder) HTML(s string) error                   { return nil }
 func (f *queryFakeResponder) SendString(s string) error             { return nil }

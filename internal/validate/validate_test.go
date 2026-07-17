@@ -112,7 +112,7 @@ func (f *fakeResponder) GetPath() string                       { return "" }
 func (f *fakeResponder) GetHeader(name string) string          { return "" }
 func (f *fakeResponder) SetHeaderValue(name, value string)     {}
 func (f *fakeResponder) GetParam(name string) string           { return "" }
-func (f *fakeResponder) RawBody() []byte                          { return f.body }
+func (f *fakeResponder) RawBody() []byte                       { return f.body }
 func (f *fakeResponder) Queries() map[string]string            { return nil }
 func (f *fakeResponder) HTML(s string) error                   { return nil }
 func (f *fakeResponder) SendString(s string) error             { return nil }

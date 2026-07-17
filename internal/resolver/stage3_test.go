@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/provider"
-	"gonest.dev/gonest/internal/inject"
 )
 
 // --- fixtures -------------------------------------------------------------
