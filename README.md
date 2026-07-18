@@ -36,6 +36,7 @@
   - [Partial updates (Accessor dirty-tracking)](#partial-updates-accessor-dirty-tracking)
   - [File upload (multipart/form-data streaming)](#file-upload-multipartform-data-streaming)
   - [OpenAPI / Swagger](#openapi--swagger)
+  - [GraphQL](#graphql)
   - [Event Emitter](#event-emitter)
   - [Scheduler (Cron/Interval/Timeout)](#scheduler-cronintervaltimeout)
   - [Health checks (Terminus)](#health-checks-terminus)
@@ -108,6 +109,7 @@ full docs site.
 - [x] M14 - Request/Response Split (`gonest.Request`/`gonest.Response`, Express-style handler signature)
 - [x] M15 - Schema Value Support (`gonest.NewValue[T]`/`gonest.Value` for standalone primitive schemas, `gonest.Accessor[T]` dirty-tracking wrapper -- renamed from `Value[T]`)
 - [x] M16 - Schema Sanitize/Refine (`PropertyBuilder.Sanitize(fn)` pre-processing, `Schema.Refine(fn)` cross-field post-processing)
+- [x] M17 - GraphQL Support (`gonest.NewGraphqlResolver`/`Query`/`Mutation`/`Subscription`, SDL generation, SSE/WebSocket subscriptions -- see below)
 
 See `.specs/project/ROADMAP.md` for the full milestone breakdown and `.specs/project/STATE.md` for
 the history of architecture decisions.
@@ -116,15 +118,11 @@ the history of architecture decisions.
 
 ## Next Steps
 
-Milestones 1-16 are complete, tagged as `v0.9.0` (see git tags for the full release history).
+Milestones 1-17 are all complete (see git tags for the full release history).
 Versioning follows `v0.{major}.{minor}` under a fixed leading `v0` (never incrementing to `v1`/`v2`,
 sidestepping Go's `v2+` import-path-suffix requirement while keeping semver's "no stability
 guarantee yet" signal for `v0.x`) -- `major` bumps on a breaking change, `minor` on a
 backward-compatible feature.
-
-Milestone 17 (GraphQL Support) is fully designed (`.specs/features/graphql-support/`) but not yet
-implemented -- `gonest.NewResolver`/`Query`/`Mutation`/`Subscription`, reusing the same
-`Schema`/`Parse[T]`/`MustInject`/`Emitter` REST already uses.
 
 Planned, not yet started (see `.specs/project/ROADMAP.md`'s "Future Considerations"):
 
@@ -511,6 +509,51 @@ func main() {
   app.MustListen(":3000")
 }
 ```
+
+### GraphQL
+
+`GraphqlResolver` is analogous to `Controller` -- registered via `module.Resolvers(...)`, reusing the
+same `Schema`/`Parse[T]`/`MustInject` REST already uses:
+
+```go
+package ex
+
+import "gonest.dev/gonest"
+
+var UserResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolver) {
+  userService := gonest.MustInject[*UserService](resolver)
+
+  resolver.Query("user", func(query *gonest.GraphqlQuery) {
+    query.Args(userIdParamsSchema)   // same Schema already used for REST validation
+    query.Returns(userEntitySchema)  // same Schema drives the generated SDL too
+
+    query.Handler(func(ctx *gonest.GraphqlContext) any {
+      args := gonest.MustParse[UserIdParams](ctx.Args(), userIdParamsSchema)
+      return userService.Get(args.UserId) // the returned value IS the data, no Response/write-side
+    })
+  })
+
+  resolver.Subscription("orderCreated", func(subscription *gonest.GraphqlSubscription) {
+    subscription.Returns(orderEntitySchema)
+    subscription.Handler(func(ctx *gonest.GraphqlContext, emit func(any)) {
+      // gonest.Subscribe[T] is Emitter's dynamic counterpart to MustOn --
+      // a channel that lives only as long as ctx.Done() stays open (one
+      // connection), closed automatically when the client disconnects.
+      emitter := gonest.MustInject[*gonest.Emitter](resolver)
+      for event := range gonest.Subscribe[OrderCreatedEvent](emitter, ctx.Done()) {
+        emit(event)
+      }
+    })
+  })
+})
+```
+
+Query/Mutation dispatch through one fixed `POST /graphql` endpoint (standard `{query, variables,
+operationName}` → `{data, errors}`). Subscriptions get their own `GET /graphql/stream/:name` (SSE) and
+`GET /graphql/ws/:name` (WebSocket) endpoints, args passed via `?args=<JSON>`. Branches with a format
+(`Email`/`Uuid`/`DateTime`/etc) become GraphQL Custom Scalars automatically in the generated SDL;
+`Custom(fn).GraphqlScalar(name)` names a scalar for a `Custom(fn)` field with no native format
+equivalent (e.g. `primitive.ObjectID`).
 
 ### Event Emitter
 
