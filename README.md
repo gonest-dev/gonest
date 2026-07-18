@@ -87,8 +87,9 @@ func main() {
 See [`.examples/simple-todo`](.examples/simple-todo) for a minimal MVC example (no external
 dependencies), [`.examples/blog-api`](.examples/blog-api) for a denser one (guards,
 interceptors, middleware, filters, OpenAPI/Swagger, SQLite persistence, a real 3-module domain),
-and [`.examples/blog-graphql`](.examples/blog-graphql) for GraphQL (Query/Mutation/Subscription
-over SSE and WebSocket). See [Documentation](#documentation) below for the full API, or
+and [`.examples/blog-graphql`](.examples/blog-graphql) for GraphQL (Query/Mutation/Subscription over
+`graphql-transport-ws`/`graphql-sse`, the real, spec-compliant protocols). See
+[Documentation](#documentation) below for the full API, or
 [gonest.dev](https://gonest.dev) for the full docs site.
 
 ---
@@ -111,7 +112,9 @@ over SSE and WebSocket). See [Documentation](#documentation) below for the full 
 - [x] M14 - Request/Response Split (`gonest.Request`/`gonest.Response`, Express-style handler signature)
 - [x] M15 - Schema Value Support (`gonest.NewValue[T]`/`gonest.Value` for standalone primitive schemas, `gonest.Accessor[T]` dirty-tracking wrapper -- renamed from `Value[T]`)
 - [x] M16 - Schema Sanitize/Refine (`PropertyBuilder.Sanitize(fn)` pre-processing, `Schema.Refine(fn)` cross-field post-processing)
-- [x] M17 - GraphQL Support (`gonest.NewGraphqlResolver`/`Query`/`Mutation`/`Subscription`, SDL generation, SSE/WebSocket subscriptions -- see below)
+- [x] M17 - GraphQL Support (`gonest.NewGraphqlResolver`/`Query`/`Mutation`/`Subscription`, SDL generation -- see below)
+- [x] M18 - GraphQL Realtime Protocols (`graphql-transport-ws` over WebSocket, `graphql-sse` Distinct
+      + Single connection modes, all on the same `/graphql` -- see below)
 
 See `.specs/project/ROADMAP.md` for the full milestone breakdown and `.specs/project/STATE.md` for
 the history of architecture decisions.
@@ -120,7 +123,7 @@ the history of architecture decisions.
 
 ## Next Steps
 
-Milestones 1-17 are all complete (see git tags for the full release history).
+Milestones 1-18 are all complete (see git tags for the full release history).
 Versioning follows `v0.{major}.{minor}` under a fixed leading `v0` (never incrementing to `v1`/`v2`,
 sidestepping Go's `v2+` import-path-suffix requirement while keeping semver's "no stability
 guarantee yet" signal for `v0.x`) -- `major` bumps on a breaking change, `minor` on a
@@ -550,12 +553,18 @@ var UserResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 })
 ```
 
-Query/Mutation dispatch through one `POST /graphql` endpoint by default (standard `{query, variables,
-operationName}` → `{data, errors}`) -- override via `AppOptions{GraphqlPath: "/api/gql"}`. Subscriptions
-get their own `GET <path>/stream/:name` (SSE) and `GET <path>/ws/:name` (WebSocket) endpoints, derived
-from the same path, args passed via `?args=<JSON>`. Branches with a format (`Email`/`Uuid`/`DateTime`/etc)
-become GraphQL Custom Scalars automatically in the generated SDL; `Custom(fn).GraphqlScalar(name)` names
-a scalar for a `Custom(fn)` field with no native format equivalent (e.g. `primitive.ObjectID`).
+Query/Mutation/Subscription all dispatch through one `/graphql` path by default (override via
+`AppOptions{GraphqlPath: "/api/gql"}`), multiplexed by real, spec-compliant protocols instead of an
+ad-hoc format -- `POST /graphql` for plain GraphQL-over-HTTP (`{query, variables, operationName}` →
+`{data, errors}`); `GET /graphql` with `Upgrade: websocket` and the `graphql-transport-ws` subprotocol
+(`ConnectionInit`/`Ack`, `Subscribe`/`Next`/`Complete`, multiplexed by `id`) for WebSocket; `GET
+/graphql` with `Accept: text/event-stream` for `graphql-sse`'s Distinct connections mode (one SSE
+connection per operation); `PUT`/`GET`/`POST`/`DELETE /graphql` for `graphql-sse`'s Single connection
+mode (one shared SSE connection reserved via token, operations multiplexed by `operationId`) -- see
+[`.examples/blog-graphql`](.examples/blog-graphql)'s README for a full walkthrough of all 4. Branches
+with a format (`Email`/`Uuid`/`DateTime`/etc) become GraphQL Custom Scalars automatically in the
+generated SDL; `Custom(fn).GraphqlScalar(name)` names a scalar for a `Custom(fn)` field with no native
+format equivalent (e.g. `primitive.ObjectID`).
 
 ### Event Emitter
 

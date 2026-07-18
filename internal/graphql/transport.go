@@ -22,8 +22,8 @@ const wsTextMessage = 1
 // name so wsprotocol.go and its tests need no other change.
 type WSConn = execution.WSConn
 
-// sseHeartbeatInterval is how often the SSE transports (ssedistinct.go,
-// ssesingle.go) write a comment-only frame (`: ping\n\n`, ignored by every
+// sseHeartbeatInterval is how often the SSE transports (sse_distinct.go,
+// sse_single.go) write a comment-only frame (`: ping\n\n`, ignored by every
 // SSE client per the spec) purely to detect a disconnected client -- a
 // write failure only surfaces on an actual write attempt, so a
 // Subscription whose Handler never itself emits (or emits rarely) would

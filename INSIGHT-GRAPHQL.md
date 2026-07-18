@@ -80,16 +80,23 @@ var UserResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 
 Um panic dentro de uma Subscription é recuperado (não derruba o processo), mas não tem canal de erro GraphQL-shaped próprio ainda -- gap reconhecido, aceito, ver "O que fica em aberto" abaixo.
 
-### Transporte: `POST /graphql`, `GET /graphql/stream/:name` (SSE), `GET /graphql/ws/:name` (WebSocket)
+### Transporte: tudo em `/graphql`, protocolos reais (Milestone 18, `graphql-realtime-protocols`)
 
-Query/Mutation dispatcham através de UM endpoint fixo, `POST /graphql`, seguindo o formato padrão GraphQL-over-HTTP (`{query, variables, operationName}` → `{data, errors}`). Subscription usa dois endpoints à parte (SSE e WebSocket, ambos registrados automaticamente quando pelo menos uma `Subscription` existe) -- `:name` seleciona qual Subscription conectar, args chegam via `?args=<JSON>` na query string (não há corpo numa conexão SSE/WS de longa duração):
+Query/Mutation/Subscription dispecham TODOS pelo MESMO path fixo, `/graphql` -- multiplexados por protocolo real, não por sub-path. Os 2 transportes ad-hoc originais desta feature (SSE em `/graphql/stream/:name`, WS em `/graphql/ws/:name`, nenhum seguindo protocolo padrão nenhum) foram REMOVIDOS por inteiro no Milestone 18, motivados por um bug real: uma IDE GraphQL de verdade tentou WS direto em `/graphql` esperando o subprotocolo padrão e falhou. Ver `.specs/features/graphql-realtime-protocols/` pro spec/design/tasks completos.
 
 ```
-GET /graphql/stream/onOrderCreated?args={"customerId":42}   -- SSE
-GET /graphql/ws/onOrderCreated?args={"customerId":42}       -- WebSocket
+POST /graphql                                          -- GraphQL-over-HTTP simples ({query,variables,operationName} -> {data,errors})
+GET  /graphql  (Upgrade: websocket)                     -- graphql-transport-ws (ConnectionInit/Ack, Subscribe/Next/Complete, multiplexado por id)
+GET  /graphql  (Accept: text/event-stream, sem token)   -- graphql-sse, Distinct connections mode (1 conexão por operação)
+PUT  /graphql -> 201 {token}                            -- graphql-sse, Single connection mode: reserva
+GET  /graphql  (com token)                              -- graphql-sse, Single connection mode: conexão única
+POST /graphql  (com token + extensions.operationId)     -- graphql-sse, Single connection mode: executa operação, resultado chega pela conexão GET
+DELETE /graphql?operationId=X  (com token)              -- graphql-sse, Single connection mode: cancela operação streaming
 ```
 
-Ambos os transportes chamam `Subscription.Handler` diretamente -- nenhum passa pelo motor de execução do `graphql-go/graphql` (ele nunca trouxe um pronto, ver decisão de motor abaixo).
+O `GET /graphql` dispatcha entre os 3 casos (WS/SSE Distinct/SSE Single) checando `Upgrade`/`Accept`/token, tudo dentro de UM `RegisterRoute(HttpGet, ...)` só -- decisão central do Milestone 18 (`design.md`): registrar `POST`/`PUT`/`GET`/`DELETE` como rotas comuns no mesmo path exige que o adapter NÃO use `app.Use(path, ...)` (que intercepta todo método) pro upgrade WS -- `execution.Response.UpgradeWebSocket`/`Request.IsWebSocketUpgrade` (novo capability em `Responder`) resolvem isso, chamados de DENTRO do handler comum, não via registro de rota separado.
+
+Query/Mutation via WS reaproveitam o MESMO `gql.Do`/`*gql.Schema` que `POST /graphql` já usa (`internal/graphql.Execute`, extraído no Milestone 18). Subscription via qualquer transporte chama `Subscription.HandlerFunc()` diretamente -- nenhum passa pelo motor de execução do `graphql-go/graphql` (ele nunca trouxe um pronto, ver decisão de motor abaixo).
 
 ### Motor GraphQL: `graphql-go/graphql`
 
@@ -97,7 +104,7 @@ Pesquisado (web + `gh issue view`, 2026-07): `99designs/gqlgen` é **schema-firs
 
 A issue histórica sobre Subscription (github.com/graphql-go/graphql/issues/49, fechada em 2016) confirma que a lib só resolveu o suporte SINTÁTICO -- nunca veio com motor de execução/streaming pronto. Isso não pesou contra a escolha: o gonest já ia construir sua própria camada de execução via `gonest.Subscribe`/SSE/WebSocket de qualquer forma.
 
-**Consequência aceita**: o gonest escreveu sua PRÓPRIA solução de transporte de Subscription, SSE e WebSocket (via `github.com/gofiber/contrib/v3/websocket`), sem seguir `graphql-ws`/`graphql-transport-ws`/`graphql-sse` byte-a-byte (só compatibilidade conceitual).
+**Consequência aceita no Milestone 17**: o gonest escreveu sua PRÓPRIA solução de transporte de Subscription (SSE e WebSocket ad-hoc), sem seguir protocolo padrão nenhum -- corrigido no Milestone 18 (`graphql-realtime-protocols`), que substitui os 2 transportes ad-hoc por `graphql-transport-ws` e `graphql-sse` REAIS (ver seção de Transporte acima).
 
 ## 2. Geração Code-First do SDL
 
@@ -137,11 +144,10 @@ Dois campos com o MESMO `.GraphqlScalar("ObjectID")` deduplicam pra uma única d
 
 ## Como foi implementado
 
-- Todo o código real vive num pacote ÚNICO, `internal/graphql` (não 3 pacotes separados como cogitado durante o design) -- `Resolver`/`Query`/`Mutation`/`Subscription`/`GraphqlContext` (builder), `Build` (Schema→SDL/`graphql-go/graphql`), `SSEHandler`/`WSHandler` (transportes). Toda referência à lib EXTERNA `graphql-go/graphql` dentro desse pacote é import-aliased (`gql "github.com/graphql-go/graphql"`) para não colidir com o nome do próprio pacote.
+- Todo o código real vive num pacote ÚNICO, `internal/graphql` (não 3 pacotes separados como cogitado durante o design) -- `Resolver`/`Query`/`Mutation`/`Subscription`/`GraphqlContext` (builder), `Build` (Schema→SDL/`graphql-go/graphql`), `Execute` (dispatch de Query/Mutation compartilhado, Milestone 18), `WSProtocolHandler`/`SSEDistinctHandler`/`SSESingleXxxHandler`+`ReservationRegistry` (transportes reais, Milestone 18 -- `SSEHandler`/`WSHandler` ad-hoc do Milestone 17 foram removidos por inteiro). Toda referência à lib EXTERNA `graphql-go/graphql` dentro desse pacote é import-aliased (`gql "github.com/graphql-go/graphql"`) para não colidir com o nome do próprio pacote.
 - `Module.Resolvers`/`OwnResolvers` -- mesma forma de `Controllers`/`OwnControllers`.
-- Dispatch real de Query/Mutation: `graphql.Do` (motor real do `graphql-go/graphql`) é quem invoca `Resolve` por campo -- os callbacks `Resolve` são construídos DENTRO de `Build`, chamando `Query.HandlerFunc()`/`Mutation.HandlerFunc()` diretamente e recuperando um panic de `gonest.MustParse` como erro GraphQL-shaped (`{errors: [...]}`).
-- `internal/execution.Responder` ganhou `WriteStream` (via `fasthttp.SetBodyStreamWriter` real) -- necessário pra SSE, não existia forma de "manter conexão aberta, escrever aos poucos" antes desta feature.
-- `HttpAdapter` ganhou `RegisterWebSocket` -- via `github.com/gofiber/contrib/v3/websocket` real (`IsWebSocketUpgrade` + `websocket.New`).
+- Dispatch real de Query/Mutation: `graphql.Do` (motor real do `graphql-go/graphql`) é quem invoca `Resolve` por campo -- os callbacks `Resolve` são construídos DENTRO de `Build`, chamando `Query.HandlerFunc()`/`Mutation.HandlerFunc()` diretamente e recuperando um panic de `gonest.MustParse` como erro GraphQL-shaped (`{errors: [...]}`). O mesmo `graphql.Execute` é reusado por `POST /graphql`, pelo `Subscribe` de single-result via WS, e por ambos os modos SSE.
+- `internal/execution.Responder` ganhou `WriteStream` (via `fasthttp.SetBodyStreamWriter` real, Milestone 17) -- necessário pra SSE, não existia forma de "manter conexão aberta, escrever aos poucos" antes. Milestone 18 acrescentou `IsUpgradeRequest`/`Upgrade` (via `Request.IsWebSocketUpgrade()`/`Response.UpgradeWebSocket(handler, subprotocols...)`) -- permite `POST`/`PUT`/`GET`/`DELETE` conviverem no MESMO `/graphql` sem o `app.Use(path, ...)` antigo (`HttpAdapter.RegisterWebSocket`, removido) interceptando todo método.
 - API pública em `gonest.go`: `GraphqlResolver`/`NewGraphqlResolver`/`GraphqlQuery`/`GraphqlMutation`/`GraphqlSubscription`/`GraphqlContext`/`Subscribe[T]`.
 
 ## O que continua em aberto (não resolvido nesta feature)
@@ -149,7 +155,8 @@ Dois campos com o MESMO `.GraphqlScalar("ObjectID")` deduplicam pra uma única d
 - Canal de erro próprio dentro de Subscription (`emitError(err)` ao lado de `emit(value)`) -- panic é recuperado (não derruba o processo), mas sem notificar o client com uma mensagem GraphQL-shaped.
 - `Refine`/`Sanitize` (schema-sanitize-refine feature) não conectados a Args de GraphQL.
 - Federation/schema stitching entre múltiplos serviços -- fora de escopo, v1 é um único schema por app.
-- **Transportes de Subscription (SSE `/graphql/stream/:name` e WS `/graphql/ws/:name`) são AD-HOC, não seguem protocolo padrão nenhum** -- confirmado como problema real (uma IDE GraphQL tentou WS direto em `/graphql` esperando `graphql-transport-ws` e falhou). Nova feature especificada pra resolver isso: `.specs/features/graphql-realtime-protocols/` (Milestone 18) -- substitui os dois ad-hoc por `graphql-transport-ws` real e `graphql-sse` real (os dois modos), Design/Tasks/Execute ainda pendentes.
+- Subprotocolo WS legado `graphql-ws` (apollographql/subscriptions-transport-ws, descontinuado pelo autor original) -- só o moderno `graphql-transport-ws` é suportado.
+- Reserva SSE Single connection mode (`PUT` sem `GET` correspondente nunca chegando) não tem TTL/expiração -- gap conhecido, documentado no `design.md` do Milestone 18.
 
 ## Conclusão
 
