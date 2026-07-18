@@ -73,10 +73,10 @@ métodos em `Schema` (`Refine`/`OwnRefines`), (3) a aplicação desses dois em
 
 ```go
 updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, m *gonest.Schema) {
-  m.Property(&t.Cpf).String().Sanitize(func(raw any) any {
+  m.Property(&t.Cpf).String().Min(11).Max(11).Pattern(`^\d{11}$`).Sanitize(func(raw any) any {
     s, _ := raw.(string)
     return strings.TrimSpace(s)
-  }).Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+  }).Required()
 
   m.Property(&t.Password).String().Min(8).Required()
   m.Property(&t.ConfirmPassword).String().Min(8).Required()

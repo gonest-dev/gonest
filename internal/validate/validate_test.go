@@ -3,10 +3,12 @@ package validate
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -585,6 +587,82 @@ func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.
 	}()
 
 	mustParseJSON[UserProperties](ctx, userSchema)
+}
+
+// --- schema-sanitize-refine: Sanitize (pre-processing) ----------------------
+
+// sanitizeCustomEntity exercises Sanitize alone and Sanitize+Custom
+// combined (schema-sanitize-refine feature).
+type sanitizeCustomEntity struct {
+	Cpf  string `json:"cpf"`
+	Code string `json:"code"`
+}
+
+var sanitizeCustomSchema *schema.Schema
+
+func init() {
+	e := &sanitizeCustomEntity{}
+	sanitizeCustomSchema = schema.New(reflect.TypeOf(*e), uintptr(unsafe.Pointer(e)))
+	sanitizeCustomSchema.Property(&e.Cpf).String().
+		Min(11).Max(11).Pattern(`^\d{11}$`).
+		Sanitize(func(raw any) any {
+			s, _ := raw.(string)
+			return strings.TrimSpace(s)
+		}).
+		Required()
+	sanitizeCustomSchema.Property(&e.Code).String().
+		Sanitize(func(raw any) any {
+			s, _ := raw.(string)
+			return strings.ToUpper(s)
+		}).
+		Custom(func(raw any) (any, error) {
+			s, _ := raw.(string)
+			if s != "V1" {
+				return nil, fmt.Errorf("expected sanitized value %q, got %q", "V1", s)
+			}
+			return s, nil
+		})
+}
+
+func TestSanitize_TrimsBeforeMinMaxPattern_AcceptsPaddedValidCpf(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{"cpf": "  12345678901  ", "code": "v1"})
+	ctx := newCtx(body)
+
+	result := mustParseJSON[sanitizeCustomEntity](ctx, sanitizeCustomSchema)
+
+	if result.Cpf != "12345678901" {
+		t.Fatalf("Cpf = %q, want %q (trimmed)", result.Cpf, "12345678901")
+	}
+}
+
+func TestSanitize_TrimsBeforeMinMaxPattern_RejectsPaddedTooShortValue(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{"cpf": "  123  ", "code": "v1"})
+	ctx := newCtx(body)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		exc := expectBadRequest(t, r)
+		vs := violationsOf(t, exc)
+		if !hasFieldViolation(vs, "cpf") {
+			t.Fatalf("expected a violation on 'cpf' (too short after trim), got %+v", vs)
+		}
+	}()
+
+	mustParseJSON[sanitizeCustomEntity](ctx, sanitizeCustomSchema)
+}
+
+func TestSanitize_ComposesWithCustom_CustomReceivesSanitizedValue(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{"cpf": "12345678901", "code": "v1"})
+	ctx := newCtx(body)
+
+	result := mustParseJSON[sanitizeCustomEntity](ctx, sanitizeCustomSchema)
+
+	if result.Code != "V1" {
+		t.Fatalf("Code = %q, want %q (Custom received the sanitized/uppercased value)", result.Code, "V1")
+	}
 }
 
 // --- schema-value-support: Value-schema (no struct) -------------------------

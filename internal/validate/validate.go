@@ -244,6 +244,14 @@ func validateStruct(presence map[string]any, m *schema.Schema, pathPrefix string
 // kind (null handling), then dispatch on p.KindValue() to the
 // kind-specific validator.
 func validateValue(raw any, p *schema.PropertyBuilder, path string) []violation {
+	// schema-sanitize-refine feature: Sanitize runs BEFORE anything else --
+	// Custom (below) and the built-in kind dispatch both consume its return
+	// value, not the original raw. Unlike Custom, Sanitize never replaces a
+	// check, it only transforms the input those checks go on to consume.
+	if fn, ok := p.SanitizeFunc(); ok {
+		raw = fn(raw)
+	}
+
 	if fn, ok := p.CustomFunc(); ok {
 		if _, err := fn(raw); err != nil {
 			return []violation{{Field: path, Message: err.Error()}}
@@ -463,6 +471,13 @@ func populate(dest reflect.Value, presence map[string]any, m *schema.Schema, tag
 			continue
 		}
 
+		// schema-sanitize-refine feature: same placement as validateValue's
+		// own Sanitize call -- runs before Custom, transforming raw into
+		// what Custom (or the plain assignment below) actually consumes.
+		if fn, ok := p.SanitizeFunc(); ok {
+			raw = fn(raw)
+		}
+
 		value := raw
 		if fn, isCustom := p.CustomFunc(); isCustom {
 			v, err := fn(raw)
@@ -497,6 +512,14 @@ func populate(dest reflect.Value, presence map[string]any, m *schema.Schema, tag
 func populateValue(dest reflect.Value, raw any, p *schema.PropertyBuilder) error {
 	if violations := validateValue(raw, p, ""); len(violations) > 0 {
 		return exception.NewBadRequestException(violations)
+	}
+
+	// schema-sanitize-refine feature: same placement as validateValue's own
+	// Sanitize call above -- validateValue's own transformation is local to
+	// that call, so it must be re-applied here before Custom/setField
+	// consume raw, same as populate's own per-field loop does.
+	if fn, ok := p.SanitizeFunc(); ok {
+		raw = fn(raw)
 	}
 
 	value := raw

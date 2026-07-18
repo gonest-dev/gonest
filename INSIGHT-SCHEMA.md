@@ -114,10 +114,10 @@ inspirados em `.preprocess()`/`.refine()` do Zod:
 ## Proposta: `Sanitize(fn)` no `PropertyBuilder` (pré, por campo)
 
 ```go
-m.Property(&t.Cpf).String().Sanitize(func(raw any) any {
+m.Property(&t.Cpf).String().Min(11).Max(11).Pattern(`^\d{11}$`).Sanitize(func(raw any) any {
   s, _ := raw.(string)
   return strings.TrimSpace(s)
-}).Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+}).Required()
 ```
 
 `Sanitize(fn)` roda ANTES de tudo -- inclusive antes de `Custom(fn)`, se
