@@ -2,7 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"net/http"
 
 	gql "github.com/graphql-go/graphql"
 
@@ -18,6 +17,16 @@ import (
 // open, resolved now via AppOptions.GraphqlPath.
 const defaultGraphqlPath = "/graphql"
 
+// graphqlEventStreamTokenHeader mirrors internal/graphql's own unexported
+// sseSingleTokenHeader constant (ssesingle.go) -- this dispatcher only
+// needs to know whether a graphql-sse Single connection mode token is
+// PRESENT (header or query) to decide which handler to delegate to; the
+// handlers themselves (already built, T11-T14) own the actual token
+// lookup/validation logic. Kept as a literal rather than exporting
+// graphql's constant to avoid growing that package's public surface for a
+// single string only this file needs.
+const graphqlEventStreamTokenHeader = "X-GraphQL-Event-Stream-Token"
+
 // resolvableResolver is a locally-declared interface used to type-assert
 // module.ResolverRef values down to the methods Stage 2.5-equivalent
 // registration needs (OwnQueries/OwnMutations/OwnSubscriptions) but that
@@ -32,10 +41,18 @@ type resolvableResolver interface {
 
 // registerGraphql collects every Query/Mutation/Subscription registered
 // across every module's OwnResolvers(), builds the resulting
-// *gql.Schema via internal/graphql.Build, and registers ONE POST
-// /graphql route dispatching through it. A no-op (no route registered) if
-// no module registered any resolver at all -- an app that never uses
-// GraphQL gets no extra endpoint.
+// *gql.Schema via internal/graphql.Build, and registers the 4 real-protocol
+// routes (graphql-realtime-protocols feature, Milestone 18, T15) -- POST,
+// PUT, GET, DELETE -- ALL on the same graphqlPath, replacing the previous
+// POST-only + ad-hoc-WS/SSE-path registration. A no-op (no route
+// registered at all) if no module registered any resolver -- an app that
+// never uses GraphQL gets no extra endpoint, unchanged from before.
+//
+// See design.md's "Central Decision: Removing the /graphql Routing
+// Collision" -- registering all 4 methods via the ordinary RegisterRoute
+// (no app.Use-style middleware) is what makes this coexistence possible at
+// all; each handler below is dispatched to purely by HTTP method, exactly
+// like any other multi-method path in the framework.
 func registerGraphql(adapter HttpAdapter, modules []*module.Module, opts AppOptions) error {
 	var queries []*graphql.Query
 	var mutations []*graphql.Mutation
@@ -67,46 +84,123 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module, opts AppOpti
 		graphqlPath = defaultGraphqlPath
 	}
 
-	if err := adapter.RegisterRoute(route.HttpPost, graphqlPath, graphqlHandler(sch)); err != nil {
-		return err
-	}
-
-	if len(subscriptions) == 0 {
-		return nil
-	}
-
 	subsByName := make(map[string]*graphql.Subscription, len(subscriptions))
 	for _, s := range subscriptions {
 		subsByName[s.Name()] = s
 	}
-	if err := adapter.RegisterRoute(route.HttpGet, graphqlPath+"/stream/:name", graphql.SSEHandler(subsByName)); err != nil {
+
+	reg := graphql.NewReservationRegistry()
+
+	if err := adapter.RegisterRoute(route.HttpPost, graphqlPath, graphqlPostDispatcher(sch, subsByName, reg)); err != nil {
 		return err
 	}
-	return adapter.RegisterRoute(route.HttpGet, graphqlPath+"/ws/:name", graphqlWebSocketHandler(subsByName))
+	if err := adapter.RegisterRoute(route.HttpPut, graphqlPath, graphql.SSESingleReserveHandler(reg)); err != nil {
+		return err
+	}
+	if err := adapter.RegisterRoute(route.HttpGet, graphqlPath, graphqlGetDispatcher(sch, subsByName, reg)); err != nil {
+		return err
+	}
+	return adapter.RegisterRoute(route.HttpDelete, graphqlPath, graphql.SSESingleCancelHandler(reg))
 }
 
-// graphqlWebSocketHandler is a minimal compatibility bridge that keeps the
-// ad-hoc GET /graphql/ws/:name WebSocket route (previously registered via
-// the now-removed HttpAdapter.RegisterWebSocket) working exactly as before,
-// now expressed purely through RegisterRoute + the Responder-level
-// upgrade contract (Request.IsWebSocketUpgrade/Response.UpgradeWebSocket)
-// T4 (graphql-realtime-protocols) wired up -- NOT a reorganization of the
-// GraphQL WS paths themselves (that is T15/T16's job). A non-upgrade
-// request to this path now gets a real 426 Upgrade Required instead of
-// RegisterWebSocket's old app.Use-middleware-driven fiber.ErrUpgradeRequired
-// (also a 426, so observable behavior for that case is unchanged);
-// graphql.WSHandler(subsByName)'s own func(conn WSConn) signature already
-// matches what UpgradeWebSocket expects verbatim (graphql.WSConn is a type
-// alias for execution.WSConn, see internal/graphql/ws.go), so no further
-// adapting of the handler itself is needed.
-func graphqlWebSocketHandler(subsByName map[string]*graphql.Subscription) func(req *execution.Request, res *execution.Response) {
-	handler := graphql.WSHandler(subsByName)
+// requestCarriesEventStreamToken reports whether req carries a graphql-sse
+// Single connection mode reservation token -- either via the
+// X-GraphQL-Event-Stream-Token header or a ?token= query parameter, the
+// same two locations every Single connection mode handler (ssesingle.go)
+// itself accepts a token from. Used only to DISPATCH to the right handler
+// below; the handlers themselves independently re-read and validate the
+// token.
+func requestCarriesEventStreamToken(req *execution.Request) bool {
+	if req.Header(graphqlEventStreamTokenHeader) != "" {
+		return true
+	}
+	return req.Queries()["token"] != ""
+}
+
+// graphqlPostBodyPeek is the minimal shape needed to detect a graphql-sse
+// Single connection mode "start operation" POST (body carries
+// extensions.operationId) vs the plain GraphQL-over-HTTP POST /graphql
+// (graphqlRequestBody, below) -- both share the same query/variables/
+// operationName triple, so only extensions.operationId's presence tells
+// them apart.
+type graphqlPostBodyPeek struct {
+	Extensions struct {
+		OperationId string `json:"operationId"`
+	} `json:"extensions"`
+}
+
+// graphqlPostDispatcher builds the POST graphqlPath handler: a
+// graphql-sse Single connection mode "start operation" request (token
+// present AND body carries extensions.operationId) delegates to
+// graphql.SSESingleOperationHandler; every other POST is the original
+// plain GraphQL-over-HTTP JSON dispatch, unchanged, via graphqlHandler.
+//
+// The body is peeked at (json.Unmarshal into graphqlPostBodyPeek) before
+// deciding which branch to take -- both branches re-parse/re-read the body
+// themselves afterwards (graphqlHandler and SSESingleOperationHandler each
+// wire their own BodySource via req.WithSources and read req.Body().Raw()
+// independently), so this peek does not consume or share any parsing
+// state with either.
+func graphqlPostDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscription, reg *graphql.ReservationRegistry) func(req *execution.Request, res *execution.Response) {
+	plainHandler := graphqlHandler(sch)
+	singleOperationHandler := graphql.SSESingleOperationHandler(sch, subsByName, reg)
+
 	return func(req *execution.Request, res *execution.Response) {
-		if !req.IsWebSocketUpgrade() {
-			res.Status(http.StatusUpgradeRequired)
+		if requestCarriesEventStreamToken(req) {
+			// Body().Raw() needs a BodySource wired first (req.res.RawBody()
+			// is only reachable through it -- see BodySource.Raw()'s own doc
+			// comment: a zero-value BodySource, which req.Body() returns
+			// before any WithSources call, always returns nil). Both branches
+			// below re-wire WithSources themselves (graphqlHandler and
+			// SSESingleOperationHandler each do, independently) -- wiring it
+			// again here first is redundant but harmless, and lets this peek
+			// read the real body without duplicating BodySource's own
+			// plumbing.
+			req.WithSources(
+				validate.NewParamsSource(req),
+				validate.NewQuerySource(req),
+				validate.NewHeadersSource(req),
+				execution.NewBodySource(
+					req,
+					func() execution.Parseable { return validate.NewJSONBodySource(req) },
+					func(onFile func(*execution.FormFile) error) execution.Parseable {
+						return validate.NewFormBodySource(req, onFile)
+					},
+				),
+			)
+
+			var peek graphqlPostBodyPeek
+			if err := json.Unmarshal(req.Body().Raw(), &peek); err == nil && peek.Extensions.OperationId != "" {
+				singleOperationHandler(req, res)
+				return
+			}
+		}
+		plainHandler(req, res)
+	}
+}
+
+// graphqlGetDispatcher builds the GET graphqlPath handler: a WebSocket
+// upgrade handshake delegates to graphql.WSProtocolHandler (the real
+// graphql-transport-ws state machine); otherwise, a graphql-sse Single
+// connection mode token (header/query) delegates to
+// graphql.SSESingleConnectHandler; otherwise (GraphQL-over-HTTP GET with
+// Accept: text/event-stream, or any other GET) falls through to
+// graphql.SSEDistinctHandler.
+func graphqlGetDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscription, reg *graphql.ReservationRegistry) func(req *execution.Request, res *execution.Response) {
+	wsHandler := graphql.WSProtocolHandler(sch, subsByName)
+	connectHandler := graphql.SSESingleConnectHandler(reg)
+	distinctHandler := graphql.SSEDistinctHandler(sch, subsByName)
+
+	return func(req *execution.Request, res *execution.Response) {
+		if req.IsWebSocketUpgrade() {
+			res.UpgradeWebSocket(wsHandler)
 			return
 		}
-		res.UpgradeWebSocket(handler)
+		if requestCarriesEventStreamToken(req) {
+			connectHandler(req, res)
+			return
+		}
+		distinctHandler(req, res)
 	}
 }
 
@@ -127,14 +221,14 @@ type graphqlResponseBody struct {
 	Errors []any `json:"errors,omitempty"`
 }
 
-// graphqlHandler builds the POST /graphql HTTP handler: decode the
+// graphqlHandler builds the plain POST /graphql HTTP handler: decode the
 // standard GraphQL-over-HTTP body, execute it against sch via
 // graphql.Execute (Query/Mutation dispatch happens INSIDE gql.Do, which
 // graphql.Execute wraps -- see internal/graphql's own Resolve callbacks,
 // wired at Build time), write {data, errors} back.
 // Subscription requests are never dispatched here -- they connect via
-// SSE/WebSocket (T9/T10, internal/graphql), a genuinely different
-// transport, not this JSON-over-HTTP endpoint.
+// WS/SSE (graphql-support and graphql-realtime-protocols features), a
+// genuinely different transport, not this JSON-over-HTTP endpoint.
 func graphqlHandler(sch *gql.Schema) func(req *execution.Request, res *execution.Response) {
 	return func(req *execution.Request, res *execution.Response) {
 		// Same BodySource wiring registerRoutes' own withRoute closure does
