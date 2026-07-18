@@ -87,15 +87,15 @@ func SSEDistinctHandler(sch *gql.Schema, subs map[string]*Subscription) func(req
 // (WriteString + Flush, first write failure aborts the rest) rather than
 // reimplementing them.
 //
-// SPEC_DEVIATION: graphql-sse's PROTOCOL.md was not directly accessible from
-// this session to confirm the exact byte-for-byte shape of the terminating
-// `complete` event. Decision taken here: `event: complete\n\n` with NO
-// `data:` field at all (as opposed to an empty `data: \n`) -- every other
-// SSE-consuming client in this codebase (sse.go's ad-hoc transport) already
-// treats a data-less frame as valid per the SSE spec itself (a `data:` line
-// is optional per WHATWG's EventSource spec), and this keeps the terminating
-// frame minimal/unambiguous rather than guessing a specific empty-body
-// shape.
+// The terminating `complete` event includes an explicit, empty `data: `
+// field (`event: complete\ndata: \n\n`), per graphql-sse's own PROTOCOL.md
+// (github.com/enisdenjo/graphql-sse, "Include an empty `data: ` field when
+// sending the message to a client that uses EventSource. If the field is
+// omitted, the complete event won't trigger the listener.") -- confirmed by
+// reading PROTOCOL.md directly. Omitting the field (an earlier version of
+// this function did) is a real bug, not a neutral choice: browser
+// EventSource never fires its listener for an event with no `data:` line at
+// all.
 func writeSSEDistinctResult(res *execution.Response, data any, errs []map[string]any) {
 	res.SetHeader("Content-Type", "text/event-stream")
 	res.SetHeader("Cache-Control", "no-cache")
@@ -119,7 +119,7 @@ func writeSSEDistinctResult(res *execution.Response, data any, errs []map[string
 			return
 		}
 
-		if _, err := w.WriteString("event: complete\n\n"); err != nil {
+		if _, err := w.WriteString("event: complete\ndata: \n\n"); err != nil {
 			return
 		}
 		_ = w.Flush()

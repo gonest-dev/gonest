@@ -73,6 +73,14 @@ func TestSSEDistinctHandler_ValidQuery_RespondsNextThenComplete(t *testing.T) {
 	if strings.TrimSpace(completeLine) != "event: complete" {
 		t.Fatalf("complete line = %q, want %q", completeLine, "event: complete")
 	}
+
+	// graphql-sse's own PROTOCOL.md requires an explicit, empty `data: `
+	// field on the complete event -- EventSource never fires its listener
+	// for an event with no `data:` line at all.
+	completeDataLine := readLine(t, r, time.Second)
+	if strings.TrimRight(completeDataLine, "\n") != "data: " {
+		t.Fatalf("complete data line = %q, want %q", completeDataLine, "data: ")
+	}
 }
 
 func TestSSEDistinctHandler_InvalidQuery_RespondsNextWithErrorNot400(t *testing.T) {
