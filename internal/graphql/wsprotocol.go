@@ -38,10 +38,11 @@ const (
 
 // graphql-transport-ws well-known WebSocket close codes.
 const (
-	wsCloseInvalidMessage        = 4400
-	wsCloseUnauthorized          = 4401
-	wsCloseConnectionInitTimeout = 4408
-	wsCloseTooManyInitRequests   = 4429
+	wsCloseInvalidMessage          = 4400
+	wsCloseUnauthorized            = 4401
+	wsCloseConnectionInitTimeout   = 4408
+	wsCloseTooManyInitRequests     = 4429
+	wsCloseSubscriberAlreadyExists = 4409
 )
 
 // wsProtocolMessage is the wire shape shared by every graphql-transport-ws
@@ -157,6 +158,22 @@ func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn
 			activeOps[id] = done
 			opsMu.Unlock()
 		}
+		// isOpActive reports whether id is currently registered in
+		// activeOps -- T8's duplicate-id guard: handleSubscribe checks this
+		// before dispatching a Subscribe so a second Subscribe for an id
+		// whose earlier streaming operation hasn't completed yet (no
+		// Complete sent, and the handler hasn't returned) is rejected with
+		// 4409 rather than racing/overwriting the first one's registration.
+		// Only Subscription (streaming) ids are ever actually present in
+		// activeOps -- see handleSubscribe's own comment for why the
+		// Query/Mutation single-result path deliberately does NOT register
+		// here too.
+		isOpActive := func(id string) bool {
+			opsMu.Lock()
+			_, ok := activeOps[id]
+			opsMu.Unlock()
+			return ok
+		}
 		stopOp := func(id string) {
 			opsMu.Lock()
 			done, ok := activeOps[id]
@@ -247,7 +264,7 @@ func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn
 					_ = conn.CloseWithCode(wsCloseUnauthorized, "Unauthorized")
 					return false
 				}
-				return handleSubscribe(conn, sch, subs, msg, writeJSON, registerOp, stopOp)
+				return handleSubscribe(conn, sch, subs, msg, writeJSON, registerOp, stopOp, isOpActive)
 
 			case wsMsgComplete:
 				// Cancels only this id's own active stream (if any) --
@@ -301,18 +318,48 @@ func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn
 // a client-initiated cancel (wsMsgComplete's own handleMessage case) or the
 // handler itself returning (self-cleanup below).
 //
-// writeJSON and registerOp/stopOp are threaded in from WSProtocolHandler so
-// every write on conn and every id->done registration goes through that
-// single connection-wide writeMu/opsMu -- this function holds no lock of
-// its own.
+// writeJSON and registerOp/stopOp/isOpActive are threaded in from
+// WSProtocolHandler so every write on conn and every id->done
+// registration/lookup goes through that single connection-wide
+// writeMu/opsMu -- this function holds no lock of its own.
 //
-// Returns false when the connection should be closed (write failure on the
-// synchronous Query/Mutation/Error paths) -- same "false stops the loop"
-// contract handleMessage's other cases use. The streaming branch never
-// returns false: a write failure inside emit() only stops that one stream
-// (via stopOp), it does not by itself close the connection -- the read
-// loop's own ReadMessage error is what detects a dead connection.
-func handleSubscribe(conn WSConn, sch *gql.Schema, subs map[string]*Subscription, msg wsProtocolMessage, writeJSON func(any) bool, registerOp func(string, chan struct{}), stopOp func(string)) bool {
+// T8 adds the duplicate-id guard up front: isOpActive(msg.Id) is checked
+// before either dispatch branch runs, and a hit closes the whole connection
+// with 4409 (graphql-transport-ws's "Subscriber already exists"). Only the
+// streaming Subscription branch below ever calls registerOp -- the Query/
+// Mutation single-result branch deliberately does NOT also register its own
+// id in activeOps, even briefly. That is a correctness-neutral choice, not
+// an oversight: every Subscribe is decoded and dispatched from inside
+// handleMessage, which itself is only ever invoked synchronously, one
+// message at a time, from WSProtocolHandler's single read loop (the loop
+// never calls conn.ReadMessage() again until the current handleMessage call
+// returns). The Query/Mutation branch runs graphql.Execute and writes its
+// Next+Complete synchronously, in-line, before returning -- so by
+// construction no second Subscribe for the same id can ever reach this
+// function while an earlier single-result operation for that id is still
+// "in flight": there is no such window on this connection. Registering it
+// in activeOps would add a lock/unlock pair (and an immediate stopOp right
+// after) that could never actually catch a real duplicate, only add cost.
+// The streaming branch is different because it returns immediately after
+// registerOp, while sub.HandlerFunc() keeps running in its own goroutine
+// for an arbitrary, unbounded time afterwards -- that is the only case
+// where a later Subscribe for the same id can legitimately race with a
+// still-active earlier one, which is exactly what isOpActive here guards
+// against.
+//
+// Returns false when the connection should be closed (the new duplicate-id
+// 4409 close, or a write failure on the synchronous Query/Mutation/Error
+// paths) -- same "false stops the loop" contract handleMessage's other
+// cases use. The streaming branch never returns false: a write failure
+// inside emit() only stops that one stream (via stopOp), it does not by
+// itself close the connection -- the read loop's own ReadMessage error is
+// what detects a dead connection.
+func handleSubscribe(conn WSConn, sch *gql.Schema, subs map[string]*Subscription, msg wsProtocolMessage, writeJSON func(any) bool, registerOp func(string, chan struct{}), stopOp func(string), isOpActive func(string) bool) bool {
+	if isOpActive(msg.Id) {
+		_ = conn.CloseWithCode(wsCloseSubscriberAlreadyExists, "Subscriber already exists")
+		return false
+	}
+
 	var payload wsSubscribePayload
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		return writeJSON(map[string]any{

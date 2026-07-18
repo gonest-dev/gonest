@@ -610,6 +610,174 @@ func TestWSProtocolHandler_ConnectionDrops_StopsAllActiveSubscriptions(t *testin
 	<-done
 }
 
+// TestWSProtocolHandler_TwoConcurrentOperationsDifferentIds_BothRunIndependently
+// proves T8's multiplexing claim for real: a streaming Subscription (id 1)
+// deliberately parked mid-stream (blocked on blockEmit, well before its own
+// Complete) must not stop the read loop from dispatching and fully finishing
+// a Query (id 2) on the very same connection. If handleSubscribe's streaming
+// branch ever blocked the read loop (e.g. running the handler inline instead
+// of in its own goroutine), id 2's Subscribe would simply never be read
+// until id 1 unblocks -- this test would time out on id 2's Next, not just
+// silently pass.
+func TestWSProtocolHandler_TwoConcurrentOperationsDifferentIds_BothRunIndependently(t *testing.T) {
+	sch := newProtoTestSchema(t)
+	started := make(chan struct{})
+	blockEmit := make(chan struct{})
+	subs := newProtoSubTestSchema(t, func(ctx *graphql.GraphqlContext, emit func(any)) {
+		close(started)
+		emit(1)
+		<-blockEmit
+		emit(2)
+		<-ctx.Done()
+	})
+
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(sch, subs)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":      "1",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { count }`},
+	})
+
+	<-started
+
+	// id 1's first Next, before it blocks on blockEmit.
+	select {
+	case msg := <-conn.written:
+		var payload map[string]any
+		if err := json.Unmarshal(msg, &payload); err != nil {
+			t.Fatalf("failed to decode message: %v", err)
+		}
+		if payload["type"] != "next" || payload["id"] != "1" {
+			t.Fatalf("payload = %#v, want next for id 1", payload)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for id 1's first next")
+	}
+
+	// While id 1's stream is parked mid-flight (blocked on blockEmit, no
+	// Complete sent), dispatch a Query under a different id on the SAME
+	// connection -- proves the two operations run independently rather than
+	// one blocking the other.
+	conn.sendJSON(t, map[string]any{
+		"id":      "2",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `{ ping }`},
+	})
+
+	var next2, complete2 map[string]any
+	for i := 0; i < 2; i++ {
+		select {
+		case msg := <-conn.written:
+			var payload map[string]any
+			if err := json.Unmarshal(msg, &payload); err != nil {
+				t.Fatalf("failed to decode message: %v", err)
+			}
+			switch payload["type"] {
+			case "next":
+				next2 = payload
+			case "complete":
+				complete2 = payload
+			default:
+				t.Fatalf("unexpected message type %v", payload["type"])
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for id 2's next/complete -- id 1 may be blocking id 2")
+		}
+	}
+
+	if next2 == nil || next2["id"] != "2" {
+		t.Fatalf("next2 = %#v, want id 2", next2)
+	}
+	payload2, ok := next2["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("next2[payload] = %#v, want map", next2["payload"])
+	}
+	data2, ok := payload2["data"].(map[string]any)
+	if !ok || data2["ping"] != "pong" {
+		t.Fatalf("next2 payload data = %#v, want {ping: pong}", payload2["data"])
+	}
+	if complete2 == nil || complete2["id"] != "2" {
+		t.Fatalf("complete2 = %#v, want id 2", complete2)
+	}
+
+	// id 1's stream is still alive and can keep progressing after id 2
+	// finished -- proves id 2's dispatch/completion didn't disturb id 1's
+	// still-active stream either.
+	close(blockEmit)
+
+	select {
+	case msg := <-conn.written:
+		var payload map[string]any
+		if err := json.Unmarshal(msg, &payload); err != nil {
+			t.Fatalf("failed to decode message: %v", err)
+		}
+		if payload["type"] != "next" || payload["id"] != "1" {
+			t.Fatalf("payload = %#v, want next for id 1", payload)
+		}
+		data, ok := payload["payload"].(map[string]any)["data"].(map[string]any)
+		if !ok || data["count"] != float64(2) {
+			t.Fatalf("next payload data = %#v, want {count: 2}", payload["payload"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for id 1's second next")
+	}
+
+	conn.readErr <- errors.New("connection closed")
+	<-done
+}
+
+// TestWSProtocolHandler_SubscribeWithIdAlreadyActive_Closes4409 proves T8's
+// duplicate-id guard: a second Subscribe for an id whose earlier streaming
+// Subscription is still active (registered in activeOps, no Complete sent,
+// handler still running) must close the whole connection with 4409 rather
+// than being processed.
+func TestWSProtocolHandler_SubscribeWithIdAlreadyActive_Closes4409(t *testing.T) {
+	subs := newProtoSubTestSchema(t, func(ctx *graphql.GraphqlContext, emit func(any)) {
+		<-ctx.Done()
+	})
+
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(nil, subs)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":      "1",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { count }`},
+	})
+	conn.sendJSON(t, map[string]any{
+		"id":      "1",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { count }`},
+	})
+
+	select {
+	case call := <-conn.closes:
+		if call.code != 4409 {
+			t.Fatalf("close code = %d, want 4409", call.code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for CloseWithCode(4409, ...)")
+	}
+
+	<-done
+}
+
 func TestWSProtocolHandler_Ping_RespondsPong(t *testing.T) {
 	conn := newProtoFakeWSConn()
 
