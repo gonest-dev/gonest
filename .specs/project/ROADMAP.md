@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 17 (GraphQL Support) -- **PRÓXIMA A SER IMPLEMENTADA**, spec+design+tasks prontos, aguardando execução
-**Status:** Milestones 1-16 COMPLETE, Milestone 17 (GraphQL Support) DESIGNED (next up, não iniciada)
+**Current Milestone:** nenhuma -- Milestones 1-17 COMPLETE
+**Status:** Milestones 1-17 COMPLETE
 
 ---
 
@@ -314,18 +314,19 @@
 ## Milestone 17: GraphQL Support
 
 **Goal:** `Resolver`/`Query`/`Mutation`/`Subscription` como nova ponta de exposição GraphQL, reaproveitando 100% de `Schema`/`Parse[T]`/`MustParse[T]`/`MustInject`/`Emitter` já existentes -- sem duplicar validação/DI entre REST e GraphQL.
-**Status:** DESIGNED (spec.md + context.md + design.md + tasks.md prontos, 11 tasks/T1-T11 -- pronta para Execute)
+**Status:** COMPLETE (T1-T11 executados, `go test ./... -race` verde, 24 pacotes)
 
 ### Features
 
-**GraphQL Support** - DESIGNED
-- `gonest.NewResolver`/`resolver.Query`/`Mutation` -- `Handler(func(ctx *GraphqlContext) any)`, retorno direto vira o `data` (igual NestJS, sem `Response` separado)
-- `resolver.Subscription` -- `Handler(func(ctx, emit func(any)))`, reaproveita `gonest.Emitter` via novo `Emitter.Subscribe[T](done) <-chan T`
+**GraphQL Support** - COMPLETE
+- `gonest.NewGraphqlResolver`/`resolver.Query`/`Mutation` -- `Handler(func(ctx *GraphqlContext) any)`, retorno direto vira o `data` (igual NestJS, sem `Response` separado)
+- `resolver.Subscription` -- `Handler(func(ctx, emit func(any)))`, reaproveita `gonest.Emitter` via novo `gonest.Subscribe[T](emitter, done) <-chan T`
 - Geração automática de SDL a partir do MESMO `gonest.Schema` usado em REST/OpenAPI; branches de formato (Email/Uuid/DateTime/etc) viram Custom Scalars
 - `Custom(fn).GraphqlScalar(name)` -- nomeia scalar pra tipos sem `format` OpenAPI nativo (ex: `primitive.ObjectID`)
 - Motor: `graphql-go/graphql` (code-first, runtime, sem `go generate`) -- decidido após pesquisa real (web + `gh issue view`), não assumido
-- Transporte de Subscription (SSE + WebSocket) escrito por conta própria -- nenhum dos dois vem pronto do motor escolhido
-- Ver `.specs/features/graphql-support/{spec,context}.md` — evolui `INSIGHT-GRAPHQL.md`
+- Transporte de Subscription (SSE + WebSocket) escrito por conta própria -- nenhum dos dois vem pronto do motor escolhido; WebSocket via `github.com/gofiber/contrib/v3/websocket` (nova `HttpAdapter.RegisterWebSocket` capability)
+- Todo o código real vive em UM único pacote `internal/graphql` (builder + gerador SDL + transportes) -- não 3 pacotes separados como o design original previa, reorganizado durante a execução
+- Ver `.specs/features/graphql-support/{spec,context,design,tasks}.md` — evolui `INSIGHT-GRAPHQL.md`
 
 ---
 
