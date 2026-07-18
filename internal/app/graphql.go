@@ -7,6 +7,7 @@ import (
 
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/gqlresolver"
+	"gonest.dev/gonest/internal/gqltransport"
 	"gonest.dev/gonest/internal/graphqlgen"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/route"
@@ -18,6 +19,11 @@ import (
 // 17). Not yet configurable via AppOptions -- design.md's Tech Decisions
 // left this open, a fixed default is enough for the MVP.
 const graphqlPath = "/graphql"
+
+// graphqlSubscriptionPath is the SSE transport's own endpoint (T9) --
+// :name selects which registered Subscription to stream. WebSocket (T10)
+// uses a sibling path, registered separately.
+const graphqlSubscriptionPath = "/graphql/stream/:name"
 
 // resolvableResolver is a locally-declared interface used to type-assert
 // module.ResolverRef values down to the methods Stage 2.5-equivalent
@@ -63,7 +69,19 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
 		return err
 	}
 
-	return adapter.RegisterRoute(route.HttpPost, graphqlPath, graphqlHandler(sch))
+	if err := adapter.RegisterRoute(route.HttpPost, graphqlPath, graphqlHandler(sch)); err != nil {
+		return err
+	}
+
+	if len(subscriptions) == 0 {
+		return nil
+	}
+
+	subsByName := make(map[string]*gqlresolver.Subscription, len(subscriptions))
+	for _, s := range subscriptions {
+		subsByName[s.Name()] = s
+	}
+	return adapter.RegisterRoute(route.HttpGet, graphqlSubscriptionPath, gqltransport.SSEHandler(subsByName))
 }
 
 // graphqlRequestBody is the standard GraphQL-over-HTTP request shape
