@@ -28,6 +28,12 @@ type Schema struct {
 	title       string
 	description string
 	properties  map[uintptr]*PropertyBuilder // keyed by field offset from baseAddr
+
+	// isValue distinguishes a Schema built via NewValue (schema-value-support
+	// feature, value.go) from one built via New (struct-shaped) -- read by
+	// internal/validate to route ParseInto down a value-shaped path instead
+	// of the struct-field-walking one. See IsValue's own doc comment.
+	isValue bool
 }
 
 // New constructs a *Schema for structType, whose zero value's address is
