@@ -23,6 +23,7 @@ import (
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/filter"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/guard"
 	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/interceptor"
@@ -994,6 +995,55 @@ var NewListener = emitter.NewListener
 func MustOn[EventType any](listener *Listener, handler func(ctx context.Context, event EventType)) {
 	emitter.MustOn(listener, handler)
 }
+
+// Subscribe registers a dynamic, per-connection channel that receives
+// every future Emit(EventType{...}) call until done closes (graphql-
+// support feature, Milestone 17) -- complementary to the static, app-
+// lifetime MustOn/Emit pair. Go cannot re-export a generic function via
+// var, so this is a real wrapper (same AD-004 precedent as MustOn).
+func Subscribe[EventType any](e *Emitter, done <-chan struct{}) <-chan EventType {
+	return emitter.Subscribe[EventType](e, done)
+}
+
+// ---------------------------------------------------------------------------
+// GraphQL (graphql-support feature, Milestone 17)
+// ---------------------------------------------------------------------------
+
+// GraphqlResolver is a declarative unit analogous to Controller, exposing
+// GraphQL Query/Mutation/Subscription fields instead of REST routes.
+// Registered via Module.Resolvers, its builder fn is expected to call
+// Query/Mutation/Subscription and MustInject for its dependencies -- see
+// internal/graphql.Resolver's own doc comment.
+type GraphqlResolver = graphql.Resolver
+
+// NewGraphqlResolver creates a GraphqlResolver that defers fn until
+// bootstrap runs it.
+var NewGraphqlResolver = graphql.New
+
+// GraphqlQuery represents one declared GraphQL query field -- name, args
+// schema, return schema, handler, registered via
+// GraphqlResolver.Query(name, fn).
+type GraphqlQuery = graphql.Query
+
+// GraphqlMutation represents one declared GraphQL mutation field --
+// identical shape to GraphqlQuery (only the root type it ends up under in
+// the generated SDL differs), registered via
+// GraphqlResolver.Mutation(name, fn).
+type GraphqlMutation = graphql.Mutation
+
+// GraphqlSubscription represents one declared GraphQL subscription field
+// -- a STREAM, not request-response, so its Handler signature differs
+// from GraphqlQuery/GraphqlMutation's (func(ctx, emit) instead of
+// func(ctx) any). Registered via GraphqlResolver.Subscription(name, fn).
+type GraphqlSubscription = graphql.Subscription
+
+// GraphqlContext is the single parameter passed to every
+// GraphqlQuery/GraphqlMutation/GraphqlSubscription Handler -- ctx.Args()
+// returns a Parseable consumable by Parse[T]/MustParse[T] exactly like
+// req.Params()/req.Query()/req.Body().Json() already are for REST;
+// ctx.Done() is a Subscription's own cancellation signal (nil for
+// Query/Mutation).
+type GraphqlContext = graphql.GraphqlContext
 
 // ---------------------------------------------------------------------------
 // Scheduler (Milestone 10)

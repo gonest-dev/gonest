@@ -1439,6 +1439,82 @@ func TestNewValue_RootAlias_CpfExample(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// GraphQL (graphql-support feature, Milestone 17)
+// ---------------------------------------------------------------------------
+
+// TestNewGraphqlResolver_RootAlias_RealHTTPDispatch proves the public
+// gonest.NewGraphqlResolver/GraphqlResolver/GraphqlQuery/GraphqlContext
+// aliases resolve and a real Query dispatches end-to-end through a real
+// app.Test POST /graphql, reusing the SAME Schema REST already uses.
+func TestNewGraphqlResolver_RootAlias_RealHTTPDispatch(t *testing.T) {
+	type userEntity struct {
+		Id    int64  `json:"id"`
+		Email string `json:"email"`
+	}
+
+	userSchema := NewSchema(func(t *userEntity, m *Schema) {
+		m.Property(&t.Id).Integer().Required()
+		m.Property(&t.Email).Email().Required()
+	})
+
+	userResolver := NewGraphqlResolver(func(r *GraphqlResolver) {
+		r.Query("user", func(q *GraphqlQuery) {
+			q.Returns(userSchema)
+			q.Handler(func(ctx *GraphqlContext) any {
+				return map[string]any{"id": int64(1), "email": "john@example.com"}
+			})
+		})
+	})
+
+	root := NewModule(func(m *Module) {
+		m.Resolvers(userResolver)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() { _ = fiberAdapter.FiberApp().Shutdown() })
+
+	body, _ := json.Marshal(map[string]any{"query": `{ user { id email } }`})
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var out struct {
+		Data struct {
+			User struct {
+				Id    int64  `json:"id"`
+				Email string `json:"email"`
+			} `json:"user"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(out.Errors) != 0 {
+		t.Fatalf("unexpected errors: %+v", out.Errors)
+	}
+	if out.Data.User.Id != 1 || out.Data.User.Email != "john@example.com" {
+		t.Fatalf("unexpected data: %+v", out.Data)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // StringSchema (String-family Branches feature)
 // ---------------------------------------------------------------------------
 
