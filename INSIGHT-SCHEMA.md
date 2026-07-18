@@ -93,3 +93,94 @@ changes := gonest.AccessorsToDirtyMap(body)
 - **Registro/reuso em `components.schemas`**: um `cpfSchema` desse tipo
   ainda não tem identidade própria no gerador OpenAPI (`internal/openapi`)
   -- não pensado nesta feature.
+
+---
+
+# Pré/pós-processamento -- Sanitize + Refine (Futuro, reflexão)
+
+Hoje `Custom(fn)` é a ÚNICA porta de escape do `PropertyBuilder`, e ela
+SUBSTITUI por inteiro a validação built-in (Min/Max/Pattern nunca rodam
+se `Custom` foi chamado) -- e é por campo isolado, sem acesso a outros
+campos do mesmo struct. Dois casos reais do dia a dia não cabem nisso,
+inspirados em `.preprocess()`/`.refine()` do Zod:
+
+1. **Sanitizar ANTES de validar** (ex: `trim()` num `string` antes de
+   checar `Min(11)` -- sem isso, `"  12345678901  "` falha por tamanho
+   mesmo sendo um CPF válido depois de aparado).
+2. **Comparar 2+ campos DEPOIS que cada um passou individualmente** (ex:
+   `password == confirmPassword` -- não existe campo isolado que saiba
+   disso, só o struct INTEIRO sabe).
+
+## Proposta: `Sanitize(fn)` no `PropertyBuilder` (pré, por campo)
+
+```go
+m.Property(&t.Cpf).String().Sanitize(func(raw any) any {
+  s, _ := raw.(string)
+  return strings.TrimSpace(s)
+}).Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+```
+
+`Sanitize(fn)` roda ANTES de tudo -- inclusive antes de `Custom(fn)`, se
+os dois forem usados juntos (raro, mas não impedido): `raw` chega
+transformado no dispatch existente (`Custom` OU o `kind` built-in), sem
+duplicar lógica nenhuma. Diferente de `Custom`, `Sanitize` NÃO substitui
+Min/Max/Pattern -- só prepara o valor que eles vão checar. Mesma
+convenção de idempotência que `Custom` já documenta (`PropertyBuilder.
+Custom`'s doc comment): pode rodar até 2x por request (validate + populate),
+precisa ser idempotente.
+
+## Proposta: `Refine(fn)` no `Schema` (pós, cross-field)
+
+```go
+updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, m *gonest.Schema) {
+  m.Property(&t.Password).String().Min(8).Required()
+  m.Property(&t.ConfirmPassword).String().Min(8).Required()
+
+  m.Refine(func(dst any) (field string, err error) {
+    d := dst.(*UpdateUserDTO)
+    if d.Password != d.ConfirmPassword {
+      return "confirmPassword", errors.New("must match password")
+    }
+    return "", nil
+  })
+})
+```
+
+`Refine` fica no `Schema` (não no `PropertyBuilder`) porque precisa ver o
+struct INTEIRO já populado, não um campo isolado. Roda só DEPOIS que
+toda validação individual (`validateStruct`) já passou E o struct já foi
+populado (`populate`) -- comparar campos que ainda nem foram validados
+não faz sentido. Múltiplos `Refine(...)` na mesma `Schema` -- cada
+chamada registra UM check a mais, todos rodam (mesma convenção
+"coletar TODAS as violações, nunca parar na primeira" que
+`validateStruct` já segue hoje), cada um contribuindo 0 ou 1 violação,
+identificada pelo `field` retornado (pode ser um campo específico, ex:
+`"confirmPassword"`, ou `""` pra um erro geral do objeto).
+
+## Onde isso se conectaria
+
+- `internal/validate`'s `jsonBodySource.ParseInto` ganharia um passo NOVO
+  depois de `populate` ter sucesso: rodar cada `Refine` registrado contra
+  `dstVal.Addr().Interface()`, coletar violações, falhar com
+  `BadRequestException` se alguma existir -- mesmo formato de erro que
+  `validateStruct` já produz hoje.
+- `validateValue`'s dispatch ganharia um passo ANTES do `Custom`/`kind`
+  check: se `p.SanitizeFunc()` existir, `raw = fn(raw)` primeiro.
+- Reaproveitado por GraphQL (Milestone 16) sem nenhum trabalho extra --
+  mesma `Schema`/`PropertyBuilder` que `.Args()`/`.Returns()` já usam.
+
+## O que fica em aberto
+
+- `Sanitize` + `Custom` juntos no MESMO campo -- ordem é clara (Sanitize
+  sempre primeiro), mas ninguém testou o caso combinado ainda.
+- `Refine` contra um `Value`-schema (sem struct) -- tecnicamente `dst`
+  seria só o valor solto, sem muito o que comparar contra outra coisa;
+  provavelmente só faz sentido pra `NewSchema[T]` (struct), não pra
+  `NewValue[T]`.
+- Nome final -- `Sanitize`/`Refine` são um ponto de partida (mesmo
+  vocabulário do Zod, adaptado), não decisão fechada.
+
+Sem decisão tomada aqui -- fica registrado como reflexão, igual o resto
+deste arquivo, para virar `.specs/features/` quando entrar em pauta de
+verdade (`tlc-spec-driven`, mesmo padrão de `schema-value-support`/
+`graphql-support`).
