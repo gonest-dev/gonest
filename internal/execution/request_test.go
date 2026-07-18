@@ -21,10 +21,11 @@ type fakeResponder struct {
 	method     string
 	path       string
 
-	isUpgradeRequest bool
-	isUpgradeCalled  bool
-	upgradeCalled    bool
-	upgradeHandler   func(conn WSConn)
+	isUpgradeRequest    bool
+	isUpgradeCalled     bool
+	upgradeCalled       bool
+	upgradeHandler      func(conn WSConn)
+	upgradeSubprotocols []string
 }
 
 func newFakeResponder() *fakeResponder {
@@ -95,9 +96,10 @@ func (f *fakeResponder) IsUpgradeRequest() bool {
 	return f.isUpgradeRequest
 }
 
-func (f *fakeResponder) Upgrade(handler func(conn WSConn)) {
+func (f *fakeResponder) Upgrade(handler func(conn WSConn), subprotocols ...string) {
 	f.upgradeCalled = true
 	f.upgradeHandler = handler
+	f.upgradeSubprotocols = subprotocols
 }
 
 func TestRequest_Header_ReadsFromResponder(t *testing.T) {
@@ -263,5 +265,22 @@ func TestResponse_UpgradeWebSocket_DelegatesToResponder(t *testing.T) {
 	fake.upgradeHandler(nil)
 	if !called {
 		t.Fatalf("expected the handler passed to Responder.Upgrade() to be the exact handler given to UpgradeWebSocket()")
+	}
+}
+
+// TestResponse_UpgradeWebSocket_PassesSubprotocolsThrough proves
+// Response.UpgradeWebSocket forwards its variadic subprotocols argument to
+// Responder.Upgrade unchanged -- this is what lets a caller (internal/app's
+// graphql GET dispatcher) request that the underlying HTTP engine negotiate
+// and echo back a Sec-WebSocket-Protocol response header such as
+// "graphql-transport-ws" during the handshake.
+func TestResponse_UpgradeWebSocket_PassesSubprotocolsThrough(t *testing.T) {
+	fake := newFakeResponder()
+	_, res := New(fake)
+
+	res.UpgradeWebSocket(func(conn WSConn) {}, "graphql-transport-ws", "graphql-ws")
+
+	if got := fake.upgradeSubprotocols; len(got) != 2 || got[0] != "graphql-transport-ws" || got[1] != "graphql-ws" {
+		t.Fatalf("expected UpgradeWebSocket() to pass subprotocols through to Responder.Upgrade(), got %v", got)
 	}
 }

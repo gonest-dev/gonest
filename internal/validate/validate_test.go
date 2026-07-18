@@ -107,22 +107,22 @@ type fakeResponder struct {
 	body []byte
 }
 
-func (f *fakeResponder) JSON(v any) error                            { return nil }
-func (f *fakeResponder) SetStatus(code int)                          {}
-func (f *fakeResponder) GetStatus() int                              { return 200 }
-func (f *fakeResponder) GetMethod() string                           { return "GET" }
-func (f *fakeResponder) GetPath() string                             { return "" }
-func (f *fakeResponder) GetHeader(name string) string                { return "" }
-func (f *fakeResponder) SetHeaderValue(name, value string)           {}
-func (f *fakeResponder) GetParam(name string) string                 { return "" }
-func (f *fakeResponder) RawBody() []byte                             { return f.body }
-func (f *fakeResponder) Queries() map[string]string                  { return nil }
-func (f *fakeResponder) HTML(s string) error                         { return nil }
-func (f *fakeResponder) SendString(s string) error                   { return nil }
-func (f *fakeResponder) BodyStream() (io.Reader, string, bool)       { return nil, "", false }
-func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer))        {}
-func (f *fakeResponder) IsUpgradeRequest() bool                      { return false }
-func (f *fakeResponder) Upgrade(handler func(conn execution.WSConn)) {}
+func (f *fakeResponder) JSON(v any) error                                                    { return nil }
+func (f *fakeResponder) SetStatus(code int)                                                  {}
+func (f *fakeResponder) GetStatus() int                                                      { return 200 }
+func (f *fakeResponder) GetMethod() string                                                   { return "GET" }
+func (f *fakeResponder) GetPath() string                                                     { return "" }
+func (f *fakeResponder) GetHeader(name string) string                                        { return "" }
+func (f *fakeResponder) SetHeaderValue(name, value string)                                   {}
+func (f *fakeResponder) GetParam(name string) string                                         { return "" }
+func (f *fakeResponder) RawBody() []byte                                                     { return f.body }
+func (f *fakeResponder) Queries() map[string]string                                          { return nil }
+func (f *fakeResponder) HTML(s string) error                                                 { return nil }
+func (f *fakeResponder) SendString(s string) error                                           { return nil }
+func (f *fakeResponder) BodyStream() (io.Reader, string, bool)                               { return nil, "", false }
+func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer))                                {}
+func (f *fakeResponder) IsUpgradeRequest() bool                                              { return false }
+func (f *fakeResponder) Upgrade(handler func(conn execution.WSConn), subprotocols ...string) {}
 
 func expectBadRequest(t *testing.T, r any) *exception.BadRequestException {
 	t.Helper()
@@ -1025,6 +1025,6 @@ func (r *httpFiberResponder) WriteStream(fn func(w *bufio.Writer)) {
 	r.c.RequestCtx().SetBodyStreamWriter(fn)
 }
 func (r *httpFiberResponder) IsUpgradeRequest() bool { return false }
-func (r *httpFiberResponder) Upgrade(handler func(conn execution.WSConn)) {
+func (r *httpFiberResponder) Upgrade(handler func(conn execution.WSConn), subprotocols ...string) {
 	panic("not implemented")
 }

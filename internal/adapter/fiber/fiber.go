@@ -473,9 +473,35 @@ func (r *fiberResponder) IsUpgradeRequest() bool {
 // Upgrade contract returns nothing, mirroring JSON/HTML/SendString's own
 // best-effort, error-swallowing style for writes fired after the point where
 // a Handler has committed to a specific response path.
-func (r *fiberResponder) Upgrade(handler func(conn execution.WSConn)) {
-	upgrade := websocket.New(func(c *websocket.Conn) {
+//
+// subprotocols, when non-empty, are passed through as websocket.Config{
+// Subprotocols: subprotocols} -- confirmed via github.com/gofiber/contrib/v3/
+// websocket@v1.2.1's own source (websocket.go): New's signature is `func
+// New(handler func(*Conn), config ...Config) fiber.Handler`, and Config's
+// own Subprotocols field is forwarded, unmodified, into
+// websocket.FastHTTPUpgrader{Subprotocols: cfg.Subprotocols} -- the
+// fasthttp/websocket-level upgrader responsible for actually negotiating and
+// echoing back the Sec-WebSocket-Protocol response header during the
+// handshake. Without passing this, the zero-value Config leaves
+// Subprotocols nil and the upgrader never echoes anything back, even when
+// the client offers a subprotocol the server does support -- a
+// spec-compliant client (Apollo Sandbox/GraphiQL) that checks that response
+// header before proceeding then refuses the connection. websocket.New is
+// only called with the Config argument when subprotocols is non-empty
+// (rather than always passing websocket.Config{Subprotocols: subprotocols}
+// unconditionally) purely to keep the zero-subprotocol call site identical
+// to before this fix, since passing an explicit zero-value Config{} is
+// behaviorally the same as omitting it entirely.
+func (r *fiberResponder) Upgrade(handler func(conn execution.WSConn), subprotocols ...string) {
+	fn := func(c *websocket.Conn) {
 		handler(&fiberWSConn{c: c})
-	})
+	}
+
+	var upgrade fiber.Handler
+	if len(subprotocols) > 0 {
+		upgrade = websocket.New(fn, websocket.Config{Subprotocols: subprotocols})
+	} else {
+		upgrade = websocket.New(fn)
+	}
 	_ = upgrade(r.c)
 }

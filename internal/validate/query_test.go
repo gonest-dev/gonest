@@ -77,22 +77,22 @@ type queryFakeResponder struct {
 	queries map[string]string
 }
 
-func (f *queryFakeResponder) JSON(v any) error                            { return nil }
-func (f *queryFakeResponder) SetStatus(code int)                          {}
-func (f *queryFakeResponder) GetStatus() int                              { return 200 }
-func (f *queryFakeResponder) GetMethod() string                           { return "GET" }
-func (f *queryFakeResponder) GetPath() string                             { return "" }
-func (f *queryFakeResponder) GetHeader(name string) string                { return "" }
-func (f *queryFakeResponder) SetHeaderValue(name, value string)           {}
-func (f *queryFakeResponder) GetParam(name string) string                 { return "" }
-func (f *queryFakeResponder) RawBody() []byte                             { return nil }
-func (f *queryFakeResponder) Queries() map[string]string                  { return f.queries }
-func (f *queryFakeResponder) HTML(s string) error                         { return nil }
-func (f *queryFakeResponder) SendString(s string) error                   { return nil }
-func (f *queryFakeResponder) BodyStream() (io.Reader, string, bool)       { return nil, "", false }
-func (f *queryFakeResponder) WriteStream(fn func(w *bufio.Writer))        {}
-func (f *queryFakeResponder) IsUpgradeRequest() bool                      { return false }
-func (f *queryFakeResponder) Upgrade(handler func(conn execution.WSConn)) {}
+func (f *queryFakeResponder) JSON(v any) error                                                    { return nil }
+func (f *queryFakeResponder) SetStatus(code int)                                                  {}
+func (f *queryFakeResponder) GetStatus() int                                                      { return 200 }
+func (f *queryFakeResponder) GetMethod() string                                                   { return "GET" }
+func (f *queryFakeResponder) GetPath() string                                                     { return "" }
+func (f *queryFakeResponder) GetHeader(name string) string                                        { return "" }
+func (f *queryFakeResponder) SetHeaderValue(name, value string)                                   {}
+func (f *queryFakeResponder) GetParam(name string) string                                         { return "" }
+func (f *queryFakeResponder) RawBody() []byte                                                     { return nil }
+func (f *queryFakeResponder) Queries() map[string]string                                          { return f.queries }
+func (f *queryFakeResponder) HTML(s string) error                                                 { return nil }
+func (f *queryFakeResponder) SendString(s string) error                                           { return nil }
+func (f *queryFakeResponder) BodyStream() (io.Reader, string, bool)                               { return nil, "", false }
+func (f *queryFakeResponder) WriteStream(fn func(w *bufio.Writer))                                {}
+func (f *queryFakeResponder) IsUpgradeRequest() bool                                              { return false }
+func (f *queryFakeResponder) Upgrade(handler func(conn execution.WSConn), subprotocols ...string) {}
 
 // newQueryCtx builds a *execution.Request carrying the given query map,
 // mirroring how a real dispatched request would look.

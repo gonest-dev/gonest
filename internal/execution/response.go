@@ -90,8 +90,12 @@ func (res *Response) Stream(fn func(w *bufio.Writer)) {
 // UpgradeWebSocket hands off the current connection to handler once the
 // underlying HTTP engine completes the WebSocket handshake --
 // graphql-realtime-protocols feature, Milestone 18's graphql-transport-ws/
-// graphql-ws transport. One-line delegation, same pattern as Stream/Json/
-// Html/Text. Callers should check Request.IsWebSocketUpgrade() first.
-func (res *Response) UpgradeWebSocket(handler func(conn WSConn)) {
-	res.res.Upgrade(handler)
+// graphql-ws transport. subprotocols, when given, are offered to the
+// underlying engine's handshake so it can negotiate and echo back a
+// Sec-WebSocket-Protocol response header -- see Responder.Upgrade's own doc
+// comment for why this matters. One-line delegation, same pattern as
+// Stream/Json/Html/Text. Callers should check Request.IsWebSocketUpgrade()
+// first.
+func (res *Response) UpgradeWebSocket(handler func(conn WSConn), subprotocols ...string) {
+	res.res.Upgrade(handler, subprotocols...)
 }

@@ -81,8 +81,8 @@ func (f *fakeSSEResponder) disconnect() {
 	f.pr.Close()
 }
 
-func (f *fakeSSEResponder) IsUpgradeRequest() bool                      { return false }
-func (f *fakeSSEResponder) Upgrade(handler func(conn execution.WSConn)) {}
+func (f *fakeSSEResponder) IsUpgradeRequest() bool                                              { return false }
+func (f *fakeSSEResponder) Upgrade(handler func(conn execution.WSConn), subprotocols ...string) {}
 
 func readLine(t *testing.T, r *bufio.Reader, timeout time.Duration) string {
 	t.Helper()

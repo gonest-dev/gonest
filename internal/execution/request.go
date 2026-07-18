@@ -160,8 +160,14 @@ type Responder interface {
 	// underlying HTTP engine completes the WebSocket handshake, wrapping
 	// its own connection type behind WSConn so callers never depend on a
 	// concrete engine (mirrors Responder itself being the adapter-agnostic
-	// seam for plain HTTP). Used by Response.UpgradeWebSocket.
-	Upgrade(handler func(conn WSConn))
+	// seam for plain HTTP). subprotocols, when non-empty, are offered to the
+	// underlying engine's handshake so it can negotiate and echo back a
+	// Sec-WebSocket-Protocol response header (e.g. "graphql-transport-ws") --
+	// without this, a spec-compliant client (Apollo Sandbox/GraphiQL) that
+	// checks the negotiated subprotocol on connect refuses the connection,
+	// even though the TCP-level handshake itself succeeds. Used by
+	// Response.UpgradeWebSocket.
+	Upgrade(handler func(conn WSConn), subprotocols ...string)
 }
 
 // Request encapsulates the READ side of an HTTP request/response cycle for a

@@ -77,9 +77,9 @@ func (f *formFakeResponder) BodyStream() (io.Reader, string, bool) {
 	}
 	return f.stream, f.boundary, true
 }
-func (f *formFakeResponder) WriteStream(fn func(w *bufio.Writer))        {}
-func (f *formFakeResponder) IsUpgradeRequest() bool                      { return false }
-func (f *formFakeResponder) Upgrade(handler func(conn execution.WSConn)) {}
+func (f *formFakeResponder) WriteStream(fn func(w *bufio.Writer))                                {}
+func (f *formFakeResponder) IsUpgradeRequest() bool                                              { return false }
+func (f *formFakeResponder) Upgrade(handler func(conn execution.WSConn), subprotocols ...string) {}
 
 // buildMultipartBody writes fields (in order) and files (name -> content)
 // via the real mime/multipart.Writer, returning the built body + its

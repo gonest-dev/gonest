@@ -887,6 +887,85 @@ func TestRegisterRoute_WebSocketUpgrade_CompletesRealHandshake(t *testing.T) {
 	}
 }
 
+// TestRegisterRoute_WebSocketUpgrade_NegotiatesSubprotocol proves
+// fiberResponder.Upgrade's subprotocols argument actually reaches the
+// underlying fasthttp/websocket upgrader and gets echoed back in the real
+// HTTP 101 handshake response's Sec-WebSocket-Protocol header -- the bug
+// this test guards against: passing websocket.New(fn) with NO Config at all
+// silently drops any subprotocol the caller asked for, so a spec-compliant
+// client (Apollo Sandbox/GraphiQL) checking that response header before
+// proceeding would refuse the connection even though the wire-level
+// handshake itself reports success. Same real-dial style as
+// TestRegisterRoute_WebSocketUpgrade_CompletesRealHandshake above (a real
+// ephemeral TCP port, not app.Test), since only a genuine handshake exposes
+// response headers.
+func TestRegisterRoute_WebSocketUpgrade_NegotiatesSubprotocol(t *testing.T) {
+	app := New()
+
+	if err := app.RegisterRoute(route.HttpGet, "/graphql", func(req *execution.Request, res *execution.Response) {
+		if !req.IsWebSocketUpgrade() {
+			res.Status(http.StatusUpgradeRequired).Json(map[string]string{"error": "upgrade required"})
+			return
+		}
+		res.UpgradeWebSocket(func(conn execution.WSConn) {
+			_ = conn.Close()
+		}, "graphql-transport-ws")
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve an ephemeral port: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("failed to release reserved port: %v", err)
+	}
+
+	fired := make(chan struct{})
+	listenErrCh := make(chan error, 1)
+	go func() {
+		listenErrCh <- app.Listen(addr, func() { close(fired) })
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := app.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+	})
+
+	select {
+	case <-fired:
+		// server is bound -- proceed to dial it.
+	case err := <-listenErrCh:
+		t.Fatalf("Listen returned before onListen fired: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the server to start listening")
+	}
+
+	dialer := fasthttpws.Dialer{
+		HandshakeTimeout: 2 * time.Second,
+		Subprotocols:     []string{"graphql-transport-ws"},
+	}
+	conn, resp, err := dialer.Dial("ws://"+addr+"/graphql", nil)
+	if err != nil {
+		t.Fatalf("expected the WebSocket handshake to succeed, got error: %v", err)
+	}
+	defer conn.Close()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("expected status 101 Switching Protocols, got %d", resp.StatusCode)
+	}
+
+	if got := resp.Header.Get("Sec-WebSocket-Protocol"); got != "graphql-transport-ws" {
+		t.Fatalf("expected the handshake response to echo back Sec-WebSocket-Protocol: %q, got %q", "graphql-transport-ws", got)
+	}
+	if got := conn.Subprotocol(); got != "graphql-transport-ws" {
+		t.Fatalf("expected conn.Subprotocol() to report %q, got %q", "graphql-transport-ws", got)
+	}
+}
+
 // TestRegisterRoute_NonUpgradeRequest_SameMethodSamePath_DoesNotUpgrade
 // proves a plain request to the SAME method+path as a WebSocket route,
 // missing the Upgrade headers, is told apart by IsUpgradeRequest and never

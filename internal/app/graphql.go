@@ -193,7 +193,7 @@ func graphqlGetDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscr
 
 	return func(req *execution.Request, res *execution.Response) {
 		if req.IsWebSocketUpgrade() {
-			res.UpgradeWebSocket(wsHandler)
+			res.UpgradeWebSocket(wsHandler, "graphql-transport-ws")
 			return
 		}
 		if requestCarriesEventStreamToken(req) {
