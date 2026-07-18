@@ -231,6 +231,12 @@ type PropertyBuilder struct {
 	// are set on the same field), transforming raw into whatever those
 	// checks actually consume. See Sanitize's own doc comment.
 	sanitize func(raw any) any
+
+	// graphqlScalar is the graphql-support feature's GraphQL-only naming
+	// hint for a Custom(fn) field with no native OpenAPI format equivalent
+	// (e.g. primitive.ObjectID) -- REST/OpenAPI generation ignores this
+	// entirely. See GraphqlScalar's own doc comment.
+	graphqlScalar string
 }
 
 // Required marks this field as required and returns p so calls can chain.
@@ -666,4 +672,34 @@ func (p *PropertyBuilder) SanitizeFunc() (func(raw any) any, bool) {
 		return nil, false
 	}
 	return p.sanitize, true
+}
+
+// GraphqlScalar names the GraphQL custom scalar this Custom(fn) field maps
+// to (graphql-support feature) and returns p so calls can chain. Only
+// relevant when this Schema is consumed by a GraphQL Resolver (via
+// .Args()/.Returns()) -- REST/OpenAPI generation ignores this value
+// entirely, same as it already ignores everything Custom(fn)-shaped beyond
+// name/required/nullable/description.
+//
+// Needed because Custom(fn) alone has no format-equivalent hint the SDL
+// generator could use to pick a scalar name (unlike a native format --
+// Email/Uuid/etc -- which NativeScalarName already maps automatically):
+// a genuinely custom type (e.g. primitive.ObjectID) is generic by nature.
+// Multiple fields sharing the SAME GraphqlScalar(name) deduplicate to a
+// single `scalar X` declaration in the generated SDL (dedup by NAME, same
+// precedent as internal/openapi's own $ref dedup, just keyed differently
+// since distinct PropertyBuilders can legitimately share one scalar name).
+func (p *PropertyBuilder) GraphqlScalar(name string) *PropertyBuilder {
+	p.graphqlScalar = name
+	return p
+}
+
+// GraphqlScalarValue returns the name set via GraphqlScalar, and whether
+// GraphqlScalar was ever called -- same "never called" bool-return shape
+// as CustomFunc/SanitizeFunc.
+func (p *PropertyBuilder) GraphqlScalarValue() (string, bool) {
+	if p.graphqlScalar == "" {
+		return "", false
+	}
+	return p.graphqlScalar, true
 }

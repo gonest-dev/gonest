@@ -4,7 +4,11 @@
 // pure generator with no request-time logic of its own.
 package graphqlgen
 
-import "gonest.dev/gonest/internal/schema"
+import (
+	"fmt"
+
+	"gonest.dev/gonest/internal/schema"
+)
 
 // nativeFormatScalarNames maps a PropertyBuilder's OpenAPI format string
 // (PropertyBuilder.FormatValue()) to the GraphQL custom scalar name the
@@ -35,18 +39,39 @@ func NativeScalarName(format string) (string, bool) {
 
 // CollectScalars walks properties, returning the DEDUPLICATED (by name,
 // not pointer identity -- design.md's Tech Decisions: multiple DIFFERENT
-// PropertyBuilders can share the same scalar) set of native-format-derived
-// scalar names required across all of them, in first-seen order.
-func CollectScalars(properties []*schema.PropertyBuilder) []string {
+// PropertyBuilders can share the same scalar) set of scalar names required
+// across all of them, in first-seen order -- both native-format-derived
+// (NativeScalarName) and explicitly named via GraphqlScalar (schema.
+// PropertyBuilder.GraphqlScalar).
+//
+// Returns an error (spec.md AC4, a build-time configuration failure, never
+// a per-request one) when a property has Custom(fn) set but NEITHER a
+// native format NOR an explicit GraphqlScalar name -- the SDL generator
+// has no way to know what scalar name to declare for it.
+func CollectScalars(properties []*schema.PropertyBuilder) ([]string, error) {
 	seen := map[string]bool{}
 	var names []string
-	for _, p := range properties {
-		name, ok := NativeScalarName(p.FormatValue())
-		if !ok || seen[name] {
-			continue
+	add := func(name string) {
+		if name == "" || seen[name] {
+			return
 		}
 		seen[name] = true
 		names = append(names, name)
 	}
-	return names
+
+	for _, p := range properties {
+		if name, ok := NativeScalarName(p.FormatValue()); ok {
+			add(name)
+			continue
+		}
+		if name, ok := p.GraphqlScalarValue(); ok {
+			add(name)
+			continue
+		}
+		if _, isCustom := p.CustomFunc(); isCustom {
+			return nil, fmt.Errorf("gonest: field %q uses Custom(fn) in a GraphQL-exposed schema without .GraphqlScalar(name) -- the SDL generator has no scalar name to declare for it", p.Field().Name)
+		}
+	}
+
+	return names, nil
 }
