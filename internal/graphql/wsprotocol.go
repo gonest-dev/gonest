@@ -3,11 +3,15 @@ package graphql
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	gql "github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/parser"
+
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/validate"
 )
 
 // wsConnectionInitTimeout bounds how long WSProtocolHandler waits for the
@@ -18,8 +22,9 @@ const wsConnectionInitTimeout = 3 * time.Second
 
 // graphql-transport-ws message types (github.com/enisdenjo/graphql-ws's own
 // PROTOCOL.md). connection_init/ping/pong were T5's handshake-only scope;
-// subscribe/next/error/complete are added by T6 -- streaming Subscribe
-// (multiple Next over time) is still out of scope, left to T7.
+// subscribe/next/error/complete are added by T6 (Query/Mutation only);
+// streaming Subscribe (multiple Next over time, and Complete cancelling one
+// id) is T7's own scope.
 const (
 	wsMsgConnectionInit = "connection_init"
 	wsMsgConnectionAck  = "connection_ack"
@@ -105,14 +110,82 @@ func wsRootFieldName(query, operationName string) (string, error) {
 
 // WSProtocolHandler builds the WebSocket connection handler implementing
 // the graphql-transport-ws protocol's state machine (graphql-realtime-
-// protocols feature, Milestone 18). This task (T5) covers only the
-// handshake: ConnectionInit (with timeout) -> ConnectionAck, duplicate
-// ConnectionInit -> 4429, unknown/invalid message -> 4400, and Ping ->
-// Pong. Subscribe/Complete handling is added by future tasks that extend
-// this same read loop -- not a rewrite.
+// protocols feature, Milestone 18). T5 covered the handshake (ConnectionInit
+// with timeout -> ConnectionAck, duplicate ConnectionInit -> 4429, unknown/
+// invalid message -> 4400, Ping -> Pong); T6 added single-result Subscribe
+// dispatch for Query/Mutation. T7 (this) adds streaming dispatch: a
+// Subscribe whose root field matches a registered Subscription runs
+// sub.HandlerFunc() in its own goroutine, emitting one Next per emit(value)
+// call until either the client sends Complete for that id or the
+// connection itself drops -- multiple such streams, and the handshake's
+// own Ack/Pong replies, can all be writing to the same conn concurrently,
+// so every write on conn goes through the single writeMu below.
 func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn WSConn) {
 	return func(conn WSConn) {
 		defer func() { _ = recover() }()
+
+		// writeMu serializes every write onto conn: the handshake replies
+		// (Ack/Pong) below, the single-result Next/Complete pair T6 already
+		// sends for Query/Mutation, and -- new in T7 -- however many
+		// concurrent Subscription streams are emitting Next messages for
+		// their own ids at the same time.
+		var writeMu sync.Mutex
+		writeJSON := func(v any) bool {
+			data, err := json.Marshal(v)
+			if err != nil {
+				return true
+			}
+			writeMu.Lock()
+			err = conn.WriteMessage(wsTextMessage, data)
+			writeMu.Unlock()
+			return err == nil
+		}
+
+		// activeOps tracks, per Subscribe id, the done channel of whichever
+		// streaming Subscription is currently running for that id --
+		// per-id (not a single connection-wide channel) so a Complete for
+		// one id never disturbs another id's still-active stream. stopOp
+		// removes and closes one id's done channel (idempotent: a second
+		// call for an id already removed is a no-op); stopAllOps does the
+		// same for every id still active, used when the connection itself
+		// goes away.
+		var opsMu sync.Mutex
+		activeOps := make(map[string]chan struct{})
+
+		registerOp := func(id string, done chan struct{}) {
+			opsMu.Lock()
+			activeOps[id] = done
+			opsMu.Unlock()
+		}
+		stopOp := func(id string) {
+			opsMu.Lock()
+			done, ok := activeOps[id]
+			if ok {
+				delete(activeOps, id)
+			}
+			opsMu.Unlock()
+			if ok {
+				close(done)
+			}
+		}
+		stopAllOps := func() {
+			opsMu.Lock()
+			toClose := make([]chan struct{}, 0, len(activeOps))
+			for id, done := range activeOps {
+				toClose = append(toClose, done)
+				delete(activeOps, id)
+			}
+			opsMu.Unlock()
+			for _, done := range toClose {
+				close(done)
+			}
+		}
+		// Every return path out of this handler -- handshake timeout,
+		// 4400/4401/4429 closes, and the normal ReadMessage-error exit at
+		// the bottom of the loop -- must stop every Subscription still
+		// streaming on this connection; deferring it here covers all of
+		// them in one place rather than duplicating the call at each exit.
+		defer stopAllOps()
 
 		type readResult struct {
 			messageType int
@@ -154,15 +227,13 @@ func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn
 					return false
 				}
 				acked = true
-				ack, _ := json.Marshal(map[string]string{"type": wsMsgConnectionAck})
-				if err := conn.WriteMessage(wsTextMessage, ack); err != nil {
+				if !writeJSON(map[string]string{"type": wsMsgConnectionAck}) {
 					return false
 				}
 				return true
 
 			case wsMsgPing:
-				pong, _ := json.Marshal(map[string]string{"type": wsMsgPong})
-				if err := conn.WriteMessage(wsTextMessage, pong); err != nil {
+				if !writeJSON(map[string]string{"type": wsMsgPong}) {
 					return false
 				}
 				return true
@@ -176,7 +247,15 @@ func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn
 					_ = conn.CloseWithCode(wsCloseUnauthorized, "Unauthorized")
 					return false
 				}
-				return handleSubscribe(conn, sch, subs, msg)
+				return handleSubscribe(conn, sch, subs, msg, writeJSON, registerOp, stopOp)
+
+			case wsMsgComplete:
+				// Cancels only this id's own active stream (if any) --
+				// stopOp is a no-op for an id that isn't (or is no longer)
+				// streaming, e.g. Complete for a Query/Mutation's id that
+				// already finished on its own in T6's single-result path.
+				stopOp(msg.Id)
+				return true
 
 			default:
 				_ = conn.CloseWithCode(wsCloseInvalidMessage, "Invalid message")
@@ -204,32 +283,36 @@ func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn
 	}
 }
 
-// handleSubscribe dispatches one Subscribe message. This task (T6) only
-// covers the Query/Mutation path: the root field's name is resolved from
-// the payload's query (via wsRootFieldName) and looked up in subs; when it
-// is NOT a registered Subscription, the operation is request-response --
-// dispatched through graphql.Execute exactly like GraphQL-over-HTTP, then
-// answered with exactly one Next followed by Complete (no further Next
-// ever follows for this id, unlike a real streaming Subscription).
+// handleSubscribe dispatches one Subscribe message. T6 covers the Query/
+// Mutation path: the root field's name is resolved from the payload's
+// query (via wsRootFieldName) and looked up in subs; when it is NOT a
+// registered Subscription, the operation is request-response -- dispatched
+// through graphql.Execute exactly like GraphQL-over-HTTP, then answered
+// with exactly one Next followed by Complete (no further Next ever follows
+// for this id, unlike a real streaming Subscription).
 //
-// Returns false when the connection should be closed (write failure) --
-// same "false stops the loop" contract handleMessage's other cases use.
+// T7 adds the other branch: when the root field IS a registered
+// Subscription, sub.HandlerFunc() runs in its own goroutine (own done
+// channel, registered under msg.Id via registerOp so a later Complete for
+// this specific id -- or the connection dropping -- can cancel it without
+// touching any other id's own stream), emitting one Next per emit(value)
+// call for as long as the handler keeps running. Unlike the Query/Mutation
+// branch, this never sends an immediate Complete -- Complete only follows
+// a client-initiated cancel (wsMsgComplete's own handleMessage case) or the
+// handler itself returning (self-cleanup below).
 //
-// SPEC_DEVIATION: streaming dispatch for an id that DOES match a
-// registered Subscription is out of scope for T6 (left to T7, which
-// extends this same function/loop). To avoid leaving such a message
-// silently unanswered in the meantime, it gets a minimal Error response
-// instead of Next/Complete -- doesn't close the connection, doesn't hang,
-// just reports "not implemented yet" for that one id.
-func handleSubscribe(conn WSConn, sch *gql.Schema, subs map[string]*Subscription, msg wsProtocolMessage) bool {
-	writeJSON := func(v any) bool {
-		data, err := json.Marshal(v)
-		if err != nil {
-			return true
-		}
-		return conn.WriteMessage(wsTextMessage, data) == nil
-	}
-
+// writeJSON and registerOp/stopOp are threaded in from WSProtocolHandler so
+// every write on conn and every id->done registration goes through that
+// single connection-wide writeMu/opsMu -- this function holds no lock of
+// its own.
+//
+// Returns false when the connection should be closed (write failure on the
+// synchronous Query/Mutation/Error paths) -- same "false stops the loop"
+// contract handleMessage's other cases use. The streaming branch never
+// returns false: a write failure inside emit() only stops that one stream
+// (via stopOp), it does not by itself close the connection -- the read
+// loop's own ReadMessage error is what detects a dead connection.
+func handleSubscribe(conn WSConn, sch *gql.Schema, subs map[string]*Subscription, msg wsProtocolMessage, writeJSON func(any) bool, registerOp func(string, chan struct{}), stopOp func(string)) bool {
 	var payload wsSubscribePayload
 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 		return writeJSON(map[string]any{
@@ -248,13 +331,41 @@ func handleSubscribe(conn WSConn, sch *gql.Schema, subs map[string]*Subscription
 		})
 	}
 
-	if _, isSubscription := subs[rootField]; isSubscription {
-		// Streaming Subscription dispatch: not this task's scope (T7).
-		return writeJSON(map[string]any{
-			"id":      msg.Id,
-			"type":    wsMsgError,
-			"payload": []map[string]any{{"message": "gonest: streaming Subscribe not implemented yet"}},
-		})
+	if sub, isSubscription := subs[rootField]; isSubscription {
+		done := make(chan struct{})
+		registerOp(msg.Id, done)
+
+		var args execution.Parseable
+		if sub.ArgsSchema() != nil {
+			args = validate.NewGraphqlArgsSource(payload.Variables)
+		}
+		ctx := NewGraphqlContext(args, done)
+
+		emit := func(v any) {
+			if !writeJSON(map[string]any{
+				"id":   msg.Id,
+				"type": wsMsgNext,
+				"payload": map[string]any{
+					"data": map[string]any{rootField: v},
+				},
+			}) {
+				// conn is gone -- stop this id's own stream; the read
+				// loop's ReadMessage error will separately tear down any
+				// other stream still active on this connection.
+				stopOp(msg.Id)
+			}
+		}
+
+		go func() {
+			// Self-cleanup for a handler that returns on its own (stream
+			// ended without an explicit client Complete or a connection
+			// drop): stopOp is a no-op if this id was already removed by
+			// either of those, so this never double-closes done.
+			defer stopOp(msg.Id)
+			sub.HandlerFunc()(ctx, emit)
+		}()
+
+		return true
 	}
 
 	data, errs := Execute(sch, payload.Query, payload.Variables, payload.OperationName)

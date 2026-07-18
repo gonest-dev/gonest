@@ -390,6 +390,226 @@ func TestWSProtocolHandler_OperationBeforeAck_Closes4401(t *testing.T) {
 	<-done
 }
 
+// newProtoSubTestSchema builds a subs map holding one Subscription
+// ("count") whose Handler is supplied by the caller, matching how
+// registerGraphql wires a real Subscription's HandlerFunc into
+// WSProtocolHandler's own subs parameter.
+func newProtoSubTestSchema(t *testing.T, handler func(ctx *graphql.GraphqlContext, emit func(any))) map[string]*graphql.Subscription {
+	t.Helper()
+	return newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.GraphqlContext, emit func(any)){
+		"count": handler,
+	})
+}
+
+// newProtoMultiSubTestSchema is newProtoSubTestSchema generalised to
+// register one Subscription per (fieldName -> handler) entry -- used by
+// tests that need two independently-identifiable streams running at once
+// (e.g. to prove Completing one id's stream never touches another id's),
+// since driving that from a single shared field/handler would leave which
+// goroutine ran for which Subscribe id up to the Go scheduler, not the
+// test.
+func newProtoMultiSubTestSchema(t *testing.T, handlers map[string]func(ctx *graphql.GraphqlContext, emit func(any))) map[string]*graphql.Subscription {
+	t.Helper()
+	res := graphql.New(func(r *graphql.Resolver) {
+		for name, handler := range handlers {
+			name, handler := name, handler
+			r.Subscription(name, func(s *graphql.Subscription) {
+				s.Handler(handler)
+			})
+		}
+	})
+	res.Declare()
+	subs := make(map[string]*graphql.Subscription)
+	for _, s := range res.OwnSubscriptions() {
+		subs[s.Name()] = s
+	}
+	return subs
+}
+
+func TestWSProtocolHandler_SubscribeSubscription_EmitsNextPerEmittedValue(t *testing.T) {
+	started := make(chan struct{})
+	subs := newProtoSubTestSchema(t, func(ctx *graphql.GraphqlContext, emit func(any)) {
+		close(started)
+		emit(1)
+		emit(2)
+		<-ctx.Done()
+	})
+
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(nil, subs)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":   "1",
+		"type": "subscribe",
+		"payload": map[string]any{
+			"query": `subscription { count }`,
+		},
+	})
+
+	<-started
+
+	for _, want := range []float64{1, 2} {
+		select {
+		case msg := <-conn.written:
+			var payload map[string]any
+			if err := json.Unmarshal(msg, &payload); err != nil {
+				t.Fatalf("failed to decode message: %v", err)
+			}
+			if payload["type"] != "next" {
+				t.Fatalf("payload[type] = %v, want next", payload["type"])
+			}
+			if payload["id"] != "1" {
+				t.Fatalf("payload[id] = %v, want %q", payload["id"], "1")
+			}
+			data, ok := payload["payload"].(map[string]any)["data"].(map[string]any)
+			if !ok || data["count"] != want {
+				t.Fatalf("next payload data = %#v, want {count: %v}", payload["payload"], want)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for next")
+		}
+	}
+
+	// No Complete should follow -- the Subscription handler is still
+	// blocked on ctx.Done(), i.e. streaming, unlike T6's single-result path.
+	select {
+	case msg := <-conn.written:
+		t.Fatalf("unexpected extra message while still streaming: %s", msg)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	conn.readErr <- errors.New("connection closed")
+	<-done
+}
+
+func TestWSProtocolHandler_CompleteOneId_DoesNotAffectOtherActiveId(t *testing.T) {
+	doneCh1 := make(chan struct{})
+	doneCh2 := make(chan struct{})
+
+	// Two distinct Subscription fields (rather than reusing one field for
+	// both ids) so which stream is which is fixed by the query text itself,
+	// not by goroutine scheduling order.
+	subs := newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.GraphqlContext, emit func(any)){
+		"countA": func(ctx *graphql.GraphqlContext, emit func(any)) {
+			<-ctx.Done()
+			close(doneCh1)
+		},
+		"countB": func(ctx *graphql.GraphqlContext, emit func(any)) {
+			<-ctx.Done()
+			close(doneCh2)
+		},
+	})
+
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(nil, subs)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":      "1",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { countA }`},
+	})
+	conn.sendJSON(t, map[string]any{
+		"id":      "2",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { countB }`},
+	})
+
+	// Wait until both goroutines are registered by giving the handler loop
+	// a moment to process both Subscribe messages before sending Complete.
+	time.Sleep(100 * time.Millisecond)
+
+	conn.sendJSON(t, map[string]any{"id": "1", "type": "complete"})
+
+	select {
+	case <-doneCh1:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for id 1's stream to stop after its own Complete")
+	}
+
+	select {
+	case <-doneCh2:
+		t.Fatal("id 2's stream stopped, but only id 1 was completed")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	conn.readErr <- errors.New("connection closed")
+
+	select {
+	case <-doneCh2:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for id 2's stream to stop after connection drop")
+	}
+
+	<-done
+}
+
+func TestWSProtocolHandler_ConnectionDrops_StopsAllActiveSubscriptions(t *testing.T) {
+	stopped1 := make(chan struct{})
+	stopped2 := make(chan struct{})
+	subs := newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.GraphqlContext, emit func(any)){
+		"countA": func(ctx *graphql.GraphqlContext, emit func(any)) {
+			<-ctx.Done()
+			close(stopped1)
+		},
+		"countB": func(ctx *graphql.GraphqlContext, emit func(any)) {
+			<-ctx.Done()
+			close(stopped2)
+		},
+	})
+
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(nil, subs)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":      "1",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { countA }`},
+	})
+	conn.sendJSON(t, map[string]any{
+		"id":      "2",
+		"type":    "subscribe",
+		"payload": map[string]any{"query": `subscription { countB }`},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	conn.readErr <- errors.New("connection closed")
+
+	select {
+	case <-stopped1:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for id 1's stream to stop after connection drop")
+	}
+	select {
+	case <-stopped2:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for id 2's stream to stop after connection drop")
+	}
+
+	<-done
+}
+
 func TestWSProtocolHandler_Ping_RespondsPong(t *testing.T) {
 	conn := newProtoFakeWSConn()
 
