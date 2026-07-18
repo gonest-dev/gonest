@@ -25,6 +25,10 @@ const graphqlPath = "/graphql"
 // uses a sibling path, registered separately.
 const graphqlSubscriptionPath = "/graphql/stream/:name"
 
+// graphqlSubscriptionWSPath is the WebSocket transport's own endpoint
+// (T10) -- same :name convention as graphqlSubscriptionPath.
+const graphqlSubscriptionWSPath = "/graphql/ws/:name"
+
 // resolvableResolver is a locally-declared interface used to type-assert
 // module.ResolverRef values down to the methods Stage 2.5-equivalent
 // registration needs (OwnQueries/OwnMutations/OwnSubscriptions) but that
@@ -81,7 +85,10 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
 	for _, s := range subscriptions {
 		subsByName[s.Name()] = s
 	}
-	return adapter.RegisterRoute(route.HttpGet, graphqlSubscriptionPath, gqltransport.SSEHandler(subsByName))
+	if err := adapter.RegisterRoute(route.HttpGet, graphqlSubscriptionPath, gqltransport.SSEHandler(subsByName)); err != nil {
+		return err
+	}
+	return adapter.RegisterWebSocket(graphqlSubscriptionWSPath, gqltransport.WSHandler(subsByName))
 }
 
 // graphqlRequestBody is the standard GraphQL-over-HTTP request shape

@@ -14,11 +14,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
 
 	"gonest.dev/gonest/internal/appoptions"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/gqltransport"
 	"gonest.dev/gonest/internal/route"
 )
 
@@ -172,6 +174,53 @@ func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(re
 
 	f.app.Add([]string{fiberMethod(method)}, path, wrapped)
 	return nil
+}
+
+// RegisterWebSocket wires one WebSocket upgrade endpoint onto f.app, via
+// github.com/gofiber/contrib/v3/websocket (confirmed real API through
+// Context7: `app.Use(path, upgradeCheckMiddleware)` followed by
+// `app.Get(path, websocket.New(func(c *websocket.Conn) {...}))` -- the
+// middleware step is required, per that package's own README, so a
+// non-upgrade request to the same path gets fiber.ErrUpgradeRequired
+// instead of falling through to the WebSocket handler).
+func (f *FiberApp) RegisterWebSocket(path string, h func(conn gqltransport.WSConn)) error {
+	f.app.Use(path, func(c fiber.Ctx) error {
+		if websocket.IsWebSocketUpgrade(c) {
+			return c.Next()
+		}
+		return fiber.ErrUpgradeRequired
+	})
+	f.app.Get(path, websocket.New(func(c *websocket.Conn) {
+		h(&fiberWSConn{c: c})
+	}))
+	return nil
+}
+
+// fiberWSConn adapts *websocket.Conn to gqltransport.WSConn -- same
+// adapter-agnostic-wrapper rationale as fiberResponder for
+// execution.Responder.
+type fiberWSConn struct {
+	c *websocket.Conn
+}
+
+func (w *fiberWSConn) ReadMessage() (int, []byte, error) {
+	return w.c.ReadMessage()
+}
+
+func (w *fiberWSConn) WriteMessage(messageType int, data []byte) error {
+	return w.c.WriteMessage(messageType, data)
+}
+
+func (w *fiberWSConn) Close() error {
+	return w.c.Close()
+}
+
+func (w *fiberWSConn) Params(name string) string {
+	return w.c.Params(name)
+}
+
+func (w *fiberWSConn) Query(name string) string {
+	return w.c.Query(name)
 }
 
 // Listen starts the underlying Fiber app listening on addr, blocking until
