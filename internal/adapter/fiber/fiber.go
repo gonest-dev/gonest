@@ -435,3 +435,16 @@ func (r *fiberResponder) BodyStream() (io.Reader, string, bool) {
 func (r *fiberResponder) WriteStream(fn func(w *bufio.Writer)) {
 	r.c.RequestCtx().SetBodyStreamWriter(fn)
 }
+
+// IsUpgradeRequest is a temporary stub -- graphql-realtime-protocols
+// feature's T3 only extends the Responder contract; the real Fiber-backed
+// WebSocket implementation is wired in by a later task (T4), which replaces
+// this stub with one backed by github.com/gofiber/contrib/v3/websocket.
+func (r *fiberResponder) IsUpgradeRequest() bool {
+	panic("not implemented")
+}
+
+// Upgrade is a temporary stub -- see IsUpgradeRequest's doc comment.
+func (r *fiberResponder) Upgrade(handler func(conn execution.WSConn)) {
+	panic("not implemented")
+}

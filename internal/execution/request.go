@@ -149,6 +149,19 @@ type Responder interface {
 	// own doc comment on its implementation for the underlying engine's
 	// exact contract.
 	WriteStream(fn func(w *bufio.Writer))
+	// IsUpgradeRequest reports whether the current request is a WebSocket
+	// upgrade handshake (graphql-realtime-protocols feature, Milestone 18's
+	// graphql-transport-ws/graphql-ws transport) -- used by
+	// Request.IsWebSocketUpgrade so a Handler/Middleware/Guard can branch on
+	// "this is a WS connection, not a plain HTTP request" before touching
+	// any WS-specific API.
+	IsUpgradeRequest() bool
+	// Upgrade hands off the current connection to handler once the
+	// underlying HTTP engine completes the WebSocket handshake, wrapping
+	// its own connection type behind WSConn so callers never depend on a
+	// concrete engine (mirrors Responder itself being the adapter-agnostic
+	// seam for plain HTTP). Used by Response.UpgradeWebSocket.
+	Upgrade(handler func(conn WSConn))
 }
 
 // Request encapsulates the READ side of an HTTP request/response cycle for a
@@ -279,4 +292,13 @@ func (req *Request) Queries() map[string]string {
 // for the 2 reasons that can be true).
 func (req *Request) FormStream() (stream io.Reader, boundary string, ok bool) {
 	return req.res.BodyStream()
+}
+
+// IsWebSocketUpgrade reports whether the current request is a WebSocket
+// upgrade handshake (graphql-realtime-protocols feature, Milestone 18) --
+// one-line delegation, same pattern as Queries()/FormStream(). A
+// Guard/Middleware can use this to branch before the connection is actually
+// upgraded via Response.UpgradeWebSocket.
+func (req *Request) IsWebSocketUpgrade() bool {
+	return req.res.IsUpgradeRequest()
 }

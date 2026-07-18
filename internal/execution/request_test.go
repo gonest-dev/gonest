@@ -20,6 +20,11 @@ type fakeResponder struct {
 	htmlErr    error
 	method     string
 	path       string
+
+	isUpgradeRequest bool
+	isUpgradeCalled  bool
+	upgradeCalled    bool
+	upgradeHandler   func(conn WSConn)
 }
 
 func newFakeResponder() *fakeResponder {
@@ -84,6 +89,16 @@ func (f *fakeResponder) BodyStream() (io.Reader, string, bool) {
 }
 
 func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer)) {}
+
+func (f *fakeResponder) IsUpgradeRequest() bool {
+	f.isUpgradeCalled = true
+	return f.isUpgradeRequest
+}
+
+func (f *fakeResponder) Upgrade(handler func(conn WSConn)) {
+	f.upgradeCalled = true
+	f.upgradeHandler = handler
+}
 
 func TestRequest_Header_ReadsFromResponder(t *testing.T) {
 	fake := newFakeResponder()
@@ -207,5 +222,46 @@ func TestRequest_WithRoute_IsChainableAndStoresRoute(t *testing.T) {
 	}
 	if got != r {
 		t.Fatalf("expected Route() to return the exact attached pointer")
+	}
+}
+
+// TestRequest_IsWebSocketUpgrade_DelegatesToResponder proves
+// Request.IsWebSocketUpgrade is a one-line delegation to the underlying
+// Responder.IsUpgradeRequest, both invoking it and returning its result
+// unchanged.
+func TestRequest_IsWebSocketUpgrade_DelegatesToResponder(t *testing.T) {
+	fake := newFakeResponder()
+	fake.isUpgradeRequest = true
+	req, _ := New(fake)
+
+	if got := req.IsWebSocketUpgrade(); got != true {
+		t.Fatalf("expected IsWebSocketUpgrade() to return true, got %v", got)
+	}
+	if !fake.isUpgradeCalled {
+		t.Fatalf("expected IsWebSocketUpgrade() to delegate to Responder.IsUpgradeRequest()")
+	}
+}
+
+// TestResponse_UpgradeWebSocket_DelegatesToResponder proves
+// Response.UpgradeWebSocket is a one-line delegation to the underlying
+// Responder.Upgrade, passing the exact handler through unchanged.
+func TestResponse_UpgradeWebSocket_DelegatesToResponder(t *testing.T) {
+	fake := newFakeResponder()
+	_, res := New(fake)
+
+	var called bool
+	handler := func(conn WSConn) { called = true }
+
+	res.UpgradeWebSocket(handler)
+
+	if !fake.upgradeCalled {
+		t.Fatalf("expected UpgradeWebSocket() to delegate to Responder.Upgrade()")
+	}
+	if fake.upgradeHandler == nil {
+		t.Fatalf("expected UpgradeWebSocket() to pass the handler through to Responder.Upgrade()")
+	}
+	fake.upgradeHandler(nil)
+	if !called {
+		t.Fatalf("expected the handler passed to Responder.Upgrade() to be the exact handler given to UpgradeWebSocket()")
 	}
 }

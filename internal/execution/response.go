@@ -86,3 +86,12 @@ func (res *Response) Text(s string) error {
 func (res *Response) Stream(fn func(w *bufio.Writer)) {
 	res.res.WriteStream(fn)
 }
+
+// UpgradeWebSocket hands off the current connection to handler once the
+// underlying HTTP engine completes the WebSocket handshake --
+// graphql-realtime-protocols feature, Milestone 18's graphql-transport-ws/
+// graphql-ws transport. One-line delegation, same pattern as Stream/Json/
+// Html/Text. Callers should check Request.IsWebSocketUpgrade() first.
+func (res *Response) UpgradeWebSocket(handler func(conn WSConn)) {
+	res.res.Upgrade(handler)
+}
