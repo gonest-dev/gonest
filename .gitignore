@@ -3,3 +3,4 @@
 *.db
 *.sqlite
 /.examples/blog-api/uploads/
+image.png
