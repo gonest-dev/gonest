@@ -22,11 +22,12 @@ import (
 // write into the pipe's write side returns io.ErrClosedPipe, exactly the
 // write-failure SSEHandler's own emit/heartbeat use to detect disconnect.
 type fakeSSEResponder struct {
-	param   string
-	queries map[string]string
-	pr      *io.PipeReader
-	pw      *io.PipeWriter
-	status  int
+	param    string
+	queries  map[string]string
+	pr       *io.PipeReader
+	pw       *io.PipeWriter
+	status   int
+	jsonBody any
 }
 
 func newFakeSSEResponder(param string, queries map[string]string) *fakeSSEResponder {
@@ -34,7 +35,10 @@ func newFakeSSEResponder(param string, queries map[string]string) *fakeSSERespon
 	return &fakeSSEResponder{param: param, queries: queries, pr: pr, pw: pw}
 }
 
-func (f *fakeSSEResponder) JSON(v any) error { return nil }
+func (f *fakeSSEResponder) JSON(v any) error {
+	f.jsonBody = v
+	return nil
+}
 
 func (f *fakeSSEResponder) SetStatus(code int) { f.status = code }
 func (f *fakeSSEResponder) GetStatus() int {
