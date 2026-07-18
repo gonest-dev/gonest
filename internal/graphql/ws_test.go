@@ -60,6 +60,14 @@ func (c *fakeWSConn) Close() error {
 	return nil
 }
 
+// CloseWithCode satisfies the newer graphql.WSConn (execution.WSConn)
+// method added for graphql-transport-ws's own close codes -- real
+// code/reason handling arrives in a future task, this test double just
+// delegates to Close().
+func (c *fakeWSConn) CloseWithCode(code int, reason string) error {
+	return c.Close()
+}
+
 func TestWSHandler_UnknownSubscription_WritesErrorAndCloses(t *testing.T) {
 	conn := newFakeWSConn("missing", nil)
 	conn.readErr <- errors.New("unused") // let the (never-reached) read loop unblock if it somehow got there

@@ -215,6 +215,15 @@ func (w *fiberWSConn) Close() error {
 	return w.c.Close()
 }
 
+// CloseWithCode is a temporary stub satisfying the execution.WSConn
+// method added in T2 (graphql-realtime-protocols feature, Milestone
+// 18) -- ignores code/reason and just delegates to Close(); real
+// close-code handling (graphql-transport-ws's own 4400/4401/4408/4409/
+// 4429) lands in T4, out of this task's scope.
+func (w *fiberWSConn) CloseWithCode(code int, reason string) error {
+	return w.c.Close()
+}
+
 func (w *fiberWSConn) Params(name string) string {
 	return w.c.Params(name)
 }

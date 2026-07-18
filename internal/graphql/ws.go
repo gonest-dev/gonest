@@ -16,22 +16,14 @@ import (
 // since WSConn (below) already keeps this package adapter-agnostic.
 const wsTextMessage = 1
 
-// WSConn is the minimal contract internal/adapter/fiber's WebSocket
-// connection wrapper satisfies -- deliberately NOT the real
-// *websocket.Conn type (github.com/gofiber/contrib/v3/websocket), so this
-// package stays adapter-agnostic the same way execution.Responder does
-// for HTTP. ReadMessage/WriteMessage mirror that library's own real
-// method signatures (confirmed via Context7: gofiber/contrib's own
-// README example calls c.ReadMessage()/c.WriteMessage(mt, msg) on a
-// *websocket.Conn) -- Params/Query read the upgrade request's own path
-// param/query string, captured at connection time.
-type WSConn interface {
-	ReadMessage() (messageType int, p []byte, err error)
-	WriteMessage(messageType int, data []byte) error
-	Close() error
-	Params(name string) string
-	Query(name string) string
-}
+// WSConn is an alias of execution.WSConn -- moved there
+// (graphql-realtime-protocols feature, Milestone 18, T2) so
+// internal/execution can also depend on it (namely for the
+// graphql-transport-ws protocol's own close-code handling) without an
+// import cycle back into internal/graphql. Kept here under its original
+// name so ws.go's WSHandler and ws_test.go's fakeWSConn need no other
+// change.
+type WSConn = execution.WSConn
 
 // WSHandler builds the WebSocket connection handler for whichever
 // Subscription subs[name] resolves to (graphql-support feature, Milestone
