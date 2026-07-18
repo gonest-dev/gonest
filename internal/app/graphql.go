@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"net/http"
 
 	gql "github.com/graphql-go/graphql"
 
@@ -81,7 +82,32 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module, opts AppOpti
 	if err := adapter.RegisterRoute(route.HttpGet, graphqlPath+"/stream/:name", graphql.SSEHandler(subsByName)); err != nil {
 		return err
 	}
-	return adapter.RegisterWebSocket(graphqlPath+"/ws/:name", graphql.WSHandler(subsByName))
+	return adapter.RegisterRoute(route.HttpGet, graphqlPath+"/ws/:name", graphqlWebSocketHandler(subsByName))
+}
+
+// graphqlWebSocketHandler is a minimal compatibility bridge that keeps the
+// ad-hoc GET /graphql/ws/:name WebSocket route (previously registered via
+// the now-removed HttpAdapter.RegisterWebSocket) working exactly as before,
+// now expressed purely through RegisterRoute + the Responder-level
+// upgrade contract (Request.IsWebSocketUpgrade/Response.UpgradeWebSocket)
+// T4 (graphql-realtime-protocols) wired up -- NOT a reorganization of the
+// GraphQL WS paths themselves (that is T15/T16's job). A non-upgrade
+// request to this path now gets a real 426 Upgrade Required instead of
+// RegisterWebSocket's old app.Use-middleware-driven fiber.ErrUpgradeRequired
+// (also a 426, so observable behavior for that case is unchanged);
+// graphql.WSHandler(subsByName)'s own func(conn WSConn) signature already
+// matches what UpgradeWebSocket expects verbatim (graphql.WSConn is a type
+// alias for execution.WSConn, see internal/graphql/ws.go), so no further
+// adapting of the handler itself is needed.
+func graphqlWebSocketHandler(subsByName map[string]*graphql.Subscription) func(req *execution.Request, res *execution.Response) {
+	handler := graphql.WSHandler(subsByName)
+	return func(req *execution.Request, res *execution.Response) {
+		if !req.IsWebSocketUpgrade() {
+			res.Status(http.StatusUpgradeRequired)
+			return
+		}
+		res.UpgradeWebSocket(handler)
+	}
 }
 
 // graphqlRequestBody is the standard GraphQL-over-HTTP request shape

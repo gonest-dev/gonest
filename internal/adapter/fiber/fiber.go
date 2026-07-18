@@ -13,6 +13,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
@@ -20,9 +21,17 @@ import (
 	"gonest.dev/gonest/internal/appoptions"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/route"
 )
+
+// wsCloseWriteWait bounds how long CloseWithCode below waits for the close
+// control frame to be written before giving up -- mirrors the
+// time.Now().Add(writeWait) pattern gorilla/websocket-family docs use for
+// WriteControl deadlines (fasthttp/websocket@v1.5.12's own WriteControl doc
+// comment: "writes a control message with the given deadline"). Kept short
+// since this only needs to get one small frame onto an already-established
+// TCP connection.
+const wsCloseWriteWait = 5 * time.Second
 
 // FiberApp wraps a real *fiber.App and satisfies the minimal httpAdapter
 // contract NewApp[T] (future T8) needs: RegisterRoute and Listen. Kept as a
@@ -176,27 +185,7 @@ func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(re
 	return nil
 }
 
-// RegisterWebSocket wires one WebSocket upgrade endpoint onto f.app, via
-// github.com/gofiber/contrib/v3/websocket (confirmed real API through
-// Context7: `app.Use(path, upgradeCheckMiddleware)` followed by
-// `app.Get(path, websocket.New(func(c *websocket.Conn) {...}))` -- the
-// middleware step is required, per that package's own README, so a
-// non-upgrade request to the same path gets fiber.ErrUpgradeRequired
-// instead of falling through to the WebSocket handler).
-func (f *FiberApp) RegisterWebSocket(path string, h func(conn graphql.WSConn)) error {
-	f.app.Use(path, func(c fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
-	f.app.Get(path, websocket.New(func(c *websocket.Conn) {
-		h(&fiberWSConn{c: c})
-	}))
-	return nil
-}
-
-// fiberWSConn adapts *websocket.Conn to graphql.WSConn -- same
+// fiberWSConn adapts *websocket.Conn to execution.WSConn -- same
 // adapter-agnostic-wrapper rationale as fiberResponder for
 // execution.Responder.
 type fiberWSConn struct {
@@ -215,13 +204,27 @@ func (w *fiberWSConn) Close() error {
 	return w.c.Close()
 }
 
-// CloseWithCode is a temporary stub satisfying the execution.WSConn
-// method added in T2 (graphql-realtime-protocols feature, Milestone
-// 18) -- ignores code/reason and just delegates to Close(); real
-// close-code handling (graphql-transport-ws's own 4400/4401/4408/4409/
-// 4429) lands in T4, out of this task's scope.
+// CloseWithCode sends a real WebSocket close control frame carrying code and
+// reason (via fasthttp/websocket's WriteControl(CloseMessage,
+// FormatCloseMessage(code, reason), deadline) -- both re-exported unchanged
+// through github.com/gofiber/contrib/v3/websocket, confirmed by that
+// package's own source, websocket.go, which defines Conn as `struct {
+// *websocket.Conn; ... }` embedding fasthttp/websocket's *Conn directly, and
+// re-declares CloseMessage/FormatCloseMessage as thin wrappers around the
+// same fasthttp/websocket symbols) before closing the underlying connection.
+// This is what lets graphql-transport-ws's own close codes (4400, 4401,
+// 4408, 4409, 4429) actually reach the client, instead of the plain TCP-only
+// Close() this stubbed out until T4. A WriteControl failure (e.g. the peer
+// already dropped the connection) is intentionally NOT fatal here -- Close()
+// still runs to release the connection either way, and the write error is
+// returned to the caller for visibility.
 func (w *fiberWSConn) CloseWithCode(code int, reason string) error {
-	return w.c.Close()
+	writeErr := w.c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason), time.Now().Add(wsCloseWriteWait))
+	closeErr := w.c.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	return closeErr
 }
 
 func (w *fiberWSConn) Params(name string) string {
@@ -436,15 +439,43 @@ func (r *fiberResponder) WriteStream(fn func(w *bufio.Writer)) {
 	r.c.RequestCtx().SetBodyStreamWriter(fn)
 }
 
-// IsUpgradeRequest is a temporary stub -- graphql-realtime-protocols
-// feature's T3 only extends the Responder contract; the real Fiber-backed
-// WebSocket implementation is wired in by a later task (T4), which replaces
-// this stub with one backed by github.com/gofiber/contrib/v3/websocket.
+// IsUpgradeRequest reports whether the current request carries the
+// Upgrade/Connection/Sec-WebSocket-* headers a WebSocket handshake requires,
+// via github.com/gofiber/contrib/v3/websocket's own IsWebSocketUpgrade(c) --
+// the exact same detection RegisterRoute's predecessor, the now-removed
+// RegisterWebSocket, used in its app.Use middleware step.
 func (r *fiberResponder) IsUpgradeRequest() bool {
-	panic("not implemented")
+	return websocket.IsWebSocketUpgrade(r.c)
 }
 
-// Upgrade is a temporary stub -- see IsUpgradeRequest's doc comment.
+// Upgrade performs the real WebSocket handshake on r.c and hands the
+// resulting connection to handler, via websocket.New(fn) -- confirmed
+// through Context7 (github.com/gofiber/contrib/v3/websocket's own README)
+// that New returns a plain `fiber.Handler` (func(fiber.Ctx) error), i.e. an
+// ordinary handler value, not something that must be registered through
+// app.Get/app.Use ahead of time. That is what lets this be called directly,
+// inline, on r.c -- the *fiber.Ctx already in flight for the CURRENT
+// request/handler invocation -- instead of requiring a second route
+// registered in advance.
+//
+// This is the mechanism that lets WS and SSE/POST share one path
+// (`/graphql`): RegisterRoute (above) already dispatches by HTTP method via
+// f.app.Add, so a GET carrying the upgrade headers reaches a Handler that
+// calls req.IsWebSocketUpgrade()/res.UpgradeWebSocket(...) (which delegate
+// to these two methods) and upgrades in place, while a POST to the same
+// path is routed to an entirely different Handler -- unlike the old
+// RegisterWebSocket, whose app.Use(path, ...) middleware intercepted EVERY
+// method hitting that path, non-upgrade or not.
+//
+// Any error websocket.New's returned handler produces (e.g. the handshake
+// failing after IsUpgradeRequest already reported true, a TOCTOU-style race)
+// is intentionally swallowed rather than propagated -- execution.Responder's
+// Upgrade contract returns nothing, mirroring JSON/HTML/SendString's own
+// best-effort, error-swallowing style for writes fired after the point where
+// a Handler has committed to a specific response path.
 func (r *fiberResponder) Upgrade(handler func(conn execution.WSConn)) {
-	panic("not implemented")
+	upgrade := websocket.New(func(c *websocket.Conn) {
+		handler(&fiberWSConn{c: c})
+	})
+	_ = upgrade(r.c)
 }

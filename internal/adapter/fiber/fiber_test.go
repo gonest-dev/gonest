@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	fasthttpws "github.com/fasthttp/websocket"
+
 	"gonest.dev/gonest/internal/appoptions"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
@@ -785,5 +787,210 @@ func TestRegisterRoute_HandlerPanicsWithNil_FallsThroughToGeneric500(t *testing.
 	}
 	if bodyBytes.String() != "Internal Server Error" {
 		t.Fatalf("expected body %q, got %q", "Internal Server Error", bodyBytes.String())
+	}
+}
+
+// TestRegisterRoute_WebSocketUpgrade_CompletesRealHandshake proves
+// fiberResponder.IsUpgradeRequest/Upgrade (T4's real implementation,
+// replacing the panic stubs T3 left behind) complete a genuine HTTP 101
+// WebSocket handshake over a real TCP connection -- NOT via app.Test, which
+// per TESTING.md buffers the whole request through httputil.DumpRequest
+// before ServeConn even runs and cannot observe a protocol upgrade. Instead
+// this mirrors TestListen_OnListenFires_BeforeBlockingForGood's pattern:
+// bind a real ephemeral port, run Listen in its own goroutine, and dial it
+// for real -- here with github.com/fasthttp/websocket's own Dialer, an
+// existing transitive dependency (go.mod: `// indirect`) promoted to direct
+// test-only use, exactly what T4's Tests section calls for.
+//
+// The route is registered the same way any gonest route is (RegisterRoute),
+// and the Handler itself only calls req.IsWebSocketUpgrade()/
+// res.UpgradeWebSocket -- the Fiber-agnostic execution-layer API that
+// delegates to fiberResponder.IsUpgradeRequest/Upgrade -- never touching
+// fiber.Ctx or the websocket package directly. This also proves the
+// GET-with-upgrade-headers and a plain request can be told apart by ONE
+// Handler on the SAME path, without the old RegisterWebSocket's
+// app.Use(path, ...) middleware intercepting every method up front.
+func TestRegisterRoute_WebSocketUpgrade_CompletesRealHandshake(t *testing.T) {
+	app := New()
+
+	upgraded := make(chan struct{}, 1)
+	if err := app.RegisterRoute(route.HttpGet, "/graphql", func(req *execution.Request, res *execution.Response) {
+		if !req.IsWebSocketUpgrade() {
+			res.Status(http.StatusUpgradeRequired).Json(map[string]string{"error": "upgrade required"})
+			return
+		}
+		res.UpgradeWebSocket(func(conn execution.WSConn) {
+			upgraded <- struct{}{}
+			_ = conn.WriteMessage(1, []byte("hello"))
+			_ = conn.Close()
+		})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve an ephemeral port: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("failed to release reserved port: %v", err)
+	}
+
+	fired := make(chan struct{})
+	listenErrCh := make(chan error, 1)
+	go func() {
+		listenErrCh <- app.Listen(addr, func() { close(fired) })
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := app.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+	})
+
+	select {
+	case <-fired:
+		// server is bound -- proceed to dial it.
+	case err := <-listenErrCh:
+		t.Fatalf("Listen returned before onListen fired: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the server to start listening")
+	}
+
+	dialer := fasthttpws.Dialer{HandshakeTimeout: 2 * time.Second}
+	conn, resp, err := dialer.Dial("ws://"+addr+"/graphql", nil)
+	if err != nil {
+		t.Fatalf("expected the WebSocket handshake to succeed, got error: %v", err)
+	}
+	defer conn.Close()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("expected status 101 Switching Protocols, got %d", resp.StatusCode)
+	}
+
+	select {
+	case <-upgraded:
+		// handler's Upgrade callback ran -- confirms fiberResponder.Upgrade
+		// actually invoked handler(&fiberWSConn{...}), not just that the
+		// wire-level handshake succeeded.
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the Upgrade handler to run")
+	}
+
+	mt, msg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("expected to read the message the handler wrote, got error: %v", err)
+	}
+	if mt != 1 || string(msg) != "hello" {
+		t.Fatalf("expected text message %q, got type %d message %q", "hello", mt, string(msg))
+	}
+}
+
+// TestRegisterRoute_NonUpgradeRequest_SameMethodSamePath_DoesNotUpgrade
+// proves a plain request to the SAME method+path as a WebSocket route,
+// missing the Upgrade headers, is told apart by IsUpgradeRequest and never
+// reaches Upgrade -- the exact coexistence the old RegisterWebSocket's
+// app.Use(path, ...) middleware could not offer for other HTTP methods on
+// the same path, now handled entirely inside one Handler via
+// req.IsWebSocketUpgrade().
+func TestRegisterRoute_NonUpgradeRequest_SameMethodSamePath_DoesNotUpgrade(t *testing.T) {
+	app := New()
+
+	upgradeCalled := false
+	if err := app.RegisterRoute(route.HttpGet, "/graphql", func(req *execution.Request, res *execution.Response) {
+		if !req.IsWebSocketUpgrade() {
+			res.Status(http.StatusOK).Json(map[string]string{"mode": "plain"})
+			return
+		}
+		res.UpgradeWebSocket(func(conn execution.WSConn) {
+			upgradeCalled = true
+			_ = conn.Close()
+		})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/graphql", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200 for a non-upgrade request, got %d", resp.StatusCode)
+	}
+	if upgradeCalled {
+		t.Fatalf("expected Upgrade's handler to NOT run for a non-upgrade request")
+	}
+}
+
+// TestFiberWSConn_CloseWithCode_SendsRealCloseFrame proves
+// fiberWSConn.CloseWithCode (T4's real implementation, replacing T2's
+// Close()-only stub) writes an actual WebSocket close control frame
+// carrying the given code/reason -- observed from a real client via
+// fasthttp/websocket's own CloseError, which ReadMessage returns once it
+// receives a close frame, per that package's documented behavior.
+func TestFiberWSConn_CloseWithCode_SendsRealCloseFrame(t *testing.T) {
+	app := New()
+
+	const closeCode = 4409
+	const closeReason = "Subscriber already exists"
+
+	if err := app.RegisterRoute(route.HttpGet, "/graphql", func(req *execution.Request, res *execution.Response) {
+		res.UpgradeWebSocket(func(conn execution.WSConn) {
+			_ = conn.CloseWithCode(closeCode, closeReason)
+		})
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve an ephemeral port: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("failed to release reserved port: %v", err)
+	}
+
+	fired := make(chan struct{})
+	listenErrCh := make(chan error, 1)
+	go func() {
+		listenErrCh <- app.Listen(addr, func() { close(fired) })
+	}()
+	t.Cleanup(func() {
+		if shutdownErr := app.FiberApp().Shutdown(); shutdownErr != nil {
+			t.Errorf("Shutdown returned error: %v", shutdownErr)
+		}
+	})
+
+	select {
+	case <-fired:
+	case err := <-listenErrCh:
+		t.Fatalf("Listen returned before onListen fired: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the server to start listening")
+	}
+
+	dialer := fasthttpws.Dialer{HandshakeTimeout: 2 * time.Second}
+	conn, resp, err := dialer.Dial("ws://"+addr+"/graphql", nil)
+	if err != nil {
+		t.Fatalf("expected the WebSocket handshake to succeed, got error: %v", err)
+	}
+	defer conn.Close()
+	defer resp.Body.Close()
+
+	_, _, err = conn.ReadMessage()
+	closeErr, ok := err.(*fasthttpws.CloseError)
+	if !ok {
+		t.Fatalf("expected ReadMessage to return a *websocket.CloseError, got %T: %v", err, err)
+	}
+	if closeErr.Code != closeCode {
+		t.Fatalf("expected close code %d, got %d", closeCode, closeErr.Code)
+	}
+	if closeErr.Text != closeReason {
+		t.Fatalf("expected close reason %q, got %q", closeReason, closeErr.Text)
 	}
 }

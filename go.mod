@@ -3,19 +3,19 @@ module gonest.dev/gonest
 go 1.25.0
 
 require (
+	github.com/fasthttp/websocket v1.5.12
+	github.com/gofiber/contrib/v3/websocket v1.2.1
 	github.com/gofiber/fiber/v3 v3.4.0
 	github.com/google/uuid v1.6.0
+	github.com/graphql-go/graphql v0.8.1
 	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/sync v0.22.0
 )
 
 require (
 	github.com/andybalholm/brotli v1.2.2 // indirect
-	github.com/fasthttp/websocket v1.5.12 // indirect
-	github.com/gofiber/contrib/v3/websocket v1.2.1 // indirect
 	github.com/gofiber/schema v1.8.0 // indirect
 	github.com/gofiber/utils/v2 v2.1.1 // indirect
-	github.com/graphql-go/graphql v0.8.1 // indirect
 	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
