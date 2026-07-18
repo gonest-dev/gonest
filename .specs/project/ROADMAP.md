@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 18 (GraphQL Realtime Protocols) -- especificada, aguardando Design/Tasks/Execute
-**Status:** Milestones 1-17 COMPLETE, Milestone 18 SPECIFIED (não iniciada)
+**Current Milestone:** 18 (GraphQL Realtime Protocols) -- COMPLETE
+**Status:** Milestones 1-18 COMPLETE
 
 ---
 
@@ -333,16 +333,18 @@
 ## Milestone 18: GraphQL Realtime Protocols
 
 **Goal:** Substituir os transportes de Subscription ad-hoc (SSE/WS próprios, Milestone 17/T9-T10) pelos protocolos REAIS e amplamente adotados -- `graphql-transport-ws` (WebSocket) e `graphql-sse` (SSE, os dois modos: Distinct connections e Single connection), ambos direto no `/graphql` já existente. Motivado por um bug real: uma IDE GraphQL de verdade tentou WS em `/graphql` esperando o protocolo padrão e falhou.
-**Status:** SPECIFIED (spec.md + context.md prontos -- Design/Tasks/Execute pendentes)
+**Status:** COMPLETE (T1-T18 executados via subagentes Planner/Implementer/Evaluator, `go test ./... -race` verde, 25 pacotes, `.examples/*` buildam)
 
 ### Features
 
-**GraphQL Realtime Protocols** - SPECIFIED
-- WebSocket: `graphql-transport-ws` real (`ConnectionInit`/`Ack`, `Ping`/`Pong`, `Subscribe`/`Next`/`Error`/`Complete`, multiplexação por `id`, fechamentos `4408`/`4429`/`4409`/`4401`/`4400`) -- só o subprotocolo moderno, sem o legado `graphql-ws`
-- SSE Distinct connections mode: `GET /graphql` com `Accept: text/event-stream`, 1 conexão por operação
+**GraphQL Realtime Protocols** - COMPLETE
+- WebSocket: `graphql-transport-ws` real (`ConnectionInit`/`Ack`, `Ping`/`Pong`, `Subscribe`/`Next`/`Error`/`Complete`, multiplexação por `id`, fechamentos `4408`/`4429`/`4409`/`4401`/`4400`) -- só o subprotocolo moderno, sem o legado `graphql-ws`; servidor NEGOCIA o subprotocolo de verdade (`Sec-WebSocket-Protocol` ecoado no handshake, achado real rodando `.examples/blog-graphql` -- sem isso, IDEs reais recusariam a conexão, o MESMO tipo de falha que motivou a feature inteira)
+- SSE Distinct connections mode: `GET /graphql` com `Accept: text/event-stream`, 1 conexão por operação, evento `complete` inclui `data: ` vazio (exigido pelo PROTOCOL.md real pro listener do `EventSource` disparar -- confirmado via `curl` direto no PROTOCOL.md, não assumido)
 - SSE Single connection mode: `PUT` (reserva+token) → `GET` (conexão única) → `POST`/`DELETE` (executa/encerra operação, multiplexado por `operationId`)
-- Remove por inteiro os 2 endpoints ad-hoc (`/graphql/stream/:name`, `/graphql/ws/:name`) -- nenhum teve consumidor real
-- Ver `.specs/features/graphql-realtime-protocols/{spec,context}.md`
+- Removidos por inteiro os 2 endpoints ad-hoc (`/graphql/stream/:name`, `/graphql/ws/:name`, `internal/graphql/{ws,sse}.go`) -- nenhum teve consumidor real
+- Decisão central de arquitetura: `HttpAdapter.RegisterWebSocket` removido, substituído por `execution.Response.UpgradeWebSocket`/`execution.Request.IsWebSocketUpgrade` (novo capability em `Responder`) -- permite `POST`/`PUT`/`GET`/`DELETE` coexistirem no MESMO `/graphql` sem o `app.Use(path, ...)` antigo interceptando todo método (o Edge Case que o spec.md deixou em aberto pra Design)
+- `.examples/blog-graphql` demonstra os 3 transportes reais, com evidência real de dial WS/SSE colada nos relatórios de execução
+- Ver `.specs/features/graphql-realtime-protocols/{spec,context,design,tasks}.md`, AD-040 em STATE.md
 
 ---
 

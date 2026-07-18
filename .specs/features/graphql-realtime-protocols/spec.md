@@ -170,14 +170,14 @@ códigos corretos).
 ## Requirement Traceability
 
 | Requirement ID | Story | Phase | Status |
-| --------------- | -------------------------------------------------------- | ------- | ------- |
-| GQLRT-01 | P1: WS handshake (ConnectionInit/Ack, timeouts) | Specify | Pending |
-| GQLRT-02 | P1: WS single-result operation (Query/Mutation) | Specify | Pending |
-| GQLRT-03 | P1: WS streaming operation (Subscription) | Specify | Pending |
-| GQLRT-04 | P2: WS multiplexação | Specify | Pending |
-| GQLRT-05 | P1: SSE Distinct connections mode | Specify | Pending |
-| GQLRT-06 | P2: SSE Single connection mode (reserva + multiplexação) | Specify | Pending |
-| GQLRT-07 | Remoção dos 2 endpoints ad-hoc (Milestone 17/T9-T10) | Specify | Pending |
+| --------------- | -------------------------------------------------------- | ------- | -------- |
+| GQLRT-01 | P1: WS handshake (ConnectionInit/Ack, timeouts) | Execute | Verified |
+| GQLRT-02 | P1: WS single-result operation (Query/Mutation) | Execute | Verified |
+| GQLRT-03 | P1: WS streaming operation (Subscription) | Execute | Verified |
+| GQLRT-04 | P2: WS multiplexação | Execute | Verified |
+| GQLRT-05 | P1: SSE Distinct connections mode | Execute | Verified |
+| GQLRT-06 | P2: SSE Single connection mode (reserva + multiplexação) | Execute | Verified |
+| GQLRT-07 | Remoção dos 2 endpoints ad-hoc (Milestone 17/T9-T10) | Execute | Verified |
 
 ## Success Criteria
 
