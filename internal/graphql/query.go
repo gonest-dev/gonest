@@ -11,10 +11,11 @@ import "gonest.dev/gonest/internal/schema"
 // Mutation) is decided by which list Resolver.Query/Mutation appended them
 // to, not by their own Go type.
 type Query struct {
-	name    string
-	args    *schema.Schema
-	returns *schema.Schema
-	handler func(ctx *GraphqlContext) any
+	name        string
+	args        *schema.Schema
+	returns     *schema.Schema
+	returnsList bool
+	handler     func(ctx *GraphqlContext) any
 }
 
 // newQuery creates a *Query and runs fn on it immediately -- same
@@ -60,6 +61,22 @@ func (q *Query) Returns(s *schema.Schema) *Query {
 // was never called.
 func (q *Query) ReturnsSchema() *schema.Schema {
 	return q.returns
+}
+
+// ReturnsList stores s as this Query's return-value schema, same as
+// Returns, but declares the field's GraphQL type as a LIST of s (`[X!]`)
+// instead of a bare object -- for a Handler returning a Go slice (e.g.
+// `service.List()`), not a single value. Returns q so calls can chain.
+func (q *Query) ReturnsList(s *schema.Schema) *Query {
+	q.returns = s
+	q.returnsList = true
+	return q
+}
+
+// ReturnsIsList reports whether ReturnsList (rather than Returns) was
+// used to declare this Query's return schema.
+func (q *Query) ReturnsIsList() bool {
+	return q.returnsList
 }
 
 // Handler stores fn as this Query's resolve function and returns q so

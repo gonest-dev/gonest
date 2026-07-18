@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"fmt"
+	"reflect"
 
 	gql "github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
@@ -35,7 +36,7 @@ func Build(queries []*Query, mutations []*Mutation, subscriptions []*Subscriptio
 
 	queryFields := gql.Fields{}
 	for _, q := range queries {
-		f, err := b.buildField(q.Name(), q.ArgsSchema(), q.ReturnsSchema(), q.HandlerFunc())
+		f, err := b.buildField(q.Name(), q.ArgsSchema(), q.ReturnsSchema(), q.ReturnsIsList(), q.HandlerFunc())
 		if err != nil {
 			return nil, fmt.Errorf("query %q: %w", q.Name(), err)
 		}
@@ -47,7 +48,7 @@ func Build(queries []*Query, mutations []*Mutation, subscriptions []*Subscriptio
 
 	mutationFields := gql.Fields{}
 	for _, m := range mutations {
-		f, err := b.buildField(m.Name(), m.ArgsSchema(), m.ReturnsSchema(), m.HandlerFunc())
+		f, err := b.buildField(m.Name(), m.ArgsSchema(), m.ReturnsSchema(), m.ReturnsIsList(), m.HandlerFunc())
 		if err != nil {
 			return nil, fmt.Errorf("mutation %q: %w", m.Name(), err)
 		}
@@ -63,8 +64,9 @@ func Build(queries []*Query, mutations []*Mutation, subscriptions []*Subscriptio
 		// bypasses graphql-go's own execution engine entirely (T9/T10's
 		// internal/gqltransport calls Subscription.HandlerFunc() directly),
 		// this Field only exists so the Subscription root type/SDL declares
-		// the right name/args/return-type shape.
-		f, err := b.buildField(s.Name(), s.ArgsSchema(), s.ReturnsSchema(), nil)
+		// the right name/args/return-type shape. Subscriptions emit ONE
+		// value at a time (never a list), so no ReturnsIsList concept here.
+		f, err := b.buildField(s.Name(), s.ArgsSchema(), s.ReturnsSchema(), false, nil)
 		if err != nil {
 			return nil, fmt.Errorf("subscription %q: %w", s.Name(), err)
 		}
@@ -115,10 +117,13 @@ func Build(queries []*Query, mutations []*Mutation, subscriptions []*Subscriptio
 // therefore built HERE, at schema-construction time, wrapping handler --
 // internal/app's own role (T7) is only to invoke gql.Do itself and
 // translate its result to an HTTP response, not to dispatch per-field.
-func (b *builder) buildField(name string, args, returns *schema.Schema, handler func(ctx *GraphqlContext) any) (*gql.Field, error) {
+func (b *builder) buildField(name string, args, returns *schema.Schema, returnsList bool, handler func(ctx *GraphqlContext) any) (*gql.Field, error) {
 	outType, err := b.outputType(returns)
 	if err != nil {
 		return nil, err
+	}
+	if returnsList {
+		outType = gql.NewList(outType)
 	}
 
 	fieldArgs, err := b.fieldArgs(args)
@@ -245,12 +250,47 @@ func (b *builder) objectType(s *schema.Schema) (*gql.Object, error) {
 		if p.IsRequired() {
 			t = gql.NewNonNull(t)
 		}
-		fields[argKey(p)] = &gql.Field{Type: t}
+		fields[argKey(p)] = &gql.Field{Type: t, Resolve: fieldResolver(p)}
 	}
 
 	obj := gql.NewObject(gql.ObjectConfig{Name: name, Fields: fields})
 	b.objects[s] = obj
 	return obj, nil
+}
+
+// fieldResolver builds the Resolve callback for one struct field --
+// SPEC_DEVIATION (real bug found via a live example dispatch, not caught
+// by unit tests): graphql-go's own DEFAULT resolve (used when Field.
+// Resolve is nil) only reads a map[string]any source by key -- it does
+// NOT match a Go struct's exported field name against the lowercase
+// json-tag-derived SDL field name (e.g. SDL field "id" vs Go field "ID"),
+// so any Query/Mutation returning a real struct value (not a map) failed
+// with "Cannot return null for non-nullable field" for every field.
+// Reads via p.Field()'s own reflect.StructField.Index -- the EXACT same
+// field the rest of this package (argKey, validation) already keys off
+// of, so there is no second, potentially-diverging name-matching rule.
+// Falls back to map[string]any lookup (by the same argKey) for a Handler
+// that returns a plain map, same as graphql-go's own default already
+// supported.
+func fieldResolver(p *schema.PropertyBuilder) gql.FieldResolveFn {
+	key := argKey(p)
+	return func(params gql.ResolveParams) (any, error) {
+		if m, ok := params.Source.(map[string]any); ok {
+			return m[key], nil
+		}
+
+		v := reflect.ValueOf(params.Source)
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				return nil, nil
+			}
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Struct {
+			return nil, nil
+		}
+		return v.FieldByIndex(p.Field().Index).Interface(), nil
+	}
 }
 
 // scalarOrListType builds the GraphQL type for a single property --

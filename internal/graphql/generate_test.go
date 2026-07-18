@@ -180,3 +180,99 @@ func TestBuild_CustomWithoutGraphqlScalar_ReturnsError(t *testing.T) {
 		t.Fatal("expected an error for Custom(fn) without GraphqlScalar(name), got nil")
 	}
 }
+
+// --- regressions found via a live .examples/blog-graphql dispatch, not
+// caught by any earlier unit test (all of which returned map[string]any
+// from Handler, never a real Go struct) ---
+
+type genPostEntity struct {
+	Id    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+func TestBuild_QueryReturningStruct_ResolvesFieldsCorrectly(t *testing.T) {
+	zero := &genPostEntity{}
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { schema.Deregister(typ) })
+	postSchema := schema.New(typ, uintptr(unsafe.Pointer(zero)))
+	postSchema.Property(&zero.Id).Integer().Required()
+	postSchema.Property(&zero.Title).String().Required()
+
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("post", func(qb *graphql.Query) {
+			qb.Returns(postSchema)
+			qb.Handler(func(ctx *graphql.GraphqlContext) any {
+				// A REAL struct value, NOT a map[string]any -- graphql-go's
+				// own DEFAULT field resolver (used when Field.Resolve is
+				// nil) only knows how to read a map by key, so this used to
+				// come back all-null before fieldResolver was added.
+				return &genPostEntity{Id: 1, Title: "Hello"}
+			})
+		})
+	})
+	res.Declare()
+
+	sch, err := graphql.Build(res.OwnQueries(), nil, nil)
+	if err != nil {
+		t.Fatalf("Build() error: %v", err)
+	}
+
+	result := gql.Do(gql.Params{
+		Schema:        *sch,
+		RequestString: `{ post { id title } }`,
+	})
+	if result.HasErrors() {
+		t.Fatalf("query failed: %v", result.Errors)
+	}
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("result.Data = %T, want map[string]any", result.Data)
+	}
+	post, ok := data["post"].(map[string]any)
+	if !ok {
+		t.Fatalf("data[\"post\"] = %T, want map[string]any", data["post"])
+	}
+	if post["title"] != "Hello" {
+		t.Fatalf("post[\"title\"] = %v, want %q (struct field resolution)", post["title"], "Hello")
+	}
+}
+
+func TestBuild_QueryReturnsList_ProducesArrayOfResults(t *testing.T) {
+	zero := &genPostEntity{}
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { schema.Deregister(typ) })
+	postSchema := schema.New(typ, uintptr(unsafe.Pointer(zero)))
+	postSchema.Property(&zero.Id).Integer().Required()
+	postSchema.Property(&zero.Title).String().Required()
+
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("posts", func(qb *graphql.Query) {
+			qb.ReturnsList(postSchema)
+			qb.Handler(func(ctx *graphql.GraphqlContext) any {
+				return []*genPostEntity{{Id: 1, Title: "A"}, {Id: 2, Title: "B"}}
+			})
+		})
+	})
+	res.Declare()
+
+	sch, err := graphql.Build(res.OwnQueries(), nil, nil)
+	if err != nil {
+		t.Fatalf("Build() error: %v", err)
+	}
+
+	result := gql.Do(gql.Params{
+		Schema:        *sch,
+		RequestString: `{ posts { id title } }`,
+	})
+	if result.HasErrors() {
+		t.Fatalf("query failed: %v", result.Errors)
+	}
+	data := result.Data.(map[string]any)
+	posts, ok := data["posts"].([]any)
+	if !ok {
+		t.Fatalf("data[\"posts\"] = %T, want []any (ReturnsList must produce a GraphQL LIST type)", data["posts"])
+	}
+	if len(posts) != 2 {
+		t.Fatalf("len(posts) = %d, want 2", len(posts))
+	}
+}

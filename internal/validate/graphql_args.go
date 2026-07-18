@@ -36,5 +36,48 @@ func (s *mapArgsSource) ParseInto(dst any, schemaArg any) error {
 	m := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
 	resolveSchema(m, dstVal.Type())
-	return parseDecoded(dst, dstVal, m, s.parsed)
+	return parseDecoded(dst, dstVal, m, normalizeGraphqlValue(s.parsed))
+}
+
+// normalizeGraphqlValue converts graphql-go's own decoded arg shapes into
+// the SAME shapes encoding/json's decode-into-any produces -- the shape
+// validateValue/validatePrimitive/setField (this package's shared
+// validate/populate pipeline, reused unchanged from REST) already assume.
+//
+// SPEC_DEVIATION (real bug found via a live example's Query, not caught by
+// unit tests that only ever passed raw string/int64 args by hand):
+// graphql-go's own Int/Float scalar coercion (confirmed via Context7 --
+// stream.go/coerceInt) parses a GraphQL `Int` literal into a native Go
+// `int`, not `float64` -- but validatePrimitive's "integer"/"number" case
+// does a hard `raw.(float64)` type assertion, matching ONLY what
+// encoding/json's own json.Unmarshal(..., &any{}) produces for a JSON
+// number. Left unnormalized, EVERY integer/float GraphQL arg failed
+// validation with a confusing, near-silent "expected number" violation
+// (surfacing as an EMPTY error message, since NewBadRequestException's
+// default Message() is "" when never explicitly set).
+func normalizeGraphqlValue(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, val := range x {
+			out[k] = normalizeGraphqlValue(val)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, val := range x {
+			out[i] = normalizeGraphqlValue(val)
+		}
+		return out
+	case int:
+		return float64(x)
+	case int32:
+		return float64(x)
+	case int64:
+		return float64(x)
+	case float32:
+		return float64(x)
+	default:
+		return v
+	}
 }
