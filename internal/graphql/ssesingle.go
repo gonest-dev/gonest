@@ -209,6 +209,55 @@ func writeSSESingleFrame(write func(string) error, event string, frame sseSingle
 	return write(fmt.Sprintf("event: %s\ndata: %s\n\n", event, data))
 }
 
+// SSESingleCancelHandler builds the DELETE /graphql handler implementing
+// graphql-sse's Single connection mode operation termination: "This is done
+// by sending a DELETE HTTP request encoding the unique operation ID inside
+// the URL's search parameters behind the operationId key... The HTTP
+// request MUST contain the matching reservation token." The token is read
+// the same way every other Single connection mode handler reads it
+// (X-GraphQL-Event-Stream-Token header, falling back to a ?token= query
+// parameter), and operationId is read from the ?operationId= query
+// parameter per that same PROTOCOL.md excerpt.
+//
+// reg.StopOperation(token, operationId) (already implemented, reservation.go
+// T11/T13) is the exact primitive this delegates to -- it removes and
+// closes only that operationId's done channel on token's reservation,
+// leaving every other operationId active on the same token (or on any
+// other token) untouched, so cancelling one Subscription can never
+// interrupt another one multiplexed over the same SSE connection.
+//
+// ok=false (StopOperation found nothing to stop -- either operationId was
+// never started, already completed on its own, or was already cancelled by
+// a prior DELETE, OR token itself is unknown) responds with a plain HTTP
+// 404: same "transport-level, not a GraphQL execution error" reasoning
+// SSESingleConnectHandler's own doc comment gives for its 404s -- there is
+// no GraphQL result to report here at all, just "nothing found to cancel".
+// This makes a DELETE against an already-finished operationId NOT
+// idempotent in its HTTP response (a second DELETE 404s), but it IS
+// idempotent in effect (never double-closes a channel, never panics) --
+// StopOperation's own contract already guarantees that. A successful
+// cancellation responds 200 with an empty JSON body; PROTOCOL.md does not
+// specify a response shape for DELETE, so the convention is picked to match
+// this file's own PUT/POST bare-JSON responses.
+func SSESingleCancelHandler(reg *ReservationRegistry) func(req *execution.Request, res *execution.Response) {
+	return func(req *execution.Request, res *execution.Response) {
+		token := req.Header(sseSingleTokenHeader)
+		if token == "" {
+			token = req.Queries()["token"]
+		}
+		operationId := req.Queries()["operationId"]
+
+		if ok := reg.StopOperation(token, operationId); !ok {
+			res.Status(404)
+			_ = res.Json(map[string]any{"message": fmt.Sprintf("gonest: no active operation %q for reservation token %q", operationId, token)})
+			return
+		}
+
+		res.Status(200)
+		_ = res.Json(map[string]any{})
+	}
+}
+
 // SSESingleOperationHandler builds the POST /graphql handler implementing
 // graphql-sse's Single connection mode operation start: "separate HTTP
 // requests solicit GraphQL operations... successful responses (execution

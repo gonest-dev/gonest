@@ -411,6 +411,157 @@ func TestSSESingleConnectHandler_UnknownToken_RespondsError(t *testing.T) {
 	})
 }
 
+// TestSSESingleCancelHandler_ActiveOperationId_StopsThatSubscriptionOnly
+// proves a DELETE against one operationId cancels exactly that Subscription
+// -- via reg.StopOperation, which closes its ctx.Done() and unblocks its
+// Handler -- while a second Subscription active on the SAME token, under a
+// different operationId, keeps running (observed here by it still emitting
+// a `next` frame after the DELETE).
+func TestSSESingleCancelHandler_ActiveOperationId_StopsThatSubscriptionOnly(t *testing.T) {
+	stopped := make(chan struct{})
+	sub := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+				<-ctx.Done()
+				close(stopped)
+			})
+		})
+	})
+	sub.Declare()
+
+	other := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onOther", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+				ticker := time.NewTicker(5 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						emit(map[string]any{"ok": true})
+					}
+				}
+			})
+		})
+	})
+	other.Declare()
+
+	subs := map[string]*graphql.Subscription{
+		"onCreated": sub.OwnSubscriptions()[0],
+		"onOther":   other.OwnSubscriptions()[0],
+	}
+
+	reg := graphql.NewReservationRegistry()
+	token := reg.Reserve()
+	r := attachAndDrainToken(t, reg, token)
+	t.Cleanup(func() { reg.StopOperation(token, "op-other") })
+
+	// op-other's ticker-driven emits write frames over the same unbuffered
+	// io.Pipe as everything else on this token -- drain them continuously
+	// (content is irrelevant to this test) so those writes never block
+	// forever with nothing reading.
+	drainDone := make(chan struct{})
+	go func() {
+		defer close(drainDone)
+		buf := make([]byte, 4096)
+		for {
+			if _, err := r.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	body1 := `{"query":"{ onCreated }","extensions":{"operationId":"op-cancel"}}`
+	postResponder1 := newFakeSSEResponder("", map[string]string{"token": token})
+	postResponder1.body = []byte(body1)
+	postReq1, postRes1 := execution.New(postResponder1)
+	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq1, postRes1)
+
+	body2 := `{"query":"{ onOther }","extensions":{"operationId":"op-other"}}`
+	postResponder2 := newFakeSSEResponder("", map[string]string{"token": token})
+	postResponder2.body = []byte(body2)
+	postReq2, postRes2 := execution.New(postResponder2)
+	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq2, postRes2)
+
+	// Wait for op-other to actually be registered before op-cancel is
+	// DELETEd, so StopOperation(token, "op-cancel") below can never race
+	// ahead of StartOperation registering it.
+	deadline := time.After(2 * time.Second)
+	for {
+		if _, ok := reg.Route(token, "op-other"); ok {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("op-other never routed")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+
+	delResponder := newFakeSSEResponder("", map[string]string{"token": token, "operationId": "op-cancel"})
+	delReq, delRes := execution.New(delResponder)
+	graphql.SSESingleCancelHandler(reg)(delReq, delRes)
+
+	if delResponder.GetStatus() != 200 {
+		t.Fatalf("GetStatus() = %d, want 200", delResponder.GetStatus())
+	}
+
+	select {
+	case <-stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("op-cancel's Subscription Handler was never unblocked by the DELETE")
+	}
+
+	// op-other must still be active: a further StopOperation call on it
+	// must report ok=true (it hasn't already finished/been removed).
+	if ok := reg.StopOperation(token, "op-other"); !ok {
+		t.Fatal("op-other was stopped too -- DELETE for op-cancel must not affect other operations on the same token")
+	}
+}
+
+// TestSSESingleCancelHandler_UnknownOperationId_RespondsError proves a
+// DELETE for an operationId that was never started (or a token that was
+// never reserved) responds with a clear HTTP error (404), never panics.
+func TestSSESingleCancelHandler_UnknownOperationId_RespondsError(t *testing.T) {
+	reg := graphql.NewReservationRegistry()
+
+	t.Run("token never reserved", func(t *testing.T) {
+		responder := newFakeSSEResponder("", map[string]string{"token": "does-not-exist", "operationId": "op-1"})
+		req, res := execution.New(responder)
+
+		graphql.SSESingleCancelHandler(reg)(req, res)
+
+		if responder.GetStatus() != 404 {
+			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
+		}
+	})
+
+	t.Run("token reserved, operationId never started", func(t *testing.T) {
+		token := reg.Reserve()
+		responder := newFakeSSEResponder("", map[string]string{"token": token, "operationId": "does-not-exist"})
+		req, res := execution.New(responder)
+
+		graphql.SSESingleCancelHandler(reg)(req, res)
+
+		if responder.GetStatus() != 404 {
+			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
+		}
+	})
+
+	t.Run("missing operationId query parameter", func(t *testing.T) {
+		token := reg.Reserve()
+		responder := newFakeSSEResponder("", map[string]string{"token": token})
+		req, res := execution.New(responder)
+
+		graphql.SSESingleCancelHandler(reg)(req, res)
+
+		if responder.GetStatus() != 404 {
+			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
+		}
+	})
+}
+
 func TestSSESingleConnectHandler_ClientDisconnects_ReleasesReservation(t *testing.T) {
 	reg := graphql.NewReservationRegistry()
 	token := reg.Reserve()
