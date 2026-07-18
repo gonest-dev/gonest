@@ -21,12 +21,27 @@ import (
 type Emitter struct {
 	mu        sync.Mutex
 	listeners map[reflect.Type][]reflect.Value
+
+	// subscribers holds every dynamic channel registered via Subscribe[T]
+	// (graphql-support feature, Milestone 17), keyed by the exact event
+	// type it was registered for -- same keying as listeners, but a
+	// fundamentally different lifecycle: a subscriber is dynamic (lives
+	// only as long as the caller's own done channel stays open, e.g. one
+	// GraphQL Subscription connection), while a listener registered via
+	// MustOn is static (lives for the whole app). Kept as a SEPARATE map
+	// rather than folding into listeners so Emit's hot path never needs to
+	// distinguish "is this entry a MustOn handler or a Subscribe channel"
+	// per event.
+	subscribers map[reflect.Type][]chan any
 }
 
 // New builds an empty Emitter. Called once per bootstrap by internal/app
 // (NewApp/MustNewTestApp), never directly by user code.
 func New() *Emitter {
-	return &Emitter{listeners: make(map[reflect.Type][]reflect.Value)}
+	return &Emitter{
+		listeners:   make(map[reflect.Type][]reflect.Value),
+		subscribers: make(map[reflect.Type][]chan any),
+	}
 }
 
 // on registers handler (a func(context.Context, T) value, T == t) for t.
@@ -71,5 +86,17 @@ func (e *Emitter) Emit(event any) {
 			}()
 			h.Call([]reflect.Value{reflect.ValueOf(context.Background()), eventValue})
 		}()
+	}
+
+	// graphql-support feature: forward to every Subscribe[T] channel
+	// registered for t, non-blocking (select+default) -- same "never
+	// blocks the caller" contract Emit already documents above. A full or
+	// abandoned-but-not-yet-removed channel simply drops the event rather
+	// than stalling Emit.
+	for _, ch := range e.subscribersFor(t) {
+		select {
+		case ch <- event:
+		default:
+		}
 	}
 }
