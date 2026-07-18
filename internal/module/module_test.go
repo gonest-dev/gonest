@@ -50,6 +50,16 @@ func (c *fakeController) SetOwnerModule(m *Module) {
 	c.ownerModule = m
 }
 
+type fakeResolver struct {
+	ownerModule *Module
+}
+
+func (*fakeResolver) IsResolver() {}
+
+func (r *fakeResolver) SetOwnerModule(m *Module) {
+	r.ownerModule = m
+}
+
 func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
 	executed := false
 
@@ -210,6 +220,52 @@ func TestModule_OwnControllers_ReturnsCopyNotInternalSlice(t *testing.T) {
 	got2 := m.OwnControllers()
 	if got2[0] != ControllerRef(c) {
 		t.Fatalf("OwnControllers() leaked mutable internal slice: mutation of returned slice affected subsequent call")
+	}
+}
+
+func TestModule_Resolvers_RegistersResolvers(t *testing.T) {
+	r := &fakeResolver{}
+	m := New(func(m *Module) {
+		m.Resolvers(r)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+}
+
+func TestModule_OwnResolvers_ReturnsRegisteredResolvers(t *testing.T) {
+	r := &fakeResolver{}
+	m := New(func(m *Module) {
+		m.Resolvers(r)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnResolvers()
+	if len(got) != 1 || got[0] != ResolverRef(r) {
+		t.Fatalf("OwnResolvers() = %v, want [r]", got)
+	}
+}
+
+func TestModule_OwnResolvers_ReturnsCopyNotInternalSlice(t *testing.T) {
+	r := &fakeResolver{}
+	m := New(func(m *Module) {
+		m.Resolvers(r)
+	})
+
+	if _, err := assemble(m); err != nil {
+		t.Fatalf("assemble returned unexpected error: %v", err)
+	}
+
+	got := m.OwnResolvers()
+	got[0] = &fakeResolver{}
+
+	got2 := m.OwnResolvers()
+	if got2[0] != ResolverRef(r) {
+		t.Fatalf("OwnResolvers() leaked mutable internal slice: mutation of returned slice affected subsequent call")
 	}
 }
 

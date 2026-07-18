@@ -50,6 +50,9 @@ func assemble(root *Module) ([]*Module, error) {
 		for _, c := range m.controllers {
 			c.SetOwnerModule(m)
 		}
+		for _, r := range m.resolvers {
+			r.SetOwnerModule(m)
+		}
 		for _, l := range m.listeners {
 			l.SetOwnerModule(m)
 		}

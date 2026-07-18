@@ -50,6 +50,19 @@ type Owner interface {
 	OwnerModule() *Module
 }
 
+// ResolverRef is the GraphQL Resolver equivalent of ControllerRef
+// (graphql-support feature, Milestone 17) -- same cross-package marker
+// rationale, mirroring ControllerRef's exact shape. Satisfied by the real
+// *gqlresolver.Resolver type (internal/gqlresolver), declared here rather
+// than importing that package directly for the same reason ControllerRef
+// avoids importing internal/controller.
+type ResolverRef interface {
+	IsResolver()
+	// SetOwnerModule associates this resolver with the module that owns
+	// it. Called by assemble during Stage 1.
+	SetOwnerModule(m *Module)
+}
+
 // MiddlewareRef is a minimal marker interface satisfied by the real
 // *middleware.Middleware type (owned by internal/middleware). Module never
 // needs to know the concrete middleware type -- it only stores registrations
@@ -107,6 +120,7 @@ type Module struct {
 	imports     []*Module
 	providers   []ProviderRef
 	controllers []ControllerRef
+	resolvers   []ResolverRef
 	exports     []ProviderRef
 	middleware  []MiddlewareRef
 	filters     []FilterRef
@@ -144,6 +158,12 @@ func (m *Module) Providers(ps ...ProviderRef) {
 // Controllers registers controllers owned by this module.
 func (m *Module) Controllers(cs ...ControllerRef) {
 	m.controllers = append(m.controllers, cs...)
+}
+
+// Resolvers registers GraphQL resolvers owned by this module (graphql-
+// support feature, Milestone 17) -- same registration shape as Controllers.
+func (m *Module) Resolvers(rs ...ResolverRef) {
+	m.resolvers = append(m.resolvers, rs...)
 }
 
 // Exports registers the subset of this module's own providers that are
@@ -194,6 +214,14 @@ func (m *Module) OwnProviders() []ProviderRef {
 // every registered controller) and by a future task's route registration.
 func (m *Module) OwnControllers() []ControllerRef {
 	return append([]ControllerRef(nil), m.controllers...)
+}
+
+// OwnResolvers returns a copy of the GraphQL resolvers registered on this
+// module via Resolvers. Read-only: mutating the returned slice does not
+// affect this Module's internal state. Same defensive-copy pattern as
+// OwnControllers.
+func (m *Module) OwnResolvers() []ResolverRef {
+	return append([]ResolverRef(nil), m.resolvers...)
 }
 
 // OwnMiddleware returns a copy of the middleware registered on this module
