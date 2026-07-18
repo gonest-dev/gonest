@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** nenhuma -- Milestones 1-17 COMPLETE
-**Status:** Milestones 1-17 COMPLETE
+**Current Milestone:** 18 (GraphQL Realtime Protocols) -- especificada, aguardando Design/Tasks/Execute
+**Status:** Milestones 1-17 COMPLETE, Milestone 18 SPECIFIED (não iniciada)
 
 ---
 
@@ -327,6 +327,22 @@
 - Transporte de Subscription (SSE + WebSocket) escrito por conta própria -- nenhum dos dois vem pronto do motor escolhido; WebSocket via `github.com/gofiber/contrib/v3/websocket` (nova `HttpAdapter.RegisterWebSocket` capability)
 - Todo o código real vive em UM único pacote `internal/graphql` (builder + gerador SDL + transportes) -- não 3 pacotes separados como o design original previa, reorganizado durante a execução
 - Ver `.specs/features/graphql-support/{spec,context,design,tasks}.md` — evolui `INSIGHT-GRAPHQL.md`
+
+---
+
+## Milestone 18: GraphQL Realtime Protocols
+
+**Goal:** Substituir os transportes de Subscription ad-hoc (SSE/WS próprios, Milestone 17/T9-T10) pelos protocolos REAIS e amplamente adotados -- `graphql-transport-ws` (WebSocket) e `graphql-sse` (SSE, os dois modos: Distinct connections e Single connection), ambos direto no `/graphql` já existente. Motivado por um bug real: uma IDE GraphQL de verdade tentou WS em `/graphql` esperando o protocolo padrão e falhou.
+**Status:** SPECIFIED (spec.md + context.md prontos -- Design/Tasks/Execute pendentes)
+
+### Features
+
+**GraphQL Realtime Protocols** - SPECIFIED
+- WebSocket: `graphql-transport-ws` real (`ConnectionInit`/`Ack`, `Ping`/`Pong`, `Subscribe`/`Next`/`Error`/`Complete`, multiplexação por `id`, fechamentos `4408`/`4429`/`4409`/`4401`/`4400`) -- só o subprotocolo moderno, sem o legado `graphql-ws`
+- SSE Distinct connections mode: `GET /graphql` com `Accept: text/event-stream`, 1 conexão por operação
+- SSE Single connection mode: `PUT` (reserva+token) → `GET` (conexão única) → `POST`/`DELETE` (executa/encerra operação, multiplexado por `operationId`)
+- Remove por inteiro os 2 endpoints ad-hoc (`/graphql/stream/:name`, `/graphql/ws/:name`) -- nenhum teve consumidor real
+- Ver `.specs/features/graphql-realtime-protocols/{spec,context}.md`
 
 ---
 

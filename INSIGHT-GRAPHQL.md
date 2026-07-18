@@ -147,9 +147,9 @@ Dois campos com o MESMO `.GraphqlScalar("ObjectID")` deduplicam pra uma única d
 ## O que continua em aberto (não resolvido nesta feature)
 
 - Canal de erro próprio dentro de Subscription (`emitError(err)` ao lado de `emit(value)`) -- panic é recuperado (não derruba o processo), mas sem notificar o client com uma mensagem GraphQL-shaped.
-- Endpoint `/graphql` fixo, não configurável via `AppOptions` ainda.
 - `Refine`/`Sanitize` (schema-sanitize-refine feature) não conectados a Args de GraphQL.
 - Federation/schema stitching entre múltiplos serviços -- fora de escopo, v1 é um único schema por app.
+- **Transportes de Subscription (SSE `/graphql/stream/:name` e WS `/graphql/ws/:name`) são AD-HOC, não seguem protocolo padrão nenhum** -- confirmado como problema real (uma IDE GraphQL tentou WS direto em `/graphql` esperando `graphql-transport-ws` e falhou). Nova feature especificada pra resolver isso: `.specs/features/graphql-realtime-protocols/` (Milestone 18) -- substitui os dois ad-hoc por `graphql-transport-ws` real e `graphql-sse` real (os dois modos), Design/Tasks/Execute ainda pendentes.
 
 ## Conclusão
 
