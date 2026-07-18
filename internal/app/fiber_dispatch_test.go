@@ -2613,9 +2613,17 @@ func listenOnEphemeralPort(t *testing.T, app *coreapp.App) (addr string) {
 
 	fiberAdapter := app.Adapter().(*fiber.FiberApp)
 	t.Cleanup(func() {
-		if err := fiberAdapter.FiberApp().Shutdown(); err != nil {
-			t.Errorf("Shutdown returned error: %v", err)
-		}
+		// ShutdownWithTimeout, not Shutdown: a graceful Shutdown() waits for
+		// every still-open connection to close on its own -- an abandoned
+		// SSE stream (sse_distinct.go/sse_single.go) only notices its
+		// client is gone on the NEXT heartbeat write attempt
+		// (sseHeartbeatInterval, 15s), so a plain Shutdown() here would pay
+		// up to a real 15-30s wall-clock tax per test. A bounded timeout
+		// forcibly closes whatever is still open once it elapses instead --
+		// a "context deadline exceeded" return in THAT case is the expected
+		// outcome (an SSE connection this test deliberately left open,
+		// never a genuine shutdown failure), so it is not asserted on here.
+		_ = fiberAdapter.FiberApp().ShutdownWithTimeout(200 * time.Millisecond)
 	})
 
 	select {
