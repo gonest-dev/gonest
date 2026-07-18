@@ -657,6 +657,32 @@ func NewSchema[T any](fn func(t *T, m *Schema)) *Schema {
 	return m
 }
 
+// Value is the builder handed to NewValue's callback -- a true Go type
+// alias of PropertyBuilder (schema-value-support feature), since a
+// standalone value needs none of PropertyBuilder's struct-field bookkeeping,
+// only its type+format branch methods (String()/Integer()/Boolean()/
+// Array()/Object()) and Min/Max/Pattern/Custom, all already implemented and
+// reused here with zero duplication.
+type Value = schema.Value
+
+// NewValue constructs a *Schema for a standalone value of type T -- no
+// struct required, unlike NewSchema[T]. Go cannot re-export a generic
+// function via var, so this is a real wrapper (same AD-004 precedent as
+// NewSchema itself).
+//
+//	cpfSchema := gonest.NewValue[string](func(m *gonest.Value) {
+//	    m.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+//	})
+//	cpf := gonest.MustParse[string](req.Body(), cpfSchema)
+func NewValue[T any](fn func(m *Value)) *Schema {
+	var zero T
+	m, pb := schema.NewValue(reflect.TypeOf(zero))
+	if fn != nil {
+		fn(pb)
+	}
+	return m
+}
+
 // ---------------------------------------------------------------------------
 // NumericSchema (Numeric & Boolean Branches feature)
 // ---------------------------------------------------------------------------

@@ -1400,6 +1400,42 @@ func TestNewSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	}
 }
 
+// TestNewValue_RootAlias_CpfExample reproduces spec.md's own API Sketch
+// example verbatim (schema-value-support feature): a standalone `string`
+// value schema, no struct wrapping it, built via NewValue instead of
+// NewSchema.
+func TestNewValue_RootAlias_CpfExample(t *testing.T) {
+	m := NewValue[string](func(m *Value) {
+		m.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+	})
+
+	if m == nil {
+		t.Fatal("NewValue() returned nil *Schema")
+	}
+
+	props := m.OwnProperties()
+	if len(props) != 1 {
+		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+	}
+
+	p := props[0]
+	if p.KindValue() != "string" {
+		t.Fatalf("KindValue() = %q, want %q", p.KindValue(), "string")
+	}
+	if min, ok := p.MinValue(); !ok || min != 11 {
+		t.Fatalf("MinValue() = (%d, %v), want (11, true)", min, ok)
+	}
+	if max, ok := p.MaxValue(); !ok || max != 11 {
+		t.Fatalf("MaxValue() = (%d, %v), want (11, true)", max, ok)
+	}
+	if p.PatternValue() != `^\d{11}$` {
+		t.Fatalf("PatternValue() = %q, want %q", p.PatternValue(), `^\d{11}$`)
+	}
+	if !p.IsRequired() {
+		t.Fatal("IsRequired() = false, want true")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // StringSchema (String-family Branches feature)
 // ---------------------------------------------------------------------------
