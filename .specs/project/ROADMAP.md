@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** 15 (Schema Value Support) -- **PRÓXIMA A SER IMPLEMENTADA**, spec+design+tasks prontos, aguardando execução
-**Status:** Milestones 1-14 COMPLETE, Milestone 15 DESIGNED (next up), Milestone 16 (GraphQL Support) DESIGNED (não iniciada)
+**Status:** Milestones 1-15 COMPLETE, Milestone 16 (GraphQL Support) DESIGNED (next up, não iniciada)
 
 ---
 
@@ -284,11 +284,11 @@
 ## Milestone 15: Schema Value Support
 
 **Goal:** Permitir `gonest.NewSchema`-like para um valor primitivo isolado (sem struct em volta -- ex: um CPF `string` solto), e renomear `gonest.Value[T]` (dirty-tracking existente) para `gonest.Accessor[T]`, liberando o nome `Value` para o conceito novo.
-**Status:** SPECIFIED (spec.md + context.md + design.md + tasks.md prontos, 7 tasks — execução pendente)
+**Status:** COMPLETE (T1-T7 executados, `go test ./... -race` verde, 23 pacotes)
 
 ### Features
 
-**Schema Value Support** - SPECIFIED
+**Schema Value Support** - COMPLETE
 - `gonest.Value[T]` (dirty-tracking, código real hoje) → `gonest.Accessor[T]` -- mesma API, só o nome muda
 - `gonest.NewValue[T](func(m *gonest.Value) {...})` novo -- constrói um `*Schema` pra valor único, reaproveitando 100% do `PropertyBuilder`/`validateValue` já existentes
 - `gonest.Property(&t.X)` (dentro de `NewSchema[T]`, struct) permanece inalterado -- decisão explícita de não reformar por causa de um caso secundário

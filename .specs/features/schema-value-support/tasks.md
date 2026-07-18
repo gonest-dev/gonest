@@ -1,7 +1,7 @@
 # Schema Value Support — Tasks
 
 **Spec**: `.specs/features/schema-value-support/spec.md`
-**Status**: Draft
+**Status**: Complete
 
 ---
 

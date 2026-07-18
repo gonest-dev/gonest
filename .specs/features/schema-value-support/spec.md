@@ -140,10 +140,10 @@ rename do P1 anterior.
 
 | Requirement ID | Story                                    | Phase   | Status  |
 | -------------- | ------------------------------------------ | ------- | ------- |
-| SVAL-01        | P1: Rename Value[T] → Accessor[T]           | Specify | Pending |
-| SVAL-02        | P1: NewValue[T]/Value construtor            | Specify | Pending |
-| SVAL-03        | P1: Value reaproveita PropertyBuilder engine| Specify | Pending |
-| SVAL-04        | P1: Property/NewSchema[T] struct inalterado | Specify | Pending |
+| SVAL-01        | P1: Rename Value[T] → Accessor[T]           | Execute | Verified |
+| SVAL-02        | P1: NewValue[T]/Value construtor            | Execute | Verified |
+| SVAL-03        | P1: Value reaproveita PropertyBuilder engine| Execute | Verified |
+| SVAL-04        | P1: Property/NewSchema[T] struct inalterado | Execute | Verified |
 
 ---
 

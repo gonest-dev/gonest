@@ -2,7 +2,7 @@
 
 **Spec**: `.specs/features/schema-value-support/spec.md`
 **Context**: `.specs/features/schema-value-support/context.md`
-**Status**: Draft
+**Status**: Complete
 
 ---
 
