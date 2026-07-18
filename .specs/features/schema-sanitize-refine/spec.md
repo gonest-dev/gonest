@@ -37,22 +37,22 @@ feature `request-response-split`).
 
 ## Out of Scope
 
-| Feature | Reason |
-| ------- | ------ |
+| Feature                                                            | Reason                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Sanitize`/`Refine` para `params`/`query`/`form`/`headers` sources | V1 cobre só JSON body -- os exemplos reais trazidos (CPF trim, password/confirmPassword) são naturalmente body-shaped; os outros 4 sources têm parsing de string-pra-tipo próprio (`coerceParamString`) com um caminho de `Custom` já especial-casado por fonte, extensão exigiria tocar 4 arquivos com formatos sutilmente diferentes -- adiado até haver caso de uso real |
-| `Refine` contra um `Value`-schema (`NewValue[T]`, sem struct) | `dst` seria só o valor solto, sem outro campo pra comparar contra -- só faz sentido pra `NewSchema[T]` (struct) nesta v1 |
-| `Sanitize`/`Refine` em GraphQL (`Resolver.Args()`/`.Returns()`) | Reaproveitado automaticamente por serem a MESMA `Schema`/`PropertyBuilder` -- sem trabalho extra, mas Milestone 16 (GraphQL Support) continua fora de escopo desta feature |
+| `Refine` contra um `Value`-schema (`NewValue[T]`, sem struct)      | `dst` seria só o valor solto, sem outro campo pra comparar contra -- só faz sentido pra `NewSchema[T]` (struct) nesta v1                                                                                                                                                                                                                                                    |
+| `Sanitize`/`Refine` em GraphQL (`Resolver.Args()`/`.Returns()`)    | Reaproveitado automaticamente por serem a MESMA `Schema`/`PropertyBuilder` -- sem trabalho extra, mas Milestone 16 (GraphQL Support) continua fora de escopo desta feature                                                                                                                                                                                                  |
 
 ## Design Decisions (tomadas durante o brainstorming)
 
-| # | Decisão |
-| - | ------- |
-| D1 | `Sanitize` fica no `PropertyBuilder` (por campo) -- só precisa do próprio `raw`, mesmo nível que `Custom` |
-| D2 | `Refine` fica no `Schema` (whole-type) -- precisa ver o struct INTEIRO já populado, não um campo isolado |
-| D3 | `Sanitize` roda ANTES de `Custom`/dispatch built-in, transformando `raw` que os dois vão consumir -- não substitui nada, só prepara |
-| D4 | `Refine` roda DEPOIS de `validateStruct` (validação individual) E `populate` (população) terem sucesso -- comparar campos que ainda nem foram validados não faz sentido |
-| D5 | Múltiplos `Refine` na mesma `Schema` -- todos rodam (collect-all), cada um contribui 0 ou 1 violação, identificada pelo `field` que a função retorna (pode ser `""` pra um erro geral do objeto) |
-| D6 | `Sanitize(fn)` é idempotente por contrato (mesma convenção que `Custom(fn)` já documenta) -- pode rodar até 2x por request (validate + populate) |
+| #   | Decisão                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | `Sanitize` fica no `PropertyBuilder` (por campo) -- só precisa do próprio `raw`, mesmo nível que `Custom`                                                                                        |
+| D2  | `Refine` fica no `Schema` (whole-type) -- precisa ver o struct INTEIRO já populado, não um campo isolado                                                                                         |
+| D3  | `Sanitize` roda ANTES de `Custom`/dispatch built-in, transformando `raw` que os dois vão consumir -- não substitui nada, só prepara                                                              |
+| D4  | `Refine` roda DEPOIS de `validateStruct` (validação individual) E `populate` (população) terem sucesso -- comparar campos que ainda nem foram validados não faz sentido                          |
+| D5  | Múltiplos `Refine` na mesma `Schema` -- todos rodam (collect-all), cada um contribui 0 ou 1 violação, identificada pelo `field` que a função retorna (pode ser `""` pra um erro geral do objeto) |
+| D6  | `Sanitize(fn)` é idempotente por contrato (mesma convenção que `Custom(fn)` já documenta) -- pode rodar até 2x por request (validate + populate)                                                 |
 
 ## Architecture Note
 
@@ -72,16 +72,16 @@ métodos em `Schema` (`Refine`/`OwnRefines`), (3) a aplicação desses dois em
 ## API Sketch
 
 ```go
-updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, m *gonest.Schema) {
-  m.Property(&t.Cpf).String().Min(11).Max(11).Pattern(`^\d{11}$`).Sanitize(func(raw any) any {
+updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, s *gonest.Schema) {
+  s.Property(&t.Cpf).String().Min(11).Max(11).Pattern(`^\d{11}$`).Sanitize(func(raw any) any {
     s, _ := raw.(string)
     return strings.TrimSpace(s)
   }).Required()
 
-  m.Property(&t.Password).String().Min(8).Required()
-  m.Property(&t.ConfirmPassword).String().Min(8).Required()
+  s.Property(&t.Password).String().Min(8).Required()
+  s.Property(&t.ConfirmPassword).String().Min(8).Required()
 
-  m.Refine(func(dst any) (field string, err error) {
+  s.Refine(func(dst any) (field string, err error) {
     d := dst.(*UpdateUserDTO)
     if d.Password != d.ConfirmPassword {
       return "confirmPassword", errors.New("must match password")
@@ -136,11 +136,11 @@ violação customizada se a comparação falhar.
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --------------- | ------------------------------------ | ------- | ------- |
-| SANR-01 | P1: Sanitize(fn) pré-processamento | Execute | Verified |
-| SANR-02 | P1: Refine(fn) pós-processamento cross-field | Execute | Verified |
-| SANR-03 | Custom/Property/NewSchema/NewValue permanecem inalterados | Execute | Verified |
+| Requirement ID | Story                                                     | Phase   | Status   |
+| -------------- | --------------------------------------------------------- | ------- | -------- |
+| SANR-01        | P1: Sanitize(fn) pré-processamento                        | Execute | Verified |
+| SANR-02        | P1: Refine(fn) pós-processamento cross-field              | Execute | Verified |
+| SANR-03        | Custom/Property/NewSchema/NewValue permanecem inalterados | Execute | Verified |
 
 ## Success Criteria
 

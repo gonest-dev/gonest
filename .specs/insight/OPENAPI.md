@@ -23,15 +23,15 @@ type UserEntity struct {
 // tipo Number().Integer() — direto Integer(), Float(), Double(), Email(), Uuid() etc).
 // Required/Nullable/Description/Examples ficam na base, comuns a qualquer branch.
 // mesma declaração alimenta: schema OpenAPI (oas) + validação runtime (gonest.MustParse/MustInject).
-var _ = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
-  m.Description("Entidade de usuário")
-  m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
-  m.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
-  m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("[EMAIL_ADDRESS]")
-  m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
-  m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(time.Now())
-  m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
-  m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
+var _ = gonest.NewSchema[UserEntity](func (t *UserEntity, s *gonest.Schema) {
+  s.Description("Entidade de usuário")
+  s.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+  s.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
+  s.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("[EMAIL_ADDRESS]")
+  s.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
+  s.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(time.Now())
+  s.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
+  s.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
 })
 
 // branches previstos (OpenAPI 3.1 type+format), cada um com métodos próprios de validação:
@@ -77,49 +77,49 @@ type UserEntity struct {
 }
 
 func init() {
-  gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
+  gonest.NewSchema[UserEntity](func (t *UserEntity, s *gonest.Schema) {
     // schema aninhada declarada dentro do mesmo closure e capturada em variável —
     // sem reflect, sem [T] em método (Go não permite parâmetro de tipo em método).
     // reusada abaixo tanto em Array (Items) quanto em Object direto.
-    addressSchema := gonest.NewSchema[AddressEntity](func (t *AddressEntity, m *gonest.Schema) {
-      m.Description("Endereço")
-      m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
-      m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
-      m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+    addressSchema := gonest.NewSchema[AddressEntity](func (t *AddressEntity, s2 *gonest.Schema) {
+      s2.Description("Endereço")
+      s2.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+      s2.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+      s2.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
     })
 
-    m.Description("Entidade de usuário com campos aninhados")
-    m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+    s.Description("Entidade de usuário com campos aninhados")
+    s.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
     // Array() de tipo primitivo — Items() sem arg encadeia o branch igual Property faria.
-    m.Property(&t.Tags).Array().Items(func(m *gonest.ArraySchema) {
-      m.String().Min(1).Max(50)
-      m.Required()
-      m.Description("Tags do usuário")
-      m.Examples("admin", "beta")
+    s.Property(&t.Tags).Array().Items(func(as *gonest.ArraySchema) {
+      as.String().Min(1).Max(50)
+      as.Required()
+      as.Description("Tags do usuário")
+      as.Examples("admin", "beta")
     })
 
     // Array() de número — Min/Max aqui são do ITEM (0 a 100); array em si não tem Min/Max
     // de quantidade nesse caso (poderia mesclar com .Array(1, 10) se quantidade importasse).
-    m.Property(&t.Scores).Array().Items(func(m *gonest.ArraySchema) {
-      m.Integer().Min(0).Max(100)
-      m.Required()
-      m.Description("Notas do usuário")
-      m.Examples(80, 95)
+    s.Property(&t.Scores).Array().Items(func(as *gonest.ArraySchema) {
+      as.Integer().Min(0).Max(100)
+      as.Required()
+      as.Description("Notas do usuário")
+      as.Examples(80, 95)
     })
 
     // Array() de Object() — Items(addressSchema) reusa a schema já registrada acima
     // (mesmo objeto, sem duplicar Property; equivalente a $ref no OpenAPI).
-    m.Property(&t.Addresses).Array().Items(func(m *gonest.ArraySchema) {
-      m.Object(addressSchema)
-      m.Required()
-      m.Min(1)
-      m.Description("Endereços do usuário")
-      m.Examples("admin", "beta")
+    s.Property(&t.Addresses).Array().Items(func(as *gonest.ArraySchema) {
+      as.Object(addressSchema)
+      as.Required()
+      as.Min(1)
+      as.Description("Endereços do usuário")
+      as.Examples("admin", "beta")
     })
 
     // Object() direto (não-array) — mesma reutilização via valor, sem reflect.
-    m.Property(&t.Address).Object(func(om *gonest.ObjectSchema) {
+    s.Property(&t.Address).Object(func(om *gonest.ObjectSchema) {
       om.Schema(addressSchema)
       om.Required()
       om.Description("Endereço principal")
@@ -127,7 +127,7 @@ func init() {
 
     // Object() livre (schema aberto, tipo map[string]any) — sem struct Go aninhada pra
     // reusar, por isso recebe callback em vez de schema já registrada.
-    m.Property(&t.Schema).Object(func (om *gonest.ObjectSchema) {
+    s.Property(&t.Schema).Object(func (om *gonest.ObjectSchema) {
       om.AdditionalProperties()
     }).Nullable().Description("Metadados abertos do usuário")
   })
@@ -516,8 +516,8 @@ type UserIdParams struct {
   UserId int64 `param:"user_id"`
 }
 
-var userIdParamsSchema = gonest.NewSchema[UserIdParams](func (t *UserIdParams, m *gonest.Schema) {
-  m.Property(&t.UserId).Integer().Min(1).Required()
+var userIdParamsSchema = gonest.NewSchema[UserIdParams](func (t *UserIdParams, s *gonest.Schema) {
+  s.Property(&t.UserId).Integer().Min(1).Required()
 })
 
 // query string: struct + tag `query:"..."`, mesmo mecanismo, um campo por
@@ -527,9 +527,9 @@ type ListUsersQuery struct {
   Limit int `query:"limit"`
 }
 
-var listUsersQuerySchema = gonest.NewSchema[ListUsersQuery](func (t *ListUsersQuery, m *gonest.Schema) {
-  m.Property(&t.Page).Integer().Min(1).Required()
-  m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
+var listUsersQuerySchema = gonest.NewSchema[ListUsersQuery](func (t *ListUsersQuery, s *gonest.Schema) {
+  s.Property(&t.Page).Integer().Min(1).Required()
+  s.Property(&t.Limit).Integer().Min(1).Max(100).Required()
 })
 
 // headers: struct + tag `header:"..."`
@@ -538,9 +538,9 @@ type CustomHeaders struct {
   RequestId string `header:"x-request-id"`
 }
 
-var customHeadersSchema = gonest.NewSchema[CustomHeaders](func (t *CustomHeaders, m *gonest.Schema) {
-  m.Property(&t.UserAgent).String().Required()
-  m.Property(&t.RequestId).String().Required()
+var customHeadersSchema = gonest.NewSchema[CustomHeaders](func (t *CustomHeaders, s *gonest.Schema) {
+  s.Property(&t.UserAgent).String().Required()
+  s.Property(&t.RequestId).String().Required()
 })
 
 // UserEntity/UserService (mesmos do "exemplo mais simples" em
@@ -643,8 +643,8 @@ type CreatePostForm struct {
   Title string `form:"title"`
 }
 
-var createPostFormSchema = gonest.NewSchema[CreatePostForm](func (t *CreatePostForm, m *gonest.Schema) {
-  m.Property(&t.Title).String().Required()
+var createPostFormSchema = gonest.NewSchema[CreatePostForm](func (t *CreatePostForm, s *gonest.Schema) {
+  s.Property(&t.Title).String().Required()
 })
 
 var PostController = gonest.NewController(func (controller *gonest.Controller) {
@@ -764,32 +764,28 @@ func (t *UserService) Get(userId int64) *UserEntity {
   panic(gonest.NewNotFoundException(map[string]any{"userId": userId}))
 }
 
-var addressSchema = gonest.NewSchema[AddressEntity](func (t *AddressEntity, m *gonest.Schema) {
-  m.Property(&t.Street).String().Required()
-  m.Property(&t.City).String().Required()
-  m.Property(&t.Zip).String().Required()
+var addressSchema = gonest.NewSchema[AddressEntity](func (t *AddressEntity, s *gonest.Schema) {
+  s.Property(&t.Street).String().Required()
+  s.Property(&t.City).String().Required()
+  s.Property(&t.Zip).String().Required()
 })
 
 // Object(func(om *gonest.ObjectSchema){ om.Schema(ref) }) e
 // Array().Items(func(am *gonest.ArraySchema){ am.Object(ref) }) reusam a
 // MESMA addressSchema declarada acima -- Schema Generation dedup automático
 // por identidade de ponteiro, não por nome (ver abaixo).
-var userEntitySchema = gonest.NewSchema[UserEntity](func (t *UserEntity, m *gonest.Schema) {
-  m.Title("UserEntity") // nome do schema em components.schemas -- default é
+var userEntitySchema = gonest.NewSchema[UserEntity](func (t *UserEntity, s *gonest.Schema) {
+  s.Title("UserEntity") // nome do schema em components.schemas -- default é
                         // o nome do tipo Go (reflect.Type.Name()), Title()
                         // sobrescreve.
-  m.Property(&t.Id).Integer().Required()
-  m.Property(&t.Name).String().Required()
-  m.Property(&t.Address).Object(func (om *gonest.ObjectSchema) {
-    om.Schema(addressSchema)
-  }).Required()
-  m.Property(&t.Addresses).Array().Items(func (am *gonest.ArraySchema) {
-    am.Object(addressSchema)
-  })
+  s.Property(&t.Id).Integer().Required()
+  s.Property(&t.Name).String().Required()
+  s.Property(&t.Address).Object(func (om *gonest.ObjectSchema) { om.Schema(addressSchema) }).Required()
+  s.Property(&t.Addresses).Array().Items(func (am *gonest.ArraySchema) { am.Object(addressSchema) })
 })
 
-var userIdParamsSchema = gonest.NewSchema[UserIdParams](func (t *UserIdParams, m *gonest.Schema) {
-  m.Property(&t.UserId).Integer().Min(1).Required()
+var userIdParamsSchema = gonest.NewSchema[UserIdParams](func (t *UserIdParams, s *gonest.Schema) {
+  s.Property(&t.UserId).Integer().Min(1).Required()
 })
 
 var UserController = gonest.NewController(func (controller *gonest.Controller) {
@@ -942,25 +938,25 @@ type exQuery struct {
   Limit  int64 `query:"limit"`
   Offset int64 `query:"offset"`
 }
-var exQuerySchema = gonest.NewSchema[exQuery](func(q *exQuery, m *gonest.Schema) {
-  m.Property(&q.Limit).Integer().Required()
-  m.Property(&q.Offset).Integer().Required()
+var exQuerySchema = gonest.NewSchema[exQuery](func(q *exQuery, s *gonest.Schema) {
+  s.Property(&q.Limit).Integer().Required()
+  s.Property(&q.Offset).Integer().Required()
 })
 
 type exParams struct {
   UserID int64 `param:"user_id"`
 }
-var exParamsSchema = gonest.NewSchema[exParams](func(p *exParams, m *gonest.Schema) {
-  m.Property(&p.UserID).Integer().Required()
+var exParamsSchema = gonest.NewSchema[exParams](func(p *exParams, s *gonest.Schema) {
+  s.Property(&p.UserID).Integer().Required()
 })
 
 type exBody struct {
   Name  string `json:"name"`
   Email string `json:"email"`
 }
-var exBodySchema = gonest.NewSchema[exBody](func(b *exBody, m *gonest.Schema) {
-  m.Property(&b.Name).String().Required()
-  m.Property(&b.Email).String().Required()
+var exBodySchema = gonest.NewSchema[exBody](func(b *exBody, s *gonest.Schema) {
+  s.Property(&b.Name).String().Required()
+  s.Property(&b.Email).String().Required()
 })
 
 var controller = gonest.NewController(func(controller *gonest.Controller) {

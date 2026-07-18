@@ -115,11 +115,11 @@ type UserEntity struct {
   CreatedAt time.Time `json:"createdAt"`
 }
 
-var userEntitySchema = gonest.NewSchema(func(t *UserEntity, m *gonest.Schema) {
-  m.Property(&t.Id).Integer().Required()
-  m.Property(&t.Email).Email().Required()
-  m.Property(&t.Website).Uri()
-  m.Property(&t.CreatedAt).DateTime().Required()
+var userEntitySchema = gonest.NewSchema(func(t *UserEntity, s *gonest.Schema) {
+  s.Property(&t.Id).Integer().Required()
+  s.Property(&t.Email).Email().Required()
+  s.Property(&t.Website).Uri()
+  s.Property(&t.CreatedAt).DateTime().Required()
 })
 ```
 

@@ -10,29 +10,29 @@ type CreateBodyDTO struct {
 	Body   string `json:"body"`
 }
 
-var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, m *gonest.Schema) {
-	m.Title("PostCreateBodyDTO")
-	m.Property(&t.UserID).Integer().Min(1).Required()
-	m.Property(&t.Title).String().Min(1).Required()
-	m.Property(&t.Body).String().Min(1).Required()
+var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, s *gonest.Schema) {
+	s.Title("PostCreateBodyDTO")
+	s.Property(&t.UserID).Integer().Min(1).Required()
+	s.Property(&t.Title).String().Min(1).Required()
+	s.Property(&t.Body).String().Min(1).Required()
 })
 
 type ParamsDTO struct {
 	PostID int64 `param:"post_id"`
 }
 
-var paramsDTOSchema = gonest.NewSchema(func(t *ParamsDTO, m *gonest.Schema) {
-	m.Title("PostParamsDTO")
-	m.Property(&t.PostID).Integer().Min(1).Required()
+var paramsDTOSchema = gonest.NewSchema(func(t *ParamsDTO, s *gonest.Schema) {
+	s.Title("PostParamsDTO")
+	s.Property(&t.PostID).Integer().Min(1).Required()
 })
 
 type ListQueryDTO struct {
 	UserID int64 `query:"user_id"`
 }
 
-var listQueryDTOSchema = gonest.NewSchema(func(t *ListQueryDTO, m *gonest.Schema) {
-	m.Title("post.ListQueryDTO")
-	m.Property(&t.UserID).Integer()
+var listQueryDTOSchema = gonest.NewSchema(func(t *ListQueryDTO, s *gonest.Schema) {
+	s.Title("post.ListQueryDTO")
+	s.Property(&t.UserID).Integer()
 })
 
 // UploadAttachmentFormDTO is the multipart/form-data TEXT field validated
@@ -43,7 +43,7 @@ type UploadAttachmentFormDTO struct {
 	Description string `form:"description"`
 }
 
-var uploadAttachmentFormDTOSchema = gonest.NewSchema(func(t *UploadAttachmentFormDTO, m *gonest.Schema) {
-	m.Title("PostUploadAttachmentFormDTO")
-	m.Property(&t.Description).String()
+var uploadAttachmentFormDTOSchema = gonest.NewSchema(func(t *UploadAttachmentFormDTO, s *gonest.Schema) {
+	s.Title("PostUploadAttachmentFormDTO")
+	s.Property(&t.Description).String()
 })

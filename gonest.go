@@ -612,7 +612,7 @@ var NewFilter = filter.New
 
 // Schema holds the whole-type description plus every field registered via
 // Property, for a single NewSchema[T] call (e.g. INSIGHT.md's
-// `gonest.NewSchema[UserEntity](func(t *UserEntity, m *gonest.Schema) {
+// `gonest.NewSchema[UserEntity](func(t *UserEntity, s *gonest.Schema) {
 // ... })`). See internal/schema.Schema's doc comment for the full
 // contract.
 type Schema = schema.Schema

@@ -10,11 +10,11 @@ type CreateBodyDTO struct {
 	Body   string `json:"body"`
 }
 
-var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, m *gonest.Schema) {
-	m.Title("CommentCreateBodyDTO")
-	m.Property(&t.PostID).Integer().Min(1).Required()
-	m.Property(&t.UserID).Integer().Min(1).Required()
-	m.Property(&t.Body).String().Min(1).Required()
+var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, s *gonest.Schema) {
+	s.Title("CommentCreateBodyDTO")
+	s.Property(&t.PostID).Integer().Min(1).Required()
+	s.Property(&t.UserID).Integer().Min(1).Required()
+	s.Property(&t.Body).String().Min(1).Required()
 })
 
 type ListQueryDTO struct {
@@ -22,8 +22,8 @@ type ListQueryDTO struct {
 	UserID int64 `query:"user_id"`
 }
 
-var listQueryDTOSchema = gonest.NewSchema(func(t *ListQueryDTO, m *gonest.Schema) {
-	m.Title("CommentListQueryDTO")
-	m.Property(&t.PostID).Integer()
-	m.Property(&t.UserID).Integer()
+var listQueryDTOSchema = gonest.NewSchema(func(t *ListQueryDTO, s *gonest.Schema) {
+	s.Title("CommentListQueryDTO")
+	s.Property(&t.PostID).Integer()
+	s.Property(&t.UserID).Integer()
 })

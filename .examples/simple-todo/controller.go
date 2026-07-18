@@ -10,8 +10,8 @@ type createTodoBody struct {
 	Title string `json:"title"`
 }
 
-var createTodoBodySchema = gonest.NewSchema(func(t *createTodoBody, m *gonest.Schema) {
-	m.Property(&t.Title).String().Min(1).Required()
+var createTodoBodySchema = gonest.NewSchema(func(t *createTodoBody, s *gonest.Schema) {
+	s.Property(&t.Title).String().Min(1).Required()
 })
 
 type updateTodoBody struct {
@@ -19,17 +19,17 @@ type updateTodoBody struct {
 	Done  bool   `json:"done"`
 }
 
-var updateTodoBodySchema = gonest.NewSchema(func(t *updateTodoBody, m *gonest.Schema) {
-	m.Property(&t.Title).String().Min(1).Required()
-	m.Property(&t.Done).Boolean()
+var updateTodoBodySchema = gonest.NewSchema(func(t *updateTodoBody, s *gonest.Schema) {
+	s.Property(&t.Title).String().Min(1).Required()
+	s.Property(&t.Done).Boolean()
 })
 
 type todoIDParams struct {
 	ID int64 `param:"id"`
 }
 
-var todoIDParamsSchema = gonest.NewSchema(func(t *todoIDParams, m *gonest.Schema) {
-	m.Property(&t.ID).Integer().Min(1).Required()
+var todoIDParamsSchema = gonest.NewSchema(func(t *todoIDParams, s *gonest.Schema) {
+	s.Property(&t.ID).Integer().Min(1).Required()
 })
 
 var TodoController = gonest.NewController(func(controller *gonest.Controller) {

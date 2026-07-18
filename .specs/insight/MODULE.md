@@ -22,9 +22,9 @@ type UserEntity struct {
   DeletedAt *time.Time `json:"deleted_at"`
 }
 
-var userPropertiesSchema = gonest.NewSchema[UserProperties](func (t *UserProperties, m *gonest.Schema) {
-  m.Property(&t.Name).String().Required()
-  m.Property(&t.Age).Integer().Required()
+var userPropertiesSchema = gonest.NewSchema[UserProperties](func (t *UserProperties, s *gonest.Schema) {
+  s.Property(&t.Name).String().Required()
+  s.Property(&t.Age).Integer().Required()
 })
 
 // exemplo mínimo de serviço crud
@@ -82,8 +82,8 @@ type UserIdParam struct {
 // gonest.Parse agora recebe o Schema explícito como argumento (ver seção
 // "hipótese" mais abaixo, decisão tomada e já executada), não existe mais
 // lookup por tipo num registry global.
-var userIdParamSchema = gonest.NewSchema[UserIdParam](func (t *UserIdParam, m *gonest.Schema) {
-  m.Property(&t.UserId).Integer().Min(1).Required()
+var userIdParamSchema = gonest.NewSchema[UserIdParam](func (t *UserIdParam, s *gonest.Schema) {
+  s.Property(&t.UserId).Integer().Min(1).Required()
 })
 
 var UserController = gonest.NewController(func (controller *gonest.Controller) {
@@ -165,11 +165,11 @@ type UserPatchDTO struct {
   Age  gonest.Value[int]    `json:"age"`
 }
 
-var userPatchSchema = gonest.NewSchema[UserPatchDTO](func(t *UserPatchDTO, m *gonest.Schema) {
+var userPatchSchema = gonest.NewSchema[UserPatchDTO](func(t *UserPatchDTO, s *gonest.Schema) {
   // As constraints só são verificadas se o campo vier no payload (dirty).
   // Quando omitido, não existe violation de Required -- é um PATCH, não um PUT.
-  m.Property(&t.Name).String().Min(2)
-  m.Property(&t.Age).Integer().Min(0)
+  s.Property(&t.Name).String().Min(2)
+  s.Property(&t.Age).Integer().Min(0)
 })
 
 var _ = gonest.NewController(func(c *gonest.Controller) {
@@ -349,16 +349,16 @@ type PrefixedUserIdParam struct {
   UserId int64 `param:"user_id"`
 }
 
-var prefixedUserIdParamSchema = gonest.NewSchema[PrefixedUserIdParam](func (t *PrefixedUserIdParam, m *gonest.Schema) {
-  m.Property(&t.UserId).Custom(func(raw any) (any, error) {
-    s, _ := raw.(string)
-    rest, ok := strings.CutPrefix(s, "usr_")
+var prefixedUserIdParamSchema = gonest.NewSchema[PrefixedUserIdParam](func (t *PrefixedUserIdParam, s *gonest.Schema) {
+  s.Property(&t.UserId).Custom(func(raw any) (any, error) {
+    strVal, _ := raw.(string)
+    rest, ok := strings.CutPrefix(strVal, "usr_")
     if !ok {
-      return nil, fmt.Errorf("expected a %q-prefixed id, got %q", "usr_", s)
+      return nil, fmt.Errorf("expected a %q-prefixed id, got %q", "usr_", strVal)
     }
     id, err := strconv.ParseInt(rest, 10, 64)
     if err != nil {
-      return nil, fmt.Errorf("expected a numeric suffix after %q, got %q", "usr_", s)
+      return nil, fmt.Errorf("expected a numeric suffix after %q, got %q", "usr_", strVal)
     }
     return id, nil
   }).Required()

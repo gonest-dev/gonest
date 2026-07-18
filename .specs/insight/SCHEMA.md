@@ -131,11 +131,11 @@ precisa ser idempotente.
 ## `Refine(fn)` no `Schema` (pós, cross-field)
 
 ```go
-updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, m *gonest.Schema) {
-  m.Property(&t.Password).String().Min(8).Required()
-  m.Property(&t.ConfirmPassword).String().Min(8).Required()
+updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, s *gonest.Schema) {
+  s.Property(&t.Password).String().Min(8).Required()
+  s.Property(&t.ConfirmPassword).String().Min(8).Required()
 
-  m.Refine(func(dst any) (field string, err error) {
+  s.Refine(func(dst any) (field string, err error) {
     d := dst.(*UpdateUserDTO)
     if d.Password != d.ConfirmPassword {
       return "confirmPassword", errors.New("must match password")

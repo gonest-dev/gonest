@@ -41,6 +41,7 @@
   - [Scheduler (Cron/Interval/Timeout)](#scheduler-cronintervaltimeout)
   - [Health checks (Terminus)](#health-checks-terminus)
   - [Testing](#testing)
+  - [Development](#development)
 - [Contributors](#contributors)
 - [License](#license)
 
@@ -333,11 +334,11 @@ type UserEntity struct {
   Email string `json:"email"`
 }
 
-var userEntitySchema = gonest.NewSchema[UserEntity](func(t *UserEntity, m *gonest.Schema) {
-  m.Title("UserEntity") // components.schemas name in OpenAPI; defaults to the Go type name
-  m.Property(&t.Id).Integer().Required()
-  m.Property(&t.Name).String().Required().Min(1).Max(50)
-  m.Property(&t.Email).Email().Required()
+var userEntitySchema = gonest.NewSchema[UserEntity](func(t *UserEntity, s *gonest.Schema) {
+  s.Title("UserEntity") // components.schemas name in OpenAPI; defaults to the Go type name
+  s.Property(&t.Id).Integer().Required()
+  s.Property(&t.Name).String().Required().Min(1).Max(50)
+  s.Property(&t.Email).Email().Required()
 })
 ```
 
@@ -394,8 +395,8 @@ type UserIdParams struct {
   UserId int64 `param:"user_id"`
 }
 
-var userIdParamsSchema = gonest.NewSchema[UserIdParams](func(t *UserIdParams, m *gonest.Schema) {
-  m.Property(&t.UserId).Integer().Min(1).Required()
+var userIdParamsSchema = gonest.NewSchema[UserIdParams](func(t *UserIdParams, s *gonest.Schema) {
+  s.Property(&t.UserId).Integer().Min(1).Required()
 })
 
 var UserController = gonest.NewController(func(controller *gonest.Controller) {
@@ -457,8 +458,8 @@ type CreatePostForm struct {
   Title string `form:"title"`
 }
 
-var createPostFormSchema = gonest.NewSchema[CreatePostForm](func(t *CreatePostForm, m *gonest.Schema) {
-  m.Property(&t.Title).String().Required()
+var createPostFormSchema = gonest.NewSchema[CreatePostForm](func(t *CreatePostForm, s *gonest.Schema) {
+  s.Property(&t.Title).String().Required()
 })
 
 var PostController = gonest.NewController(func(controller *gonest.Controller) {

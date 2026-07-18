@@ -48,13 +48,13 @@ Se no futuro o Gonest suportar **gRPC**, o `GrpcContext` possuirá a capacidade 
 O mesmo `Schema` que valida um Controller REST pode validar um serviço gRPC sem qualquer alteração:
 
 ```go
-var AuthHeaders = gonest.NewSchema[authHeaders](func(h *authHeaders, m *gonest.Schema) {
-  m.Property(&h.Authorization).String().Required().Pattern("^Bearer ")
+var AuthHeaders = gonest.NewSchema[authHeaders](func(h *authHeaders, s *gonest.Schema) {
+  s.Property(&h.Authorization).String().Required().Pattern("^Bearer ")
 })
 
-var CreateUserPayload = gonest.NewSchema[createUserPayload](func(p *createUserPayload, m *gonest.Schema) {
-  m.Property(&p.Age).Integer().Min(18).Required()
-  m.Property(&p.Email).String().Required() // valida formato
+var CreateUserPayload = gonest.NewSchema[createUserPayload](func(p *createUserPayload, s *gonest.Schema) {
+  s.Property(&p.Age).Integer().Min(18).Required()
+  s.Property(&p.Email).String().Required() // valida formato
 })
 
 // ==========================================

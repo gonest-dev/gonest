@@ -16,9 +16,9 @@ type Entity struct {
 // user.Entity) -- referenced by Controller's Route.Response calls so
 // generated docs actually describe the response body shape, not just the
 // bare path/summary.
-var Schema = gonest.NewSchema(func(t *Entity, m *gonest.Schema) {
-	m.Title("UserEntity")
-	m.Property(&t.ID).Integer().Required()
-	m.Property(&t.Name).String().Required()
-	m.Property(&t.Email).Email().Required()
+var Schema = gonest.NewSchema(func(t *Entity, s *gonest.Schema) {
+	s.Title("UserEntity")
+	s.Property(&t.ID).Integer().Required()
+	s.Property(&t.Name).String().Required()
+	s.Property(&t.Email).Email().Required()
 })

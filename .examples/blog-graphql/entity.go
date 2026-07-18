@@ -11,11 +11,11 @@ type PostEntity struct {
 	Body  string `json:"body"`
 }
 
-var postSchema = gonest.NewSchema(func(t *PostEntity, m *gonest.Schema) {
-	m.Title("PostEntity")
-	m.Property(&t.ID).Integer().Required()
-	m.Property(&t.Title).String().Min(1).Required()
-	m.Property(&t.Body).String().Min(1).Required()
+var postSchema = gonest.NewSchema(func(t *PostEntity, s *gonest.Schema) {
+	s.Title("PostEntity")
+	s.Property(&t.ID).Integer().Required()
+	s.Property(&t.Title).String().Min(1).Required()
+	s.Property(&t.Body).String().Min(1).Required()
 })
 
 // PostCreatedEvent is published (via gonest.Emitter.Emit) every time a Post

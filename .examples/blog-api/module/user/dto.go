@@ -16,17 +16,17 @@ type CreateBodyDTO struct {
 // this exact example: only ONE "createBody" schema ever showed up in
 // /openapi.json, silently wrong for 2 of the 3 controllers).
 
-var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, m *gonest.Schema) {
-	m.Title("user.CreateBodyDTO")
-	m.Property(&t.Name).String().Min(1).Required()
-	m.Property(&t.Email).Email().Required()
+var createBodyDTOSchema = gonest.NewSchema(func(t *CreateBodyDTO, s *gonest.Schema) {
+	s.Title("user.CreateBodyDTO")
+	s.Property(&t.Name).String().Min(1).Required()
+	s.Property(&t.Email).Email().Required()
 })
 
 type ParamsDTO struct {
 	UserID int64 `param:"user_id"`
 }
 
-var paramsDTOSchema = gonest.NewSchema(func(t *ParamsDTO, m *gonest.Schema) {
-	m.Title("UserParamsDTO")
-	m.Property(&t.UserID).Integer().Min(1).Required()
+var paramsDTOSchema = gonest.NewSchema(func(t *ParamsDTO, s *gonest.Schema) {
+	s.Title("UserParamsDTO")
+	s.Property(&t.UserID).Integer().Min(1).Required()
 })
