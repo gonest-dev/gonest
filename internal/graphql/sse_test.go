@@ -43,15 +43,15 @@ func (f *fakeSSEResponder) GetStatus() int {
 	}
 	return f.status
 }
-func (f *fakeSSEResponder) GetMethod() string                 { return "GET" }
-func (f *fakeSSEResponder) GetPath() string                   { return "" }
-func (f *fakeSSEResponder) GetHeader(name string) string      { return "" }
-func (f *fakeSSEResponder) SetHeaderValue(name, value string) {}
-func (f *fakeSSEResponder) GetParam(name string) string       { return f.param }
-func (f *fakeSSEResponder) RawBody() []byte                   { return nil }
-func (f *fakeSSEResponder) Queries() map[string]string        { return f.queries }
-func (f *fakeSSEResponder) HTML(s string) error                { return nil }
-func (f *fakeSSEResponder) SendString(s string) error          { return nil }
+func (f *fakeSSEResponder) GetMethod() string                     { return "GET" }
+func (f *fakeSSEResponder) GetPath() string                       { return "" }
+func (f *fakeSSEResponder) GetHeader(name string) string          { return "" }
+func (f *fakeSSEResponder) SetHeaderValue(name, value string)     {}
+func (f *fakeSSEResponder) GetParam(name string) string           { return f.param }
+func (f *fakeSSEResponder) RawBody() []byte                       { return nil }
+func (f *fakeSSEResponder) Queries() map[string]string            { return f.queries }
+func (f *fakeSSEResponder) HTML(s string) error                   { return nil }
+func (f *fakeSSEResponder) SendString(s string) error             { return nil }
 func (f *fakeSSEResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
 func (f *fakeSSEResponder) WriteStream(fn func(w *bufio.Writer)) {

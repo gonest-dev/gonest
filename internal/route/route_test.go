@@ -34,7 +34,7 @@ func (f *fakeResponder) RawBody() []byte                       { return nil }
 func (f *fakeResponder) Queries() map[string]string            { return nil }
 func (f *fakeResponder) HTML(s string) error                   { return nil }
 func (f *fakeResponder) SendString(s string) error             { return nil }
-func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer)) {}
+func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer))  {}
 func (f *fakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
 
 // TestNew_RunsFnImmediately proves route.New(method, path, fn) runs fn
