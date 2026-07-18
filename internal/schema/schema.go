@@ -34,6 +34,12 @@ type Schema struct {
 	// internal/validate to route ParseInto down a value-shaped path instead
 	// of the struct-field-walking one. See IsValue's own doc comment.
 	isValue bool
+
+	// refines holds every cross-field check registered via Refine
+	// (schema-sanitize-refine feature), in registration order. Run by
+	// internal/validate ONLY after every individual field's validation AND
+	// population have both succeeded -- see Refine's own doc comment.
+	refines []func(dst any) (string, error)
 }
 
 // New constructs a *Schema for structType, whose zero value's address is
@@ -157,6 +163,32 @@ func (m *Schema) OwnProperties() []*PropertyBuilder {
 	return out
 }
 
+// Refine registers fn as a cross-field check (schema-sanitize-refine
+// feature) and returns m so calls can chain. Unlike Property/Custom/
+// Sanitize (all field-scoped), fn receives dst -- a pointer to the WHOLE
+// value this Schema describes, already populated -- since a cross-field
+// comparison (e.g. password == confirmPassword) has no meaning at the
+// single-field level. fn returns (field, err): a non-nil err becomes one
+// violation, identified by field (which may be "" for a whole-object
+// error, or a specific field name like "confirmPassword").
+//
+// Calling Refine more than once accumulates checks -- every one of them
+// runs (internal/validate never stops at the first failing Refine, same
+// collect-all convention validateStruct already follows for individual
+// fields), each contributing at most one violation.
+func (m *Schema) Refine(fn func(dst any) (field string, err error)) *Schema {
+	m.refines = append(m.refines, fn)
+	return m
+}
+
+// OwnRefines returns a copy of every function registered via Refine, in
+// registration order. Read-only: mutating the returned slice does not
+// affect this Schema's internal state (same defensive-copy pattern as
+// OwnProperties).
+func (m *Schema) OwnRefines() []func(dst any) (string, error) {
+	return append([]func(dst any) (string, error)(nil), m.refines...)
+}
+
 // PropertyBuilder holds one field's own constraints -- Required/Nullable/
 // Description/Examples in this feature; future type+format branch features
 // (String(), Integer(), etc. -- see ROADMAP.md, explicitly out of scope
@@ -192,6 +224,13 @@ type PropertyBuilder struct {
 	// field, and its returned value (not the raw decoded value) is what
 	// ultimately populates T's field.
 	custom func(raw any) (any, error)
+
+	// sanitize is the schema-sanitize-refine feature's pre-processing hook:
+	// unlike custom, it does NOT replace the built-in kind/format/Min/Max/
+	// Pattern checks -- it runs BEFORE them (and before custom too, if both
+	// are set on the same field), transforming raw into whatever those
+	// checks actually consume. See Sanitize's own doc comment.
+	sanitize func(raw any) any
 }
 
 // Required marks this field as required and returns p so calls can chain.
@@ -597,4 +636,34 @@ func (p *PropertyBuilder) CustomFunc() (func(raw any) (any, error), bool) {
 		return nil, false
 	}
 	return p.custom, true
+}
+
+// Sanitize sets fn as this field's pre-processing hook (schema-sanitize-
+// refine feature): fn(raw) runs BEFORE any other check -- Custom's full
+// replacement of built-in checks, and the built-in kind/format/Min/Max/
+// Pattern dispatch itself, both consume fn's RETURN value, not the
+// original raw. Unlike Custom, Sanitize never REPLACES a check -- it only
+// transforms the input those checks go on to consume, so Min/Max/Pattern
+// (or Custom, if also set) still run afterwards.
+//
+// fn may be called MORE THAN ONCE per request for the same field (once
+// during validation, once during population -- same reason Custom's own
+// doc comment gives) and must therefore be idempotent: calling it twice
+// with the same raw input must produce the same result.
+//
+// Last-call-wins, no panic, same as every other branch method on
+// PropertyBuilder -- calling Sanitize a second time simply overwrites the
+// first fn.
+func (p *PropertyBuilder) Sanitize(fn func(raw any) any) *PropertyBuilder {
+	p.sanitize = fn
+	return p
+}
+
+// SanitizeFunc returns the function set via Sanitize, and whether Sanitize
+// was ever called -- same "never called" bool-return shape as CustomFunc.
+func (p *PropertyBuilder) SanitizeFunc() (func(raw any) any, bool) {
+	if p.sanitize == nil {
+		return nil, false
+	}
+	return p.sanitize, true
 }
