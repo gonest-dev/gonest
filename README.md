@@ -549,12 +549,12 @@ var UserResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 })
 ```
 
-Query/Mutation dispatch through one fixed `POST /graphql` endpoint (standard `{query, variables,
-operationName}` → `{data, errors}`). Subscriptions get their own `GET /graphql/stream/:name` (SSE) and
-`GET /graphql/ws/:name` (WebSocket) endpoints, args passed via `?args=<JSON>`. Branches with a format
-(`Email`/`Uuid`/`DateTime`/etc) become GraphQL Custom Scalars automatically in the generated SDL;
-`Custom(fn).GraphqlScalar(name)` names a scalar for a `Custom(fn)` field with no native format
-equivalent (e.g. `primitive.ObjectID`).
+Query/Mutation dispatch through one `POST /graphql` endpoint by default (standard `{query, variables,
+operationName}` → `{data, errors}`) -- override via `AppOptions{GraphqlPath: "/api/gql"}`. Subscriptions
+get their own `GET <path>/stream/:name` (SSE) and `GET <path>/ws/:name` (WebSocket) endpoints, derived
+from the same path, args passed via `?args=<JSON>`. Branches with a format (`Email`/`Uuid`/`DateTime`/etc)
+become GraphQL Custom Scalars automatically in the generated SDL; `Custom(fn).GraphqlScalar(name)` names
+a scalar for a `Custom(fn)` field with no native format equivalent (e.g. `primitive.ObjectID`).
 
 ### Event Emitter
 
