@@ -113,6 +113,18 @@ func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 		})
 	}
 
+	return parseDecoded(dst, dstVal, m, parsed)
+}
+
+// parseDecoded is jsonBodySource.ParseInto's shared core, factored out
+// (graphql-support feature, T7's SPEC_DEVIATION) so a second Parseable --
+// mapArgsSource, below, over graphql-go's own already-decoded p.Args map --
+// can reuse the EXACT same validate/populate/Refine pipeline without
+// re-running json.Unmarshal (GraphQL's own args arrive pre-decoded, there
+// is no raw JSON body to unmarshal for them). parsed is either a
+// map[string]any (struct-shaped m) or a bare value (m.IsValue()) -- same
+// shape jsonBodySource.ParseInto already produced via json.Unmarshal.
+func parseDecoded(dst any, dstVal reflect.Value, m *schema.Schema, parsed any) error {
 	// SPEC_DEVIATION (schema-value-support feature, T5): a Value-schema (m
 	// built via schema.NewValue, no struct around it) has no JSON object
 	// wrapping it, no struct tag, no reflect.StructField to key off of --

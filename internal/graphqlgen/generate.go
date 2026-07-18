@@ -6,8 +6,11 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 
+	"gonest.dev/gonest/internal/exception"
+	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/gqlresolver"
 	"gonest.dev/gonest/internal/schema"
+	"gonest.dev/gonest/internal/validate"
 )
 
 // builder accumulates the type caches needed across a single Build call --
@@ -33,7 +36,7 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 
 	queryFields := graphql.Fields{}
 	for _, q := range queries {
-		f, err := b.buildField(q.Name(), q.ArgsSchema(), q.ReturnsSchema())
+		f, err := b.buildField(q.Name(), q.ArgsSchema(), q.ReturnsSchema(), q.HandlerFunc())
 		if err != nil {
 			return nil, fmt.Errorf("query %q: %w", q.Name(), err)
 		}
@@ -45,7 +48,7 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 
 	mutationFields := graphql.Fields{}
 	for _, m := range mutations {
-		f, err := b.buildField(m.Name(), m.ArgsSchema(), m.ReturnsSchema())
+		f, err := b.buildField(m.Name(), m.ArgsSchema(), m.ReturnsSchema(), m.HandlerFunc())
 		if err != nil {
 			return nil, fmt.Errorf("mutation %q: %w", m.Name(), err)
 		}
@@ -57,7 +60,12 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 
 	subscriptionFields := graphql.Fields{}
 	for _, s := range subscriptions {
-		f, err := b.buildField(s.Name(), s.ArgsSchema(), s.ReturnsSchema())
+		// Subscription's Field carries no Resolve/Subscribe -- real dispatch
+		// bypasses graphql-go's own execution engine entirely (T9/T10's
+		// internal/gqltransport calls Subscription.HandlerFunc() directly),
+		// this Field only exists so the Subscription root type/SDL declares
+		// the right name/args/return-type shape.
+		f, err := b.buildField(s.Name(), s.ArgsSchema(), s.ReturnsSchema(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("subscription %q: %w", s.Name(), err)
 		}
@@ -95,18 +103,20 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 	return &sch, nil
 }
 
-// buildField builds one graphql.Field -- its return type (from returns)
-// and its arguments (from args, each property becoming one
-// graphql.ArgumentConfig). Resolve/Subscribe are intentionally left nil:
-// Query/Mutation dispatch is wired by internal/app (T7) directly against
-// gqlresolver.Query/Mutation's own HandlerFunc, not through graphql-go's
-// own execution engine's Resolve callback -- see design.md's Architecture
-// Overview (gonest owns dispatch, graphql-go only supplies the type
-// system/SDL). Subscription dispatch is likewise handled entirely by
-// internal/gqltransport (T9/T10), never through graphql-go's own
-// Subscribe/execution loop (context.md's research: graphql-go's own
-// subscription support never shipped a streaming engine).
-func (b *builder) buildField(name string, args, returns *schema.Schema) (*graphql.Field, error) {
+// buildField builds one graphql.Field -- its return type (from returns),
+// its arguments (from args, each property becoming one
+// graphql.ArgumentConfig), and its Resolve callback (handler, nil for
+// Subscription -- see Build's own comment on subscriptionFields).
+//
+// SPEC_DEVIATION (not anticipated by tasks.md's original "What" for T7):
+// dispatch cannot be wired from internal/app alone as originally
+// sketched -- graphql-go's own execution engine (graphql.Do) is what
+// walks the parsed query/selection set and invokes Resolve per field;
+// there is no other hook to intercept a field's resolution. Resolve is
+// therefore built HERE, at schema-construction time, wrapping handler --
+// internal/app's own role (T7) is only to invoke graphql.Do itself and
+// translate its result to an HTTP response, not to dispatch per-field.
+func (b *builder) buildField(name string, args, returns *schema.Schema, handler func(ctx *gqlresolver.GraphqlContext) any) (*graphql.Field, error) {
 	outType, err := b.outputType(returns)
 	if err != nil {
 		return nil, err
@@ -117,11 +127,43 @@ func (b *builder) buildField(name string, args, returns *schema.Schema) (*graphq
 		return nil, err
 	}
 
-	return &graphql.Field{
+	field := &graphql.Field{
 		Name: name,
 		Type: outType,
 		Args: fieldArgs,
-	}, nil
+	}
+
+	if handler != nil {
+		field.Resolve = func(p graphql.ResolveParams) (result any, resolveErr error) {
+			defer func() {
+				r := recover()
+				if r == nil {
+					return
+				}
+				// gonest.MustParse[T] (called inside handler against
+				// ctx.Args()) panics *exception.BadRequestException on
+				// validation failure -- same panic-based contract REST
+				// already uses. Surface its Message() (e.g. "validation
+				// failed") rather than a generic panic string, so a GraphQL
+				// client sees an error equivalent to what a REST 400 would
+				// have reported (spec.md's Independent Test, P1 story 1).
+				if exc, ok := r.(exception.Exception); ok {
+					resolveErr = fmt.Errorf("%s", exc.Message())
+					return
+				}
+				resolveErr = fmt.Errorf("gonest: panic in resolver %q: %v", name, r)
+			}()
+
+			var argsParseable execution.Parseable
+			if args != nil {
+				argsParseable = validate.NewGraphqlArgsSource(p.Args)
+			}
+			ctx := gqlresolver.NewGraphqlContext(argsParseable, nil)
+			return handler(ctx), nil
+		}
+	}
+
+	return field, nil
 }
 
 // fieldArgs builds a graphql.FieldConfigArgument from args's own

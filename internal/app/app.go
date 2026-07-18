@@ -350,6 +350,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions
 	// satisfies internal/inject's directResolver post-Stage-1 assembly, see
 	// controller.go's ResolveDirect/ResolveDirectAll).
 	declareControllers(modules)
+	declareResolvers(modules)
 	declareListeners(modules)
 	declareSchedulers(modules)
 
@@ -365,6 +366,9 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions
 
 	adapter := newAdapter[T, PT](opt)
 	if err := registerRoutes(adapter, root, modules); err != nil {
+		return nil, err
+	}
+	if err := registerGraphql(adapter, modules); err != nil {
 		return nil, err
 	}
 
@@ -761,6 +765,21 @@ func declareControllers(modules []*module.Module) {
 	for _, m := range modules {
 		for _, c := range m.OwnControllers() {
 			if d, ok := c.(declarable); ok {
+				d.Declare()
+			}
+		}
+	}
+}
+
+// declareResolvers runs Declare (phase 2) on every GraphQL resolver
+// registered across modules, exactly once each -- graphql-support feature,
+// Milestone 17, same phase/rationale as declareControllers (a Resolver has
+// exactly one owning module, MustInject/MustInjectAll calls made during
+// its Declare resolve DIRECTLY).
+func declareResolvers(modules []*module.Module) {
+	for _, m := range modules {
+		for _, r := range m.OwnResolvers() {
+			if d, ok := r.(declarable); ok {
 				d.Declare()
 			}
 		}

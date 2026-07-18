@@ -11,11 +11,14 @@ type GraphqlContext struct {
 	done <-chan struct{}
 }
 
-// newGraphqlContext builds a *GraphqlContext for a single field resolution.
+// NewGraphqlContext builds a *GraphqlContext for a single field resolution.
 // done may be nil for Query/Mutation (request-response, no cancellation
 // concept); Subscription always supplies one, closed when the client
-// disconnects.
-func newGraphqlContext(args execution.Parseable, done <-chan struct{}) *GraphqlContext {
+// disconnects. Exported so internal/graphqlgen (Resolve callbacks) and
+// internal/gqltransport (Subscription transport) can construct one without
+// a same-package helper -- gqlresolver holds the type, but building it is
+// the dispatch layer's job, not this package's own.
+func NewGraphqlContext(args execution.Parseable, done <-chan struct{}) *GraphqlContext {
 	return &GraphqlContext{args: args, done: done}
 }
 
