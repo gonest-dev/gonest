@@ -33,6 +33,7 @@
   - [Multi-binding (MustInjectAll)](#multi-binding-mustinjectall)
   - [Schema declaration + validation](#schema-declaration--validation)
   - [Path params, query string, JSON body](#path-params-query-string-json-body)
+  - [Partial updates (Accessor dirty-tracking)](#partial-updates-accessor-dirty-tracking)
   - [File upload (multipart/form-data streaming)](#file-upload-multipartform-data-streaming)
   - [OpenAPI / Swagger](#openapi--swagger)
   - [Event Emitter](#event-emitter)
@@ -103,25 +104,34 @@ full docs site.
 - [x] M10 - Scheduler (`Cron`/`Interval`/`Timeout`, `Stop`)
 - [x] M11 - Terminus / health checks (`MustInjectAll[Pingable]` pattern, no dedicated bootstrap type needed)
 - [x] M12 - Multipart Form Streaming (`req.Body().Form(onFile)`, true streaming file upload -- see below)
+- [x] M13 - Unified Parse API (`gonest.Parse[T]`/`MustParse[T]`, `Parseable`, `req.Params()`/`Query()`/`Headers()`/`Body()`)
+- [x] M14 - Request/Response Split (`gonest.Request`/`gonest.Response`, Express-style handler signature)
+- [x] M15 - Schema Value Support (`gonest.NewValue[T]`/`gonest.Value` for standalone primitive schemas, `gonest.Accessor[T]` dirty-tracking wrapper -- renamed from `Value[T]`)
+- [x] M16 - Schema Sanitize/Refine (`PropertyBuilder.Sanitize(fn)` pre-processing, `Schema.Refine(fn)` cross-field post-processing)
 
 See `.specs/project/ROADMAP.md` for the full milestone breakdown and `.specs/project/STATE.md` for
-the history of architecture decisions (AD-001 through AD-022 so far).
+the history of architecture decisions.
 
 ---
 
 ## Next Steps
 
-v1's roadmap (M1-M11) plus Milestone 12 (post-v1) are complete. Not yet tagged as a stable release
-(no `v0.x.y` git tag exists yet) -- versioning convention decided: `v0.{major}-{minor}.{release}`
-(dash between major/minor; `v0` stays fixed forever, both to avoid Go's `v2+` import-path-suffix
-requirement and to keep signaling semver's "no stability guarantee" for `v0.x`).
+Milestones 1-16 are complete, tagged as `v0.9.0` (see git tags for the full release history).
+Versioning follows `v0.{major}.{minor}` under a fixed leading `v0` (never incrementing to `v1`/`v2`,
+sidestepping Go's `v2+` import-path-suffix requirement while keeping semver's "no stability
+guarantee yet" signal for `v0.x`) -- `major` bumps on a breaking change, `minor` on a
+backward-compatible feature.
+
+Milestone 17 (GraphQL Support) is fully designed (`.specs/features/graphql-support/`) but not yet
+implemented -- `gonest.NewResolver`/`Query`/`Mutation`/`Subscription`, reusing the same
+`Schema`/`Parse[T]`/`MustInject`/`Emitter` REST already uses.
 
 Planned, not yet started (see `.specs/project/ROADMAP.md`'s "Future Considerations"):
 
 - Multi-adapter HTTP abstraction (`net/http`, Echo, Gin) -- v1 is Fiber-only
 - CLI scaffolding (equivalent to `nest new`/`nest generate`)
 - Microservices/transport layer (equivalent to `@nestjs/microservices`)
-- GraphQL/gRPC adapters (early exploratory notes: `INSIGHT-GRAPHQL.md`, `INSIGHT-GRPC.md`, `INSIGHT-MICROSERVICE.md`)
+- gRPC adapter (early exploratory notes: `INSIGHT-GRPC.md`, `INSIGHT-MICROSERVICE.md`)
 
 ---
 
@@ -337,6 +347,43 @@ Branches: `String`/`Email`/`Uuid`/`Uri`/`Hostname`/`Ipv4`/`Ipv6`/`Password`/`Byt
 also takes `Required()`/`Nullable()`/`Description()`/`Examples()`, plus `Custom(fn)` as an escape
 hatch for domain-specific formats the fixed vocabulary doesn't cover.
 
+`Sanitize(fn func(raw any) any)` pre-processes a field's raw value BEFORE any other check runs
+(including `Custom`) -- unlike `Custom`, it never replaces `Min`/`Max`/`Pattern`, it only transforms
+what they go on to check:
+
+```go
+m.Property(&t.Cpf).String().Min(11).Max(11).Pattern(`^\d{11}$`).Sanitize(func(raw any) any {
+  s, _ := raw.(string)
+  return strings.TrimSpace(s) // "  12345678901  " still passes Min/Max/Pattern after this
+}).Required()
+```
+
+`Schema.Refine(fn func(dst any) (field string, err error))` registers a cross-field check, run only
+after every individual field has validated AND been populated -- for comparisons no single field can
+know on its own (e.g. password confirmation):
+
+```go
+m.Refine(func(dst any) (field string, err error) {
+  d := dst.(*UpdateUserDTO)
+  if d.Password != d.ConfirmPassword {
+    return "confirmPassword", errors.New("must match password")
+  }
+  return "", nil
+})
+```
+
+For a value with no struct around it at all (e.g. a bare CPF string), `gonest.NewValue[T]` builds a
+`*Schema` directly, reusing the same branch methods:
+
+```go
+var cpfSchema = gonest.NewValue[string](func(m *gonest.Value) {
+  m.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+})
+```
+
+`gonest.Accessor[T]` (renamed from `Value[T]`) is the unrelated dirty-tracking field wrapper for
+PATCH-style handlers -- see the JSON body example below.
+
 ### Path params, query string, JSON body
 
 ```go
@@ -374,6 +421,26 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
 `req.Params()`/`req.Query()`/`req.Body().Json()` (a `Parseable`). Every
 `gonest.MustParse[T](src, schema)` has a non-panicking `gonest.Parse[T](src, schema) (T, error)`
 twin for callers that want to handle the error themselves.
+
+### Partial updates (Accessor dirty-tracking)
+
+`gonest.Accessor[T]` tracks whether a field was explicitly present in the payload -- including
+explicit `null` -- so a PATCH handler applies only what the client actually sent:
+
+```go
+type UpdateUserDTO struct {
+  Name  gonest.Accessor[string] `json:"name"`
+  Email gonest.Accessor[string] `json:"email"`
+}
+
+// only fields present in the JSON body are marked dirty
+body := gonest.MustParse[*UpdateUserDTO](req.Body().Json(), updateUserSchema)
+body.Name.OnDirty(func(name string) { user.Name = name })
+body.Email.Apply(&user.Email)
+
+// or build a partial-update map directly, keyed by json tag
+changes := gonest.AccessorsToDirtyMap(body)
+```
 
 ### File upload (multipart/form-data streaming)
 
