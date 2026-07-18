@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** none -- v1 + Milestones 12-14 roadmap COMPLETE
-**Status:** Milestones 1-14 COMPLETE
+**Current Milestone:** 15 (Schema Value Support) -- **PRÓXIMA A SER IMPLEMENTADA**, spec+design+tasks prontos, aguardando execução
+**Status:** Milestones 1-14 COMPLETE, Milestone 15 DESIGNED (next up), Milestone 16 (GraphQL Support) DESIGNED (não iniciada)
 
 ---
 
@@ -278,6 +278,39 @@
 - `Response.Html`/`.Text`/`.Json` cada um força seu Content-Type; `SendString` removido
 - `Response.Status(code)`/`StatusCode()` substitui `Status`/`ResponseStatus`
 - Ver `.specs/features/request-response-split/{spec,context,tasks}.md` — decidido via `superpowers:brainstorming` conduzido só na conversa (usuário pediu sem gerar `docs/superpowers/specs/*.md`); tasks.md é a primeira feature a seguir o padrão de 3 papéis de subagente (Planner/Implementer/Evaluator, ver STATE.md's "Subagent workflow convention")
+
+---
+
+## Milestone 15: Schema Value Support
+
+**Goal:** Permitir `gonest.NewSchema`-like para um valor primitivo isolado (sem struct em volta -- ex: um CPF `string` solto), e renomear `gonest.Value[T]` (dirty-tracking existente) para `gonest.Accessor[T]`, liberando o nome `Value` para o conceito novo.
+**Status:** SPECIFIED (spec.md + context.md + design.md + tasks.md prontos, 7 tasks — execução pendente)
+
+### Features
+
+**Schema Value Support** - SPECIFIED
+- `gonest.Value[T]` (dirty-tracking, código real hoje) → `gonest.Accessor[T]` -- mesma API, só o nome muda
+- `gonest.NewValue[T](func(m *gonest.Value) {...})` novo -- constrói um `*Schema` pra valor único, reaproveitando 100% do `PropertyBuilder`/`validateValue` já existentes
+- `gonest.Property(&t.X)` (dentro de `NewSchema[T]`, struct) permanece inalterado -- decisão explícita de não reformar por causa de um caso secundário
+- Ver `.specs/features/schema-value-support/{spec,context,design,tasks}.md` — brainstorm evoluindo `INSIGHT-SCHEMA.md`, mesmo padrão de 3 papéis de subagente (Planner/Implementer/Evaluator) da feature anterior
+
+---
+
+## Milestone 16: GraphQL Support
+
+**Goal:** `Resolver`/`Query`/`Mutation`/`Subscription` como nova ponta de exposição GraphQL, reaproveitando 100% de `Schema`/`Parse[T]`/`MustParse[T]`/`MustInject`/`Emitter` já existentes -- sem duplicar validação/DI entre REST e GraphQL.
+**Status:** DESIGNED (spec.md + context.md + design.md + tasks.md prontos, 11 tasks/T1-T11 -- pronta para Execute)
+
+### Features
+
+**GraphQL Support** - DESIGNED
+- `gonest.NewResolver`/`resolver.Query`/`Mutation` -- `Handler(func(ctx *GraphqlContext) any)`, retorno direto vira o `data` (igual NestJS, sem `Response` separado)
+- `resolver.Subscription` -- `Handler(func(ctx, emit func(any)))`, reaproveita `gonest.Emitter` via novo `Emitter.Subscribe[T](done) <-chan T`
+- Geração automática de SDL a partir do MESMO `gonest.Schema` usado em REST/OpenAPI; branches de formato (Email/Uuid/DateTime/etc) viram Custom Scalars
+- `Custom(fn).GraphqlScalar(name)` -- nomeia scalar pra tipos sem `format` OpenAPI nativo (ex: `primitive.ObjectID`)
+- Motor: `graphql-go/graphql` (code-first, runtime, sem `go generate`) -- decidido após pesquisa real (web + `gh issue view`), não assumido
+- Transporte de Subscription (SSE + WebSocket) escrito por conta própria -- nenhum dos dois vem pronto do motor escolhido
+- Ver `.specs/features/graphql-support/{spec,context}.md` — evolui `INSIGHT-GRAPHQL.md`
 
 ---
 

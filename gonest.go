@@ -737,49 +737,62 @@ type Request = execution.Request
 type Response = execution.Response
 
 // ---------------------------------------------------------------------------
-// Value (dirty-tracking field wrapper)
+// Accessor (dirty-tracking field wrapper)
 // ---------------------------------------------------------------------------
 
-// Value[T] is a generic field wrapper that tracks whether its value was
+// Accessor[T] is a generic field wrapper that tracks whether its value was
 // explicitly set (dirty-tracking). It is the canonical way to model
 // optional/partial updates in PATCH-style handlers: decode the JSON body
-// into a struct whose fields are Value[T]; only fields that were present in
-// the payload (including explicit null) are marked dirty -- omitted fields
-// stay clean and can be safely ignored when writing changes to a database.
+// into a struct whose fields are Accessor[T]; only fields that were present
+// in the payload (including explicit null) are marked dirty -- omitted
+// fields stay clean and can be safely ignored when writing changes to a
+// database.
 //
 // JSON is transparent: MarshalJSON emits T's value directly with no extra
 // wrapper in the wire format; UnmarshalJSON marks the field dirty whenever
 // it appears in the payload.
 //
+// SPEC_DEVIATION (schema-value-support feature, T2): renamed from Value[T]
+// -- "dirty" is a STATE of an accessor, not the type's own name (literature
+// term for "something with get/set" is "accessor") -- freeing the name
+// Value for the new standalone-schema construct (NewValue[T]/Value, below
+// in the Schema section).
+//
 //	type UpdateUserDTO struct {
-//	  Name  gonest.Value[string] `json:"name"`
-//	  Email gonest.Value[string] `json:"email"`
+//	  Name  gonest.Accessor[string] `json:"name"`
+//	  Email gonest.Accessor[string] `json:"email"`
 //	}
 //
 //	// PATCH /users/:id -- only sent fields are applied
-//	body := gonest.MustParseRestJsonBody[*UpdateUserDTO](ctx, updateUserSchema)
+//	body := gonest.MustParse[*UpdateUserDTO](req, updateUserSchema)
 //	body.Name.OnDirty(func(name string) { user.Name = name })
 //	body.Email.Apply(&user.Email)
-type Value[T any] = value.Value[T]
+type Accessor[T any] = value.Accessor[T]
 
-// NewValue creates a Value[T]. If an initial value is provided it starts
-// dirty; the zero-arg form creates a clean (not-dirty) value.
+// NewAccessor creates an Accessor[T]. If an initial value is provided it
+// starts dirty; the zero-arg form creates a clean (not-dirty) value.
 //
-//	name := gonest.NewValue("alice")  // dirty=true,  value="alice"
-//	age  := gonest.NewValue[int]()    // dirty=false, value=0
-func NewValue[T any](val ...T) Value[T] {
+// SPEC_DEVIATION (schema-value-support feature, T2): renamed from NewValue,
+// same reason as Accessor's own doc comment.
+//
+//	name := gonest.NewAccessor("alice")  // dirty=true,  value="alice"
+//	age  := gonest.NewAccessor[int]()    // dirty=false, value=0
+func NewAccessor[T any](val ...T) Accessor[T] {
 	return value.New(val...)
 }
 
-// ValueToDirtyMap converts a struct (or pointer to struct) whose fields are
-// Value[T] into a map[string]any containing only the dirty fields, keyed
-// by their json struct tag (or field name when the tag is absent or "-").
-// Non-Value fields are always ignored. Useful for building partial-update
-// queries without reflection on the caller's side.
+// AccessorsToDirtyMap converts a struct (or pointer to struct) whose fields
+// are Accessor[T] into a map[string]any containing only the dirty fields,
+// keyed by their json struct tag (or field name when the tag is absent or
+// "-"). Non-Accessor fields are always ignored. Useful for building
+// partial-update queries without reflection on the caller's side.
 //
-//	changes := gonest.ValueToDirtyMap(body)
+// SPEC_DEVIATION (schema-value-support feature, T2): renamed from
+// ValueToDirtyMap, same reason as Accessor's own doc comment.
+//
+//	changes := gonest.AccessorsToDirtyMap(body)
 //	db.Model(&user).Updates(changes)
-func ValueToDirtyMap(obj any) map[string]any {
+func AccessorsToDirtyMap(obj any) map[string]any {
 	return value.ToDirtyMap(obj)
 }
 
