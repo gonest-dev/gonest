@@ -18,7 +18,7 @@ import (
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/filter"
-	"gonest.dev/gonest/internal/gqltransport"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/guard"
 	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/interceptor"
@@ -233,10 +233,10 @@ type HttpAdapter interface {
 	// (bidirectional, long-lived, no single request/response body), so it
 	// gets its own method rather than being expressed through
 	// RegisterRoute's existing handler signature. h receives a
-	// gqltransport.WSConn, not the real underlying connection type, for
+	// graphql.WSConn, not the real underlying connection type, for
 	// the same adapter-agnostic reason RegisterRoute's h receives
 	// execution.Request/Response rather than a raw fiber.Ctx.
-	RegisterWebSocket(path string, h func(conn gqltransport.WSConn)) error
+	RegisterWebSocket(path string, h func(conn graphql.WSConn)) error
 	// Listen starts the underlying HTTP engine serving on addr, blocking
 	// until it stops. onListen, if non-nil, is invoked exactly once, after
 	// the underlying engine has successfully bound addr but before Listen's

@@ -1,14 +1,13 @@
-package graphqlgen
+package graphql
 
 import (
 	"fmt"
 
-	"github.com/graphql-go/graphql"
+	gql "github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqlresolver"
 	"gonest.dev/gonest/internal/schema"
 	"gonest.dev/gonest/internal/validate"
 )
@@ -19,22 +18,22 @@ import (
 // scalar name for custom Scalars (dedup by NAME, since distinct
 // PropertyBuilders can share one GraphqlScalar(name) -- see scalar.go).
 type builder struct {
-	objects map[*schema.Schema]*graphql.Object
-	scalars map[string]*graphql.Scalar
+	objects map[*schema.Schema]*gql.Object
+	scalars map[string]*gql.Scalar
 }
 
 // Build converts every registered Query/Mutation/Subscription (each
 // carrying a *schema.Schema for Args/Returns, built via the SAME
-// NewSchema[T]/PropertyBuilder REST already uses) into a *graphql.Schema.
+// NewSchema[T]/PropertyBuilder REST already uses) into a *gql.Schema.
 // A pure generator, mirroring internal/openapi's role for REST -- called
 // once at boot (Stage 2.5-equivalent), never per-request.
-func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subscriptions []*gqlresolver.Subscription) (*graphql.Schema, error) {
+func Build(queries []*Query, mutations []*Mutation, subscriptions []*Subscription) (*gql.Schema, error) {
 	b := &builder{
-		objects: map[*schema.Schema]*graphql.Object{},
-		scalars: map[string]*graphql.Scalar{},
+		objects: map[*schema.Schema]*gql.Object{},
+		scalars: map[string]*gql.Scalar{},
 	}
 
-	queryFields := graphql.Fields{}
+	queryFields := gql.Fields{}
 	for _, q := range queries {
 		f, err := b.buildField(q.Name(), q.ArgsSchema(), q.ReturnsSchema(), q.HandlerFunc())
 		if err != nil {
@@ -46,7 +45,7 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 		queryFields[q.Name()] = f
 	}
 
-	mutationFields := graphql.Fields{}
+	mutationFields := gql.Fields{}
 	for _, m := range mutations {
 		f, err := b.buildField(m.Name(), m.ArgsSchema(), m.ReturnsSchema(), m.HandlerFunc())
 		if err != nil {
@@ -58,7 +57,7 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 		mutationFields[m.Name()] = f
 	}
 
-	subscriptionFields := graphql.Fields{}
+	subscriptionFields := gql.Fields{}
 	for _, s := range subscriptions {
 		// Subscription's Field carries no Resolve/Subscribe -- real dispatch
 		// bypasses graphql-go's own execution engine entirely (T9/T10's
@@ -80,43 +79,43 @@ func Build(queries []*gqlresolver.Query, mutations []*gqlresolver.Mutation, subs
 	// root type exists) -- a placeholder field keeps such a schema valid
 	// without forcing every caller to declare a throwaway Query.
 	if len(queryFields) == 0 {
-		queryFields["_empty"] = &graphql.Field{
-			Type:    graphql.Boolean,
-			Resolve: func(p graphql.ResolveParams) (any, error) { return true, nil },
+		queryFields["_empty"] = &gql.Field{
+			Type:    gql.Boolean,
+			Resolve: func(p gql.ResolveParams) (any, error) { return true, nil },
 		}
 	}
 
-	cfg := graphql.SchemaConfig{
-		Query: graphql.NewObject(graphql.ObjectConfig{Name: "Query", Fields: queryFields}),
+	cfg := gql.SchemaConfig{
+		Query: gql.NewObject(gql.ObjectConfig{Name: "Query", Fields: queryFields}),
 	}
 	if len(mutationFields) > 0 {
-		cfg.Mutation = graphql.NewObject(graphql.ObjectConfig{Name: "Mutation", Fields: mutationFields})
+		cfg.Mutation = gql.NewObject(gql.ObjectConfig{Name: "Mutation", Fields: mutationFields})
 	}
 	if len(subscriptionFields) > 0 {
-		cfg.Subscription = graphql.NewObject(graphql.ObjectConfig{Name: "Subscription", Fields: subscriptionFields})
+		cfg.Subscription = gql.NewObject(gql.ObjectConfig{Name: "Subscription", Fields: subscriptionFields})
 	}
 
-	sch, err := graphql.NewSchema(cfg)
+	sch, err := gql.NewSchema(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("gonest: failed to build GraphQL schema: %w", err)
 	}
 	return &sch, nil
 }
 
-// buildField builds one graphql.Field -- its return type (from returns),
+// buildField builds one gql.Field -- its return type (from returns),
 // its arguments (from args, each property becoming one
-// graphql.ArgumentConfig), and its Resolve callback (handler, nil for
+// gql.ArgumentConfig), and its Resolve callback (handler, nil for
 // Subscription -- see Build's own comment on subscriptionFields).
 //
 // SPEC_DEVIATION (not anticipated by tasks.md's original "What" for T7):
 // dispatch cannot be wired from internal/app alone as originally
-// sketched -- graphql-go's own execution engine (graphql.Do) is what
+// sketched -- graphql-go's own execution engine (gql.Do) is what
 // walks the parsed query/selection set and invokes Resolve per field;
 // there is no other hook to intercept a field's resolution. Resolve is
 // therefore built HERE, at schema-construction time, wrapping handler --
-// internal/app's own role (T7) is only to invoke graphql.Do itself and
+// internal/app's own role (T7) is only to invoke gql.Do itself and
 // translate its result to an HTTP response, not to dispatch per-field.
-func (b *builder) buildField(name string, args, returns *schema.Schema, handler func(ctx *gqlresolver.GraphqlContext) any) (*graphql.Field, error) {
+func (b *builder) buildField(name string, args, returns *schema.Schema, handler func(ctx *GraphqlContext) any) (*gql.Field, error) {
 	outType, err := b.outputType(returns)
 	if err != nil {
 		return nil, err
@@ -127,14 +126,14 @@ func (b *builder) buildField(name string, args, returns *schema.Schema, handler 
 		return nil, err
 	}
 
-	field := &graphql.Field{
+	field := &gql.Field{
 		Name: name,
 		Type: outType,
 		Args: fieldArgs,
 	}
 
 	if handler != nil {
-		field.Resolve = func(p graphql.ResolveParams) (result any, resolveErr error) {
+		field.Resolve = func(p gql.ResolveParams) (result any, resolveErr error) {
 			defer func() {
 				r := recover()
 				if r == nil {
@@ -158,7 +157,7 @@ func (b *builder) buildField(name string, args, returns *schema.Schema, handler 
 			if args != nil {
 				argsParseable = validate.NewGraphqlArgsSource(p.Args)
 			}
-			ctx := gqlresolver.NewGraphqlContext(argsParseable, nil)
+			ctx := NewGraphqlContext(argsParseable, nil)
 			return handler(ctx), nil
 		}
 	}
@@ -166,27 +165,27 @@ func (b *builder) buildField(name string, args, returns *schema.Schema, handler 
 	return field, nil
 }
 
-// fieldArgs builds a graphql.FieldConfigArgument from args's own
+// fieldArgs builds a gql.FieldConfigArgument from args's own
 // properties -- flat only in this version (an Args schema whose field is
 // itself Array/Object is out of scope for V1, same restriction the
 // Out of Scope table in spec.md documents for other source kinds; a
 // nested Object/Array arg returns an error here rather than silently
 // producing a wrong type).
-func (b *builder) fieldArgs(args *schema.Schema) (graphql.FieldConfigArgument, error) {
+func (b *builder) fieldArgs(args *schema.Schema) (gql.FieldConfigArgument, error) {
 	if args == nil {
 		return nil, nil
 	}
 
-	out := graphql.FieldConfigArgument{}
+	out := gql.FieldConfigArgument{}
 	for _, p := range args.OwnProperties() {
 		t, err := b.scalarOrListType(p)
 		if err != nil {
 			return nil, fmt.Errorf("arg %q: %w", p.Field().Name, err)
 		}
 		if p.IsRequired() {
-			t = graphql.NewNonNull(t)
+			t = gql.NewNonNull(t)
 		}
-		out[argKey(p)] = &graphql.ArgumentConfig{Type: t}
+		out[argKey(p)] = &gql.ArgumentConfig{Type: t}
 	}
 	return out, nil
 }
@@ -210,12 +209,12 @@ func argKey(p *schema.PropertyBuilder) string {
 // outputType builds the GraphQL output type for a whole Schema -- an
 // Object (struct-shaped, dedup'd by pointer identity in b.objects) or a
 // bare scalar/list (Value-shaped, schema-value-support feature). Returns
-// graphql.String as a degenerate default when returns is nil (a
+// gql.String as a degenerate default when returns is nil (a
 // Query/Mutation/Subscription with no declared Returns) since GraphQL
 // requires SOME output type.
-func (b *builder) outputType(returns *schema.Schema) (graphql.Output, error) {
+func (b *builder) outputType(returns *schema.Schema) (gql.Output, error) {
 	if returns == nil {
-		return graphql.String, nil
+		return gql.String, nil
 	}
 	if returns.IsValue() {
 		return b.scalarOrListType(returns.ValueProperty())
@@ -223,11 +222,11 @@ func (b *builder) outputType(returns *schema.Schema) (graphql.Output, error) {
 	return b.objectType(returns)
 }
 
-// objectType builds (or returns the cached) *graphql.Object for a
+// objectType builds (or returns the cached) *gql.Object for a
 // struct-shaped Schema, keyed by pointer identity -- the SAME dedup
 // mechanism internal/openapi/generate.go's registerSchema already uses for
 // $ref/components.schemas (design.md's Code Reuse Analysis).
-func (b *builder) objectType(s *schema.Schema) (*graphql.Object, error) {
+func (b *builder) objectType(s *schema.Schema) (*gql.Object, error) {
 	if obj, ok := b.objects[s]; ok {
 		return obj, nil
 	}
@@ -237,19 +236,19 @@ func (b *builder) objectType(s *schema.Schema) (*graphql.Object, error) {
 		name = s.StructType().Name()
 	}
 
-	fields := graphql.Fields{}
+	fields := gql.Fields{}
 	for _, p := range s.OwnProperties() {
 		t, err := b.scalarOrListType(p)
 		if err != nil {
 			return nil, fmt.Errorf("field %q: %w", p.Field().Name, err)
 		}
 		if p.IsRequired() {
-			t = graphql.NewNonNull(t)
+			t = gql.NewNonNull(t)
 		}
-		fields[argKey(p)] = &graphql.Field{Type: t}
+		fields[argKey(p)] = &gql.Field{Type: t}
 	}
 
-	obj := graphql.NewObject(graphql.ObjectConfig{Name: name, Fields: fields})
+	obj := gql.NewObject(gql.ObjectConfig{Name: name, Fields: fields})
 	b.objects[s] = obj
 	return obj, nil
 }
@@ -257,7 +256,7 @@ func (b *builder) objectType(s *schema.Schema) (*graphql.Object, error) {
 // scalarOrListType builds the GraphQL type for a single property --
 // dispatching on KindValue() the same way internal/validate's
 // validatePrimitive/validateArray/validateObject already do for REST.
-func (b *builder) scalarOrListType(p *schema.PropertyBuilder) (graphql.Output, error) {
+func (b *builder) scalarOrListType(p *schema.PropertyBuilder) (gql.Output, error) {
 	switch p.KindValue() {
 	case "array":
 		item := p.ItemBuilder()
@@ -266,13 +265,13 @@ func (b *builder) scalarOrListType(p *schema.PropertyBuilder) (graphql.Output, e
 			if err != nil {
 				return nil, err
 			}
-			return graphql.NewList(obj), nil
+			return gql.NewList(obj), nil
 		}
 		t, err := b.scalarOrListType(item)
 		if err != nil {
 			return nil, err
 		}
-		return graphql.NewList(t), nil
+		return gql.NewList(t), nil
 	case "object":
 		if ref, ok := p.SchemaRef(); ok {
 			return b.objectType(ref)
@@ -289,7 +288,7 @@ func (b *builder) scalarOrListType(p *schema.PropertyBuilder) (graphql.Output, e
 // leafScalar builds the GraphQL type for a non-array/object property --
 // native format (email/uuid/etc), explicit GraphqlScalar(name), or one of
 // GraphQL's own built-ins (String/Int/Float/Boolean).
-func (b *builder) leafScalar(p *schema.PropertyBuilder) (graphql.Output, error) {
+func (b *builder) leafScalar(p *schema.PropertyBuilder) (gql.Output, error) {
 	if name, ok := NativeScalarName(p.FormatValue()); ok {
 		return b.scalar(name, identityScalarConfig(name)), nil
 	}
@@ -302,24 +301,24 @@ func (b *builder) leafScalar(p *schema.PropertyBuilder) (graphql.Output, error) 
 
 	switch p.KindValue() {
 	case "integer":
-		return graphql.Int, nil
+		return gql.Int, nil
 	case "number":
-		return graphql.Float, nil
+		return gql.Float, nil
 	case "boolean":
-		return graphql.Boolean, nil
+		return gql.Boolean, nil
 	default:
-		return graphql.String, nil
+		return gql.String, nil
 	}
 }
 
-// scalar returns the cached *graphql.Scalar for name, building it via cfg
+// scalar returns the cached *gql.Scalar for name, building it via cfg
 // the first time it's requested -- dedup by name (b.scalars), same
 // rationale as CollectScalars.
-func (b *builder) scalar(name string, cfg graphql.ScalarConfig) *graphql.Scalar {
+func (b *builder) scalar(name string, cfg gql.ScalarConfig) *gql.Scalar {
 	if s, ok := b.scalars[name]; ok {
 		return s
 	}
-	s := graphql.NewScalar(cfg)
+	s := gql.NewScalar(cfg)
 	b.scalars[name] = s
 	return s
 }
@@ -329,8 +328,8 @@ func (b *builder) scalar(name string, cfg graphql.ScalarConfig) *graphql.Scalar 
 // backed by a plain Go string, so no real coercion is needed beyond
 // satisfying graphql-go's own ScalarConfig contract (design.md never asked
 // for format-specific serialization beyond naming, spec.md's GQL-03).
-func identityScalarConfig(name string) graphql.ScalarConfig {
-	return graphql.ScalarConfig{
+func identityScalarConfig(name string) gql.ScalarConfig {
+	return gql.ScalarConfig{
 		Name:       name,
 		Serialize:  func(value any) any { return value },
 		ParseValue: func(value any) any { return value },
@@ -345,7 +344,7 @@ func identityScalarConfig(name string) graphql.ScalarConfig {
 
 // jsonScalarConfig backs AdditionalProperties() open objects -- no fixed
 // shape to declare fields for, so the whole value passes through as-is.
-var jsonScalarConfig = graphql.ScalarConfig{
+var jsonScalarConfig = gql.ScalarConfig{
 	Name:       "JSON",
 	Serialize:  func(value any) any { return value },
 	ParseValue: func(value any) any { return value },

@@ -1,11 +1,20 @@
-// Package gqlresolver implements the declarative GraphQL Resolver API
-// (graphql-support feature, Milestone 17) -- analogous to internal/
-// controller's Controller for REST. Deliberately NOT named "resolver" at
-// the package level: internal/resolver already exists (DI search helpers,
-// FindDirect/FindDirectAll) and is an unrelated concept -- see design.md's
-// "Naming Collision Note". Resolver reuses internal/resolver's search
-// functions internally, it just doesn't share its package name.
-package gqlresolver
+// Package graphql implements gonest's GraphQL support (graphql-support
+// feature, Milestone 17): the declarative Resolver/Query/Mutation/
+// Subscription builder API (analogous to internal/controller's Controller
+// for REST, this file), the Schema->graphql-go/graphql generator
+// (generate.go/scalar.go, mirrors internal/openapi's role for REST), and
+// the SSE/WebSocket Subscription transports (sse.go/ws.go) graphql-go/
+// graphql itself never shipped.
+//
+// Named "graphql", not "resolver": internal/resolver already exists (DI
+// search helpers, FindDirect/FindDirectAll) and is an unrelated concept --
+// Resolver (this file) reuses internal/resolver's search functions
+// internally, it just doesn't share its package name (design.md's
+// "Naming Collision Note"). Every reference to the EXTERNAL graphql-go/
+// graphql package in this package's own files is therefore import-aliased
+// (`gql "github.com/graphql-go/graphql"`) to avoid colliding with this
+// package's own name.
+package graphql
 
 import (
 	"reflect"

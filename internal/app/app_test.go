@@ -18,7 +18,7 @@ import (
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/filter"
-	"gonest.dev/gonest/internal/gqltransport"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/guard"
 	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/interceptor"
@@ -550,7 +550,7 @@ func (f *recordingFakeAdapter) Test(req *http.Request) (*http.Response, error) {
 	return nil, nil
 }
 
-func (f *recordingFakeAdapter) RegisterWebSocket(path string, h func(conn gqltransport.WSConn)) error {
+func (f *recordingFakeAdapter) RegisterWebSocket(path string, h func(conn graphql.WSConn)) error {
 	return nil
 }
 
@@ -983,7 +983,7 @@ func (f *listenSpyAdapter) Test(req *http.Request) (*http.Response, error) {
 	return nil, nil
 }
 
-func (f *listenSpyAdapter) RegisterWebSocket(path string, h func(conn gqltransport.WSConn)) error {
+func (f *listenSpyAdapter) RegisterWebSocket(path string, h func(conn graphql.WSConn)) error {
 	return nil
 }
 

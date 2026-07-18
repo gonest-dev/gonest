@@ -1,4 +1,4 @@
-package gqltransport_test
+package graphql_test
 
 import (
 	"bufio"
@@ -11,8 +11,7 @@ import (
 	"unsafe"
 
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqlresolver"
-	"gonest.dev/gonest/internal/gqltransport"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/schema"
 )
 
@@ -96,7 +95,7 @@ func TestSSEHandler_UnknownSubscription_Returns404(t *testing.T) {
 	responder := newFakeSSEResponder("missing", nil)
 	req, res := execution.New(responder)
 
-	gqltransport.SSEHandler(map[string]*gqlresolver.Subscription{})(req, res)
+	graphql.SSEHandler(map[string]*graphql.Subscription{})(req, res)
 
 	if responder.GetStatus() != 404 {
 		t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
@@ -105,9 +104,9 @@ func TestSSEHandler_UnknownSubscription_Returns404(t *testing.T) {
 
 func TestSSEHandler_EmitsEventAsSSEFrame(t *testing.T) {
 	var gotDone <-chan struct{}
-	sub := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Subscription("onCreated", func(s *gqlresolver.Subscription) {
-			s.Handler(func(ctx *gqlresolver.GraphqlContext, emit func(any)) {
+	sub := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
 				gotDone = ctx.Done()
 				// Emits repeatedly (not just once) so that AFTER the test
 				// simulates a client disconnect, the NEXT emit's write
@@ -129,12 +128,12 @@ func TestSSEHandler_EmitsEventAsSSEFrame(t *testing.T) {
 		})
 	})
 	sub.Declare()
-	subs := map[string]*gqlresolver.Subscription{"onCreated": sub.OwnSubscriptions()[0]}
+	subs := map[string]*graphql.Subscription{"onCreated": sub.OwnSubscriptions()[0]}
 
 	responder := newFakeSSEResponder("onCreated", nil)
 	req, res := execution.New(responder)
 
-	gqltransport.SSEHandler(subs)(req, res)
+	graphql.SSEHandler(subs)(req, res)
 
 	r := bufio.NewReader(responder.pr)
 	line := readLine(t, r, time.Second)
@@ -171,10 +170,10 @@ func TestSSEHandler_ArgsFromQueryString_ParsedIntoContext(t *testing.T) {
 	argsSchema.Property(&argsZero.UserId).Integer().Required()
 
 	var receivedUserID int64
-	sub := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Subscription("onCreated", func(s *gqlresolver.Subscription) {
+	sub := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
 			s.Args(argsSchema)
-			s.Handler(func(ctx *gqlresolver.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
 				var a filterArgs
 				if err := ctx.Args().ParseInto(&a, argsSchema); err != nil {
 					panic(err)
@@ -185,12 +184,12 @@ func TestSSEHandler_ArgsFromQueryString_ParsedIntoContext(t *testing.T) {
 		})
 	})
 	sub.Declare()
-	subs := map[string]*gqlresolver.Subscription{"onCreated": sub.OwnSubscriptions()[0]}
+	subs := map[string]*graphql.Subscription{"onCreated": sub.OwnSubscriptions()[0]}
 
 	responder := newFakeSSEResponder("onCreated", map[string]string{"args": `{"userId": 42}`})
 	req, res := execution.New(responder)
 
-	gqltransport.SSEHandler(subs)(req, res)
+	graphql.SSEHandler(subs)(req, res)
 
 	r := bufio.NewReader(responder.pr)
 	readLine(t, r, time.Second)

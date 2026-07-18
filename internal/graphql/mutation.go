@@ -1,4 +1,4 @@
-package gqlresolver
+package graphql
 
 // Mutation is a true Go type alias of Query (design.md's Tech Decisions):
 // both share the exact same fields/methods today (name, args schema,

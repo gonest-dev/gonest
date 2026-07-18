@@ -173,13 +173,13 @@ streaming pronto -- D7).
 
 | Requirement ID | Story                                          | Phase   | Status  |
 | -------------- | ------------------------------------------------- | ------- | ------- |
-| GQL-01         | P1: Resolver/Query/Mutation básicos                | Design  | Pending |
-| GQL-02         | P1: Geração de SDL a partir do Schema              | Design  | Pending |
-| GQL-03         | P1: Custom Scalars (formato nativo)                | Design  | Pending |
-| GQL-04         | P1: GraphqlScalar(name) para Custom(fn)            | Design  | Pending |
-| GQL-05         | P2: Subscription + Emitter.Subscribe               | Design  | Pending |
-| GQL-06         | P2: Transporte WebSocket                           | Design  | Pending |
-| GQL-07         | P2: Transporte SSE                                 | Design  | Pending |
+| GQL-01         | P1: Resolver/Query/Mutation básicos                | Execute | Verified |
+| GQL-02         | P1: Geração de SDL a partir do Schema              | Execute | Verified |
+| GQL-03         | P1: Custom Scalars (formato nativo)                | Execute | Verified |
+| GQL-04         | P1: GraphqlScalar(name) para Custom(fn)            | Execute | Verified |
+| GQL-05         | P2: Subscription + Emitter.Subscribe               | Execute | Verified |
+| GQL-06         | P2: Transporte WebSocket                           | Execute | Verified |
+| GQL-07         | P2: Transporte SSE                                 | Execute | Verified |
 
 ---
 

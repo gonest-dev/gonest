@@ -1,10 +1,10 @@
-package graphqlgen_test
+package graphql_test
 
 import (
 	"reflect"
 	"testing"
 
-	"gonest.dev/gonest/internal/graphqlgen"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/schema"
 )
 
@@ -24,14 +24,14 @@ func newScalarTestSchema(t *testing.T) (*scalarEntity, *schema.Schema) {
 }
 
 func TestNativeScalarName_KnownFormat(t *testing.T) {
-	name, ok := graphqlgen.NativeScalarName("email")
+	name, ok := graphql.NativeScalarName("email")
 	if !ok || name != "Email" {
 		t.Fatalf("NativeScalarName(%q) = (%q, %v), want (Email, true)", "email", name, ok)
 	}
 }
 
 func TestNativeScalarName_BareStringHasNoScalar(t *testing.T) {
-	if _, ok := graphqlgen.NativeScalarName(""); ok {
+	if _, ok := graphql.NativeScalarName(""); ok {
 		t.Fatal("NativeScalarName(\"\") = ok, want false (bare string has no custom scalar)")
 	}
 }
@@ -42,7 +42,7 @@ func TestCollectScalars_DedupsByName_TwoFieldsSameFormat(t *testing.T) {
 	m.Property(&zero.Email2).Email()
 	m.Property(&zero.Plain).String()
 
-	got, err := graphqlgen.CollectScalars(m.OwnProperties())
+	got, err := graphql.CollectScalars(m.OwnProperties())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestCollectScalars_DedupsNamedGraphqlScalar_TwoFieldsSameName(t *testing.T)
 	m.Property(&zero.ObjectID1).Custom(decode).GraphqlScalar("ObjectID")
 	m.Property(&zero.ObjectID2).Custom(decode).GraphqlScalar("ObjectID")
 
-	got, err := graphqlgen.CollectScalars(m.OwnProperties())
+	got, err := graphql.CollectScalars(m.OwnProperties())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestCollectScalars_CustomWithoutGraphqlScalar_ReturnsError(t *testing.T) {
 	zero, m := newCustomScalarTestSchema(t)
 	m.Property(&zero.Unnamed).Custom(func(raw any) (any, error) { return raw, nil })
 
-	_, err := graphqlgen.CollectScalars(m.OwnProperties())
+	_, err := graphql.CollectScalars(m.OwnProperties())
 	if err == nil {
 		t.Fatal("expected an error for Custom(fn) without GraphqlScalar(name), got nil")
 	}

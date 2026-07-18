@@ -20,7 +20,7 @@ import (
 	"gonest.dev/gonest/internal/appoptions"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqltransport"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/route"
 )
 
@@ -183,7 +183,7 @@ func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(re
 // middleware step is required, per that package's own README, so a
 // non-upgrade request to the same path gets fiber.ErrUpgradeRequired
 // instead of falling through to the WebSocket handler).
-func (f *FiberApp) RegisterWebSocket(path string, h func(conn gqltransport.WSConn)) error {
+func (f *FiberApp) RegisterWebSocket(path string, h func(conn graphql.WSConn)) error {
 	f.app.Use(path, func(c fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			return c.Next()
@@ -196,7 +196,7 @@ func (f *FiberApp) RegisterWebSocket(path string, h func(conn gqltransport.WSCon
 	return nil
 }
 
-// fiberWSConn adapts *websocket.Conn to gqltransport.WSConn -- same
+// fiberWSConn adapts *websocket.Conn to graphql.WSConn -- same
 // adapter-agnostic-wrapper rationale as fiberResponder for
 // execution.Responder.
 type fiberWSConn struct {
@@ -422,7 +422,7 @@ func (r *fiberResponder) BodyStream() (io.Reader, string, bool) {
 // open until fn returns; fasthttp's own doc comment on SetBodyStreamWriter
 // forbids touching RequestCtx/its members from inside fn, so fn must only
 // ever write to (and Flush) the *bufio.Writer it's given -- gonest's own
-// fn (internal/gqltransport's SSE handler) already only does that.
+// fn (internal/graphql's SSE handler) already only does that.
 func (r *fiberResponder) WriteStream(fn func(w *bufio.Writer)) {
 	r.c.RequestCtx().SetBodyStreamWriter(fn)
 }

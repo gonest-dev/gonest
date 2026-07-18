@@ -2,7 +2,7 @@
 
 **Spec**: `.specs/features/graphql-support/spec.md`
 **Design**: `.specs/features/graphql-support/design.md`
-**Status**: Draft
+**Status**: Complete
 
 ---
 

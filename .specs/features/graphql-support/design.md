@@ -2,7 +2,7 @@
 
 **Spec**: `.specs/features/graphql-support/spec.md`
 **Context**: `.specs/features/graphql-support/context.md`
-**Status**: Draft
+**Status**: Complete
 
 ---
 

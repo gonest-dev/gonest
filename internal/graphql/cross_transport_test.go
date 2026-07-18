@@ -1,4 +1,4 @@
-package gqltransport_test
+package graphql_test
 
 import (
 	"bufio"
@@ -10,8 +10,7 @@ import (
 
 	"gonest.dev/gonest/internal/emitter"
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqlresolver"
-	"gonest.dev/gonest/internal/gqltransport"
+	"gonest.dev/gonest/internal/graphql"
 )
 
 var errWsDisconnect = errors.New("simulated disconnect")
@@ -28,9 +27,9 @@ type orderCreatedEvent struct {
 func TestSSEAndWebSocket_SameSubscription_BothReceiveSameEmittedEvent(t *testing.T) {
 	em := emitter.New()
 
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Subscription("onOrderCreated", func(s *gqlresolver.Subscription) {
-			s.Handler(func(ctx *gqlresolver.GraphqlContext, emit func(any)) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onOrderCreated", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
 				ch := emitter.Subscribe[orderCreatedEvent](em, ctx.Done())
 				for ev := range ch {
 					emit(map[string]any{"orderId": ev.OrderId})
@@ -39,12 +38,12 @@ func TestSSEAndWebSocket_SameSubscription_BothReceiveSameEmittedEvent(t *testing
 		})
 	})
 	res.Declare()
-	subs := map[string]*gqlresolver.Subscription{"onOrderCreated": res.OwnSubscriptions()[0]}
+	subs := map[string]*graphql.Subscription{"onOrderCreated": res.OwnSubscriptions()[0]}
 
 	// --- SSE client ---
 	sseResponder := newFakeSSEResponder("onOrderCreated", nil)
 	sseReq, sseRes := execution.New(sseResponder)
-	gqltransport.SSEHandler(subs)(sseReq, sseRes)
+	graphql.SSEHandler(subs)(sseReq, sseRes)
 
 	// A single dedicated goroutine reads lines off the SSE pipe --
 	// bufio.Reader is not safe for concurrent reads, so the polling loop
@@ -66,7 +65,7 @@ func TestSSEAndWebSocket_SameSubscription_BothReceiveSameEmittedEvent(t *testing
 	wsDone := make(chan struct{})
 	go func() {
 		defer close(wsDone)
-		gqltransport.WSHandler(subs)(wsConn)
+		graphql.WSHandler(subs)(wsConn)
 	}()
 
 	// Give both Subscription goroutines a moment to reach

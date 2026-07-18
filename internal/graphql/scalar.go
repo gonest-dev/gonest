@@ -1,8 +1,7 @@
-// Package graphqlgen generates a graphql-go/graphql *graphql.Schema from
-// gonest's own Schema/PropertyBuilder declarations (graphql-support
-// feature, Milestone 17) -- mirrors internal/openapi's role for REST, a
-// pure generator with no request-time logic of its own.
-package graphqlgen
+// scalar.go maps a PropertyBuilder's OpenAPI format (or explicit
+// GraphqlScalar name) to the GraphQL custom scalar name generate.go's
+// Build uses -- see the package doc comment in resolver.go.
+package graphql
 
 import (
 	"fmt"

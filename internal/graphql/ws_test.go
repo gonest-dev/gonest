@@ -1,4 +1,4 @@
-package gqltransport_test
+package graphql_test
 
 import (
 	"encoding/json"
@@ -8,12 +8,11 @@ import (
 	"time"
 	"unsafe"
 
-	"gonest.dev/gonest/internal/gqlresolver"
-	"gonest.dev/gonest/internal/gqltransport"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/schema"
 )
 
-// fakeWSConn is a minimal gqltransport.WSConn for unit tests -- written
+// fakeWSConn is a minimal graphql.WSConn for unit tests -- written
 // captures every WriteMessage payload, readErr is a channel a test sends
 // to (or closes) to make the next ReadMessage call return that error,
 // simulating a client disconnect (WSHandler's own read loop is what
@@ -68,7 +67,7 @@ func TestWSHandler_UnknownSubscription_WritesErrorAndCloses(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		gqltransport.WSHandler(map[string]*gqlresolver.Subscription{})(conn)
+		graphql.WSHandler(map[string]*graphql.Subscription{})(conn)
 	}()
 
 	select {
@@ -95,9 +94,9 @@ func TestWSHandler_UnknownSubscription_WritesErrorAndCloses(t *testing.T) {
 
 func TestWSHandler_EmitsEventAsJSONMessage_AndDetectsDisconnectViaReadLoop(t *testing.T) {
 	var gotDone <-chan struct{}
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Subscription("onCreated", func(s *gqlresolver.Subscription) {
-			s.Handler(func(ctx *gqlresolver.GraphqlContext, emit func(any)) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
 				gotDone = ctx.Done()
 				emit(map[string]any{"value": "hello"})
 				<-ctx.Done()
@@ -105,14 +104,14 @@ func TestWSHandler_EmitsEventAsJSONMessage_AndDetectsDisconnectViaReadLoop(t *te
 		})
 	})
 	res.Declare()
-	subs := map[string]*gqlresolver.Subscription{"onCreated": res.OwnSubscriptions()[0]}
+	subs := map[string]*graphql.Subscription{"onCreated": res.OwnSubscriptions()[0]}
 
 	conn := newFakeWSConn("onCreated", nil)
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		gqltransport.WSHandler(subs)(conn)
+		graphql.WSHandler(subs)(conn)
 	}()
 
 	select {
@@ -158,10 +157,10 @@ func TestWSHandler_ArgsFromQueryString_ParsedIntoContext(t *testing.T) {
 	argsSchema.Property(&argsZero.UserId).Integer().Required()
 
 	var receivedUserID int64
-	resolver := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Subscription("onCreated", func(s *gqlresolver.Subscription) {
+	resolver := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
 			s.Args(argsSchema)
-			s.Handler(func(ctx *gqlresolver.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
 				var a wsFilterArgs
 				if err := ctx.Args().ParseInto(&a, argsSchema); err != nil {
 					panic(err)
@@ -173,14 +172,14 @@ func TestWSHandler_ArgsFromQueryString_ParsedIntoContext(t *testing.T) {
 		})
 	})
 	resolver.Declare()
-	subs := map[string]*gqlresolver.Subscription{"onCreated": resolver.OwnSubscriptions()[0]}
+	subs := map[string]*graphql.Subscription{"onCreated": resolver.OwnSubscriptions()[0]}
 
 	conn := newFakeWSConn("onCreated", map[string]string{"args": `{"userId": 42}`})
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		gqltransport.WSHandler(subs)(conn)
+		graphql.WSHandler(subs)(conn)
 	}()
 
 	select {

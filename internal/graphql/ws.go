@@ -1,4 +1,4 @@
-package gqltransport
+package graphql
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqlresolver"
 	"gonest.dev/gonest/internal/validate"
 )
 
@@ -45,7 +44,7 @@ type WSConn interface {
 // WebSocket is bidirectional -- the blocking ReadMessage loop below IS the
 // disconnect detector: it returns an error the moment the connection
 // closes from either side, no heartbeat needed.
-func WSHandler(subs map[string]*gqlresolver.Subscription) func(conn WSConn) {
+func WSHandler(subs map[string]*Subscription) func(conn WSConn) {
 	return func(conn WSConn) {
 		defer func() { _ = recover() }()
 
@@ -73,7 +72,7 @@ func WSHandler(subs map[string]*gqlresolver.Subscription) func(conn WSConn) {
 		done := make(chan struct{})
 		var closeOnce sync.Once
 		closeDone := func() { closeOnce.Do(func() { close(done) }) }
-		ctx := gqlresolver.NewGraphqlContext(argsParseable, done)
+		ctx := NewGraphqlContext(argsParseable, done)
 
 		var writeMu sync.Mutex
 		emit := func(v any) {

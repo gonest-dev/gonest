@@ -1,14 +1,13 @@
-package graphqlgen_test
+package graphql_test
 
 import (
 	"reflect"
 	"testing"
 	"unsafe"
 
-	"github.com/graphql-go/graphql"
+	gql "github.com/graphql-go/graphql"
 
-	"gonest.dev/gonest/internal/gqlresolver"
-	"gonest.dev/gonest/internal/graphqlgen"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/schema"
 )
 
@@ -31,10 +30,10 @@ func TestBuild_SimpleQuery_ProducesValidSchema(t *testing.T) {
 	userSchema.Property(&zero.Id).Integer().Required()
 	userSchema.Property(&zero.Email).Email().Required()
 
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Query("user", func(qb *gqlresolver.Query) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("user", func(qb *graphql.Query) {
 			qb.Returns(userSchema)
-			qb.Handler(func(ctx *gqlresolver.GraphqlContext) any { return nil })
+			qb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
 		})
 	})
 	res.Declare()
@@ -43,7 +42,7 @@ func TestBuild_SimpleQuery_ProducesValidSchema(t *testing.T) {
 		t.Fatalf("expected 1 query, got %d", len(queries))
 	}
 
-	sch, err := graphqlgen.Build(queries, nil, nil)
+	sch, err := graphql.Build(queries, nil, nil)
 	if err != nil {
 		t.Fatalf("Build() error: %v", err)
 	}
@@ -56,7 +55,7 @@ func TestBuild_SimpleQuery_ProducesValidSchema(t *testing.T) {
 		t.Fatalf("Query root type has no 'user' field, fields: %v", queryType.Fields())
 	}
 
-	result := graphql.Do(graphql.Params{
+	result := gql.Do(gql.Params{
 		Schema:        *sch,
 		RequestString: `{ __schema { queryType { name } } }`,
 	})
@@ -76,15 +75,15 @@ func TestBuild_EmailFormat_ProducesEmailCustomScalar(t *testing.T) {
 	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	m.Property(&zero.Email).Email().Required()
 
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Query("me", func(qb *gqlresolver.Query) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("me", func(qb *graphql.Query) {
 			qb.Returns(m)
-			qb.Handler(func(ctx *gqlresolver.GraphqlContext) any { return nil })
+			qb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
 		})
 	})
 	res.Declare()
 
-	sch, err := graphqlgen.Build(res.OwnQueries(), nil, nil)
+	sch, err := graphql.Build(res.OwnQueries(), nil, nil)
 	if err != nil {
 		t.Fatalf("Build() error: %v", err)
 	}
@@ -94,8 +93,8 @@ func TestBuild_EmailFormat_ProducesEmailCustomScalar(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a custom scalar named 'Email' in the schema's type map, got types: %v", typeMap)
 	}
-	if _, ok := scalarType.(*graphql.Scalar); !ok {
-		t.Fatalf("'Email' type = %T, want *graphql.Scalar", scalarType)
+	if _, ok := scalarType.(*gql.Scalar); !ok {
+		t.Fatalf("'Email' type = %T, want *gql.Scalar", scalarType)
 	}
 }
 
@@ -109,15 +108,15 @@ func TestBuild_MutationWithArgs_ArgsBecomeFieldConfigArgument(t *testing.T) {
 	argsSchema := schema.New(argsTyp, uintptr(unsafe.Pointer(argsZero)))
 	argsSchema.Property(&argsZero.Name).String().Required()
 
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Mutation("createUser", func(mb *gqlresolver.Mutation) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Mutation("createUser", func(mb *graphql.Mutation) {
 			mb.Args(argsSchema)
-			mb.Handler(func(ctx *gqlresolver.GraphqlContext) any { return nil })
+			mb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
 		})
 	})
 	res.Declare()
 
-	sch, err := graphqlgen.Build(nil, res.OwnMutations(), nil)
+	sch, err := graphql.Build(nil, res.OwnMutations(), nil)
 	if err != nil {
 		t.Fatalf("Build() error: %v", err)
 	}
@@ -142,17 +141,17 @@ func TestBuild_MutationWithArgs_ArgsBecomeFieldConfigArgument(t *testing.T) {
 }
 
 func TestBuild_DuplicateQueryName_ReturnsError(t *testing.T) {
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Query("dup", func(qb *gqlresolver.Query) {
-			qb.Handler(func(ctx *gqlresolver.GraphqlContext) any { return 1 })
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("dup", func(qb *graphql.Query) {
+			qb.Handler(func(ctx *graphql.GraphqlContext) any { return 1 })
 		})
-		r.Query("dup", func(qb *gqlresolver.Query) {
-			qb.Handler(func(ctx *gqlresolver.GraphqlContext) any { return 2 })
+		r.Query("dup", func(qb *graphql.Query) {
+			qb.Handler(func(ctx *graphql.GraphqlContext) any { return 2 })
 		})
 	})
 	res.Declare()
 
-	_, err := graphqlgen.Build(res.OwnQueries(), nil, nil)
+	_, err := graphql.Build(res.OwnQueries(), nil, nil)
 	if err == nil {
 		t.Fatal("expected an error for duplicate Query name 'dup', got nil")
 	}
@@ -168,15 +167,15 @@ func TestBuild_CustomWithoutGraphqlScalar_ReturnsError(t *testing.T) {
 	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
 	m.Property(&zero.Weird).Custom(func(raw any) (any, error) { return raw, nil })
 
-	res := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Query("bad", func(qb *gqlresolver.Query) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("bad", func(qb *graphql.Query) {
 			qb.Returns(m)
-			qb.Handler(func(ctx *gqlresolver.GraphqlContext) any { return nil })
+			qb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
 		})
 	})
 	res.Declare()
 
-	_, err := graphqlgen.Build(res.OwnQueries(), nil, nil)
+	_, err := graphql.Build(res.OwnQueries(), nil, nil)
 	if err == nil {
 		t.Fatal("expected an error for Custom(fn) without GraphqlScalar(name), got nil")
 	}

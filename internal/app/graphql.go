@@ -3,12 +3,10 @@ package app
 import (
 	"encoding/json"
 
-	"github.com/graphql-go/graphql"
+	gql "github.com/graphql-go/graphql"
 
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqlresolver"
-	"gonest.dev/gonest/internal/gqltransport"
-	"gonest.dev/gonest/internal/graphqlgen"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/route"
 	"gonest.dev/gonest/internal/validate"
@@ -34,23 +32,23 @@ const graphqlSubscriptionWSPath = "/graphql/ws/:name"
 // registration needs (OwnQueries/OwnMutations/OwnSubscriptions) but that
 // module.ResolverRef itself does not expose -- same pattern as this
 // package's own routableController for REST Controllers. Already
-// implemented by *gqlresolver.Resolver.
+// implemented by *graphql.Resolver.
 type resolvableResolver interface {
-	OwnQueries() []*gqlresolver.Query
-	OwnMutations() []*gqlresolver.Mutation
-	OwnSubscriptions() []*gqlresolver.Subscription
+	OwnQueries() []*graphql.Query
+	OwnMutations() []*graphql.Mutation
+	OwnSubscriptions() []*graphql.Subscription
 }
 
 // registerGraphql collects every Query/Mutation/Subscription registered
 // across every module's OwnResolvers(), builds the resulting
-// *graphql.Schema via internal/graphqlgen.Build, and registers ONE POST
+// *gql.Schema via internal/graphql.Build, and registers ONE POST
 // /graphql route dispatching through it. A no-op (no route registered) if
 // no module registered any resolver at all -- an app that never uses
 // GraphQL gets no extra endpoint.
 func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
-	var queries []*gqlresolver.Query
-	var mutations []*gqlresolver.Mutation
-	var subscriptions []*gqlresolver.Subscription
+	var queries []*graphql.Query
+	var mutations []*graphql.Mutation
+	var subscriptions []*graphql.Subscription
 
 	for _, m := range modules {
 		for _, r := range m.OwnResolvers() {
@@ -68,7 +66,7 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
 		return nil
 	}
 
-	sch, err := graphqlgen.Build(queries, mutations, subscriptions)
+	sch, err := graphql.Build(queries, mutations, subscriptions)
 	if err != nil {
 		return err
 	}
@@ -81,14 +79,14 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
 		return nil
 	}
 
-	subsByName := make(map[string]*gqlresolver.Subscription, len(subscriptions))
+	subsByName := make(map[string]*graphql.Subscription, len(subscriptions))
 	for _, s := range subscriptions {
 		subsByName[s.Name()] = s
 	}
-	if err := adapter.RegisterRoute(route.HttpGet, graphqlSubscriptionPath, gqltransport.SSEHandler(subsByName)); err != nil {
+	if err := adapter.RegisterRoute(route.HttpGet, graphqlSubscriptionPath, graphql.SSEHandler(subsByName)); err != nil {
 		return err
 	}
-	return adapter.RegisterWebSocket(graphqlSubscriptionWSPath, gqltransport.WSHandler(subsByName))
+	return adapter.RegisterWebSocket(graphqlSubscriptionWSPath, graphql.WSHandler(subsByName))
 }
 
 // graphqlRequestBody is the standard GraphQL-over-HTTP request shape
@@ -109,13 +107,13 @@ type graphqlResponseBody struct {
 }
 
 // graphqlHandler builds the POST /graphql HTTP handler: decode the
-// standard GraphQL-over-HTTP body, execute it against sch via graphql.Do
-// (Query/Mutation dispatch happens INSIDE graphql.Do -- see
-// internal/graphqlgen's own Resolve callbacks, wired at Build time), write
-// {data, errors} back. Subscription requests are never dispatched here --
-// they connect via SSE/WebSocket (T9/T10, internal/gqltransport), a
-// genuinely different transport, not this JSON-over-HTTP endpoint.
-func graphqlHandler(sch *graphql.Schema) func(req *execution.Request, res *execution.Response) {
+// standard GraphQL-over-HTTP body, execute it against sch via gql.Do
+// (Query/Mutation dispatch happens INSIDE gql.Do -- see internal/graphql's
+// own Resolve callbacks, wired at Build time), write {data, errors} back.
+// Subscription requests are never dispatched here -- they connect via
+// SSE/WebSocket (T9/T10, internal/graphql), a genuinely different
+// transport, not this JSON-over-HTTP endpoint.
+func graphqlHandler(sch *gql.Schema) func(req *execution.Request, res *execution.Response) {
 	return func(req *execution.Request, res *execution.Response) {
 		// Same BodySource wiring registerRoutes' own withRoute closure does
 		// for every REST route -- req.Body().Raw() (and, transitively,
@@ -142,7 +140,7 @@ func graphqlHandler(sch *graphql.Schema) func(req *execution.Request, res *execu
 			return
 		}
 
-		result := graphql.Do(graphql.Params{
+		result := gql.Do(gql.Params{
 			Schema:         *sch,
 			RequestString:  body.Query,
 			VariableValues: body.Variables,

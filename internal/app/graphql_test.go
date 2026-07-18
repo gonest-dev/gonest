@@ -10,7 +10,7 @@ import (
 	"unsafe"
 
 	"gonest.dev/gonest/internal/adapter/fiber"
-	"gonest.dev/gonest/internal/gqlresolver"
+	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/schema"
 )
@@ -28,10 +28,10 @@ func TestNewApp_GraphqlQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 	userSchema.Property(&zero.Id).Integer().Required()
 	userSchema.Property(&zero.Email).Email().Required()
 
-	userResolver := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Query("user", func(q *gqlresolver.Query) {
+	userResolver := graphql.New(func(r *graphql.Resolver) {
+		r.Query("user", func(q *graphql.Query) {
 			q.Returns(userSchema)
-			q.Handler(func(ctx *gqlresolver.GraphqlContext) any {
+			q.Handler(func(ctx *graphql.GraphqlContext) any {
 				return map[string]any{"id": int64(1), "email": "john@example.com"}
 			})
 		})
@@ -94,10 +94,10 @@ func TestNewApp_GraphqlMutation_InvalidArgs_ProducesGraphqlError(t *testing.T) {
 	argsSchema := schema.New(argsTyp, uintptr(unsafe.Pointer(argsZero)))
 	argsSchema.Property(&argsZero.Email).Email().Required()
 
-	userResolver := gqlresolver.New(func(r *gqlresolver.Resolver) {
-		r.Mutation("createUser", func(m *gqlresolver.Mutation) {
+	userResolver := graphql.New(func(r *graphql.Resolver) {
+		r.Mutation("createUser", func(m *graphql.Mutation) {
 			m.Args(argsSchema)
-			m.Handler(func(ctx *gqlresolver.GraphqlContext) any {
+			m.Handler(func(ctx *graphql.GraphqlContext) any {
 				var args createUserArgs
 				if err := ctx.Args().ParseInto(&args, argsSchema); err != nil {
 					panic(err)

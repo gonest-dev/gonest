@@ -1,4 +1,4 @@
-package gqlresolver
+package graphql
 
 import (
 	"testing"

@@ -1,14 +1,13 @@
-// Package gqltransport implements the Subscription transports
-// graphql-go/graphql itself never shipped (graphql-support feature,
-// Milestone 17, D7/context.md's research: graphql-go's own subscription
-// support only ever resolved the SYNTAX, never an execution/streaming
-// engine) -- SSE (this file) and WebSocket (ws.go). Both bypass
-// graphql-go's own execution engine entirely: they call a
-// *gqlresolver.Subscription's own HandlerFunc directly, emitting values
-// over the wire as emit is called, exactly like internal/graphqlgen's
-// Query/Mutation Resolve callbacks call HandlerFunc directly instead of
-// going through graphql-go's own field-resolution machinery.
-package gqltransport
+// sse.go and ws.go implement the Subscription transports graphql-go/
+// graphql itself never shipped (D7/context.md's research: its own
+// subscription support only ever resolved the SYNTAX, never an
+// execution/streaming engine). Both bypass graphql-go's own execution
+// engine entirely: they call a *Subscription's own HandlerFunc directly,
+// emitting values over the wire as emit is called, exactly like
+// generate.go's Query/Mutation Resolve callbacks call HandlerFunc
+// directly instead of going through graphql-go's own field-resolution
+// machinery. See the package doc comment in resolver.go.
+package graphql
 
 import (
 	"bufio"
@@ -18,7 +17,6 @@ import (
 	"time"
 
 	"gonest.dev/gonest/internal/execution"
-	"gonest.dev/gonest/internal/gqlresolver"
 	"gonest.dev/gonest/internal/validate"
 )
 
@@ -44,7 +42,7 @@ const sseHeartbeatInterval = 15 * time.Second
 // decodes into the exact map[string]any shape that function already
 // expects (same shape graphql-go's own already-decoded ResolveParams.Args
 // has for POST /graphql).
-func SSEHandler(subs map[string]*gqlresolver.Subscription) func(req *execution.Request, res *execution.Response) {
+func SSEHandler(subs map[string]*Subscription) func(req *execution.Request, res *execution.Response) {
 	return func(req *execution.Request, res *execution.Response) {
 		name := req.Param("name")
 		sub, ok := subs[name]
@@ -80,7 +78,7 @@ func SSEHandler(subs map[string]*gqlresolver.Subscription) func(req *execution.R
 		done := make(chan struct{})
 		var closeOnce sync.Once
 		closeDone := func() { closeOnce.Do(func() { close(done) }) }
-		ctx := gqlresolver.NewGraphqlContext(argsParseable, done)
+		ctx := NewGraphqlContext(argsParseable, done)
 
 		res.Stream(func(w *bufio.Writer) {
 			// A panic inside Handler (or this function) is a recognized,
