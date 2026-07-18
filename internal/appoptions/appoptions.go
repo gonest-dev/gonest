@@ -61,10 +61,10 @@ type AppOptions struct {
 
 	// GraphqlPath overrides the fixed "/graphql" endpoint Query/Mutation
 	// dispatch through (graphql-support feature, Milestone 17) -- empty
-	// string (the zero value) keeps the "/graphql" default. Subscription's
-	// own SSE/WebSocket endpoints (/graphql/stream/:name, /graphql/ws/:name)
-	// derive from this same path, so overriding it moves all three
-	// consistently.
+	// string (the zero value) keeps the "/graphql" default. The real-protocol
+	// Subscription transports (graphql-transport-ws over WebSocket,
+	// graphql-sse's Distinct and Single connection modes, Milestone 18)
+	// share this SAME path -- overriding it moves all of them consistently.
 	GraphqlPath string
 }
 
