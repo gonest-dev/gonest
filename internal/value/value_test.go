@@ -7,7 +7,7 @@ import (
 	"gonest.dev/gonest/internal/value"
 )
 
-// --- Value[T] core behaviour ---
+// --- Accessor[T] core behaviour ---
 
 func TestNew_WithoutArgs_NotDirty(t *testing.T) {
 	v := value.New[string]()
@@ -31,7 +31,7 @@ func TestNew_WithArg_DirtyAndValueSet(t *testing.T) {
 }
 
 func TestSet_MarksDirtyAndStoresValue(t *testing.T) {
-	var v value.Value[int]
+	var v value.Accessor[int]
 	v.Set(42)
 	if !v.IsDirty() {
 		t.Fatal("Set(): want dirty=true, got false")
@@ -50,7 +50,7 @@ func TestGetAny_ReturnsValueAsAny(t *testing.T) {
 
 func TestOnDirty_CalledOnlyWhenDirty(t *testing.T) {
 	called := false
-	var clean value.Value[string]
+	var clean value.Accessor[string]
 	clean.OnDirty(func(s string) { called = true })
 	if called {
 		t.Fatal("OnDirty on clean value: callback must not be called")
@@ -66,7 +66,7 @@ func TestOnDirty_CalledOnlyWhenDirty(t *testing.T) {
 func TestApply_WritesOnlyWhenDirty(t *testing.T) {
 	target := "original"
 
-	var clean value.Value[string]
+	var clean value.Accessor[string]
 	clean.Apply(&target)
 	if target != "original" {
 		t.Fatalf("Apply on clean value: target must not change, got %q", target)
@@ -93,7 +93,7 @@ func TestMarshalJSON_EmitsInnerValueDirectly(t *testing.T) {
 }
 
 func TestUnmarshalJSON_SetsDirtyAndValue(t *testing.T) {
-	var v value.Value[int]
+	var v value.Accessor[int]
 	if err := json.Unmarshal([]byte(`7`), &v); err != nil {
 		t.Fatalf("UnmarshalJSON error: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestUnmarshalJSON_SetsDirtyAndValue(t *testing.T) {
 }
 
 func TestUnmarshalJSON_NullSetsDirty(t *testing.T) {
-	var v value.Value[string]
+	var v value.Accessor[string]
 	if err := json.Unmarshal([]byte(`null`), &v); err != nil {
 		t.Fatalf("UnmarshalJSON null error: %v", err)
 	}
@@ -117,8 +117,8 @@ func TestUnmarshalJSON_NullSetsDirty(t *testing.T) {
 
 func TestUnmarshalJSON_OmittedFieldStaysClean(t *testing.T) {
 	type patch struct {
-		Name  value.Value[string] `json:"name"`
-		Email value.Value[string] `json:"email"`
+		Name  value.Accessor[string] `json:"name"`
+		Email value.Accessor[string] `json:"email"`
 	}
 	var p patch
 	if err := json.Unmarshal([]byte(`{"name":"alice"}`), &p); err != nil {
@@ -135,10 +135,10 @@ func TestUnmarshalJSON_OmittedFieldStaysClean(t *testing.T) {
 // --- ToMap ---
 
 type patchUser struct {
-	Name  value.Value[string] `json:"name"`
-	Age   value.Value[int]    `json:"age,omitempty"`
-	Email value.Value[string] `json:"-"`
-	NoTag value.Value[bool]
+	Name  value.Accessor[string] `json:"name"`
+	Age   value.Accessor[int]    `json:"age,omitempty"`
+	Email value.Accessor[string] `json:"-"`
+	NoTag value.Accessor[bool]
 	Fixed string `json:"fixed_data"`
 }
 

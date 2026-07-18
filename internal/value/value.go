@@ -1,8 +1,8 @@
-// Package value provides Value[T], a generic field wrapper that tracks
+// Package value provides Accessor[T], a generic field wrapper that tracks
 // whether its value was explicitly set (dirty-tracking).
 //
 // The primary use case is PATCH-style handlers: decode a JSON body into a
-// struct whose fields are Value[T]; only fields that were present in the
+// struct whose fields are Accessor[T]; only fields that were present in the
 // JSON payload are marked dirty. The handler can then apply only the dirty
 // fields to the entity, leaving untouched fields unchanged without needing
 // any pointer-based optional semantics.
@@ -18,82 +18,82 @@ import (
 	"strings"
 )
 
-// Value[T] tracks a value of type T and whether it was explicitly set.
-// The zero value of Value[T] is valid: dirty=false, value=zero(T).
-type Value[T any] struct {
+// Accessor[T] tracks a value of type T and whether it was explicitly set.
+// The zero value of Accessor[T] is valid: dirty=false, value=zero(T).
+type Accessor[T any] struct {
 	dirty bool
 	value T
 }
 
-// New creates a Value[T]. If an initial value is provided, it starts dirty.
-func New[T any](val ...T) Value[T] {
+// New creates an Accessor[T]. If an initial value is provided, it starts dirty.
+func New[T any](val ...T) Accessor[T] {
 	if len(val) > 0 {
-		return Value[T]{dirty: true, value: val[0]}
+		return Accessor[T]{dirty: true, value: val[0]}
 	}
-	return Value[T]{}
+	return Accessor[T]{}
 }
 
 // Get returns the stored value regardless of dirty state.
-func (v *Value[T]) Get() T {
+func (v *Accessor[T]) Get() T {
 	return v.value
 }
 
 // IsDirty reports whether this field was explicitly set.
-func (v *Value[T]) IsDirty() bool {
+func (v *Accessor[T]) IsDirty() bool {
 	return v.dirty
 }
 
 // Set stores value and marks the field as dirty.
-func (v *Value[T]) Set(value T) {
+func (v *Accessor[T]) Set(value T) {
 	v.dirty = true
 	v.value = value
 }
 
 // OnDirty calls then with the stored value only if the field is dirty.
-func (v *Value[T]) OnDirty(then func(T)) {
+func (v *Accessor[T]) OnDirty(then func(T)) {
 	if v.dirty {
 		then(v.value)
 	}
 }
 
 // Apply writes the stored value into *ptr only if the field is dirty.
-func (v *Value[T]) Apply(ptr *T) {
+func (v *Accessor[T]) Apply(ptr *T) {
 	if v.dirty {
 		*ptr = v.value
 	}
 }
 
 // GetAny returns the stored value as any. Used internally by ToMap.
-func (v *Value[T]) GetAny() any {
+func (v *Accessor[T]) GetAny() any {
 	return v.value
 }
 
 // MarshalJSON emits the inner value directly (transparent wire format).
-func (v Value[T]) MarshalJSON() ([]byte, error) {
+func (v Accessor[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
 // UnmarshalJSON deserialises data into the inner value and marks it dirty.
 // A field whose JSON value is explicit null is still considered dirty.
-func (v *Value[T]) UnmarshalJSON(data []byte) error {
+func (v *Accessor[T]) UnmarshalJSON(data []byte) error {
 	v.dirty = true
 	return json.Unmarshal(data, &v.value)
 }
 
-// valueable is the internal interface ToMap uses via reflection to detect
-// Value fields without importing the concrete generic type.
-type valueable interface {
+// accessible is the internal interface ToMap uses via reflection to detect
+// Accessor fields without importing the concrete generic type.
+type accessible interface {
 	GetAny() any
 	IsDirty() bool
 }
 
 // ToDirtyMap converts a struct (or pointer to struct) into a map[string]any
-// containing only the dirty Value[T] fields. The map key is resolved from
+// containing only the dirty Accessor[T] fields. The map key is resolved from
 // struct tags in priority order: json → file → form → param → query → field
 // name. This covers every binding tag the framework's validate package uses,
-// so a single struct can carry Value[T] fields bound from any source (JSON
+// so a single struct can carry Accessor[T] fields bound from any source (JSON
 // body, multipart file, form field, path param, or query string) and still
-// produce the correct key in the dirty map. Non-Value fields are ignored.
+// produce the correct key in the dirty map. Non-Accessor fields are ignored.
 // Returns an empty map for non-struct input.
 func ToDirtyMap(obj any) map[string]any {
 	out := make(map[string]any)
@@ -115,7 +115,7 @@ func ToDirtyMap(obj any) map[string]any {
 			c.Elem().Set(field)
 			ptr = c
 		}
-		m, ok := ptr.Interface().(valueable)
+		m, ok := ptr.Interface().(accessible)
 		if !ok || !m.IsDirty() {
 			continue
 		}
