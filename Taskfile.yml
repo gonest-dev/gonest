@@ -4,6 +4,7 @@ vars:
   EXAMPLES:
     - .examples/simple-todo
     - .examples/blog-api
+    - .examples/blog-graphql
 
 tasks:
   default:
@@ -40,7 +41,7 @@ tasks:
       - go test {{.CLI_ARGS}}
 
   examples:
-    desc: Build both .examples/* modules (each has its own go.mod with a replace directive)
+    desc: Build all .examples/* modules (each has its own go.mod with a replace directive)
     cmds:
       - for:
           var: EXAMPLES

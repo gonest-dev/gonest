@@ -84,10 +84,11 @@ func main() {
 ```
 
 See [`.examples/simple-todo`](.examples/simple-todo) for a minimal MVC example (no external
-dependencies) and [`.examples/blog-api`](.examples/blog-api) for a denser one (guards,
-interceptors, middleware, filters, OpenAPI/Swagger, SQLite persistence, a real 3-module domain).
-See [Documentation](#documentation) below for the full API, or [gonest.dev](https://gonest.dev) for the
-full docs site.
+dependencies), [`.examples/blog-api`](.examples/blog-api) for a denser one (guards,
+interceptors, middleware, filters, OpenAPI/Swagger, SQLite persistence, a real 3-module domain),
+and [`.examples/blog-graphql`](.examples/blog-graphql) for GraphQL (Query/Mutation/Subscription
+over SSE and WebSocket). See [Documentation](#documentation) below for the full API, or
+[gonest.dev](https://gonest.dev) for the full docs site.
 
 ---
 
