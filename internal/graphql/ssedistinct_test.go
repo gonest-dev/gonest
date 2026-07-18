@@ -122,3 +122,108 @@ func TestSSEDistinctHandler_InvalidQuery_RespondsNextWithErrorNot400(t *testing.
 		t.Fatal("payload.Errors = none, want at least one for a syntactically invalid query")
 	}
 }
+
+func TestSSEDistinctHandler_Subscription_EmitsNextPerEmittedValue(t *testing.T) {
+	sub := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+				emit("hello")
+				emit("world")
+			})
+		})
+	})
+	sub.Declare()
+	subs := map[string]*graphql.Subscription{"onCreated": sub.OwnSubscriptions()[0]}
+
+	responder := newFakeSSEResponder("", map[string]string{"query": `subscription { onCreated }`})
+	req, res := execution.New(responder)
+
+	graphql.SSEDistinctHandler(nil, subs)(req, res)
+
+	r := bufio.NewReader(responder.pr)
+
+	for _, want := range []string{"hello", "world"} {
+		eventLine := readLine(t, r, time.Second)
+		if strings.TrimSpace(eventLine) != "event: next" {
+			t.Fatalf("event line = %q, want %q", eventLine, "event: next")
+		}
+
+		dataLine := readLine(t, r, time.Second)
+		var payload struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(strings.TrimSpace(dataLine), "data: ")), &payload); err != nil {
+			t.Fatalf("failed to decode SSE frame payload: %v", err)
+		}
+		if payload.Data["onCreated"] != want {
+			t.Fatalf("payload.Data[onCreated] = %v, want %q", payload.Data["onCreated"], want)
+		}
+
+		// blank line terminating the "next" frame.
+		readLine(t, r, time.Second)
+	}
+
+	completeLine := readLine(t, r, time.Second)
+	if strings.TrimSpace(completeLine) != "event: complete" {
+		t.Fatalf("complete line = %q, want %q", completeLine, "event: complete")
+	}
+	completeDataLine := readLine(t, r, time.Second)
+	if strings.TrimRight(completeDataLine, "\n") != "data: " {
+		t.Fatalf("complete data line = %q, want %q", completeDataLine, "data: ")
+	}
+}
+
+func TestSSEDistinctHandler_ClientDisconnects_HandlerGoroutineEnds(t *testing.T) {
+	var gotDone <-chan struct{}
+	handlerReturned := make(chan struct{})
+	sub := graphql.New(func(r *graphql.Resolver) {
+		r.Subscription("onCreated", func(s *graphql.Subscription) {
+			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+				gotDone = ctx.Done()
+				defer close(handlerReturned)
+				// Emits repeatedly so that AFTER the test simulates a client
+				// disconnect, the NEXT emit's write attempt is what actually
+				// detects the failure and closes ctx.Done() -- a write
+				// failure can only ever be noticed on an actual write, same
+				// reasoning sse.go's own SSEHandler test uses.
+				ticker := time.NewTicker(20 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						emit("tick")
+					}
+				}
+			})
+		})
+	})
+	sub.Declare()
+	subs := map[string]*graphql.Subscription{"onCreated": sub.OwnSubscriptions()[0]}
+
+	responder := newFakeSSEResponder("", map[string]string{"query": `subscription { onCreated }`})
+	req, res := execution.New(responder)
+
+	graphql.SSEDistinctHandler(nil, subs)(req, res)
+
+	r := bufio.NewReader(responder.pr)
+	line := readLine(t, r, time.Second)
+	if strings.TrimSpace(line) != "event: next" {
+		t.Fatalf("first line = %q, want %q", line, "event: next")
+	}
+
+	responder.disconnect()
+
+	select {
+	case <-gotDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ctx.Done() did not close after simulated client disconnect")
+	}
+
+	select {
+	case <-handlerReturned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Handler goroutine did not return after ctx.Done() closed -- leaked")
+	}
+}

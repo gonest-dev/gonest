@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 
 	gql "github.com/graphql-go/graphql"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/validate"
 )
 
 // SSEDistinctHandler builds the GET /graphql handler implementing
@@ -25,10 +28,20 @@ import (
 // POST, WS's single-result Subscribe path) -- writing exactly one `event:
 // next` frame (data: {"data":...,"errors":...}, same shape Execute already
 // returns) followed by one `event: complete` frame, then the connection
-// ends. A root field that resolves to a registered Subscription is T10's
-// own scope (real streaming, multiple Next frames over time) -- see the
-// SPEC_DEVIATION below on this function's placeholder behavior for that
-// case.
+// ends.
+//
+// T10 adds the other branch: when the root field IS a registered
+// Subscription, the connection stays open -- sub.HandlerFunc() runs in its
+// own goroutine (same pattern sse.go's own SSEHandler and wsprotocol.go's
+// own handleSubscribe already use: emit writes an `event: next` frame per
+// call, a periodic heartbeat comment-frame detects a dead connection via
+// write failure since a quiet Handler would otherwise never notice, and
+// ctx.Done() closes the moment either detects the client is gone so a
+// cooperative Handler can release its own resources promptly) -- until the
+// Handler itself returns (naturally, or because it observed <-ctx.Done()),
+// at which point exactly one final `event: complete` frame is written and
+// the connection ends. Unlike Query/Mutation's single next+complete pair,
+// this branch may write an unbounded number of next frames over time.
 //
 // GraphQL-over-HTTP SSE's own constraint (PROTOCOL.md, and this task's own
 // brief): a client using the native EventSource API can never read a non-2xx
@@ -63,21 +76,111 @@ func SSEDistinctHandler(sch *gql.Schema, subs map[string]*Subscription) func(req
 		// failure.
 		rootField, _ := wsRootFieldName(query, operationName)
 
-		if _, isSubscription := subs[rootField]; isSubscription {
-			// SPEC_DEVIATION (explicitly allowed by T9's brief): real
-			// streaming dispatch for a Subscription root field over Distinct
-			// SSE is T10's own scope. Minimum acceptable behavior here is a
-			// single, well-formed next+complete pair carrying an error --
-			// never hanging, never panicking, never a bare HTTP error status.
-			writeSSEDistinctResult(res, nil, []map[string]any{
-				{"message": fmt.Sprintf("gonest: subscription %q streaming is not yet supported over GraphQL-over-HTTP SSE", rootField)},
-			})
+		if sub, isSubscription := subs[rootField]; isSubscription {
+			streamSSEDistinctSubscription(res, sub, rootField, variables)
 			return
 		}
 
 		data, errs := Execute(sch, query, variables, operationName)
 		writeSSEDistinctResult(res, data, errs)
 	}
+}
+
+// streamSSEDistinctSubscription keeps the SSE Distinct connection open for
+// a matched Subscription root field: sub.HandlerFunc() runs in its own
+// goroutine, one `event: next` frame per emit(value) call, until the
+// Handler returns (naturally, or because ctx.Done() fired -- either the
+// heartbeat or an emit's own write failure closing it upon detecting the
+// client is gone), at which point one final `event: complete` frame is
+// written. Mechanically this is sse.go's own SSEHandler (heartbeat/mutex/
+// disconnect-detection) copy+adapted, not reimplemented: same done-channel/
+// closeOnce/mu-guarded write/heartbeat-ticker shape, only the wire frame
+// format differs (`event: next\ndata: {"data":{<fieldName>:<value>}}\n\n`
+// here vs SSEHandler's own bare `data: <value>\n\n`, plus the terminating
+// `event: complete\ndata: \n\n` frame Distinct connections require that
+// SSEHandler's own long-lived-per-Subscription endpoint never needed).
+func streamSSEDistinctSubscription(res *execution.Response, sub *Subscription, rootField string, variables map[string]any) {
+	res.SetHeader("Content-Type", "text/event-stream")
+	res.SetHeader("Cache-Control", "no-cache")
+	res.SetHeader("Connection", "keep-alive")
+
+	var argsParseable execution.Parseable
+	if sub.ArgsSchema() != nil {
+		argsParseable = validate.NewGraphqlArgsSource(variables)
+	}
+
+	// done closes the moment a write to the client fails (detected either
+	// by the Handler's own emit calls or by the heartbeat below) --
+	// ctx.Done() IS this channel, same contract sse.go's own SSEHandler
+	// documents, so a cooperative Handler observing <-ctx.Done() can
+	// release its own resources as soon as the disconnect is noticed, not
+	// only once this whole function eventually returns.
+	done := make(chan struct{})
+	var closeOnce sync.Once
+	closeDone := func() { closeOnce.Do(func() { close(done) }) }
+	ctx := NewGraphqlContext(argsParseable, done)
+
+	res.Stream(func(w *bufio.Writer) {
+		// A panic inside Handler (or this function) must not crash the
+		// process -- same recover contract sse.go's own SSEHandler and
+		// this file's own writeSSEDistinctResult document for the same
+		// reason.
+		defer func() { _ = recover() }()
+
+		// w is shared between the Handler's own goroutine (via emit) and
+		// this function's heartbeat loop -- bufio.Writer is not safe for
+		// concurrent use, so every write goes through write, serialized by
+		// mu.
+		var mu sync.Mutex
+		write := func(frame string) error {
+			mu.Lock()
+			defer mu.Unlock()
+			if _, err := w.WriteString(frame); err != nil {
+				return err
+			}
+			return w.Flush()
+		}
+
+		emit := func(v any) {
+			payload, err := json.Marshal(map[string]any{"data": map[string]any{rootField: v}})
+			if err != nil {
+				return
+			}
+			if err := write(fmt.Sprintf("event: next\ndata: %s\n\n", payload)); err != nil {
+				closeDone()
+			}
+		}
+
+		handlerDone := make(chan struct{})
+		go func() {
+			defer close(handlerDone)
+			sub.HandlerFunc()(ctx, emit)
+		}()
+
+		ticker := time.NewTicker(sseHeartbeatInterval)
+		defer ticker.Stop()
+	loop:
+		for {
+			select {
+			case <-handlerDone:
+				closeDone()
+				break loop
+			case <-ticker.C:
+				if err := write(": ping\n\n"); err != nil {
+					closeDone()
+					break loop
+				}
+			}
+		}
+
+		// Handler has returned (naturally or via disconnect) -- the
+		// terminating `complete` frame, per graphql-sse's own PROTOCOL.md
+		// (see writeSSEDistinctResult's own doc comment on the required
+		// empty `data: ` field). Best-effort: if the client is already
+		// gone this write simply fails and is ignored, same as every other
+		// write in this function past disconnect.
+		_ = write("event: complete\ndata: \n\n")
+	})
 }
 
 // writeSSEDistinctResult sets the SSE response headers and streams exactly
