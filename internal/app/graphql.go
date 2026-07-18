@@ -102,9 +102,10 @@ type graphqlResponseBody struct {
 }
 
 // graphqlHandler builds the POST /graphql HTTP handler: decode the
-// standard GraphQL-over-HTTP body, execute it against sch via gql.Do
-// (Query/Mutation dispatch happens INSIDE gql.Do -- see internal/graphql's
-// own Resolve callbacks, wired at Build time), write {data, errors} back.
+// standard GraphQL-over-HTTP body, execute it against sch via
+// graphql.Execute (Query/Mutation dispatch happens INSIDE gql.Do, which
+// graphql.Execute wraps -- see internal/graphql's own Resolve callbacks,
+// wired at Build time), write {data, errors} back.
 // Subscription requests are never dispatched here -- they connect via
 // SSE/WebSocket (T9/T10, internal/graphql), a genuinely different
 // transport, not this JSON-over-HTTP endpoint.
@@ -135,18 +136,13 @@ func graphqlHandler(sch *gql.Schema) func(req *execution.Request, res *execution
 			return
 		}
 
-		result := gql.Do(gql.Params{
-			Schema:         *sch,
-			RequestString:  body.Query,
-			VariableValues: body.Variables,
-			OperationName:  body.OperationName,
-		})
+		data, execErrs := graphql.Execute(sch, body.Query, body.Variables, body.OperationName)
 
 		var errs []any
-		for _, e := range result.Errors {
-			errs = append(errs, map[string]any{"message": e.Message})
+		for _, e := range execErrs {
+			errs = append(errs, e)
 		}
 
-		res.Json(graphqlResponseBody{Data: result.Data, Errors: errs})
+		res.Json(graphqlResponseBody{Data: data, Errors: errs})
 	}
 }
