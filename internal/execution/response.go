@@ -1,5 +1,7 @@
 package execution
 
+import "bufio"
+
 // Response encapsulates the WRITE side of an HTTP request/response cycle for
 // a single route Handler -- request-response-split feature (replaces the
 // write-side half of the old single Context type). Response holds a
@@ -73,4 +75,14 @@ func (res *Response) Html(s string) error {
 func (res *Response) Text(s string) error {
 	res.res.SetHeaderValue("Content-Type", "text/plain")
 	return res.res.SendString(s)
+}
+
+// Stream registers fn as this response's own body-streaming writer
+// (graphql-support feature, Milestone 17's SSE transport) -- fn runs on a
+// live connection, writing chunks (and flushing) over time, instead of
+// Json/Html/Text's "one full body, written once" contract. Used by
+// internal/gqltransport's SSE handler to keep a GraphQL Subscription's
+// connection open, writing one `data: ...\n\n` frame per emitted event.
+func (res *Response) Stream(fn func(w *bufio.Writer)) {
+	res.res.WriteStream(fn)
 }

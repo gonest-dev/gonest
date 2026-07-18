@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"bufio"
 	"io"
 	"testing"
 )
@@ -81,6 +82,8 @@ func (f *fakeResponder) SendString(s string) error {
 func (f *fakeResponder) BodyStream() (io.Reader, string, bool) {
 	return nil, "", false
 }
+
+func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer)) {}
 
 func TestRequest_Header_ReadsFromResponder(t *testing.T) {
 	fake := newFakeResponder()

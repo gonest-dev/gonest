@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -108,6 +109,7 @@ func (f *paramFakeResponder) Queries() map[string]string            { return nil
 func (f *paramFakeResponder) HTML(s string) error                   { return nil }
 func (f *paramFakeResponder) SendString(s string) error             { return nil }
 func (f *paramFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
+func (f *paramFakeResponder) WriteStream(fn func(w *bufio.Writer))  {}
 
 // newParamCtx builds a *execution.Request carrying params and attached to a
 // *route.Route built from pathPattern (e.g. "/user/:user_id/order/:order_id"),

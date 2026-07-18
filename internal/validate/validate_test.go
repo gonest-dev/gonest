@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -119,6 +120,7 @@ func (f *fakeResponder) Queries() map[string]string            { return nil }
 func (f *fakeResponder) HTML(s string) error                   { return nil }
 func (f *fakeResponder) SendString(s string) error             { return nil }
 func (f *fakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
+func (f *fakeResponder) WriteStream(fn func(w *bufio.Writer))  {}
 
 func expectBadRequest(t *testing.T, r any) *exception.BadRequestException {
 	t.Helper()
@@ -1016,4 +1018,7 @@ func (r *httpFiberResponder) HTML(s string) error {
 func (r *httpFiberResponder) SendString(s string) error { return r.c.SendString(s) }
 func (r *httpFiberResponder) BodyStream() (io.Reader, string, bool) {
 	return nil, "", false
+}
+func (r *httpFiberResponder) WriteStream(fn func(w *bufio.Writer)) {
+	r.c.RequestCtx().SetBodyStreamWriter(fn)
 }

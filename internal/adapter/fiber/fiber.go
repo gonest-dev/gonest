@@ -8,6 +8,7 @@
 package fiber
 
 import (
+	"bufio"
 	"io"
 	"mime"
 	"net/http"
@@ -361,4 +362,18 @@ func (r *fiberResponder) BodyStream() (io.Reader, string, bool) {
 		return nil, "", false
 	}
 	return stream, boundary, true
+}
+
+// WriteStream registers fn as this response's body-streaming writer, via
+// fasthttp's own RequestCtx.SetBodyStreamWriter (confirmed real API,
+// fasthttp@v1.72.0's server.go/stream.go: `type StreamWriter func(w
+// *bufio.Writer)`, `func (ctx *RequestCtx) SetBodyStreamWriter(sw
+// StreamWriter)`) -- graphql-support feature, Milestone 17's SSE
+// transport. fasthttp runs fn in its OWN goroutine, on a connection kept
+// open until fn returns; fasthttp's own doc comment on SetBodyStreamWriter
+// forbids touching RequestCtx/its members from inside fn, so fn must only
+// ever write to (and Flush) the *bufio.Writer it's given -- gonest's own
+// fn (internal/gqltransport's SSE handler) already only does that.
+func (r *fiberResponder) WriteStream(fn func(w *bufio.Writer)) {
+	r.c.RequestCtx().SetBodyStreamWriter(fn)
 }

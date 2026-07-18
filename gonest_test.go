@@ -1,6 +1,7 @@
 package gonest
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -329,6 +330,7 @@ func (f *paramFakeResponder) Queries() map[string]string            { return nil
 func (f *paramFakeResponder) HTML(s string) error                   { return nil }
 func (f *paramFakeResponder) SendString(s string) error             { return nil }
 func (f *paramFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
+func (f *paramFakeResponder) WriteStream(fn func(w *bufio.Writer))  {}
 
 // TestMustParams_RootPackage_RealHTTPDispatch proves the replacement for the
 // old TestParseIntPipe_RootAlias_InsightCallShape: a route param round-trips

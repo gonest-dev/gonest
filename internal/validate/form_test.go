@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"io"
@@ -76,6 +77,7 @@ func (f *formFakeResponder) BodyStream() (io.Reader, string, bool) {
 	}
 	return f.stream, f.boundary, true
 }
+func (f *formFakeResponder) WriteStream(fn func(w *bufio.Writer)) {}
 
 // buildMultipartBody writes fields (in order) and files (name -> content)
 // via the real mime/multipart.Writer, returning the built body + its

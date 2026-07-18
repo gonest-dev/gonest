@@ -12,7 +12,10 @@
 // devuser comes from (see context.md's "Motivação de Produto").
 package execution
 
-import "io"
+import (
+	"bufio"
+	"io"
+)
 
 // Parseable is the single contract every HTTP data source (params, query,
 // headers, JSON body, form body) satisfies -- unified-parse-api feature's
@@ -136,6 +139,16 @@ type Responder interface {
 	// internal/schema.Lookup already uses for "not applicable" rather
 	// than inventing a sentinel error.
 	BodyStream() (stream io.Reader, boundary string, ok bool)
+	// WriteStream registers fn as this response's OWN body-streaming
+	// writer (graphql-support feature, Milestone 17's SSE transport) --
+	// the underlying HTTP engine invokes fn on a live connection, letting
+	// a handler write chunks (and flush) over time instead of returning
+	// one full body immediately. Needed because neither JSON/HTML/
+	// SendString above nor a single Response value can express "keep this
+	// connection open, write more later" -- see internal/adapter/fiber's
+	// own doc comment on its implementation for the underlying engine's
+	// exact contract.
+	WriteStream(fn func(w *bufio.Writer))
 }
 
 // Request encapsulates the READ side of an HTTP request/response cycle for a

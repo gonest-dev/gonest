@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -89,6 +90,7 @@ func (f *queryFakeResponder) Queries() map[string]string            { return f.q
 func (f *queryFakeResponder) HTML(s string) error                   { return nil }
 func (f *queryFakeResponder) SendString(s string) error             { return nil }
 func (f *queryFakeResponder) BodyStream() (io.Reader, string, bool) { return nil, "", false }
+func (f *queryFakeResponder) WriteStream(fn func(w *bufio.Writer))  {}
 
 // newQueryCtx builds a *execution.Request carrying the given query map,
 // mirroring how a real dispatched request would look.
