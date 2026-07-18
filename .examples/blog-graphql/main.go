@@ -4,11 +4,18 @@
 // already uses (see .examples/blog-api for the REST-heavy example this
 // one deliberately stays separate from).
 //
+// It also demonstrates all 3 real-protocol transports the
+// graphql-realtime-protocols feature (Milestone 18) exposes, all on the
+// SAME /graphql path, dispatched purely by HTTP method/headers -- see
+// README.md in this directory for the full walkthrough of each one
+// (graphql-transport-ws over WebSocket, graphql-sse Distinct connections
+// mode, graphql-sse Single connection mode).
+//
 // Run:
 //
 //	cd .examples/blog-graphql && go run .
 //
-// Try:
+// Quick tries (see README.md for the WS and SSE transports):
 //
 //	# Query
 //	curl -X POST localhost:3002/graphql -d '{"query":"{ posts { id title body } }"}'
@@ -18,13 +25,6 @@
 //
 //	# Query by id
 //	curl -X POST localhost:3002/graphql -d '{"query":"{ post(id: 1) { id title body } }"}'
-//
-//	# Subscription (SSE) -- open in one terminal, then run a createPost
-//	# Mutation in another and watch the event arrive here:
-//	curl -N localhost:3002/graphql/stream/postCreated
-//
-//	# Subscription (WebSocket), e.g. via websocat:
-//	websocat ws://localhost:3002/graphql/ws/postCreated
 package main
 
 import "gonest.dev/gonest"
