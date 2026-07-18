@@ -141,3 +141,59 @@ func TestNewApp_GraphqlMutation_InvalidArgs_ProducesGraphqlError(t *testing.T) {
 		t.Fatal("expected a GraphQL error for an invalid email arg, got none")
 	}
 }
+
+func TestNewApp_GraphqlPath_OverriddenViaAppOptions(t *testing.T) {
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("ping", func(q *graphql.Query) {
+			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+		})
+	})
+
+	root := module.New(func(m *module.Module) {
+		m.Resolvers(res)
+	})
+
+	app, err := NewApp[fiber.FiberApp](root, AppOptions{GraphqlPath: "/api/gql"})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	fiberAdapter := app.Adapter().(*fiber.FiberApp)
+
+	body, _ := json.Marshal(map[string]any{"query": `{ ping }`})
+
+	// The default path must NOT be registered when overridden.
+	defaultReq := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(body))
+	defaultReq.Header.Set("Content-Type", "application/json")
+	defaultResp, err := fiberAdapter.FiberApp().Test(defaultReq)
+	if err != nil {
+		t.Fatalf("app.Test error: %v", err)
+	}
+	defer defaultResp.Body.Close()
+	if defaultResp.StatusCode != http.StatusNotFound {
+		t.Fatalf("POST /graphql (default path, should be unregistered) status = %d, want 404", defaultResp.StatusCode)
+	}
+
+	// The overridden path must work.
+	customReq := httptest.NewRequest(http.MethodPost, "/api/gql", bytes.NewReader(body))
+	customReq.Header.Set("Content-Type", "application/json")
+	customResp, err := fiberAdapter.FiberApp().Test(customReq)
+	if err != nil {
+		t.Fatalf("app.Test error: %v", err)
+	}
+	defer customResp.Body.Close()
+	if customResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/gql status = %d, want 200", customResp.StatusCode)
+	}
+
+	var out struct {
+		Data struct {
+			Ping string `json:"ping"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(customResp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if out.Data.Ping != "pong" {
+		t.Fatalf("data.ping = %q, want %q", out.Data.Ping, "pong")
+	}
+}

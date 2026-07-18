@@ -58,6 +58,14 @@ type AppOptions struct {
 	// either way, since Context.Body() still auto-drains the stream into
 	// a buffer on first touch regardless of this setting.
 	EnableFormStreaming bool
+
+	// GraphqlPath overrides the fixed "/graphql" endpoint Query/Mutation
+	// dispatch through (graphql-support feature, Milestone 17) -- empty
+	// string (the zero value) keeps the "/graphql" default. Subscription's
+	// own SSE/WebSocket endpoints (/graphql/stream/:name, /graphql/ws/:name)
+	// derive from this same path, so overriding it moves all three
+	// consistently.
+	GraphqlPath string
 }
 
 // LogLevel is internal/logger.Level's own alias -- kept under this name

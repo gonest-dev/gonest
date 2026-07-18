@@ -380,7 +380,7 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions
 	if err := registerRoutes(adapter, root, modules); err != nil {
 		return nil, err
 	}
-	if err := registerGraphql(adapter, modules); err != nil {
+	if err := registerGraphql(adapter, modules, opt); err != nil {
 		return nil, err
 	}
 

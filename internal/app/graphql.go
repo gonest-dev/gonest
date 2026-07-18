@@ -12,20 +12,10 @@ import (
 	"gonest.dev/gonest/internal/validate"
 )
 
-// graphqlPath is the fixed HTTP endpoint every registered GraphQL
-// Query/Mutation dispatches through (graphql-support feature, Milestone
-// 17). Not yet configurable via AppOptions -- design.md's Tech Decisions
-// left this open, a fixed default is enough for the MVP.
-const graphqlPath = "/graphql"
-
-// graphqlSubscriptionPath is the SSE transport's own endpoint (T9) --
-// :name selects which registered Subscription to stream. WebSocket (T10)
-// uses a sibling path, registered separately.
-const graphqlSubscriptionPath = "/graphql/stream/:name"
-
-// graphqlSubscriptionWSPath is the WebSocket transport's own endpoint
-// (T10) -- same :name convention as graphqlSubscriptionPath.
-const graphqlSubscriptionWSPath = "/graphql/ws/:name"
+// defaultGraphqlPath is used when AppOptions.GraphqlPath is empty (the
+// zero value) -- design.md's Tech Decisions left this configurable-or-not
+// open, resolved now via AppOptions.GraphqlPath.
+const defaultGraphqlPath = "/graphql"
 
 // resolvableResolver is a locally-declared interface used to type-assert
 // module.ResolverRef values down to the methods Stage 2.5-equivalent
@@ -45,7 +35,7 @@ type resolvableResolver interface {
 // /graphql route dispatching through it. A no-op (no route registered) if
 // no module registered any resolver at all -- an app that never uses
 // GraphQL gets no extra endpoint.
-func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
+func registerGraphql(adapter HttpAdapter, modules []*module.Module, opts AppOptions) error {
 	var queries []*graphql.Query
 	var mutations []*graphql.Mutation
 	var subscriptions []*graphql.Subscription
@@ -71,6 +61,11 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
 		return err
 	}
 
+	graphqlPath := opts.GraphqlPath
+	if graphqlPath == "" {
+		graphqlPath = defaultGraphqlPath
+	}
+
 	if err := adapter.RegisterRoute(route.HttpPost, graphqlPath, graphqlHandler(sch)); err != nil {
 		return err
 	}
@@ -83,10 +78,10 @@ func registerGraphql(adapter HttpAdapter, modules []*module.Module) error {
 	for _, s := range subscriptions {
 		subsByName[s.Name()] = s
 	}
-	if err := adapter.RegisterRoute(route.HttpGet, graphqlSubscriptionPath, graphql.SSEHandler(subsByName)); err != nil {
+	if err := adapter.RegisterRoute(route.HttpGet, graphqlPath+"/stream/:name", graphql.SSEHandler(subsByName)); err != nil {
 		return err
 	}
-	return adapter.RegisterWebSocket(graphqlSubscriptionWSPath, graphql.WSHandler(subsByName))
+	return adapter.RegisterWebSocket(graphqlPath+"/ws/:name", graphql.WSHandler(subsByName))
 }
 
 // graphqlRequestBody is the standard GraphQL-over-HTTP request shape
