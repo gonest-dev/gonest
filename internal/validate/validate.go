@@ -150,6 +150,26 @@ func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 		})
 	}
 
+	// schema-sanitize-refine feature: cross-field checks run ONLY after
+	// every individual field's validation (above) AND population (just
+	// above) have both succeeded -- comparing fields that weren't even
+	// populated yet (or that already failed validation) would be
+	// meaningless. Every registered Refine runs (collect-all, same
+	// convention validateStruct already follows), not just the first one
+	// that fails.
+	if refines := m.OwnRefines(); len(refines) > 0 {
+		var refineViolations []violation
+		for _, refine := range refines {
+			field, err := refine(dst)
+			if err != nil {
+				refineViolations = append(refineViolations, violation{Field: field, Message: err.Error()})
+			}
+		}
+		if len(refineViolations) > 0 {
+			return exception.NewBadRequestException(refineViolations)
+		}
+	}
+
 	return nil
 }
 

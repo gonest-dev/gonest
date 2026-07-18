@@ -665,6 +665,145 @@ func TestSanitize_ComposesWithCustom_CustomReceivesSanitizedValue(t *testing.T) 
 	}
 }
 
+// --- schema-sanitize-refine: Refine (cross-field post-processing) ----------
+
+// refineEntity exercises Refine/OwnRefines in an end-to-end ParseInto
+// dispatch (schema-sanitize-refine feature) -- password/confirmPassword,
+// spec.md's own API Sketch example.
+type refineEntity struct {
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirmPassword"`
+}
+
+var refineSchema *schema.Schema
+
+func init() {
+	e := &refineEntity{}
+	refineSchema = schema.New(reflect.TypeOf(*e), uintptr(unsafe.Pointer(e)))
+	refineSchema.Property(&e.Password).String().Min(8).Required()
+	refineSchema.Property(&e.ConfirmPassword).String().Min(8).Required()
+
+	refineSchema.Refine(func(dst any) (string, error) {
+		d := dst.(*refineEntity)
+		if d.Password != d.ConfirmPassword {
+			return "confirmPassword", fmt.Errorf("must match password")
+		}
+		return "", nil
+	})
+}
+
+func TestRefine_MatchingFields_Passes(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{"password": "hunter22", "confirmPassword": "hunter22"})
+	ctx := newCtx(body)
+
+	result := mustParseJSON[refineEntity](ctx, refineSchema)
+
+	if result.Password != "hunter22" || result.ConfirmPassword != "hunter22" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestRefine_MismatchedFields_RecordsViolationOnNamedField(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{"password": "hunter22", "confirmPassword": "different"})
+	ctx := newCtx(body)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		exc := expectBadRequest(t, r)
+		vs := violationsOf(t, exc)
+		if !hasFieldViolation(vs, "confirmPassword") {
+			t.Fatalf("expected a violation on 'confirmPassword', got %+v", vs)
+		}
+	}()
+
+	mustParseJSON[refineEntity](ctx, refineSchema)
+}
+
+func TestRefine_NeverRunsWhenIndividualFieldValidationAlreadyFailed(t *testing.T) {
+	// Password below Min(8) -- individual field validation must fail BEFORE
+	// Refine ever runs. ConfirmPassword is individually valid (>=8 chars)
+	// but deliberately MISMATCHED -- if Refine incorrectly ran anyway, it
+	// would add its own "confirmPassword" violation; asserting it does NOT
+	// appear proves Refine never ran.
+	body, _ := json.Marshal(map[string]any{"password": "short", "confirmPassword": "longenough1"})
+	ctx := newCtx(body)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		exc := expectBadRequest(t, r)
+		vs := violationsOf(t, exc)
+		if !hasFieldViolation(vs, "password") {
+			t.Fatalf("expected a violation on 'password' (Min(8)), got %+v", vs)
+		}
+		if hasFieldViolation(vs, "confirmPassword") {
+			t.Fatalf("Refine's own violation must NOT appear when field validation already failed, got %+v", vs)
+		}
+	}()
+
+	mustParseJSON[refineEntity](ctx, refineSchema)
+}
+
+// multiRefineEntity proves multiple Refine registrations all run
+// (collect-all, D5) even when more than one fails.
+type multiRefineEntity struct {
+	A string `json:"a"`
+	B string `json:"b"`
+	C string `json:"c"`
+}
+
+var multiRefineSchema *schema.Schema
+
+func init() {
+	e := &multiRefineEntity{}
+	multiRefineSchema = schema.New(reflect.TypeOf(*e), uintptr(unsafe.Pointer(e)))
+	multiRefineSchema.Property(&e.A).String()
+	multiRefineSchema.Property(&e.B).String()
+	multiRefineSchema.Property(&e.C).String()
+
+	multiRefineSchema.Refine(func(dst any) (string, error) {
+		d := dst.(*multiRefineEntity)
+		if d.A != d.B {
+			return "b", fmt.Errorf("must match a")
+		}
+		return "", nil
+	})
+	multiRefineSchema.Refine(func(dst any) (string, error) {
+		d := dst.(*multiRefineEntity)
+		if d.A != d.C {
+			return "c", fmt.Errorf("must match a")
+		}
+		return "", nil
+	})
+}
+
+func TestRefine_MultipleRegistered_AllRunAndCollectViolations(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{"a": "x", "b": "y", "c": "z"})
+	ctx := newCtx(body)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		exc := expectBadRequest(t, r)
+		vs := violationsOf(t, exc)
+		if !hasFieldViolation(vs, "b") || !hasFieldViolation(vs, "c") {
+			t.Fatalf("expected violations on BOTH 'b' and 'c' (collect-all), got %+v", vs)
+		}
+		if len(vs) != 2 {
+			t.Fatalf("expected exactly 2 violations, got %d: %+v", len(vs), vs)
+		}
+	}()
+
+	mustParseJSON[multiRefineEntity](ctx, multiRefineSchema)
+}
+
 // --- schema-value-support: Value-schema (no struct) -------------------------
 
 // cpfSchema reproduces spec.md's own API Sketch example (schema-value-
