@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	gql "github.com/graphql-go/graphql"
+
 	"gonest.dev/gonest/internal/graphql"
 )
 
@@ -183,6 +185,206 @@ func TestWSProtocolHandler_UnknownMessageType_Closes4400(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for CloseWithCode(4400, ...)")
+	}
+
+	<-done
+}
+
+// newProtoTestSchema builds a minimal *gql.Schema exposing one Query field
+// ("ping" -> "pong") and one Mutation field ("bump" -> "bumped") -- same
+// pattern execute_test.go's newExecTestSchema already uses, just with a
+// Mutation added so both dispatch paths are covered.
+func newProtoTestSchema(t *testing.T) *gql.Schema {
+	t.Helper()
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("ping", func(q *graphql.Query) {
+			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+		})
+		r.Mutation("bump", func(m *graphql.Mutation) {
+			m.Handler(func(ctx *graphql.GraphqlContext) any { return "bumped" })
+		})
+	})
+	res.Declare()
+	sch, err := graphql.Build(res.OwnQueries(), res.OwnMutations(), nil)
+	if err != nil {
+		t.Fatalf("Build() error: %v", err)
+	}
+	return sch
+}
+
+// ackConn brings a protoFakeWSConn up through ConnectionInit ->
+// ConnectionAck so subscribe tests can start from a ready state, discarding
+// the ack message itself.
+func ackConn(t *testing.T, conn *protoFakeWSConn) {
+	t.Helper()
+	conn.sendJSON(t, map[string]string{"type": "connection_init"})
+	select {
+	case <-conn.written:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for connection_ack")
+	}
+}
+
+func TestWSProtocolHandler_SubscribeQuery_RespondsNextThenComplete(t *testing.T) {
+	sch := newProtoTestSchema(t)
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(sch, nil)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":   "1",
+		"type": "subscribe",
+		"payload": map[string]any{
+			"query": `{ ping }`,
+		},
+	})
+
+	var next, complete map[string]any
+	for i := 0; i < 2; i++ {
+		select {
+		case msg := <-conn.written:
+			var payload map[string]any
+			if err := json.Unmarshal(msg, &payload); err != nil {
+				t.Fatalf("failed to decode message: %v", err)
+			}
+			switch payload["type"] {
+			case "next":
+				next = payload
+			case "complete":
+				complete = payload
+			default:
+				t.Fatalf("unexpected message type %v", payload["type"])
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for next/complete")
+		}
+	}
+
+	if next == nil {
+		t.Fatal("did not receive a Next message")
+	}
+	if next["id"] != "1" {
+		t.Fatalf("next[id] = %v, want %q", next["id"], "1")
+	}
+	payload, ok := next["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("next[payload] = %#v, want map", next["payload"])
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok || data["ping"] != "pong" {
+		t.Fatalf("next payload data = %#v, want {ping: pong}", payload["data"])
+	}
+
+	if complete == nil {
+		t.Fatal("did not receive a Complete message")
+	}
+	if complete["id"] != "1" {
+		t.Fatalf("complete[id] = %v, want %q", complete["id"], "1")
+	}
+
+	// No further message should follow a single-result operation's own
+	// Complete (streaming would keep emitting Next; this must not).
+	select {
+	case msg := <-conn.written:
+		t.Fatalf("unexpected extra message after Complete: %s", msg)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	conn.readErr <- errors.New("connection closed")
+	<-done
+}
+
+func TestWSProtocolHandler_SubscribeMutation_RespondsNextThenComplete(t *testing.T) {
+	sch := newProtoTestSchema(t)
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(sch, nil)(conn)
+	}()
+
+	ackConn(t, conn)
+
+	conn.sendJSON(t, map[string]any{
+		"id":   "1",
+		"type": "subscribe",
+		"payload": map[string]any{
+			"query": `mutation { bump }`,
+		},
+	})
+
+	var next, complete map[string]any
+	for i := 0; i < 2; i++ {
+		select {
+		case msg := <-conn.written:
+			var payload map[string]any
+			if err := json.Unmarshal(msg, &payload); err != nil {
+				t.Fatalf("failed to decode message: %v", err)
+			}
+			switch payload["type"] {
+			case "next":
+				next = payload
+			case "complete":
+				complete = payload
+			default:
+				t.Fatalf("unexpected message type %v", payload["type"])
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for next/complete")
+		}
+	}
+
+	if next == nil {
+		t.Fatal("did not receive a Next message")
+	}
+	payload, ok := next["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("next[payload] = %#v, want map", next["payload"])
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok || data["bump"] != "bumped" {
+		t.Fatalf("next payload data = %#v, want {bump: bumped}", payload["data"])
+	}
+
+	if complete == nil {
+		t.Fatal("did not receive a Complete message")
+	}
+
+	conn.readErr <- errors.New("connection closed")
+	<-done
+}
+
+func TestWSProtocolHandler_OperationBeforeAck_Closes4401(t *testing.T) {
+	conn := newProtoFakeWSConn()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		graphql.WSProtocolHandler(nil, nil)(conn)
+	}()
+
+	conn.sendJSON(t, map[string]any{
+		"id":   "1",
+		"type": "subscribe",
+		"payload": map[string]any{
+			"query": `{ ping }`,
+		},
+	})
+
+	select {
+	case call := <-conn.closes:
+		if call.code != 4401 {
+			t.Fatalf("close code = %d, want 4401", call.code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for CloseWithCode(4401, ...)")
 	}
 
 	<-done
