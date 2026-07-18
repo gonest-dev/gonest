@@ -2,7 +2,7 @@
 
 **Spec**: `.specs/features/schema-sanitize-refine/spec.md`
 **Design**: `.specs/features/schema-sanitize-refine/design.md`
-**Status**: Draft
+**Status**: Complete
 
 ---
 

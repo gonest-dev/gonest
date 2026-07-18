@@ -138,9 +138,9 @@ violação customizada se a comparação falhar.
 
 | Requirement ID | Story | Phase | Status |
 | --------------- | ------------------------------------ | ------- | ------- |
-| SANR-01 | P1: Sanitize(fn) pré-processamento | Specify | Pending |
-| SANR-02 | P1: Refine(fn) pós-processamento cross-field | Specify | Pending |
-| SANR-03 | Custom/Property/NewSchema/NewValue permanecem inalterados | Specify | Pending |
+| SANR-01 | P1: Sanitize(fn) pré-processamento | Execute | Verified |
+| SANR-02 | P1: Refine(fn) pós-processamento cross-field | Execute | Verified |
+| SANR-03 | Custom/Property/NewSchema/NewValue permanecem inalterados | Execute | Verified |
 
 ## Success Criteria
 

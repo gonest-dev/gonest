@@ -1,7 +1,7 @@
 # Schema Sanitize/Refine Design
 
 **Spec**: `.specs/features/schema-sanitize-refine/spec.md`
-**Status**: Draft
+**Status**: Complete
 
 ---
 

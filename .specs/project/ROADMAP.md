@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 16 (Schema Sanitize/Refine) -- **PRÓXIMA A SER IMPLEMENTADA**, spec+design+tasks prontos, aguardando execução
-**Status:** Milestones 1-15 COMPLETE, Milestone 16 (Schema Sanitize/Refine) SPECIFIED (execução em andamento), Milestone 17 (GraphQL Support) DESIGNED (não iniciada)
+**Current Milestone:** 17 (GraphQL Support) -- **PRÓXIMA A SER IMPLEMENTADA**, spec+design+tasks prontos, aguardando execução
+**Status:** Milestones 1-16 COMPLETE, Milestone 17 (GraphQL Support) DESIGNED (next up, não iniciada)
 
 ---
 
@@ -299,11 +299,11 @@
 ## Milestone 16: Schema Sanitize/Refine
 
 **Goal:** `PropertyBuilder.Sanitize(fn)` -- pré-processamento por campo (composto com Min/Max/Pattern, ao contrário de `Custom`); `Schema.Refine(fn)` -- pós-processamento cross-field (ex: `password == confirmPassword`), rodado depois de toda validação individual + população terem sucesso.
-**Status:** SPECIFIED (spec.md + design.md + tasks.md prontos, 5 tasks — execução em andamento)
+**Status:** COMPLETE (T1-T5 executados, `go test ./... -race` verde, 23 pacotes)
 
 ### Features
 
-**Schema Sanitize/Refine** - SPECIFIED
+**Schema Sanitize/Refine** - COMPLETE
 - `PropertyBuilder.Sanitize(fn func(raw any) any)` -- transforma `raw` ANTES de qualquer check (inclusive antes de `Custom`), sem substituir Min/Max/Pattern
 - `Schema.Refine(fn func(dst any) (field string, err error))` -- cross-field, roda só depois de `validateStruct`+`populate` terem sucesso; múltiplos `Refine` acumulam (collect-all)
 - V1 escopo: JSON body apenas (`params`/`query`/`form`/`headers` e `Value`-schemas ficam de fora, ver spec.md's Out of Scope)

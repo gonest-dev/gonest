@@ -96,13 +96,12 @@ changes := gonest.AccessorsToDirtyMap(body)
 
 ---
 
-# Pré/pós-processamento -- Sanitize + Refine (Futuro, reflexão)
+# Pré/pós-processamento -- Sanitize + Refine -- implementado
 
-Hoje `Custom(fn)` é a ÚNICA porta de escape do `PropertyBuilder`, e ela
-SUBSTITUI por inteiro a validação built-in (Min/Max/Pattern nunca rodam
-se `Custom` foi chamado) -- e é por campo isolado, sem acesso a outros
-campos do mesmo struct. Dois casos reais do dia a dia não cabem nisso,
-inspirados em `.preprocess()`/`.refine()` do Zod:
+`Custom(fn)` continua sendo a porta de escape que SUBSTITUI por inteiro a
+validação built-in de um campo isolado, **inalterado**. Dois casos reais
+do dia a dia que não cabiam nisso (inspirados em `.preprocess()`/
+`.refine()` do Zod) agora têm mecanismo PRÓPRIO, composável:
 
 1. **Sanitizar ANTES de validar** (ex: `trim()` num `string` antes de
    checar `Min(11)` -- sem isso, `"  12345678901  "` falha por tamanho
@@ -111,7 +110,7 @@ inspirados em `.preprocess()`/`.refine()` do Zod:
    `password == confirmPassword` -- não existe campo isolado que saiba
    disso, só o struct INTEIRO sabe).
 
-## Proposta: `Sanitize(fn)` no `PropertyBuilder` (pré, por campo)
+## `Sanitize(fn)` no `PropertyBuilder` (pré, por campo)
 
 ```go
 m.Property(&t.Cpf).String().Min(11).Max(11).Pattern(`^\d{11}$`).Sanitize(func(raw any) any {
@@ -129,7 +128,7 @@ convenção de idempotência que `Custom` já documenta (`PropertyBuilder.
 Custom`'s doc comment): pode rodar até 2x por request (validate + populate),
 precisa ser idempotente.
 
-## Proposta: `Refine(fn)` no `Schema` (pós, cross-field)
+## `Refine(fn)` no `Schema` (pós, cross-field)
 
 ```go
 updateUserSchema := gonest.NewSchema[UpdateUserDTO](func(t *UpdateUserDTO, m *gonest.Schema) {
@@ -157,30 +156,38 @@ chamada registra UM check a mais, todos rodam (mesma convenção
 identificada pelo `field` retornado (pode ser um campo específico, ex:
 `"confirmPassword"`, ou `""` pra um erro geral do objeto).
 
-## Onde isso se conectaria
+## Como foi implementado
 
-- `internal/validate`'s `jsonBodySource.ParseInto` ganharia um passo NOVO
-  depois de `populate` ter sucesso: rodar cada `Refine` registrado contra
-  `dstVal.Addr().Interface()`, coletar violações, falhar com
-  `BadRequestException` se alguma existir -- mesmo formato de erro que
-  `validateStruct` já produz hoje.
-- `validateValue`'s dispatch ganharia um passo ANTES do `Custom`/`kind`
-  check: se `p.SanitizeFunc()` existir, `raw = fn(raw)` primeiro.
-- Reaproveitado por GraphQL (Milestone 16) sem nenhum trabalho extra --
-  mesma `Schema`/`PropertyBuilder` que `.Args()`/`.Returns()` já usam.
+- `internal/schema.PropertyBuilder` ganhou o campo `sanitize func(raw any) any`
+  e os métodos `Sanitize(fn) *PropertyBuilder` (bare return, last-call-
+  wins, mesmo padrão de `Custom`) / `SanitizeFunc() (func(raw any) any, bool)`.
+- `internal/schema.Schema` ganhou o campo `refines []func(dst any) (string, error)`
+  e os métodos `Refine(fn) *Schema` (chain-return, acumula -- múltiplas
+  chamadas se somam) / `OwnRefines() []func(dst any) (string, error)`
+  (cópia defensiva, mesmo padrão de `OwnProperties`).
+- `internal/validate`'s `validateValue`/`populate`/`populateValue` (o
+  caminho de `NewValue[T]`, schema-value-support) ganharam, cada um, uma
+  aplicação de `Sanitize` bem no início, ANTES do check de `Custom`.
+- `jsonBodySource.ParseInto` ganhou um passo NOVO logo depois de
+  `populate` ter sucesso: roda cada `m.OwnRefines()` contra `dst`,
+  coletando toda violação (`field`, `err.Error()`) -- collect-all, mesma
+  convenção de `validateStruct`. Falha com `BadRequestException` se
+  alguma existir. Se `validateStruct` já tinha produzido violação de
+  campo individual, `Refine` NUNCA roda (mesma ordem que já impedia
+  `populate` de rodar sobre dado inválido).
+- Escopo V1: só JSON body (`jsonBodySource`) -- `params`/`query`/`form`/
+  `headers` e `Refine` contra um `Value`-schema (`NewValue[T]`, sem
+  struct) ficam de fora, ver `.specs/features/schema-sanitize-refine/
+  spec.md`'s Out of Scope.
+- Reaproveitado por GraphQL (Milestone 17) sem nenhum trabalho extra --
+  mesma `Schema`/`PropertyBuilder` que `.Args()`/`.Returns()` vão usar.
 
-## O que fica em aberto
+## O que continua em aberto (não resolvido nesta feature)
 
-- `Sanitize` + `Custom` juntos no MESMO campo -- ordem é clara (Sanitize
-  sempre primeiro), mas ninguém testou o caso combinado ainda.
-- `Refine` contra um `Value`-schema (sem struct) -- tecnicamente `dst`
-  seria só o valor solto, sem muito o que comparar contra outra coisa;
-  provavelmente só faz sentido pra `NewSchema[T]` (struct), não pra
-  `NewValue[T]`.
-- Nome final -- `Sanitize`/`Refine` são um ponto de partida (mesmo
-  vocabulário do Zod, adaptado), não decisão fechada.
-
-Sem decisão tomada aqui -- fica registrado como reflexão, igual o resto
-deste arquivo, para virar `.specs/features/` quando entrar em pauta de
-verdade (`tlc-spec-driven`, mesmo padrão de `schema-value-support`/
-`graphql-support`).
+- `Refine` para `params`/`query`/`form`/`headers` sources -- cada um tem
+  seu próprio parsing string-pra-tipo (`coerceParamString`) com um
+  caminho de `Custom` já especial-casado por fonte; extensão real, mas
+  separada.
+- `Refine` contra um `Value`-schema (sem struct) -- `dst` seria só o
+  valor solto, sem outro campo pra comparar contra; continua fora de
+  escopo.
