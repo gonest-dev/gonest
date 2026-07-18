@@ -12,9 +12,9 @@ import (
 	"gonest.dev/gonest/internal/validate"
 )
 
-// defaultGraphqlPath is used when AppOptions.GraphqlPath is empty (the
+// defaultGraphqlPath is used when Options.GraphqlPath is empty (the
 // zero value) -- design.md's Tech Decisions left this configurable-or-not
-// open, resolved now via AppOptions.GraphqlPath.
+// open, resolved now via Options.GraphqlPath.
 const defaultGraphqlPath = "/graphql"
 
 // graphqlEventStreamTokenHeader mirrors internal/graphql's own unexported
@@ -53,7 +53,7 @@ type resolvableResolver interface {
 // (no app.Use-style middleware) is what makes this coexistence possible at
 // all; each handler below is dispatched to purely by HTTP method, exactly
 // like any other multi-method path in the framework.
-func registerGraphql(adapter HttpAdapter, modules []*module.Module, opts AppOptions) error {
+func registerGraphql(adapter HttpAdapter, modules []*module.Module, opts Options) error {
 	var queries []*graphql.Query
 	var mutations []*graphql.Mutation
 	var subscriptions []*graphql.Subscription

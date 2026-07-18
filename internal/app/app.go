@@ -31,7 +31,7 @@ import (
 )
 
 // bannerRows is gonest's own ASCII wordmark, printed once by MustListen
-// (unless AppOptions.DisableBanner is set) before its 3 structured log
+// (unless Options.DisableBanner is set) before its 3 structured log
 // lines -- unformatted (no timestamp/level tag), the same convention
 // Fiber's own suppressed banner used (see
 // internal/adapter/fiber.FiberApp.Listen's DisableStartupMessage), so
@@ -47,7 +47,7 @@ var bannerRows = [5]string{
 // bootstrapTimeout bounds Stage 3 (Parallel Resolution): every Provider's
 // Constructor -- including ones that don't accept a context.Context
 // themselves -- runs within this deadline collectively, since it is the ctx
-// passed to errgroup.WithContext. Not yet configurable via AppOptions
+// passed to errgroup.WithContext. Not yet configurable via Options
 // (that arrives with the "App Bootstrap & Listen" feature); a fixed
 // generous default keeps NewApp usable today without hanging forever on a
 // Constructor that never returns.
@@ -55,13 +55,13 @@ const bootstrapTimeout = 30 * time.Second
 
 // App is the minimal handle returned once NewApp has finished bootstrapping
 // the whole dependency graph. It is intentionally opaque at this stage --
-// Listen/AppOptions/UseLogger etc. belong to the future "App Bootstrap &
+// Listen/Options/UseLogger etc. belong to the future "App Bootstrap &
 // Listen" feature. It exists now only so NewApp/MustNewApp have a return
 // type to hand back.
 type App struct {
 	root    *module.Module
 	adapter HttpAdapter
-	opts    AppOptions
+	opts    Options
 
 	// moduleCount/controllerCount/routeCount are populated by
 	// registerRoutes (Stage 2.5) -- used by MustListen's own startup log
@@ -215,12 +215,12 @@ type HttpAdapter interface {
 	// safe to call. Implementations must be idempotent -- NewApp[T] calls
 	// it exactly once, but nothing prevents an adapter's own constructor
 	// (like fiber.New) from also calling it internally. opts is the SAME
-	// AppOptions NewApp[T] itself received -- the only channel an adapter
+	// Options NewApp[T] itself received -- the only channel an adapter
 	// has to see feature toggles (e.g. EnableFormStreaming) that must be
 	// baked into its own underlying engine's config BEFORE that engine is
 	// constructed (a *fiber.App's config is immutable after fiber.New()
 	// returns, so this has to happen here, not later).
-	Init(opts AppOptions)
+	Init(opts Options)
 	// RegisterRoute wires one route (method + full path) onto the real
 	// underlying HTTP engine, translating h into whatever handler shape
 	// that engine expects.
@@ -307,18 +307,18 @@ type httpAdapterPtr[T any] interface {
 //
 // opts is optional (variadic, at most one) -- callers with no need for
 // BufferLogs/LogLevels/EnableFormStreaming/etc can call NewApp[T](root) and
-// get the zero-value AppOptions{}, same as passing AppOptions{} explicitly.
+// get the zero-value Options{}, same as passing Options{} explicitly.
 // Passing more than one opts panics -- there is no sane way to merge two
-// AppOptions, and silently taking the first (or last) would hide a caller
+// Options, and silently taking the first (or last) would hide a caller
 // bug. It is stored on the returned *App after every bootstrap stage above
 // completes, and does not influence any of them -- no Logger exists yet in
-// this codebase to act on BufferLogs/LogLevels (see AppOptions' doc comment
+// this codebase to act on BufferLogs/LogLevels (see Options' doc comment
 // in options.go).
-func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions) (*App, error) {
+func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (*App, error) {
 	if len(opts) > 1 {
-		panic("gonest: NewApp accepts at most one AppOptions")
+		panic("gonest: NewApp accepts at most one Options")
 	}
-	var opt AppOptions
+	var opt Options
 	if len(opts) == 1 {
 		opt = opts[0]
 	}
@@ -406,7 +406,7 @@ func countTree(modules []*module.Module) (moduleCount, controllerCount, routeCou
 // MustNewApp calls NewApp and panics if it returns an error. Convenience
 // for callers (typically main) that treat bootstrap failure as fatal. opts
 // is optional, same contract as NewApp's.
-func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOptions) *App {
+func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) *App {
 	app, err := NewApp[T, PT](root, opts...)
 	if err != nil {
 		panic(err)
@@ -424,7 +424,7 @@ func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...AppOpt
 // then called exactly once so the adapter can replace any
 // construction-produced nil internals with real ones (see HttpAdapter's own
 // doc comment for why this exists).
-func newAdapter[T any, PT httpAdapterPtr[T]](opts AppOptions) PT {
+func newAdapter[T any, PT httpAdapterPtr[T]](opts Options) PT {
 	adapter := PT(new(T))
 	adapter.Init(opts)
 	return adapter

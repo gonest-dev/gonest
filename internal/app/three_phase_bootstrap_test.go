@@ -81,7 +81,7 @@ func TestThreePhaseBootstrap_ProvidersFullyResolveBeforeControllerDeclares(t *te
 		m.Controllers(ctrl)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, AppOptions{}); err != nil {
+	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestThreePhaseBootstrap_GuardReferencedByTwoModules_DeclaresOnceWithUnionSc
 		m.Imports(moduleA, moduleB)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, AppOptions{}); err != nil {
+	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -195,7 +195,7 @@ func TestThreePhaseBootstrap_DeclareIdempotent_AcrossAllFourPipelineStageTypes(t
 		m.Controllers(ctrlA, ctrlB)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, AppOptions{}); err != nil {
+	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 

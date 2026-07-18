@@ -18,7 +18,7 @@ import (
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
 
-	"gonest.dev/gonest/internal/appoptions"
+	coreapp "gonest.dev/gonest/internal/app"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/route"
@@ -41,13 +41,26 @@ type FiberApp struct {
 	app *fiber.App
 }
 
+// init registers FiberApp as internal/app.MustNewTestApp's default
+// HttpAdapter -- internal/app cannot import this package directly (this
+// package already imports internal/app, see the coreapp import above, for
+// the HttpAdapter/Options types Init/RegisterRoute's own signatures
+// require; a reverse import would be a cycle), so it registers itself here
+// instead. See coreapp.RegisterTestAdapter's own doc comment for the full
+// reasoning.
+func init() {
+	coreapp.RegisterTestAdapter(func() coreapp.HttpAdapter {
+		return &FiberApp{}
+	})
+}
+
 // New builds a FiberApp around a freshly constructed *fiber.App with default
-// config (equivalent to Init(appoptions.AppOptions{})). Exported (rather than
+// config (equivalent to Init(coreapp.Options{})). Exported (rather than
 // requiring callers to reach into Fiber themselves) so T8's NewApp[T] can
 // construct one via reflection/generics without importing Fiber itself.
 func New() *FiberApp {
 	f := &FiberApp{}
-	f.Init(appoptions.AppOptions{})
+	f.Init(coreapp.Options{})
 	return f
 }
 
@@ -74,7 +87,7 @@ func New() *FiberApp {
 // Form Streaming feature, AD-022 in STATE.md). fiber.Config is immutable
 // once fiber.New() returns, so this MUST happen here, at construction time
 // -- there is no later hook to flip it on.
-func (f *FiberApp) Init(opts appoptions.AppOptions) {
+func (f *FiberApp) Init(opts coreapp.Options) {
 	if f.app == nil {
 		f.app = fiber.New(fiber.Config{
 			StreamRequestBody:            opts.EnableFormStreaming,

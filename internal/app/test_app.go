@@ -4,11 +4,33 @@ import (
 	"context"
 	"reflect"
 
-	"gonest.dev/gonest/internal/adapter/fiber"
 	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
+
+// testAdapterFactory is set by RegisterTestAdapter -- MustNewTestApp's only
+// channel to a concrete HttpAdapter. This package must NEVER import
+// internal/adapter/fiber directly: that package already imports this one
+// (for the HttpAdapter/Options types its own Init/RegisterRoute signatures
+// require), so a direct import here would be a cycle. Instead,
+// internal/adapter/fiber registers itself via this hook from its own
+// init(), inverting the dependency -- same idiom database/sql's own driver
+// registration uses for the identical reason (a leaf package cannot know
+// its own concrete implementations without importing them back).
+var testAdapterFactory func() HttpAdapter
+
+// RegisterTestAdapter lets an HttpAdapter implementation (in practice only
+// internal/adapter/fiber.FiberApp exists today) register itself as
+// MustNewTestApp's default adapter. Any program that imports the top-level
+// gonest package (which always imports internal/adapter/fiber, see
+// gonest.FiberApp) triggers this registration before MustNewTestApp could
+// possibly run. Calling MustNewTestApp without ANY adapter having
+// registered itself first is a caller/build misconfiguration, not a
+// runtime condition to recover from -- see MustNewTestApp's own panic.
+func RegisterTestAdapter(factory func() HttpAdapter) {
+	testAdapterFactory = factory
+}
 
 // TestBuilder collects overrides for MustNewTestApp's provider substitution
 // (see MustOverride). Only ever obtained via the configure callback
@@ -104,7 +126,11 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp 
 	ownership := discoverPipelineStageOwnership(modules)
 	declarePipelineStageTypes(ownership)
 
-	adapter := newAdapter[fiber.FiberApp](AppOptions{})
+	if testAdapterFactory == nil {
+		panic("gonest: no HttpAdapter registered for MustNewTestApp -- import gonest.dev/gonest (or gonest.dev/gonest/internal/adapter/fiber directly) before calling it")
+	}
+	adapter := testAdapterFactory()
+	adapter.Init(Options{})
 	if err := registerRoutes(adapter, root, modules); err != nil {
 		panic(err)
 	}

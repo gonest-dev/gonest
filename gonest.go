@@ -246,9 +246,9 @@ type HttpAdapter = app.HttpAdapter
 type FiberApp = fiber.FiberApp
 
 // AppOptions is Nest-parity bootstrap config for NewApp/MustNewApp
-// (BufferLogs, LogLevels). See internal/app.AppOptions's doc comment for the
+// (BufferLogs, LogLevels). See internal/app.Options's doc comment for the
 // full contract.
-type AppOptions = app.AppOptions
+type AppOptions = app.Options
 
 // LogLevel identifies one of Nest's 5 standard log severities. See
 // internal/app.LogLevel's doc comment for the full contract (iota-based

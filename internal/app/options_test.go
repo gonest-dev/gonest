@@ -52,12 +52,12 @@ func TestLogLevel_String_Unknown(t *testing.T) {
 }
 
 func TestAppOptions_ZeroValue(t *testing.T) {
-	var opts AppOptions
+	var opts Options
 	if opts.BufferLogs != false {
-		t.Fatalf("zero-value AppOptions.BufferLogs = %v, want false", opts.BufferLogs)
+		t.Fatalf("zero-value Options.BufferLogs = %v, want false", opts.BufferLogs)
 	}
 	if opts.LogLevels != nil {
-		t.Fatalf("zero-value AppOptions.LogLevels = %v, want nil", opts.LogLevels)
+		t.Fatalf("zero-value Options.LogLevels = %v, want nil", opts.LogLevels)
 	}
 }
 

@@ -14,7 +14,7 @@ import (
 
 	fasthttpws "github.com/fasthttp/websocket"
 
-	"gonest.dev/gonest/internal/appoptions"
+	coreapp "gonest.dev/gonest/internal/app"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/route"
@@ -91,7 +91,7 @@ func TestFiberMethod_UnknownHttpMethod_Panics(t *testing.T) {
 func TestInit_ZeroValueFiberApp_BecomesUsable(t *testing.T) {
 	app := &FiberApp{}
 
-	app.Init(appoptions.AppOptions{})
+	app.Init(coreapp.Options{})
 
 	if err := app.RegisterRoute(route.HttpGet, "/ping", func(req *execution.Request, res *execution.Response) {
 		res.Status(200).Json(map[string]string{"ok": "true"})
@@ -119,7 +119,7 @@ func TestInit_CalledTwice_DoesNotResetExistingApp(t *testing.T) {
 	app := New()
 	original := app.FiberApp()
 
-	app.Init(appoptions.AppOptions{})
+	app.Init(coreapp.Options{})
 
 	if app.FiberApp() != original {
 		t.Fatalf("Init replaced an already-initialized *fiber.App")

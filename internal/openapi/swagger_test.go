@@ -76,7 +76,7 @@ func TestRenderSwaggerUIHTML_DifferentOptions_ProduceDifferentOutput(t *testing.
 func TestSetupSwagger_RealHTTPDispatch(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	a, err := app.NewApp[fiber.FiberApp](root, app.AppOptions{})
+	a, err := app.NewApp[fiber.FiberApp](root, app.Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -181,7 +181,7 @@ func TestSetupSwagger_RealHTTPDispatch(t *testing.T) {
 func TestSetupSwagger_EmptyDocument_StillReturnsValidJSON(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	a, err := app.NewApp[fiber.FiberApp](root, app.AppOptions{})
+	a, err := app.NewApp[fiber.FiberApp](root, app.Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
