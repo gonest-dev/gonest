@@ -24,6 +24,8 @@ import (
 type fakeSSEResponder struct {
 	param    string
 	queries  map[string]string
+	headers  map[string]string
+	body     []byte
 	pr       *io.PipeReader
 	pw       *io.PipeWriter
 	status   int
@@ -47,12 +49,17 @@ func (f *fakeSSEResponder) GetStatus() int {
 	}
 	return f.status
 }
-func (f *fakeSSEResponder) GetMethod() string                     { return "GET" }
-func (f *fakeSSEResponder) GetPath() string                       { return "" }
-func (f *fakeSSEResponder) GetHeader(name string) string          { return "" }
+func (f *fakeSSEResponder) GetMethod() string { return "GET" }
+func (f *fakeSSEResponder) GetPath() string   { return "" }
+func (f *fakeSSEResponder) GetHeader(name string) string {
+	if f.headers == nil {
+		return ""
+	}
+	return f.headers[name]
+}
 func (f *fakeSSEResponder) SetHeaderValue(name, value string)     {}
 func (f *fakeSSEResponder) GetParam(name string) string           { return f.param }
-func (f *fakeSSEResponder) RawBody() []byte                       { return nil }
+func (f *fakeSSEResponder) RawBody() []byte                       { return f.body }
 func (f *fakeSSEResponder) Queries() map[string]string            { return f.queries }
 func (f *fakeSSEResponder) HTML(s string) error                   { return nil }
 func (f *fakeSSEResponder) SendString(s string) error             { return nil }

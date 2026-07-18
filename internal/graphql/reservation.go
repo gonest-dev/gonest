@@ -25,9 +25,16 @@ import (
 // reservation tracks the state of a single graphql-sse Single connection
 // mode token: reserved (write is nil, no GET has attached yet) or attached
 // (write is the frame-emitting function for the token's one SSE
-// connection).
+// connection). ops tracks, per operationId, the cancellation channel of a
+// still-streaming Subscription started via a POST that resolved through
+// this token (SSESingleOperationHandler, ssesingle.go's T13) -- so a future
+// DELETE handler (T14) can look one up by (token, operationId) and cancel
+// it specifically, without disturbing any other operationId active on the
+// same token. Lazily allocated (nil until the first StartOperation call);
+// most tokens (Query/Mutation-only traffic) never need it at all.
 type reservation struct {
 	write func(frame string) error
+	ops   map[string]chan struct{}
 }
 
 // ReservationRegistry is a thread-safe registry of graphql-sse Single
@@ -92,10 +99,78 @@ func (r *ReservationRegistry) Route(token, operationId string) (write func(frame
 	return res.write, true
 }
 
+// StartOperation registers done as the cancellation channel of a currently
+// streaming Subscription operation (operationId) on token's reservation.
+// SSESingleOperationHandler (ssesingle.go, T13) calls this right before
+// launching sub.HandlerFunc() in its own goroutine, so a later
+// StopOperation call -- whether from a future DELETE handler (T14) or from
+// Release below, once the token's SSE connection itself closes -- can
+// cancel that specific stream. Reports ok=false if token is unknown (never
+// reserved, or already released); the caller always reaches this right
+// after a successful Route call for the same token, so this should not
+// normally be observed, but it is checked rather than assumed.
+func (r *ReservationRegistry) StartOperation(token, operationId string, done chan struct{}) (ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	res, exists := r.byTok[token]
+	if !exists {
+		return false
+	}
+
+	if res.ops == nil {
+		res.ops = make(map[string]chan struct{})
+	}
+	res.ops[operationId] = done
+	return true
+}
+
+// StopOperation removes and closes operationId's done channel on token's
+// reservation, if one is currently registered -- idempotent: a second call,
+// or a call for an operationId whose stream already finished on its own, is
+// a no-op (same contract wsprotocol.go's own stopOp documents). Reports
+// ok=true only when an active operation was actually found and closed.
+func (r *ReservationRegistry) StopOperation(token, operationId string) (ok bool) {
+	r.mu.Lock()
+	res, exists := r.byTok[token]
+	if !exists || res.ops == nil {
+		r.mu.Unlock()
+		return false
+	}
+	done, found := res.ops[operationId]
+	if found {
+		delete(res.ops, operationId)
+	}
+	r.mu.Unlock()
+
+	if found {
+		close(done)
+	}
+	return found
+}
+
 // Release removes a token's reservation, called once the token's SSE
-// connection (opened via GET) closes.
+// connection (opened via GET) closes. Any Subscription operations still
+// streaming under this token (registered via StartOperation, never
+// individually stopped) are cancelled too -- their done channels are closed
+// exactly once each, same "close every remaining channel on teardown"
+// pattern wsprotocol.go's own stopAllOps uses for a dropped WS connection,
+// so no such goroutine is left running forever just because the client
+// dropped its single SSE connection without a matching DELETE per
+// operation.
 func (r *ReservationRegistry) Release(token string) {
 	r.mu.Lock()
+	res, exists := r.byTok[token]
+	var toClose []chan struct{}
+	if exists {
+		for _, done := range res.ops {
+			toClose = append(toClose, done)
+		}
+	}
 	delete(r.byTok, token)
 	r.mu.Unlock()
+
+	for _, done := range toClose {
+		close(done)
+	}
 }
