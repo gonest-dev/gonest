@@ -587,6 +587,70 @@ func TestMustJsonBody_NonObjectTopLevel_DegradesToAllRequiredMissing(t *testing.
 	mustParseJSON[UserProperties](ctx, userSchema)
 }
 
+// --- schema-value-support: Value-schema (no struct) -------------------------
+
+// cpfSchema reproduces spec.md's own API Sketch example (schema-value-
+// support feature) -- a standalone string value, no struct wrapping it.
+// Registered once here (package-level, same precedent as userSchema/
+// addressSchema above) since schema.Register panics on duplicate
+// registration for the same reflect.Type across this file's many Test
+// functions.
+var cpfSchema *schema.Schema
+
+func init() {
+	cpfSchema, _ = schema.NewValue(reflect.TypeOf(""))
+	cpfSchema.ValueProperty().String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+}
+
+func TestMustJsonBody_ValueSchema_HappyPath_ReturnsPopulatedValue(t *testing.T) {
+	ctx := newCtx([]byte(`"12345678901"`))
+
+	result := mustParseJSON[string](ctx, cpfSchema)
+
+	if result != "12345678901" {
+		t.Fatalf("mustParseJSON[string](cpfSchema) = %q, want %q", result, "12345678901")
+	}
+}
+
+func TestMustJsonBody_ValueSchema_PatternViolation_RecordsViolation(t *testing.T) {
+	ctx := newCtx([]byte(`"not-a-cpf"`))
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		exc := expectBadRequest(t, r)
+		vs := violationsOf(t, exc)
+		if len(vs) == 0 {
+			t.Fatal("expected at least one violation for a Pattern mismatch")
+		}
+	}()
+
+	mustParseJSON[string](ctx, cpfSchema)
+}
+
+func TestMustJsonBody_ValueSchema_MismatchedSchema_Panics(t *testing.T) {
+	// int64Schema was built for int64, cpfSchema (string) is passed here on
+	// purpose -- resolveSchema's mismatch panic (Kind-agnostic reflect.Type
+	// comparison) must still fire for a Value-schema, same as it already
+	// does for a struct-shaped one (TestMustJsonBody_MismatchedSchema_
+	// PanicsBeforeTouchingBody above).
+	ctx := newCtx([]byte(`42`))
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic, got none")
+		}
+		if _, ok := r.(*exception.BadRequestException); ok {
+			t.Fatal("expected a plain string panic about schema mismatch, not a BadRequestException")
+		}
+	}()
+
+	mustParseJSON[int64](ctx, cpfSchema) // cpfSchema was built for string, not int64
+}
+
 // --- real HTTP dispatch (L-012 precedent) -----------------------------------
 
 func TestMustJsonBody_RealHTTPDispatch_HappyPath(t *testing.T) {

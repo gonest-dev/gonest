@@ -113,6 +113,21 @@ func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 		})
 	}
 
+	// SPEC_DEVIATION (schema-value-support feature, T5): a Value-schema (m
+	// built via schema.NewValue, no struct around it) has no JSON object
+	// wrapping it, no struct tag, no reflect.StructField to key off of --
+	// the top-level decoded JSON value IS the value itself. validateStruct/
+	// populate below both assume a struct's own fields (p.Field()'s tag
+	// lookup, dest.FieldByIndex) and would misbehave (or simply find no
+	// keys) if reused unmodified here, so a Value-schema is routed to its
+	// own dedicated path instead -- reusing validateValue/setField, the
+	// SAME per-value primitives validateStruct/populate already call
+	// per-field, just applied directly to the whole body/dst instead of one
+	// field within it.
+	if m.IsValue() {
+		return populateValue(dstVal, parsed, m.ValueProperty())
+	}
+
 	// presence may be nil if the top-level JSON value isn't an object (e.g.
 	// a bare array or scalar) -- validateStruct treats a nil map the same
 	// as "every key absent", which is exactly the graceful degradation
@@ -465,6 +480,43 @@ func populate(dest reflect.Value, presence map[string]any, m *schema.Schema, tag
 		if err := setField(fieldVal, value); err != nil {
 			return fmt.Errorf("field %q: %w", key, err)
 		}
+	}
+
+	return nil
+}
+
+// populateValue is populate's counterpart for a Value-schema (schema-value-
+// support feature, T5's SPEC_DEVIATION): dest is the schema's own value
+// (not a struct field within it), raw is the whole decoded JSON body.
+// Reuses validateValue (the exact same per-value check validateStruct calls
+// per field) and setField (the exact same field-write validateStruct/
+// populate's caller uses), just applied directly to dest instead of one
+// field it owns -- Custom(fn)'s "called up to twice, must be idempotent"
+// contract (PropertyBuilder.Custom's own doc comment) is honored the same
+// way populate already does: once during validateValue, once here.
+func populateValue(dest reflect.Value, raw any, p *schema.PropertyBuilder) error {
+	if violations := validateValue(raw, p, ""); len(violations) > 0 {
+		return exception.NewBadRequestException(violations)
+	}
+
+	value := raw
+	if fn, isCustom := p.CustomFunc(); isCustom {
+		v, err := fn(raw)
+		if err != nil {
+			// Unreachable in practice (validateValue's own Custom check
+			// already proved fn succeeds for this raw input), same
+			// "structured error, never crash" stance as populate above.
+			return exception.NewBadRequestException([]violation{
+				{Field: "", Message: fmt.Sprintf("Custom(fn) failed on population pass: %v", err)},
+			})
+		}
+		value = v
+	}
+
+	if err := setField(dest, value); err != nil {
+		return exception.NewBadRequestException([]violation{
+			{Field: "", Message: fmt.Sprintf("failed to decode request body: %v", err)},
+		})
 	}
 
 	return nil
