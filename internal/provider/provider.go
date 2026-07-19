@@ -38,6 +38,12 @@ type Provider struct {
 
 	resolvedValueMu sync.Mutex
 	resolvedValue   reflect.Value
+
+	onModuleInit              reflect.Value
+	onApplicationBootstrap    reflect.Value
+	onModuleDestroy           reflect.Value
+	beforeApplicationShutdown reflect.Value
+	onApplicationShutdown     reflect.Value
 }
 
 // New creates a Provider that defers fn until Stage 2 builder execution

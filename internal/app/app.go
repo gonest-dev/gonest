@@ -12,6 +12,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"gonest.dev/gonest/internal/emitter"
@@ -69,6 +70,20 @@ type App struct {
 	moduleCount     int
 	controllerCount int
 	routeCount      int
+
+	// modules/shutdownHooksEnabled/shutdownOnce/shutdownDone/shutdownErr
+	// back lifecycle.go's shutdown orchestrator (EnableShutdownHooks/Close/
+	// shutdown/runShutdownSequence). NewApp populates modules (the same
+	// assembled tree Stage 1 produced) and always initializes shutdownDone
+	// to a non-nil channel, so Listen's own read from it never panics --
+	// shutdownHooksEnabled/shutdownOnce/shutdownErr are left at their Go
+	// zero values by NewApp; shutdownHooksEnabled only flips true if a
+	// caller explicitly calls EnableShutdownHooks() on the returned *App.
+	modules              []*module.Module
+	shutdownHooksEnabled bool
+	shutdownOnce         sync.Once
+	shutdownDone         chan struct{}
+	shutdownErr          error
 }
 
 // Adapter returns the HttpAdapter NewApp[T] constructed and registered
@@ -117,6 +132,22 @@ func (a *App) Root() *module.Module {
 // underneath. optionalOnListen is variadic (0 or 1 callback) so a caller
 // that doesn't need the hook can write `app.Listen(addr)` directly, no nil
 // literal required.
+//
+// If a.adapter.Listen itself returns a non-nil error (a real startup
+// failure, e.g. addr already in use -- nothing was ever put into a serving
+// state), Listen returns that error immediately. Otherwise, once
+// a.adapter.Listen has returned (meaning its own blocking accept loop has
+// already stopped, which per HttpAdapter's contract only happens once
+// something -- typically a.Close/a.shutdown via Shutdown -- has told it to)
+// AND EnableShutdownHooks was called on this App, Listen blocks further,
+// past the adapter's own return, until a.shutdownDone closes (signaling
+// runShutdownSequence has finished all 3 destroy-phase lifecycle hooks --
+// see lifecycle.go), then returns a.shutdownErr instead of the adapter's own
+// nil -- so a caller that opted into shutdown hooks gets back the actual
+// outcome of the FULL shutdown sequence, not just "the HTTP server stopped
+// accepting connections". A caller that never called EnableShutdownHooks
+// sees no behavior change at all: Listen returns exactly what the adapter
+// returned, exactly when the adapter returned it.
 func (a *App) Listen(addr string, optionalOnListen ...OnListen) error {
 	onListenFunc := func() {
 		if !a.opts.DisableBanner {
@@ -138,7 +169,15 @@ func (a *App) Listen(addr string, optionalOnListen ...OnListen) error {
 			optionalOnListen[0]()
 		}
 	}
-	return a.adapter.Listen(addr, onListenFunc)
+	err := a.adapter.Listen(addr, onListenFunc)
+	if err != nil {
+		return err
+	}
+	if a.shutdownHooksEnabled {
+		<-a.shutdownDone
+		return a.shutdownErr
+	}
+	return nil
 }
 
 // MustListen calls Listen and panics, using the same "Must"-prefixed
@@ -241,6 +280,20 @@ type HttpAdapter interface {
 	// Fiber, via *fiber.App's own Test method) provides this identically to
 	// however its underlying engine already supports in-memory dispatch.
 	Test(req *http.Request) (*http.Response, error)
+	// Shutdown gracefully stops the underlying HTTP engine that a prior
+	// Listen call put into its blocking accept loop -- it is the only way to
+	// make that blocking Listen call return short of killing the process.
+	// ctx bounds how long the engine may wait for in-flight connections to
+	// drain before it forces them closed (implementations are expected to
+	// forward ctx's deadline/cancellation to whatever real shutdown
+	// primitive their underlying engine exposes, e.g. Fiber's own
+	// ShutdownWithContext) -- callers that want an unbounded graceful drain
+	// should pass context.Background(), and callers that want a hard
+	// deadline should pass a context.WithTimeout. The returned error is
+	// whatever the underlying engine reports (implementations must not
+	// translate or swallow it), including the case where Shutdown is called
+	// on an engine that was never Listen-ing in the first place.
+	Shutdown(ctx context.Context) error
 }
 
 // httpAdapterPtr is the generic-constraint counterpart to HttpAdapter,
@@ -344,6 +397,24 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (
 		return nil, err
 	}
 
+	// Lifecycle hooks: with every Provider now fully resolved (Stage 3 just
+	// completed), run OnModuleInit then OnApplicationBootstrap across every
+	// registered provider, leaf-first -- see lifecycle.go's
+	// runModuleInitPhase/runApplicationBootstrapPhase doc comments for the
+	// full traversal/fail-fast rationale. Reuses the SAME ctx (bounded by
+	// bootstrapTimeout) Stage 3 itself ran under, rather than a fresh one --
+	// these hooks are part of the same bounded bootstrap window. Placed
+	// BEFORE declareControllers so a Controller's own Declare (which may
+	// MustInject/MustInjectAll against already-resolved Providers) always
+	// runs against a graph whose Providers have not just been constructed
+	// but also fully initialized.
+	if err := runModuleInitPhase(ctx, modules); err != nil {
+		return nil, err
+	}
+	if err := runApplicationBootstrapPhase(ctx, modules); err != nil {
+		return nil, err
+	}
+
 	// Phase 2: declare every module's own Controllers, now that every
 	// Provider is a real, resolved value -- MustInject/MustInjectAll calls
 	// inside a Controller's builder closure resolve DIRECTLY (Controller
@@ -380,6 +451,8 @@ func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (
 		moduleCount:     moduleCount,
 		controllerCount: controllerCount,
 		routeCount:      routeCount,
+		modules:         modules,
+		shutdownDone:    make(chan struct{}),
 	}, nil
 }
 

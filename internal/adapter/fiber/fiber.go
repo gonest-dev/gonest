@@ -9,6 +9,7 @@ package fiber
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"mime"
 	"net/http"
@@ -274,6 +275,21 @@ func (f *FiberApp) Listen(addr string, onListen func()) error {
 	// looks identical to a caller regardless of which HTTP engine actually
 	// answers requests underneath.
 	return f.app.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
+}
+
+// Shutdown gracefully stops f.app's underlying server via Fiber's own
+// ShutdownWithContext(ctx) -- confirmed real, fiber@v3.4.0's app.go:
+// `func (app *App) ShutdownWithContext(ctx context.Context) error`, which
+// forwards ctx straight to the underlying fasthttp server's own
+// ShutdownWithContext. This is what makes a blocked Listen call (above)
+// return: ShutdownWithContext closes the listener and waits for in-flight
+// connections to drain, up to ctx's deadline/cancellation, at which point it
+// force-closes anything still open. Satisfies internal/app's HttpAdapter
+// contract; the returned error is Fiber's own, unchanged (e.g. Fiber's
+// ErrNotRunning if Shutdown is called before any Listen ever bound a
+// listener).
+func (f *FiberApp) Shutdown(ctx context.Context) error {
+	return f.app.ShutdownWithContext(ctx)
 }
 
 // Test dispatches req against f.app in-memory, via Fiber's own *fiber.App.Test

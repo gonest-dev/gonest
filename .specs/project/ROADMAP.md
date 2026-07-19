@@ -1,7 +1,7 @@
 # Roadmap
 
 **Current Milestone:** 19 (Config Loading) -- COMPLETE
-**Status:** Milestones 1-19 COMPLETE
+**Status:** Milestones 1-20 COMPLETE
 
 ---
 
@@ -379,6 +379,37 @@ que REST já usa. Motivado pelo `ConfigModule` do NestJS e por um modelo própri
   segundo caminho de validação; `envSource` novo em `internal/validate` (mesmo nível de
   `paramsSource`/`querySource`) resolve reusando `validateStruct`/`populate` sem tocar em nenhum
 - Ver `.specs/features/env-schema-binding/{spec,context}.md`
+
+---
+
+## Milestone 20: Lifecycle Hooks
+
+**Goal:** Equivalente aos lifecycle hooks do NestJS (`OnModuleInit`/`OnApplicationBootstrap`/
+`OnModuleDestroy`/`BeforeApplicationShutdown`/`OnApplicationShutdown`) -- deixar um `Provider` rodar
+código próprio em pontos bem definidos do ciclo de vida da app (setup após dependências prontas,
+barreira global de bootstrap, e os 3 estágios de shutdown gracioso), fechando um gap que
+`INSIGHT-ON.md` (rascunho do usuário) já vinha apontando desde antes do Milestone 19.
+**Status:** COMPLETE (T1-T7 executados via subagentes Planner/Implementer/Evaluator, `go test ./... -race`
+verde, 25 pacotes, `.examples/lifecycle-hooks` demonstra o fluxo real)
+
+### Features
+
+**Lifecycle Hooks** - COMPLETE
+- `Provider` ganha 5 métodos novos (`OnModuleInit`/`OnApplicationBootstrap`/`OnModuleDestroy`/
+  `BeforeApplicationShutdown`/`OnApplicationShutdown`), 1:1 com o hook set REAL do NestJS (confirmado via
+  Context7 contra `nestjs/docs.nestjs.com` -- `INSIGHT-ON.md`'s rascunho original só tinha 4, faltava
+  `BeforeApplicationShutdown`)
+- `OnModuleInit`/`OnApplicationBootstrap` rodam automaticamente durante `NewApp`, sequencial, ordem de
+  módulo leaf-first (reverso do BFS root-first que `Module.Assemble()` já produzia) -- DEPOIS do Stage 3
+  concorrente já ter resolvido todo o grafo, sem tocar nessa concorrência
+- `App.EnableShutdownHooks()` (opt-in, igual Nest) + `App.Close(ctx)` -- disparam
+  `OnModuleDestroy → BeforeApplicationShutdown → OnApplicationShutdown` sequencial, ordem ROOT-first
+  (reversa do init), com o signal (`"SIGINT"`/`"SIGTERM"`/`""` pra `Close` manual) passado aos 2 últimos
+- Hooks só disparam pra Provider `scope.Singleton` (Request/Transient excluídos, mesma exclusão real
+  documentada pelo Nest)
+- Erro em qualquer hook aborta o restante da MESMA fase (bootstrap) ou da sequência INTEIRA de shutdown
+  restante (destroy), sem swallow -- mesmo comportamento sequencial-await do Nest real
+- Ver `.specs/features/lifecycle-hooks/{spec,context,design,tasks}.md`, AD-044 em STATE.md
 
 ---
 

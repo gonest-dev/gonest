@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"reflect"
@@ -545,6 +546,10 @@ func (f *recordingFakeAdapter) Listen(addr string, onListen func()) error {
 	return nil
 }
 
+func (f *recordingFakeAdapter) Shutdown(ctx context.Context) error {
+	return nil
+}
+
 // TestNewApp_ZeroValueAppOptions_BootstrapsIdenticallyToPreT2Behavior proves
 // NewApp[T, PT](root, Options{}) bootstraps the DI graph and registers
 // routes exactly as NewApp[T, PT](root) did before this task's signature
@@ -635,6 +640,10 @@ type listenSpyAdapter struct {
 	unblock chan struct{}
 	// err, when non-nil, is returned by Listen instead of blocking.
 	err error
+	// shutdownCalls counts Shutdown invocations, mirroring onListenRan's
+	// call-recording pattern above -- lets a test assert Shutdown was
+	// actually reached without needing a real underlying engine.
+	shutdownCalls int
 }
 
 func (f *listenSpyAdapter) Init(opts Options) {}
@@ -645,6 +654,13 @@ func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h
 
 func (f *listenSpyAdapter) Test(req *http.Request) (*http.Response, error) {
 	return nil, nil
+}
+
+func (f *listenSpyAdapter) Shutdown(ctx context.Context) error {
+	f.mu.Lock()
+	f.shutdownCalls++
+	f.mu.Unlock()
+	return nil
 }
 
 func (f *listenSpyAdapter) Listen(addr string, onListen func()) error {
