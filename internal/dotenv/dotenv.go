@@ -1,20 +1,26 @@
 // Package dotenv implements the framework's ".env" file loading and
-// (in a future sibling feature) env-var-to-struct binding. It deliberately
-// has ZERO dependency on any DI/framework package (internal/inject,
-// internal/module, internal/provider, internal/resolver, internal/app) --
-// gonest.Dotenv() must be safely callable as the very first line of main(),
-// before any Module/Provider/NewApp exists. See
-// .specs/features/dotenv-loading/design.md's Architecture Overview.
+// env-var-to-struct binding (ParseInto, satisfying execution.Parseable). It
+// deliberately has ZERO dependency on any DI/framework package
+// (internal/inject, internal/module, internal/provider, internal/resolver,
+// internal/app) -- gonest.Dotenv() must be safely callable as the very first
+// line of main(), before any Module/Provider/NewApp exists. It does import
+// internal/validate (for ParseEnvInto) and internal/execution (for the
+// Parseable compile-time guard), neither of which import dotenv back, so no
+// cycle is introduced. See .specs/features/dotenv-loading/design.md's
+// Architecture Overview.
 package dotenv
 
 import (
 	"fmt"
 	"os"
+
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/validate"
 )
 
 // Dotenv is the single type gonest.Dotenv() returns. It owns Load/MustLoad
-// (this feature) and, in the sibling env-schema-binding feature, gains
-// ParseInto to satisfy execution.Parseable. It has no fields yet.
+// (dotenv-loading feature) and ParseInto (env-schema-binding feature,
+// satisfying execution.Parseable). It has no fields yet.
 type Dotenv struct{}
 
 // instance is the package-level singleton every Get() call returns -- there
@@ -78,3 +84,19 @@ func (d *Dotenv) MustLoad(paths ...string) {
 		panic(err)
 	}
 }
+
+// ParseInto satisfies execution.Parseable, letting gonest.Parse[T]/
+// gonest.MustParse[T] accept gonest.Dotenv() as a source directly (e.g.
+// gonest.MustParse[DatabaseConfig](gonest.Dotenv(), schema)), exactly like
+// req.Params()/req.Query()/req.Headers()/req.Body().Json() already do for
+// HTTP sources -- env-schema-binding feature (T11). 100% delegation: all the
+// actual read/validate/populate logic lives in validate.ParseEnvInto (T10),
+// reused here unchanged.
+func (d *Dotenv) ParseInto(dst any, schema any) error {
+	return validate.ParseEnvInto(dst, schema)
+}
+
+// compile-time guard: *Dotenv must satisfy execution.Parseable, so
+// gonest.Dotenv() type-checks as a Parse[T]/MustParse[T] source at the call
+// site instead of only at generic-instantiation time.
+var _ execution.Parseable = (*Dotenv)(nil)

@@ -3861,3 +3861,53 @@ func TestDotenv_CallableWithoutAnyAppBootstrap(t *testing.T) {
 		t.Fatalf("os.Getenv(%q) = %q, want %q", key, got, "root-export-value")
 	}
 }
+
+// rootDotenvE2EConfig is the env-tagged target struct for
+// TestMustParse_DotenvEndToEnd_LoadThenBind -- 2 fields, one Required
+// string, one Integer with a Default, proving both plain binding and
+// Default-value binding work through the exact same MustParse[T] call as
+// any HTTP source.
+type rootDotenvE2EConfig struct {
+	Host string `env:"GONEST_ROOT_DOTENV_T11_HOST"`
+	Port int64  `env:"GONEST_ROOT_DOTENV_T11_PORT"`
+}
+
+var rootDotenvE2ESchema = NewSchema(func(c *rootDotenvE2EConfig, m *Schema) {
+	m.Property(&c.Host).String().Required()
+	m.Property(&c.Port).Integer().Default(int64(5432))
+})
+
+// TestMustParse_DotenvEndToEnd_LoadThenBind proves the full env-schema-
+// binding feature end to end: a REAL .env file (written via t.TempDir(),
+// not os.Setenv called directly) is loaded via gonest.Dotenv().MustLoad,
+// then bound into a struct via gonest.MustParse[T] using gonest.Dotenv()
+// itself as the Parseable source -- exactly the call shape T11's Done When
+// criteria describe: gonest.MustParse[DatabaseConfig](gonest.Dotenv(),
+// schema). PORT is deliberately left out of the file so its Default(5432)
+// is exercised too.
+func TestMustParse_DotenvEndToEnd_LoadThenBind(t *testing.T) {
+	const key = "GONEST_ROOT_DOTENV_T11_HOST"
+	os.Unsetenv(key)
+	os.Unsetenv("GONEST_ROOT_DOTENV_T11_PORT")
+	t.Cleanup(func() {
+		os.Unsetenv(key)
+		os.Unsetenv("GONEST_ROOT_DOTENV_T11_PORT")
+	})
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte(key+"=db.internal\n"), 0o644); err != nil {
+		t.Fatalf("failed to write .env: %v", err)
+	}
+
+	Dotenv().MustLoad(path)
+
+	got := MustParse[rootDotenvE2EConfig](Dotenv(), rootDotenvE2ESchema)
+
+	if got.Host != "db.internal" {
+		t.Fatalf("got.Host = %q, want %q", got.Host, "db.internal")
+	}
+	if got.Port != 5432 {
+		t.Fatalf("got.Port = %d, want %d", got.Port, 5432)
+	}
+}

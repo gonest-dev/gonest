@@ -3,7 +3,12 @@ package dotenv
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+	"unsafe"
+
+	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/schema"
 )
 
 func TestGet_ReturnsSameSingletonInstance(t *testing.T) {
@@ -223,5 +228,48 @@ func TestLoad_FourInlineCommentLines_MatchesSpecExamples_ViaRealLoad(t *testing.
 		if got := os.Getenv(key); got != want {
 			t.Errorf("%s = %q, want %q", key, got, want)
 		}
+	}
+}
+
+// --- T11 fixtures/tests -----------------------------------------------
+
+// TestDotenv_SatisfiesParseable is a compile-time-checked-at-runtime guard
+// mirroring the package-level `var _ execution.Parseable = (*Dotenv)(nil)`
+// declared in dotenv.go -- proves *Dotenv is usable anywhere an
+// execution.Parseable is expected (e.g. gonest.MustParse[T](gonest.Dotenv(),
+// schema)).
+func TestDotenv_SatisfiesParseable(t *testing.T) {
+	var p execution.Parseable = Get()
+	if p == nil {
+		t.Fatal("expected Get() to satisfy execution.Parseable as a non-nil value")
+	}
+}
+
+// envParseIntoFixture is a minimal env-tagged struct used to prove
+// ParseInto delegates to validate.ParseEnvInto.
+type envParseIntoFixture struct {
+	Host string `env:"GONEST_DOTENV_T11_HOST"`
+}
+
+var envParseIntoSchema = func() *schema.Schema {
+	f := &envParseIntoFixture{}
+	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	m.Property(&f.Host).String().Required()
+	return m
+}()
+
+// TestDotenv_ParseInto_DelegatesToParseEnvInto proves (*Dotenv).ParseInto
+// reads the real process environment (via validate.ParseEnvInto) and
+// populates dst -- a one-line delegation, but the delegation itself must
+// actually run.
+func TestDotenv_ParseInto_DelegatesToParseEnvInto(t *testing.T) {
+	t.Setenv("GONEST_DOTENV_T11_HOST", "db.internal")
+
+	var dst envParseIntoFixture
+	if err := Get().ParseInto(&dst, envParseIntoSchema); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dst.Host != "db.internal" {
+		t.Fatalf("dst.Host = %q, want %q", dst.Host, "db.internal")
 	}
 }
