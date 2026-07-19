@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -3828,5 +3829,35 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 	wantContent := append(append([]byte{}, firstChunk...), secondChunk...)
 	if !bytes.Equal(gotContent, wantContent) {
 		t.Fatalf("onFile's Reader() content mismatch: got %d bytes, want %d bytes", len(gotContent), len(wantContent))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Dotenv (dotenv-loading feature)
+// ---------------------------------------------------------------------------
+
+// TestDotenv_CallableWithoutAnyAppBootstrap proves gonest.Dotenv() is
+// callable as the literal FIRST line of a test/main -- no NewApp/
+// MustNewApp/NewModule bootstrap of any kind precedes it -- exactly the
+// dotenv-loading feature's core requirement (see internal/dotenv package
+// doc comment: "gonest.Dotenv() must be safely callable as the very first
+// line of main(), before any Module/Provider/NewApp exists").
+func TestDotenv_CallableWithoutAnyAppBootstrap(t *testing.T) {
+	const key = "GONEST_ROOT_DOTENV_T8_KEY"
+	os.Unsetenv(key)
+	t.Cleanup(func() { os.Unsetenv(key) })
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte(key+"=root-export-value\n"), 0o644); err != nil {
+		t.Fatalf("failed to write .env: %v", err)
+	}
+
+	if err := Dotenv().Load(path); err != nil {
+		t.Fatalf("Dotenv().Load() error = %v", err)
+	}
+
+	if got := os.Getenv(key); got != "root-export-value" {
+		t.Fatalf("os.Getenv(%q) = %q, want %q", key, got, "root-export-value")
 	}
 }

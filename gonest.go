@@ -19,6 +19,7 @@ import (
 	"gonest.dev/gonest/internal/adapter/fiber"
 	"gonest.dev/gonest/internal/app"
 	"gonest.dev/gonest/internal/controller"
+	"gonest.dev/gonest/internal/dotenv"
 	"gonest.dev/gonest/internal/emitter"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
@@ -1056,3 +1057,22 @@ type Scheduler = scheduler.Scheduler
 
 // NewScheduler creates a Scheduler that defers fn until bootstrap runs it.
 var NewScheduler = scheduler.New
+
+// ---------------------------------------------------------------------------
+// Dotenv (dotenv-loading feature)
+// ---------------------------------------------------------------------------
+
+// Dotenv returns the package-level Dotenv singleton (e.g.
+// gonest.Dotenv().MustLoad(".env")), returning *dotenv.Dotenv directly --
+// no separate `type Dotenv = dotenv.Dotenv` alias is declared here, since
+// Go forbids a type and a var sharing one identifier in the same scope, and
+// the var (the actual gonest.Dotenv() call shape the feature asks for)
+// takes priority; callers needing the type by name can still reach it as
+// the return type of gonest.Dotenv() itself (e.g. `var d = gonest.Dotenv()`
+// infers it with no import of internal/dotenv). Like NewHttpException/
+// NewMiddleware/NewGuard elsewhere in this package, Get here is not
+// generic, so Go allows aliasing the plain func directly via var -- no
+// wrapper function is needed (root package is the only public door since
+// Go blocks external import of internal/*, per AD-004 in STATE.md). See
+// internal/dotenv.Get's doc comment for the full contract.
+var Dotenv = dotenv.Get
