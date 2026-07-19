@@ -124,9 +124,9 @@ com default razoável (porta, host).
 
 | Requirement ID | Story | Phase | Status |
 | --------------- | ---------------------------------------------------------------- | ------- | ------- |
-| ENVCFG-01 | P1: Bind de struct simples a partir da env | Specify | Pending |
-| ENVCFG-02 | P1: Campo obrigatório ausente falha (collect-all) | Specify | Pending |
-| ENVCFG-03 | P1: `Default(value)` cobre campo ausente | Specify | Pending |
+| ENVCFG-01 | P1: Bind de struct simples a partir da env | Execute | Verified |
+| ENVCFG-02 | P1: Campo obrigatório ausente falha (collect-all) | Execute | Verified |
+| ENVCFG-03 | P1: `Default(value)` cobre campo ausente | Execute | Verified |
 
 **Coverage:** 3 total, 0 mapped to tasks, 3 unmapped ⚠️ (normal em Specify)
 

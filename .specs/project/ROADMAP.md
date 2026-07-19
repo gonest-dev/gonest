@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 19 (Config Loading) -- design pronto, aguardando Tasks/Execute
-**Status:** Milestones 1-18 COMPLETE, Milestone 19 DESIGNED (não iniciado)
+**Current Milestone:** 19 (Config Loading) -- COMPLETE
+**Status:** Milestones 1-19 COMPLETE
 
 ---
 
@@ -355,11 +355,11 @@ com o formato real do [`dotenvx`](https://dotenvx.com)) e validar/popular struct
 partir de variáveis de ambiente, reaproveitando 100% do `Schema`/`Parse[T]`/`MustParse[T]`/`Provider`
 que REST já usa. Motivado pelo `ConfigModule` do NestJS e por um modelo próprio do usuário
 (`gox/env`), que por sua vez foi construído mirando o comportamento do `dotenvx`.
-**Status:** DESIGNED (spec.md+context.md+design.md prontos pras 2 features -- Tasks/Execute pendentes)
+**Status:** COMPLETE (T1-T12 executados via subagentes, `go test ./... -race` verde, 25 pacotes, `.examples/config-dotenv` demonstra fluxo real)
 
 ### Features
 
-**Dotenv Loading** - DESIGNED
+**Dotenv Loading** - COMPLETE
 - `gonest.Dotenv()` -- singleton SEM DI (funciona em `main()` antes de qualquer bootstrap), `Load`/
   `MustLoad(paths ...string)`
 - Sintaxe `.env` com paridade completa com o `dotenvx` real (`https://dotenvx.com/docs/env-file`,
@@ -368,7 +368,7 @@ que REST já usa. Motivado pelo `ConfigModule` do NestJS e por um modelo própri
   (`${VAR:-x}`/`${VAR-x}`/`${VAR:+x}`/`${VAR+x}`), multiline via backtick, escapes `\n`/`\r`/`\t`/`\\`
 - Ver `.specs/features/dotenv-loading/{spec,context}.md`
 
-**Env → Schema Binding** - DESIGNED
+**Env → Schema Binding** - COMPLETE
 - `*Dotenv` (mesma instância da feature acima) ganha `ParseInto`, satisfazendo `execution.Parseable`
   -- `gonest.MustParse[DatabaseConfig](gonest.Dotenv(), schema)` funciona igual a qualquer `Parse[T]`
   já existente (REST)

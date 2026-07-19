@@ -183,12 +183,12 @@ backtick.
 
 | Requirement ID | Story | Phase | Status |
 | --------------- | -------------------------------------------------- | ------- | ------- |
-| DOTENV-01 | P1: Carregar `.env` simples | Specify | Pending |
-| DOTENV-02 | P1: Comentários inline | Specify | Pending |
-| DOTENV-03 | P1: Aspas simples vs duplas (interpolação) | Specify | Pending |
-| DOTENV-04 | P2: Operadores de default/alternate | Specify | Pending |
-| DOTENV-05 | P2: Multiline via backtick | Specify | Pending |
-| DOTENV-06 | P2: Escapes em aspas duplas | Specify | Pending |
+| DOTENV-01 | P1: Carregar `.env` simples | Execute | Verified |
+| DOTENV-02 | P1: Comentários inline | Execute | Verified |
+| DOTENV-03 | P1: Aspas simples vs duplas (interpolação) | Execute | Verified |
+| DOTENV-04 | P2: Operadores de default/alternate | Execute | Verified |
+| DOTENV-05 | P2: Multiline via backtick | Execute | Verified |
+| DOTENV-06 | P2: Escapes em aspas duplas | Execute | Verified |
 
 **Coverage:** 6 total, 0 mapped to tasks, 6 unmapped ⚠️ (normal em Specify -- mapeamento acontece em Tasks)
 
