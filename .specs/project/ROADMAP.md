@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 18 (GraphQL Realtime Protocols) -- COMPLETE
-**Status:** Milestones 1-18 COMPLETE
+**Current Milestone:** 19 (Config Loading) -- especificado, aguardando Design/Tasks/Execute
+**Status:** Milestones 1-18 COMPLETE, Milestone 19 SPECIFIED (não iniciado)
 
 ---
 
@@ -345,6 +345,40 @@
 - Decisão central de arquitetura: `HttpAdapter.RegisterWebSocket` removido, substituído por `execution.Response.UpgradeWebSocket`/`execution.Request.IsWebSocketUpgrade` (novo capability em `Responder`) -- permite `POST`/`PUT`/`GET`/`DELETE` coexistirem no MESMO `/graphql` sem o `app.Use(path, ...)` antigo interceptando todo método (o Edge Case que o spec.md deixou em aberto pra Design)
 - `.examples/blog-graphql` demonstra os 3 transportes reais, com evidência real de dial WS/SSE colada nos relatórios de execução
 - Ver `.specs/features/graphql-realtime-protocols/{spec,context,design,tasks}.md`, AD-040 em STATE.md
+
+---
+
+## Milestone 19: Config Loading
+
+**Goal:** Equivalente ao `ConfigModule` do NestJS -- carregar `.env` pro processo (paridade completa
+com o formato real do [`dotenvx`](https://dotenvx.com)) e validar/popular structs de config tipadas a
+partir de variáveis de ambiente, reaproveitando 100% do `Schema`/`Parse[T]`/`MustParse[T]`/`Provider`
+que REST já usa. Motivado pelo `ConfigModule` do NestJS e por um modelo próprio do usuário
+(`gox/env`), que por sua vez foi construído mirando o comportamento do `dotenvx`.
+**Status:** SPECIFIED (spec.md + context.md prontos pras 2 features -- Design/Tasks/Execute pendentes)
+
+### Features
+
+**Dotenv Loading** - SPECIFIED
+- `gonest.Dotenv()` -- singleton SEM DI (funciona em `main()` antes de qualquer bootstrap), `Load`/
+  `MustLoad(paths ...string)`
+- Sintaxe `.env` com paridade completa com o `dotenvx` real (`https://dotenvx.com/docs/env-file`,
+  pesquisado nesta sessão): comentários (linha inteira + inline), aspas simples (literal) vs duplas
+  (interpoladas), interpolação `${VAR}`/`$VAR`, os 4 operadores de default/alternate
+  (`${VAR:-x}`/`${VAR-x}`/`${VAR:+x}`/`${VAR+x}`), multiline via backtick, escapes `\n`/`\r`/`\t`/`\\`
+- Ver `.specs/features/dotenv-loading/{spec,context}.md`
+
+**Env → Schema Binding** - SPECIFIED
+- `*Dotenv` (mesma instância da feature acima) ganha `ParseInto`, satisfazendo `execution.Parseable`
+  -- `gonest.MustParse[DatabaseConfig](gonest.Dotenv(), schema)` funciona igual a qualquer `Parse[T]`
+  já existente (REST)
+- Tag `env:"NOME_DA_VAR"` nova (mapeia campo → env var, mesmo padrão de `param`/`query`)
+- `PropertyBuilder.Default(value)` novo -- campo ausente da fonte usa o default em vez de disparar
+  `Required` (decisão: escopado só pra `env` nesta feature, generalizar é trabalho futuro)
+- `Schema.Validate(instance)`/`MustValidate(instance)` do rascunho original REJEITADOS -- criaria
+  segundo caminho de validação; `envSource` novo em `internal/validate` (mesmo nível de
+  `paramsSource`/`querySource`) resolve reusando `validateStruct`/`populate` sem tocar em nenhum
+- Ver `.specs/features/env-schema-binding/{spec,context}.md`
 
 ---
 
