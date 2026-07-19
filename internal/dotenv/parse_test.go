@@ -345,6 +345,39 @@ func TestParseValue_DoubleQuoted_HashAfterClosingQuote_StripsComment(t *testing.
 	}
 }
 
+func TestParseValue_BacktickMultiline_PreservesRealNewlines(t *testing.T) {
+	pairs, err := parseFile([]byte("VAR=`linha1\nlinha2\nlinha3`\n"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pairs) != 1 {
+		t.Fatalf("expected 1 pair, got %d: %+v", len(pairs), pairs)
+	}
+	want := "linha1\nlinha2\nlinha3"
+	if pairs[0].Value != want {
+		t.Errorf("pairs[0].Value = %q, want %q", pairs[0].Value, want)
+	}
+	if strings.Count(pairs[0].Value, "\n") != 2 {
+		t.Errorf("value %q does not contain exactly 2 real newline bytes", pairs[0].Value)
+	}
+}
+
+func TestParseFile_LineAfterBacktickBlock_ParsedNormally(t *testing.T) {
+	pairs, err := parseFile([]byte("VAR=`linha1\nlinha2\nlinha3`\nNEXT=value\n"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pairs) != 2 {
+		t.Fatalf("expected 2 pairs, got %d: %+v", len(pairs), pairs)
+	}
+	if pairs[0] != (envPair{Key: "VAR", Value: "linha1\nlinha2\nlinha3"}) {
+		t.Errorf("pairs[0] = %+v, want VAR=linha1\\nlinha2\\nlinha3", pairs[0])
+	}
+	if pairs[1] != (envPair{Key: "NEXT", Value: "value"}) {
+		t.Errorf("pairs[1] = %+v, want NEXT=value", pairs[1])
+	}
+}
+
 func TestParseFile_LaterLineReferencesEarlierKey_ResolvesRealValue(t *testing.T) {
 	pairs, err := parseFile([]byte("A=hello\nB=${A} world\n"))
 	if err != nil {

@@ -29,9 +29,16 @@ var errUnterminatedQuote = errors.New("unterminated quote")
 // (no "=", not blank, not a comment) is a fail-loud error identifying the
 // 1-indexed line number.
 //
-// NOTE (this task, T2): parseValue only extracts the raw delimited content
-// per quote style -- no interpolation, no escape processing, no inline
-// comment stripping, no real backtick multiline. Those are future tasks.
+// NOTE: parseValue extracts the raw delimited content per quote style,
+// applying interpolation/escapes/comment-stripping as appropriate for each.
+// A backtick value that does NOT close on the same physical line falls back
+// here to extractBacktickBlock, which folds subsequent REAL lines (already
+// available in full -- lines is the WHOLE file, not a stream) into the
+// value, preserving real "\n" between them, and reports how many additional
+// lines it consumed so this loop can skip them (see the manual index loop
+// below -- it must NOT be a "for idx, line := range lines" loop, since idx
+// needs to jump forward past a multi-line backtick block instead of always
+// advancing by exactly one).
 func parseFile(raw []byte) ([]envPair, error) {
 	lines := strings.Split(string(raw), "\n")
 	pairs := make([]envPair, 0, len(lines))
@@ -41,7 +48,8 @@ func parseFile(raw []byte) ([]envPair, error) {
 	// file (T3 -- resolveInterpolation checks this map before os.Getenv).
 	resolved := make(map[string]string, len(lines))
 
-	for idx, line := range lines {
+	for idx := 0; idx < len(lines); idx++ {
+		line := lines[idx]
 		lineNo := idx + 1
 		line = strings.TrimSuffix(line, "\r")
 
@@ -64,6 +72,16 @@ func parseFile(raw []byte) ([]envPair, error) {
 		value, err := parseValue(valueExpr, resolved)
 		if err != nil {
 			if errors.Is(err, errUnterminatedQuote) {
+				trimmedExpr := strings.TrimLeft(valueExpr, " \t")
+				if len(trimmedExpr) > 0 && trimmedExpr[0] == '`' {
+					content, linesConsumed, blockErr := extractBacktickBlock(trimmedExpr, lines, idx)
+					if blockErr == nil {
+						pairs = append(pairs, envPair{Key: key, Value: content})
+						resolved[key] = content
+						idx += linesConsumed
+						continue
+					}
+				}
 				return nil, fmt.Errorf("gonest: unterminated quote in dotenv, line %d", lineNo)
 			}
 			return nil, err
@@ -74,6 +92,40 @@ func parseFile(raw []byte) ([]envPair, error) {
 	}
 
 	return pairs, nil
+}
+
+// extractBacktickBlock extends the backtick branch to real multi-line
+// values: called only after a single-line extractDelimited attempt on
+// trimmedExpr (the "KEY=" value expression from lines[startIdx], already
+// left-trimmed) has failed with errUnterminatedQuote -- i.e. no closing
+// backtick on the SAME physical line as the opening one. It appends
+// subsequent REAL lines from lines (the whole file, already fully in
+// memory -- not a stream) one at a time, joined with a real "\n" byte
+// between each consumed line, retrying extractDelimited after each append,
+// until the closing (unescaped) backtick is found or the file runs out of
+// lines. Like the single-line backtick case in parseValue, this is pure
+// literal text: no interpolation, no escape processing. linesConsumed is
+// the count of ADDITIONAL lines (beyond lines[startIdx] itself) folded into
+// the value, so parseFile's loop can advance idx past all of them without
+// reprocessing any as a new KEY=VALUE line.
+func extractBacktickBlock(trimmedExpr string, lines []string, startIdx int) (content string, linesConsumed int, err error) {
+	joined := trimmedExpr
+	for {
+		c, _, e := extractDelimited(joined, '`')
+		if e == nil {
+			return c, linesConsumed, nil
+		}
+		if !errors.Is(e, errUnterminatedQuote) {
+			return "", 0, e
+		}
+
+		nextIdx := startIdx + linesConsumed + 1
+		if nextIdx >= len(lines) {
+			return "", 0, errUnterminatedQuote
+		}
+		joined += "\n" + strings.TrimSuffix(lines[nextIdx], "\r")
+		linesConsumed++
+	}
 }
 
 // parseValue dispatches by the value's opening character -- backtick,
@@ -88,7 +140,11 @@ func parseFile(raw []byte) ([]envPair, error) {
 // dispatch so "KEY = \"val\"" still detects the quote.
 //
 // A quoted/backtick value with no matching unescaped closing delimiter
-// before end of line returns errUnterminatedQuote.
+// before end of line returns errUnterminatedQuote -- for the backtick case,
+// parseFile (the only real caller) catches that specific error and retries
+// via extractBacktickBlock, which folds in subsequent real file lines until
+// the closing backtick is found. parseValue itself stays single-line-only:
+// it has no access to the rest of the file.
 func parseValue(raw string, resolved map[string]string) (value string, err error) {
 	trimmed := strings.TrimLeft(raw, " \t")
 	if trimmed == "" {
