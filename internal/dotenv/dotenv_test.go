@@ -88,3 +88,140 @@ func TestLoad_ExistingEmptyPath_NoError(t *testing.T) {
 		t.Fatalf("expected Load with an existing empty path to return no error, got: %v", err)
 	}
 }
+
+// TestLoad_MultiplePaths_FirstPathWinsSameKey proves T7's precedence rule:
+// when two paths both define the same key with different values, Load
+// applies pathA's envPair first (calling os.Setenv), so pathB's LookupEnv
+// check for the same key finds it already present and skips it -- the
+// process ends up with pathA's value, not pathB's.
+//
+// NOT parallel (t.Parallel omitted deliberately) -- os.Setenv/os.Unsetenv is
+// global process state, and this test shares the key namespace with the
+// other Load precedence tests below.
+func TestLoad_MultiplePaths_FirstPathWinsSameKey(t *testing.T) {
+	const key = "GONEST_DOTENV_T7_FIRST_WINS"
+	os.Unsetenv(key)
+	t.Cleanup(func() { os.Unsetenv(key) })
+
+	dir := t.TempDir()
+	pathA := filepath.Join(dir, "a.env")
+	pathB := filepath.Join(dir, "b.env")
+	if err := os.WriteFile(pathA, []byte(key+"=from-a\n"), 0o644); err != nil {
+		t.Fatalf("failed to write a.env: %v", err)
+	}
+	if err := os.WriteFile(pathB, []byte(key+"=from-b\n"), 0o644); err != nil {
+		t.Fatalf("failed to write b.env: %v", err)
+	}
+
+	if err := Get().Load(pathA, pathB); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := os.Getenv(key); got != "from-a" {
+		t.Fatalf("expected %q (first path wins), got %q", "from-a", got)
+	}
+}
+
+// TestLoad_PreExistingProcessEnv_WinsOverFile proves T7's second half: a key
+// already set in the process environment BEFORE Load ever runs is never
+// overwritten by a file value, since LookupEnv reports it present on the
+// very first check.
+func TestLoad_PreExistingProcessEnv_WinsOverFile(t *testing.T) {
+	const key = "GONEST_DOTENV_T7_PREEXISTING_WINS"
+	t.Setenv(key, "pre-existing")
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a.env")
+	if err := os.WriteFile(path, []byte(key+"=from-file\n"), 0o644); err != nil {
+		t.Fatalf("failed to write a.env: %v", err)
+	}
+
+	if err := Get().Load(path); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := os.Getenv(key); got != "pre-existing" {
+		t.Fatalf("expected pre-existing process env %q to win, got %q", "pre-existing", got)
+	}
+}
+
+// TestLoad_KeyOnlyInSecondPath_IsSet proves a key present ONLY in the second
+// path (not in the first path, not pre-existing) is set normally -- the
+// "first path wins on conflict" rule must not accidentally suppress keys
+// that never conflicted in the first place.
+func TestLoad_KeyOnlyInSecondPath_IsSet(t *testing.T) {
+	const key = "GONEST_DOTENV_T7_SECOND_PATH_ONLY"
+	os.Unsetenv(key)
+	t.Cleanup(func() { os.Unsetenv(key) })
+
+	dir := t.TempDir()
+	pathA := filepath.Join(dir, "a.env")
+	pathB := filepath.Join(dir, "b.env")
+	if err := os.WriteFile(pathA, []byte("GONEST_DOTENV_T7_UNRELATED=x\n"), 0o644); err != nil {
+		t.Fatalf("failed to write a.env: %v", err)
+	}
+	if err := os.WriteFile(pathB, []byte(key+"=from-b\n"), 0o644); err != nil {
+		t.Fatalf("failed to write b.env: %v", err)
+	}
+
+	if err := Get().Load(pathA, pathB); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := os.Getenv(key); got != "from-b" {
+		t.Fatalf("expected %q, got %q", "from-b", got)
+	}
+}
+
+// TestLoad_FourInlineCommentLines_MatchesSpecExamples_ViaRealLoad is the
+// pending assertion T5's own test left as a documented SPEC_DEVIATION: back
+// then, Load parsed each path via parseFile but did not yet call os.Setenv,
+// so os.Getenv couldn't observe anything. Now that T7 wires Setenv into
+// Load, this test loads a real .env file (the same 4 literal lines from
+// spec.md's "P1: Comentários inline") via the real Load and confirms all 4
+// resolved values through os.Getenv -- the layer parseFile-level test above
+// (TestLoad_FourInlineCommentLines_MatchesSpecExamples) stays as-is,
+// covering the parsing layer; this one covers the full Load path.
+func TestLoad_FourInlineCommentLines_MatchesSpecExamples_ViaRealLoad(t *testing.T) {
+	const (
+		key1 = "GONEST_DOTENV_T7_INLINE_VAR1"
+		key2 = "GONEST_DOTENV_T7_INLINE_VAR2"
+		key3 = "GONEST_DOTENV_T7_INLINE_VAR3"
+		key4 = "GONEST_DOTENV_T7_INLINE_VAR4"
+	)
+	for _, k := range []string{key1, key2, key3, key4} {
+		os.Unsetenv(k)
+	}
+	t.Cleanup(func() {
+		for _, k := range []string{key1, key2, key3, key4} {
+			os.Unsetenv(k)
+		}
+	})
+
+	content := key1 + "=VAL # comment\n" +
+		key2 + "=VAL# not a comment\n" +
+		key3 + `="VAL # not a comment"` + "\n" +
+		key4 + `="VAL" # comment` + "\n"
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write .env: %v", err)
+	}
+
+	if err := Get().Load(path); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cases := map[string]string{
+		key1: "VAL",
+		key2: "VAL# not a comment",
+		key3: "VAL # not a comment",
+		key4: "VAL",
+	}
+	for key, want := range cases {
+		if got := os.Getenv(key); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
+	}
+}

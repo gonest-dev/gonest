@@ -31,9 +31,20 @@ func Get() *Dotenv {
 // Load reads each path in paths, in order, and applies its resolved
 // key/value pairs to the process environment. A path that doesn't exist
 // propagates os.ReadFile's own error, wrapped. Parsing of a file's raw
-// content is delegated to parseFile. As of this task (T2), parseFile
-// classifies lines and extracts raw quote-delimited values but does not yet
-// apply the resolved pairs to os.Setenv -- that wiring is a future task.
+// content is delegated to parseFile, which returns an ordered []envPair with
+// values already fully resolved (quotes stripped, interpolation/escapes/
+// inline-comments applied).
+//
+// Precedence: for each path, in the order received, and for each envPair in
+// that path (in order), os.Setenv is called ONLY IF os.LookupEnv reports the
+// key as absent. This single rule implements BOTH halves of the precedence
+// policy (design.md's "Open Edge Cases Resolved"):
+//   - "first path wins": a path processed earlier already called os.Setenv,
+//     so a later path's LookupEnv check for the same key finds it present
+//     and skips it.
+//   - "pre-existing process env always wins": a key already set in the
+//     process environment before Load ever runs is present from the very
+//     first LookupEnv check, so no file value ever overwrites it.
 func (d *Dotenv) Load(paths ...string) error {
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
@@ -41,8 +52,18 @@ func (d *Dotenv) Load(paths ...string) error {
 			return fmt.Errorf("gonest: dotenv load %q: %w", path, err)
 		}
 
-		if _, err := parseFile(raw); err != nil {
+		pairs, err := parseFile(raw)
+		if err != nil {
 			return err
+		}
+
+		for _, pair := range pairs {
+			if _, ok := os.LookupEnv(pair.Key); ok {
+				continue
+			}
+			if err := os.Setenv(pair.Key, pair.Value); err != nil {
+				return fmt.Errorf("gonest: dotenv setenv %q from %q: %w", pair.Key, path, err)
+			}
 		}
 	}
 
