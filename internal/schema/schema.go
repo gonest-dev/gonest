@@ -237,6 +237,13 @@ type PropertyBuilder struct {
 	// (e.g. primitive.ObjectID) -- REST/OpenAPI generation ignores this
 	// entirely. See GraphqlScalar's own doc comment.
 	graphqlScalar string
+
+	// defaultValue is the env-schema-binding feature's fallback value for
+	// when the source data has no entry for this field. Unlike custom
+	// (a func, nil-checked for presence), defaultValue may legitimately be
+	// nil itself, so hasDefault tracks whether Default was ever called.
+	defaultValue any
+	hasDefault   bool
 }
 
 // Required marks this field as required and returns p so calls can chain.
@@ -642,6 +649,30 @@ func (p *PropertyBuilder) CustomFunc() (func(raw any) (any, error), bool) {
 		return nil, false
 	}
 	return p.custom, true
+}
+
+// Default sets value as this field's fallback for when the source data has
+// no entry for it (env-schema-binding feature). Returns p bare, no wrapper
+// type -- same precedent as Custom(): Default has no format-specific extra
+// validators of its own to chain off of. WHO reads DefaultValue() (i.e. how
+// "absent" is decided) is left to a future task.
+//
+// Last-call-wins, no panic, same as every other branch method on
+// PropertyBuilder -- calling Default a second time simply overwrites the
+// first value.
+func (p *PropertyBuilder) Default(value any) *PropertyBuilder {
+	p.defaultValue = value
+	p.hasDefault = true
+	return p
+}
+
+// DefaultValue returns the value set via Default, and whether Default was
+// ever called -- same "never called" bool-return shape as CustomFunc.
+func (p *PropertyBuilder) DefaultValue() (any, bool) {
+	if !p.hasDefault {
+		return nil, false
+	}
+	return p.defaultValue, true
 }
 
 // Sanitize sets fn as this field's pre-processing hook (schema-sanitize-
