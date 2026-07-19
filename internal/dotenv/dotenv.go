@@ -31,9 +31,9 @@ func Get() *Dotenv {
 // Load reads each path in paths, in order, and applies its resolved
 // key/value pairs to the process environment. A path that doesn't exist
 // propagates os.ReadFile's own error, wrapped. Parsing of a file's raw
-// content is delegated to parseFile -- a stub in this task (T1), returning
-// no pairs and no error, so Load compiles and runs end-to-end with no
-// observable effect yet.
+// content is delegated to parseFile. As of this task (T2), parseFile
+// classifies lines and extracts raw quote-delimited values but does not yet
+// apply the resolved pairs to os.Setenv -- that wiring is a future task.
 func (d *Dotenv) Load(paths ...string) error {
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
