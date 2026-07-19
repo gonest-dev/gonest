@@ -78,10 +78,14 @@ func parseFile(raw []byte) ([]envPair, error) {
 
 // parseValue dispatches by the value's opening character -- backtick,
 // single quote, double quote, or bare (anything else) -- and extracts the
-// RAW delimited content only: no interpolation, no escape-sequence
-// processing, no inline-comment stripping, no real multiline support for
-// backtick yet (all future tasks). Leading whitespace right after "=" is
-// trimmed before dispatch so "KEY = \"val\"" still detects the quote.
+// RAW delimited content, then strips an inline "# comment" per the P1
+// "Comentários inline" rules (stripBareComment for bare values,
+// stripQuotedTrailingComment for single/double-quoted ones -- BEFORE
+// resolveInterpolation/applyEscapes run on what's left, so a "#" inside an
+// interpolation expression's default/alternate text is never mistaken for a
+// real trailing comment). No real multiline support for backtick yet
+// (future task). Leading whitespace right after "=" is trimmed before
+// dispatch so "KEY = \"val\"" still detects the quote.
 //
 // A quoted/backtick value with no matching unescaped closing delimiter
 // before end of line returns errUnterminatedQuote.
@@ -93,24 +97,73 @@ func parseValue(raw string, resolved map[string]string) (value string, err error
 
 	switch trimmed[0] {
 	case '`':
-		return extractDelimited(trimmed, '`')
+		content, _, err := extractDelimited(trimmed, '`')
+		return content, err
 	case '\'':
-		return extractDelimited(trimmed, '\'')
-	case '"':
-		content, err := extractDelimited(trimmed, '"')
+		content, rest, err := extractDelimited(trimmed, '\'')
 		if err != nil {
 			return "", err
 		}
+		return stripQuotedTrailingComment(content, rest), nil
+	case '"':
+		content, rest, err := extractDelimited(trimmed, '"')
+		if err != nil {
+			return "", err
+		}
+		content = stripQuotedTrailingComment(content, rest)
 		return resolveInterpolation(applyEscapes(content), resolved), nil
 	default:
-		return resolveInterpolation(trimmed, resolved), nil
+		return resolveInterpolation(stripBareComment(trimmed), resolved), nil
 	}
+}
+
+// stripBareComment implements the "P1: Comentários inline" rules for a
+// value with NO surrounding quotes: an inline comment starts at a "#" that
+// is immediately preceded by a literal space character (" #") -- everything
+// from that space onward (the space included) is dropped. A "#" with no
+// preceding space (start of string, or glued to the previous character,
+// e.g. "VAL#not-a-comment") is left untouched as part of the value. Must
+// run on the RAW extracted text, before resolveInterpolation, so a "#"
+// produced by or contained inside an interpolation expression (e.g.
+// "${A:-x#y} # real comment") is never mistaken for the literal one that
+// starts the comment.
+func stripBareComment(s string) string {
+	for i := 1; i < len(s); i++ {
+		if s[i] == '#' && s[i-1] == ' ' {
+			return s[:i-1]
+		}
+	}
+	return s
+}
+
+// stripQuotedTrailingComment implements the "P1: Comentários inline" rule
+// for a value delimited by quotes (single or double): rest is everything on
+// the line AFTER the closing quote, as returned by extractDelimited. A "#"
+// INSIDE the quotes never reaches here -- extractDelimited already consumed
+// it as part of content, so it's never treated as a comment (rule 3 is thus
+// a natural consequence of the extraction scanner, not extra logic here).
+// rest is comment-stripped with the same space-then-hash rule as bare
+// values; if what's left of rest is only whitespace (the common case: an
+// empty rest, or " # comment"), it's dropped entirely and content is
+// returned unchanged (rule 4). Any non-comment, non-whitespace trailing
+// text after the closing quote (not covered by the spec's 4 literal
+// examples) is preserved by appending it to content, rather than silently
+// discarded.
+func stripQuotedTrailingComment(content, rest string) string {
+	stripped := stripBareComment(rest)
+	if strings.TrimSpace(stripped) == "" {
+		return content
+	}
+	return content + stripped
 }
 
 // extractDelimited reads s (s[0] == delim) until the matching unescaped
 // closing delim, returning the content between the delimiters (delimiters
-// themselves stripped). A backslash escapes the next character for the
-// purpose of NOT treating it as the closing delimiter. When the escaped
+// themselves stripped) as content, and everything AFTER the closing delim
+// to end of line as rest (used by callers to detect/strip an inline
+// comment that starts after the closing quote -- see
+// stripQuotedTrailingComment). A backslash escapes the next character for
+// the purpose of NOT treating it as the closing delimiter. When the escaped
 // character IS the delimiter itself (e.g. \' inside a single-quoted value,
 // \" inside a double-quoted one), the backslash is consumed and only the
 // literal delimiter character is written to the result -- so "it said
@@ -118,7 +171,7 @@ func parseValue(raw string, resolved map[string]string) (value string, err error
 // OTHER backslash-escaped pair (e.g. \n, \\ inside a double-quoted value) is
 // left untouched in the extracted content -- resolving those is a separate
 // pass (applyEscapes, double-quoted values only).
-func extractDelimited(s string, delim byte) (string, error) {
+func extractDelimited(s string, delim byte) (content string, rest string, err error) {
 	var b strings.Builder
 	for i := 1; i < len(s); i++ {
 		c := s[i]
@@ -134,11 +187,11 @@ func extractDelimited(s string, delim byte) (string, error) {
 			continue
 		}
 		if c == delim {
-			return b.String(), nil
+			return b.String(), s[i+1:], nil
 		}
 		b.WriteByte(c)
 	}
-	return "", errUnterminatedQuote
+	return "", "", errUnterminatedQuote
 }
 
 // applyEscapes converts the 4 double-quoted-only backslash escape sequences

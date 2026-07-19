@@ -305,6 +305,46 @@ func TestParseValue_Backtick_EscapeSequencesNotApplied(t *testing.T) {
 	}
 }
 
+func TestParseValue_BareSpaceHash_StripsComment(t *testing.T) {
+	value, err := parseValue("VAL # comment", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != "VAL" {
+		t.Errorf("value = %q, want %q", value, "VAL")
+	}
+}
+
+func TestParseValue_BareHashNoSpace_KeepsAsValue(t *testing.T) {
+	value, err := parseValue("VAL# not a comment", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != "VAL# not a comment" {
+		t.Errorf("value = %q, want %q", value, "VAL# not a comment")
+	}
+}
+
+func TestParseValue_DoubleQuoted_HashInsideNotComment(t *testing.T) {
+	value, err := parseValue(`"VAL # not a comment"`, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != "VAL # not a comment" {
+		t.Errorf("value = %q, want %q", value, "VAL # not a comment")
+	}
+}
+
+func TestParseValue_DoubleQuoted_HashAfterClosingQuote_StripsComment(t *testing.T) {
+	value, err := parseValue(`"VAL" # comment`, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != "VAL" {
+		t.Errorf("value = %q, want %q", value, "VAL")
+	}
+}
+
 func TestParseFile_LaterLineReferencesEarlierKey_ResolvesRealValue(t *testing.T) {
 	pairs, err := parseFile([]byte("A=hello\nB=${A} world\n"))
 	if err != nil {
