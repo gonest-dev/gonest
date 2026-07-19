@@ -5,6 +5,7 @@ vars:
     - .examples/simple-todo
     - .examples/blog-api
     - .examples/blog-graphql
+    - .examples/config-dotenv
 
 tasks:
   default:
