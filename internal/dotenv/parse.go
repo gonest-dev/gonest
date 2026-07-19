@@ -101,30 +101,82 @@ func parseValue(raw string, resolved map[string]string) (value string, err error
 		if err != nil {
 			return "", err
 		}
-		return resolveInterpolation(content, resolved), nil
+		return resolveInterpolation(applyEscapes(content), resolved), nil
 	default:
 		return resolveInterpolation(trimmed, resolved), nil
 	}
 }
 
 // extractDelimited reads s (s[0] == delim) until the matching unescaped
-// closing delim, returning the raw content between the delimiters
-// (delimiters themselves stripped). A backslash escapes the next character
-// only for the purpose of NOT treating it as the closing delimiter -- the
-// escape itself is left untouched in the extracted content (escape
-// resolution is a future task).
+// closing delim, returning the content between the delimiters (delimiters
+// themselves stripped). A backslash escapes the next character for the
+// purpose of NOT treating it as the closing delimiter. When the escaped
+// character IS the delimiter itself (e.g. \' inside a single-quoted value,
+// \" inside a double-quoted one), the backslash is consumed and only the
+// literal delimiter character is written to the result -- so "it said
+// \'hi\'" comes out with real "'" characters, not a stray backslash. Any
+// OTHER backslash-escaped pair (e.g. \n, \\ inside a double-quoted value) is
+// left untouched in the extracted content -- resolving those is a separate
+// pass (applyEscapes, double-quoted values only).
 func extractDelimited(s string, delim byte) (string, error) {
+	var b strings.Builder
 	for i := 1; i < len(s); i++ {
-		switch s[i] {
-		case '\\':
-			if i+1 < len(s) {
-				i++
+		c := s[i]
+		if c == '\\' && i+1 < len(s) {
+			next := s[i+1]
+			if next == delim {
+				b.WriteByte(delim)
+			} else {
+				b.WriteByte(c)
+				b.WriteByte(next)
 			}
-		case delim:
-			return s[1:i], nil
+			i++
+			continue
 		}
+		if c == delim {
+			return b.String(), nil
+		}
+		b.WriteByte(c)
 	}
 	return "", errUnterminatedQuote
+}
+
+// applyEscapes converts the 4 double-quoted-only backslash escape sequences
+// -- \n, \r, \t, \\ -- into their real single-byte characters (0x0A, 0x0D,
+// 0x09, '\'). Any other backslash pair (or a trailing lone backslash) is
+// left untouched. Called ONLY from parseValue's double-quote branch, BEFORE
+// resolveInterpolation runs on the result -- bare/single-quoted/backtick
+// values never see this function.
+func applyEscapes(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\\' && i+1 < len(s) {
+			switch s[i+1] {
+			case 'n':
+				b.WriteByte('\n')
+				i++
+				continue
+			case 'r':
+				b.WriteByte('\r')
+				i++
+				continue
+			case 't':
+				b.WriteByte('\t')
+				i++
+				continue
+			case '\\':
+				b.WriteByte('\\')
+				i++
+				continue
+			}
+		}
+		b.WriteByte(c)
+	}
+
+	return b.String()
 }
 
 // resolveInterpolation scans s char by char (hand-rolled, not a single

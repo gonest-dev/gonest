@@ -244,6 +244,67 @@ func TestResolveInterpolation_UndefinedNoOperator_ExpandsEmpty(t *testing.T) {
 	}
 }
 
+func TestApplyEscapes_NewlineTabCarriageReturnBackslash_ConvertsToRealChar(t *testing.T) {
+	got := applyEscapes(`line1\nline2\r\ttail\\end`)
+	want := "line1\nline2\r\ttail\\end"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestParseValue_DoubleQuoted_EscapeSequences_ConvertToRealChars(t *testing.T) {
+	value, err := parseValue(`"linha1\nlinha2"`, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != "linha1\nlinha2" {
+		t.Errorf("value = %q, want %q", value, "linha1\nlinha2")
+	}
+	if !strings.Contains(value, "\n") {
+		t.Errorf("value %q does not contain a real newline byte", value)
+	}
+}
+
+func TestParseValue_DoubleQuoted_EscapedQuoteIsLiteral(t *testing.T) {
+	value, err := parseValue(`"ele disse \"oi\""`, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != `ele disse "oi"` {
+		t.Errorf("value = %q, want %q", value, `ele disse "oi"`)
+	}
+}
+
+func TestParseValue_SingleQuoted_EscapedQuoteIsLiteral(t *testing.T) {
+	value, err := parseValue(`'ele disse \'oi\''`, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != `ele disse 'oi'` {
+		t.Errorf("value = %q, want %q", value, `ele disse 'oi'`)
+	}
+}
+
+func TestParseValue_Bare_EscapeSequencesNotApplied(t *testing.T) {
+	value, err := parseValue(`line1\nline2`, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != `line1\nline2` {
+		t.Errorf("value = %q, want literal backslash-n preserved, got escape applied", value)
+	}
+}
+
+func TestParseValue_Backtick_EscapeSequencesNotApplied(t *testing.T) {
+	value, err := parseValue("`line1\\nline2`", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if value != `line1\nline2` {
+		t.Errorf("value = %q, want literal backslash-n preserved, got escape applied", value)
+	}
+}
+
 func TestParseFile_LaterLineReferencesEarlierKey_ResolvesRealValue(t *testing.T) {
 	pairs, err := parseFile([]byte("A=hello\nB=${A} world\n"))
 	if err != nil {
