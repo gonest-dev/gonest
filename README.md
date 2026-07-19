@@ -104,7 +104,7 @@ and [`.examples/blog-graphql`](.examples/blog-graphql) for GraphQL (Query/Mutati
 - [x] M6 - Runtime Validation (`gonest.Parse[T]`/`gonest.MustParse[T]`, `Custom(fn)`)
 - [x] M7 - OpenAPI Generation (`GenerateOpenApiSchema`, `SetupSwagger`)
 - [x] M8 - Testing Helpers (`MustNewTestApp`, `MustOverride`, `MustRequest`)
-- [x] M9 - Event Emitter (`gonest.Emitter`, `NewListener`, `MustOn`)
+- [x] M9 - Event Emitter (`gonest.Emitter`, `NewListener[EventType]`)
 - [x] M10 - Scheduler (`Cron`/`Interval`/`Timeout`, `Stop`)
 - [x] M11 - Terminus / health checks (`MustInjectAll[Pingable]` pattern, no dedicated bootstrap type needed)
 - [x] M12 - Multipart Form Streaming (`req.Body().Form(onFile)`, true streaming file upload -- see below)
@@ -541,7 +541,7 @@ var UserResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
   resolver.Subscription("orderCreated", func(subscription *gonest.GraphqlSubscription) {
     subscription.Returns(orderEntitySchema)
     subscription.Handler(func(ctx *gonest.GraphqlContext, emit func(any)) {
-      // gonest.Subscribe[T] is Emitter's dynamic counterpart to MustOn --
+      // gonest.Subscribe[T] is Emitter's dynamic counterpart to NewListener --
       // a channel that lives only as long as ctx.Done() stays open (one
       // connection), closed automatically when the client disconnects.
       emitter := gonest.MustInject[*gonest.Emitter](resolver)
@@ -579,10 +579,10 @@ import (
 
 type UserCreatedEvent struct{ UserID int64 }
 
-var UserCreatedListener = gonest.NewListener(func(listener *gonest.Listener) {
-  gonest.MustOn[UserCreatedEvent](listener, func(ctx context.Context, event UserCreatedEvent) {
+var UserCreatedListener = gonest.NewListener(func(listener *gonest.Listener) func(context.Context, UserCreatedEvent) {
+  return func(ctx context.Context, event UserCreatedEvent) {
     // ...
-  })
+  }
 })
 
 var UserModule = gonest.NewModule(func(module *gonest.Module) {

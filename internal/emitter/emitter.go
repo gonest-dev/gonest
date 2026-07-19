@@ -13,11 +13,12 @@ import (
 	"gonest.dev/gonest/internal/logger"
 )
 
-// Emitter holds every registered listener (via MustOn), keyed by the exact
-// event type it was registered for. It is a FRAMEWORK singleton -- never a
-// user-registered Provider -- see internal/inject.RegisterGlobalSingleton,
-// called once per bootstrap by internal/app, so MustInject[*Emitter]
-// resolves from ANY module without explicit registration anywhere.
+// Emitter holds every registered listener (via a *Listener's Declare, see
+// listener.go), keyed by the exact event type it was registered for. It is
+// a FRAMEWORK singleton -- never a user-registered Provider -- see
+// internal/inject.RegisterGlobalSingleton, called once per bootstrap by
+// internal/app, so MustInject[*Emitter] resolves from ANY module without
+// explicit registration anywhere.
 type Emitter struct {
 	mu        sync.Mutex
 	listeners map[reflect.Type][]reflect.Value
@@ -27,10 +28,10 @@ type Emitter struct {
 	// type it was registered for -- same keying as listeners, but a
 	// fundamentally different lifecycle: a subscriber is dynamic (lives
 	// only as long as the caller's own done channel stays open, e.g. one
-	// GraphQL Subscription connection), while a listener registered via
-	// MustOn is static (lives for the whole app). Kept as a SEPARATE map
+	// GraphQL Subscription connection), while a listener registered via a
+	// *Listener is static (lives for the whole app). Kept as a SEPARATE map
 	// rather than folding into listeners so Emit's hot path never needs to
-	// distinguish "is this entry a MustOn handler or a Subscribe channel"
+	// distinguish "is this entry a Listener handler or a Subscribe channel"
 	// per event.
 	subscribers map[reflect.Type][]chan any
 }
@@ -45,10 +46,11 @@ func New() *Emitter {
 }
 
 // on registers handler (a func(context.Context, T) value, T == t) for t.
-// Unexported -- callers register via the free function MustOn, which
-// derives t from its own type parameter and reaches the CURRENT bootstrap's
+// Unexported -- callers register via *Listener's own Declare, which derives
+// t from NewListener's type parameter and reaches the CURRENT bootstrap's
 // Emitter singleton via internal/inject's global-singleton registry (see
-// MustOn's own doc comment for why this isn't a method).
+// Listener.Declare's own doc comment for why this isn't called directly by
+// user code).
 func (e *Emitter) on(t reflect.Type, handler reflect.Value) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -64,7 +66,7 @@ func (e *Emitter) handlersFor(t reflect.Type) []reflect.Value {
 	return append([]reflect.Value(nil), e.listeners[t]...)
 }
 
-// Emit dispatches event to every listener registered (via MustOn) for
+// Emit dispatches event to every listener registered (via a *Listener) for
 // event's EXACT concrete type, one goroutine per listener, and returns
 // immediately -- fire-and-forget, never blocks the caller (spec.md's own
 // explicit requirement: "não bloqueia quem chamou Emit"). A listener that

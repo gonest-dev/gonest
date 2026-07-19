@@ -21,7 +21,7 @@ var postSchema = gonest.NewSchema(func(t *PostEntity, s *gonest.Schema) {
 // PostCreatedEvent is published (via gonest.Emitter.Emit) every time a Post
 // is created -- the "postCreated" Subscription below is subscribed to this
 // exact Go type via gonest.Subscribe[T], the same event-bus the Emitter &
-// Listener feature already provides for static (MustOn) listeners.
+// Listener feature already provides for static (NewListener) listeners.
 type PostCreatedEvent struct {
 	Post *PostEntity
 }

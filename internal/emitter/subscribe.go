@@ -40,12 +40,12 @@ func (e *Emitter) removeSubscriber(t reflect.Type, raw chan any) {
 // Subscribe registers a dynamic, per-connection channel that receives
 // every future Emit(T{...}) call until done closes (graphql-support
 // feature, Milestone 17) -- complementary to the static, app-lifetime
-// MustOn/Emit pair: a Subscribe[T] channel is cancelable and lives only as
-// long as its caller's own done channel stays open (typically one
+// *Listener/Emit pair: a Subscribe[T] channel is cancelable and lives only
+// as long as its caller's own done channel stays open (typically one
 // GraphQL Subscription connection), the same context.Context-like
 // done-channel idiom Go's own stdlib uses.
 //
-// A free function (not a method) for the same reason MustOn is one --
+// A free function (not a method) for the same reason NewListener is one --
 // Go disallows a type parameter on a method (L-001 in STATE.md).
 //
 // The returned channel is buffered (subscribeBufferSize) and CLOSED when

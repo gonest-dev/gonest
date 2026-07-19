@@ -981,27 +981,35 @@ func SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions)
 // internal/emitter.Emitter's own doc comment.
 type Emitter = emitter.Emitter
 
-// Listener represents a single unit of event-handling registration --
-// its builder fn (deferred until bootstrap runs it, same New*-deferred
-// pattern as Provider/Controller) is expected to call MustOn.
+// Listener represents a single unit of event-handling registration, bound
+// to exactly one event type via NewListener's own type parameter.
 type Listener = emitter.Listener
 
-// NewListener creates a Listener that defers fn until bootstrap runs it.
-var NewListener = emitter.NewListener
-
-// MustOn registers handler as the callback for events of type EventType on
-// the current bootstrap's Emitter singleton. Go cannot re-export a generic
-// function via var, so this is a real wrapper calling the internal one
-// (same pattern as MustInject/MustInjectAll, see AD-004 in STATE.md).
-func MustOn[EventType any](listener *Listener, handler func(ctx context.Context, event EventType)) {
-	emitter.MustOn(listener, handler)
+// NewListener creates a Listener bound to EventType, deferring fn until
+// bootstrap runs it. fn receives the Listener itself (for MustInject/
+// MustInjectAll) and returns the actual per-event handler -- dependencies
+// are resolved ONCE, at bootstrap time, then closed over for every future
+// event:
+//
+//	NewListener(func(l *Listener) func(context.Context, UserCreatedEvent) {
+//	  logger := MustInject[*LoggerService](l)
+//	  return func(ctx context.Context, event UserCreatedEvent) {
+//	    logger.Log("user created", event.UserID)
+//	  }
+//	})
+//
+// Go cannot re-export a generic function via var, so this is a real wrapper
+// calling the internal one (same pattern as MustInject/MustInjectAll, see
+// AD-004 in STATE.md).
+func NewListener[EventType any](fn func(*Listener) func(context.Context, EventType)) *Listener {
+	return emitter.NewListener(fn)
 }
 
 // Subscribe registers a dynamic, per-connection channel that receives
 // every future Emit(EventType{...}) call until done closes (graphql-
 // support feature, Milestone 17) -- complementary to the static, app-
-// lifetime MustOn/Emit pair. Go cannot re-export a generic function via
-// var, so this is a real wrapper (same AD-004 precedent as MustOn).
+// lifetime NewListener/Emit pair. Go cannot re-export a generic function
+// via var, so this is a real wrapper (same AD-004 precedent as NewListener).
 func Subscribe[EventType any](e *Emitter, done <-chan struct{}) <-chan EventType {
 	return emitter.Subscribe[EventType](e, done)
 }

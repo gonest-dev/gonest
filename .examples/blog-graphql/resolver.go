@@ -44,7 +44,7 @@ var PostResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 
 	// Subscription: a STREAM, not request-response -- Handler's signature
 	// is (ctx, emit), not (ctx) any. gonest.Subscribe[T](emitter, done) is
-	// Emitter's dynamic counterpart to MustOn/Emit: a channel that lives
+	// Emitter's dynamic counterpart to NewListener/Emit: a channel that lives
 	// only as long as ctx.Done() stays open (this ONE connection),
 	// cancelled automatically when the client disconnects (SSE: write
 	// failure/heartbeat detects it; WebSocket: the read loop detects it).

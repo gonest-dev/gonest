@@ -37,7 +37,7 @@ func (s *Service) Get(id int64) *PostEntity {
 // Create stores a new Post and publishes a PostCreatedEvent -- the
 // Subscription resolver (resolver.go) never learns about this call
 // directly, it only subscribes to the EVENT TYPE via gonest.Subscribe[T],
-// same "Uma Única Fonte de Verdade" event bus MustOn/Emit already provide.
+// same "Uma Única Fonte de Verdade" event bus NewListener/Emit already provide.
 func (s *Service) Create(title, body string) *PostEntity {
 	s.mu.Lock()
 	s.nextID++

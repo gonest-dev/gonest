@@ -862,8 +862,8 @@ func declareResolvers(modules []*module.Module) {
 // declareListeners runs Declare on every listener registered across
 // modules, exactly once each -- same phase 2 as declareControllers (a
 // Listener has exactly one owning module, registered directly via
-// Module.Listeners, like Controller; MustOn/MustInject calls inside its
-// builder fn resolve DIRECTLY, same as Controller's own).
+// Module.Listeners, like Controller; MustInject calls inside its builder fn
+// resolve DIRECTLY, same as Controller's own).
 func declareListeners(modules []*module.Module) {
 	for _, m := range modules {
 		for _, l := range m.OwnListeners() {

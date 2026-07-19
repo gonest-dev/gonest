@@ -3314,9 +3314,9 @@ func TestMustRequest_NotFound_StatusPropagatesGenericException(t *testing.T) {
 // insightUserCreatedEvent/insightLoggerService/insightUserCreatedListener/
 // insightEmitterUserService/insightEmitterUserProvider reproduce INSIGHT.md's
 // "exemplo de Emitter" section: a typed event (not a bare string), a
-// Listener registered via NewListener+MustOn (itself depending on a
-// LoggerService via MustInject, proving Listener's own builder resolves
-// direct dependencies too), and a Provider that resolves the framework's
+// Listener registered via NewListener (itself depending on a LoggerService
+// via MustInject, proving Listener's own builder resolves direct
+// dependencies too), and a Provider that resolves the framework's
 // global Emitter singleton (via MustInject[*Emitter], no explicit
 // registration) BEFORE calling its own Constructor -- the real
 // Provider-to-Provider/Provider-to-framework-singleton dependency pattern.
@@ -3363,12 +3363,12 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 	})
 
 	ranCh := make(chan struct{})
-	userCreatedListener := NewListener(func(listener *Listener) {
+	userCreatedListener := NewListener(func(listener *Listener) func(context.Context, insightUserCreatedEvent) {
 		loggerDep := MustInject[*insightLoggerService](listener)
-		MustOn[insightUserCreatedEvent](listener, func(ctx context.Context, event insightUserCreatedEvent) {
+		return func(ctx context.Context, event insightUserCreatedEvent) {
 			loggerDep.Log("user created", event.UserID)
 			close(ranCh)
-		})
+		}
 	})
 
 	var userService *insightEmitterUserService

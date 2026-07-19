@@ -68,9 +68,8 @@ func RegisterGlobalSingleton(t reflect.Type, v reflect.Value) {
 }
 
 // GlobalSingletonFor returns the value registered via RegisterGlobalSingleton
-// for t, and whether one exists. Exported so internal/emitter's MustOn (a
-// free function, not a method -- Go disallows a type parameter on a method,
-// L-001 in STATE.md) can look up the current bootstrap's Emitter singleton
+// for t, and whether one exists. Exported so internal/emitter's
+// Listener.Declare can look up the current bootstrap's Emitter singleton
 // directly, the same instance MustInject[*Emitter] would resolve.
 func GlobalSingletonFor(t reflect.Type) (reflect.Value, bool) {
 	globalSingletonsMu.Lock()
