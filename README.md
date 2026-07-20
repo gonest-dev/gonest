@@ -579,10 +579,10 @@ import (
 
 type UserCreatedEvent struct{ UserID int64 }
 
-var UserCreatedListener = gonest.NewListener(func(listener *gonest.Listener) func(context.Context, UserCreatedEvent) {
-  return func(ctx context.Context, event UserCreatedEvent) {
+var UserCreatedListener = gonest.NewListener(func(listener *gonest.Listener[UserCreatedEvent]) {
+  listener.On(func(ctx context.Context, event UserCreatedEvent) {
     // ...
-  }
+  })
 })
 
 var UserModule = gonest.NewModule(func(module *gonest.Module) {

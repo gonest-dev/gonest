@@ -3363,12 +3363,12 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 	})
 
 	ranCh := make(chan struct{})
-	userCreatedListener := NewListener(func(listener *Listener) func(context.Context, insightUserCreatedEvent) {
+	userCreatedListener := NewListener(func(listener *Listener[insightUserCreatedEvent]) {
 		loggerDep := MustInject[*insightLoggerService](listener)
-		return func(ctx context.Context, event insightUserCreatedEvent) {
+		listener.On(func(ctx context.Context, event insightUserCreatedEvent) {
 			loggerDep.Log("user created", event.UserID)
 			close(ranCh)
-		}
+		})
 	})
 
 	var userService *insightEmitterUserService

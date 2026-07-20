@@ -9,7 +9,6 @@
 package gonest
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -982,26 +981,28 @@ func SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions)
 type Emitter = emitter.Emitter
 
 // Listener represents a single unit of event-handling registration, bound
-// to exactly one event type via NewListener's own type parameter.
-type Listener = emitter.Listener
+// to EventType via its own type parameter -- a real Go generic type alias
+// (requires Go 1.24+'s parameterized alias support, this module already
+// targets 1.25).
+type Listener[EventType any] = emitter.Listener[EventType]
 
 // NewListener creates a Listener bound to EventType, deferring fn until
-// bootstrap runs it. fn receives the Listener itself (for MustInject/
-// MustInjectAll) and returns the actual per-event handler -- dependencies
-// are resolved ONCE, at bootstrap time, then closed over for every future
-// event:
+// bootstrap runs it. fn receives the Listener itself and is expected to
+// call its On method exactly once, registering the actual per-event
+// handler -- dependencies are resolved ONCE, at bootstrap time, then
+// closed over for every future event:
 //
-//	NewListener(func(l *Listener) func(context.Context, UserCreatedEvent) {
+//	NewListener(func(l *Listener[UserCreatedEvent]) {
 //	  logger := MustInject[*LoggerService](l)
-//	  return func(ctx context.Context, event UserCreatedEvent) {
+//	  l.On(func(ctx context.Context, event UserCreatedEvent) {
 //	    logger.Log("user created", event.UserID)
-//	  }
+//	  })
 //	})
 //
 // Go cannot re-export a generic function via var, so this is a real wrapper
 // calling the internal one (same pattern as MustInject/MustInjectAll, see
 // AD-004 in STATE.md).
-func NewListener[EventType any](fn func(*Listener) func(context.Context, EventType)) *Listener {
+func NewListener[EventType any](fn func(*Listener[EventType])) *Listener[EventType] {
 	return emitter.NewListener(fn)
 }
 
