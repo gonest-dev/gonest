@@ -31,7 +31,11 @@ Algumas features do Nest dependem de Decorators nativos, e no GoNest foram tradu
 - [x] **Task Scheduling (`internal/scheduler`)**: Cron jobs declarativos (`@Cron`, `@Timeout`, `@Interval`).
 - [x] **Lifecycle Hooks**: Equivalentes do `OnModuleInit`, `OnApplicationBootstrap`, `OnModuleDestroy`, `BeforeApplicationShutdown`, `OnApplicationShutdown`. Como inicializar DBs ou parar graceful shutdowns coordenados pelos módulos. (`Provider.OnModuleInit`/etc, Milestone 20 -- ver `.specs/project/ROADMAP.md`)
 - [x] **Dynamic Modules**: já funciona hoje sem código novo -- `Module` é valor Go comum, então "dynamic module" é só uma função que fecha sobre `options` e retorna `*gonest.Module` (sem decorator estático como o Nest, não precisa de escape hatch). Documentado em `/docs/core-concepts/modules#dynamic-modules` (site) e `INSIGHT-DYNAMIC.md`.
-- [ ] **Module Reference / Lazy Loading**: Busca manual de dependências e importação tardia para otimizar tempo de start ou resolver dependências circulares.
+- [x] **Module Reference (busca manual de dependência)**: já é `MustInject[T](owner)`/`MustInjectAll[T](owner)` -- mais forte que o `ModuleRef.get()` do Nest (type-safe em compile-time via generics, não reflection/token em runtime).
+- [x] **Lazy Loading de módulo**: sem equivalente idiomático em Go, DE PROPÓSITO -- `import()` dinâmico do Nest resolve um problema de runtime JS (código ainda não baixado) que não existe num binário Go compilado (todo pacote importado já está no binário). Documentado explicitamente em `/docs/core-concepts/modules` (site) e `INSIGHT-LAZY.md`, não é lacuna a preencher.
+- [ ] **Lazy Providers** (ideia derivada, NÃO é o que o Nest chama de Lazy Loading): adiar `Constructor` de um Provider caro pro primeiro uso real, em vez de eager em `NewApp`. Exemplo real: binário Lambda único atendendo múltiplos tipos de evento, só uma árvore de Provider por invocação. Especulativo, sem pedido concreto ainda -- ver `INSIGHT-LAZY.md`.
+- [x] **Resolver dependências circulares (detecção)**: `internal/resolver/cycle.go`'s `DetectCycle` já detecta e falha alto antes de Stage 3.
+- [ ] **Escape hatch pra ciclo legítimo** (equivalente a `forwardRef()`): gap real -- só detecção existe, sem jeito de permitir um ciclo intencional. Hipótese: `LazyInject[T](owner) func() T`, adia resolução pro primeiro uso, quebra a edge que `DetectCycle` considera. Especulativo, só implementar se um ciclo real aparecer -- ver `INSIGHT-LAZY.md`.
 
 ---
 
