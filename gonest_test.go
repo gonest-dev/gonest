@@ -3911,3 +3911,38 @@ func TestMustParse_DotenvEndToEnd_LoadThenBind(t *testing.T) {
 		t.Fatalf("got.Port = %d, want %d", got.Port, 5432)
 	}
 }
+
+// TestMustParse_PointerT_ReturnsPointerToParsedStruct proves
+// MustParse[*T]/Parse[*T] works alongside MustParse[T]/Parse[T]: T itself
+// may be a pointer to the schema's struct type, so a call site that wants
+// a *T back (e.g. to hand straight to a DI provider constructor) doesn't
+// need to Parse the struct value and take its own address afterward.
+func TestMustParse_PointerT_ReturnsPointerToParsedStruct(t *testing.T) {
+	const key = "GONEST_ROOT_DOTENV_T11_HOST"
+	os.Unsetenv(key)
+	os.Unsetenv("GONEST_ROOT_DOTENV_T11_PORT")
+	t.Cleanup(func() {
+		os.Unsetenv(key)
+		os.Unsetenv("GONEST_ROOT_DOTENV_T11_PORT")
+	})
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte(key+"=db.internal\n"), 0o644); err != nil {
+		t.Fatalf("failed to write .env: %v", err)
+	}
+
+	Dotenv().MustLoad(path)
+
+	got := MustParse[*rootDotenvE2EConfig](Dotenv(), rootDotenvE2ESchema)
+
+	if got == nil {
+		t.Fatal("got = nil, want a non-nil *rootDotenvE2EConfig")
+	}
+	if got.Host != "db.internal" {
+		t.Fatalf("got.Host = %q, want %q", got.Host, "db.internal")
+	}
+	if got.Port != 5432 {
+		t.Fatalf("got.Port = %d, want %d", got.Port, 5432)
+	}
+}

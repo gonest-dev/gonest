@@ -423,7 +423,10 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
 `param:"..."`/`query:"..."`/`json:"..."` are separate tag families (one per source), each read via
 `req.Params()`/`req.Query()`/`req.Body().Json()` (a `Parseable`). Every
 `gonest.MustParse[T](src, schema)` has a non-panicking `gonest.Parse[T](src, schema) (T, error)`
-twin for callers that want to handle the error themselves.
+twin for callers that want to handle the error themselves. `T` can be the struct itself or a
+pointer to it (`MustParse[*Config]`) -- the pointer variant allocates the struct for you and hands
+back the already-populated pointer, so a call site that needs a `*T` (a DI provider constructor, a
+field it's about to store) skips the manual `v := MustParse[Config](...); return &v`.
 
 ### Partial updates (Accessor dirty-tracking)
 

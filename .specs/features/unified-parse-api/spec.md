@@ -128,6 +128,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 9. WHEN the developer calls `gonest.MustParse[T](ctx.Headers(), schema)` THEN system SHALL parse HTTP headers and return `T` (new source, absent today)
 10. WHEN the developer calls `gonest.Parse[T](ctx.Headers(), schema)` THEN system SHALL parse HTTP headers and return `(T, error)`
 11. WHEN the `*Schema` passed was built for a different type than `T` THEN system SHALL panic with a clear message (same behavior as current `resolveSchema`)
+12. WHEN `T` is a pointer to the schema's struct type (e.g. `Parse[*Config]`/`MustParse[*Config]` instead of `Parse[Config]`/`MustParse[Config]`) THEN system SHALL allocate the pointee, parse into it, and return the pointer -- added in AD-045, see STATE.md
 
 **Independent Test**: The code from `INSIGHT-PARSE.md` compiles and `go test ./...` passes with no error.
 
@@ -204,6 +205,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 | PARSE-07       | P1: RawBody rename + BodySource         | Execute | Verified |
 | PARSE-08       | P1: ctx.Headers() as Parseable        | Execute | Verified |
 | PARSE-09       | P1: Remove legacy functions             | Execute | Verified |
+| PARSE-10       | P1: `Parse[*T]`/`MustParse[*T]` (pointer T) | Execute | Verified |
 
 ---
 

@@ -1,3 +1,5 @@
+`T` pode ser o struct puro (`Parse[Config]`) ou um ponteiro pra ele (`Parse[*Config]`) -- nesse segundo caso, `Parse` aloca o pointee via `reflect.New` e devolve o ponteiro já preenchido, sem precisar de um `config := Parse[Config](...); return &config` manual no call site.
+
 ```go
 package ex
 

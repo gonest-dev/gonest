@@ -845,8 +845,25 @@ type FormFile = execution.FormFile
 // (unified-parse-api feature) hands back a Parseable that already knows how
 // to read and validate its own source, so adding a new source later (e.g.
 // ctx.Body().Xml()) never touches these two functions.
+//
+// T may be a struct (the schema's own StructType, the common case) or a
+// pointer to one (e.g. Parse[*DatabaseConfig] instead of
+// Parse[DatabaseConfig]) -- a call site that wants T back as a *T (to store
+// it, hand it to a DI provider, etc.) no longer has to Parse the struct
+// value and take its address itself. src.ParseInto always receives a
+// pointer-to-struct dst either way (ParseInto's own contract, unchanged);
+// when T is itself a pointer type, that dst IS the T being returned, just
+// allocated fresh via reflect.New instead of zero-valued via `var zero T`
+// (a nil *T has nowhere for ParseInto to write into).
 func Parse[T any](src Parseable, m *Schema) (T, error) {
 	var zero T
+	if t := reflect.TypeOf(&zero).Elem(); t.Kind() == reflect.Pointer {
+		ptr := reflect.New(t.Elem())
+		if err := src.ParseInto(ptr.Interface(), m); err != nil {
+			return zero, err
+		}
+		return ptr.Interface().(T), nil
+	}
 	if err := src.ParseInto(&zero, m); err != nil {
 		return zero, err
 	}
