@@ -444,9 +444,6 @@ body.Email.Apply(&user.Email)
 // Sync writes into another Accessor[T] instead of a raw *T -- the dirty
 // state propagates along with the value (e.g. DTO -> entity, both Accessor)
 body.Email.Sync(&entity.Email)
-
-// or build a partial-update map directly, keyed by json tag
-changes := gonest.AccessorsToDirtyMap(body)
 ```
 
 ### File upload (multipart/form-data streaming)

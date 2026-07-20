@@ -1,16 +1,16 @@
-package value_test
+package accessor_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"gonest.dev/gonest/internal/value"
+	"gonest.dev/gonest/internal/accessor"
 )
 
 // --- Accessor[T] core behaviour ---
 
 func TestNew_WithoutArgs_NotDirty(t *testing.T) {
-	v := value.New[string]()
+	v := accessor.New[string]()
 	if v.IsDirty() {
 		t.Fatal("New() without args: want dirty=false, got true")
 	}
@@ -21,7 +21,7 @@ func TestNew_WithoutArgs_NotDirty(t *testing.T) {
 }
 
 func TestNew_WithArg_DirtyAndValueSet(t *testing.T) {
-	v := value.New("hello")
+	v := accessor.New("hello")
 	if !v.IsDirty() {
 		t.Fatal("New(val): want dirty=true, got false")
 	}
@@ -31,7 +31,7 @@ func TestNew_WithArg_DirtyAndValueSet(t *testing.T) {
 }
 
 func TestSet_MarksDirtyAndStoresValue(t *testing.T) {
-	var v value.Accessor[int]
+	var v accessor.Accessor[int]
 	v.Set(42)
 	if !v.IsDirty() {
 		t.Fatal("Set(): want dirty=true, got false")
@@ -41,22 +41,15 @@ func TestSet_MarksDirtyAndStoresValue(t *testing.T) {
 	}
 }
 
-func TestGetAny_ReturnsValueAsAny(t *testing.T) {
-	v := value.New(99)
-	if v.GetAny() != 99 {
-		t.Fatalf("GetAny(): want 99, got %v", v.GetAny())
-	}
-}
-
 func TestOnDirty_CalledOnlyWhenDirty(t *testing.T) {
 	called := false
-	var clean value.Accessor[string]
+	var clean accessor.Accessor[string]
 	clean.OnDirty(func(s string) { called = true })
 	if called {
 		t.Fatal("OnDirty on clean value: callback must not be called")
 	}
 
-	dirty := value.New("x")
+	dirty := accessor.New("x")
 	dirty.OnDirty(func(s string) { called = true })
 	if !called {
 		t.Fatal("OnDirty on dirty value: callback must be called")
@@ -66,13 +59,13 @@ func TestOnDirty_CalledOnlyWhenDirty(t *testing.T) {
 func TestApply_WritesOnlyWhenDirty(t *testing.T) {
 	target := "original"
 
-	var clean value.Accessor[string]
+	var clean accessor.Accessor[string]
 	clean.Apply(&target)
 	if target != "original" {
 		t.Fatalf("Apply on clean value: target must not change, got %q", target)
 	}
 
-	dirty := value.New("updated")
+	dirty := accessor.New("updated")
 	dirty.Apply(&target)
 	if target != "updated" {
 		t.Fatalf("Apply on dirty value: want %q, got %q", "updated", target)
@@ -80,15 +73,15 @@ func TestApply_WritesOnlyWhenDirty(t *testing.T) {
 }
 
 func TestSync_WritesOnlyWhenDirty(t *testing.T) {
-	target := value.New("original")
+	target := accessor.New("original")
 
-	var clean value.Accessor[string]
+	var clean accessor.Accessor[string]
 	clean.Sync(&target)
 	if target.Get() != "original" {
 		t.Fatalf("Sync on clean value: target must not change, got %q", target.Get())
 	}
 
-	dirty := value.New("updated")
+	dirty := accessor.New("updated")
 	dirty.Sync(&target)
 	if target.Get() != "updated" {
 		t.Fatalf("Sync on dirty value: want %q, got %q", "updated", target.Get())
@@ -99,8 +92,8 @@ func TestSync_WritesOnlyWhenDirty(t *testing.T) {
 }
 
 func TestSync_MarksDestDirtyEvenIfDestWasClean(t *testing.T) {
-	var dest value.Accessor[int]
-	src := value.New(5)
+	var dest accessor.Accessor[int]
+	src := accessor.New(5)
 	src.Sync(&dest)
 	if !dest.IsDirty() {
 		t.Fatal("Sync: dest must become dirty after sync from dirty src")
@@ -113,7 +106,7 @@ func TestSync_MarksDestDirtyEvenIfDestWasClean(t *testing.T) {
 // --- JSON integration ---
 
 func TestMarshalJSON_EmitsInnerValueDirectly(t *testing.T) {
-	v := value.New("world")
+	v := accessor.New("world")
 	b, err := json.Marshal(&v)
 	if err != nil {
 		t.Fatalf("MarshalJSON error: %v", err)
@@ -124,7 +117,7 @@ func TestMarshalJSON_EmitsInnerValueDirectly(t *testing.T) {
 }
 
 func TestUnmarshalJSON_SetsDirtyAndValue(t *testing.T) {
-	var v value.Accessor[int]
+	var v accessor.Accessor[int]
 	if err := json.Unmarshal([]byte(`7`), &v); err != nil {
 		t.Fatalf("UnmarshalJSON error: %v", err)
 	}
@@ -137,7 +130,7 @@ func TestUnmarshalJSON_SetsDirtyAndValue(t *testing.T) {
 }
 
 func TestUnmarshalJSON_NullSetsDirty(t *testing.T) {
-	var v value.Accessor[string]
+	var v accessor.Accessor[string]
 	if err := json.Unmarshal([]byte(`null`), &v); err != nil {
 		t.Fatalf("UnmarshalJSON null error: %v", err)
 	}
@@ -148,8 +141,8 @@ func TestUnmarshalJSON_NullSetsDirty(t *testing.T) {
 
 func TestUnmarshalJSON_OmittedFieldStaysClean(t *testing.T) {
 	type patch struct {
-		Name  value.Accessor[string] `json:"name"`
-		Email value.Accessor[string] `json:"email"`
+		Name  accessor.Accessor[string] `json:"name"`
+		Email accessor.Accessor[string] `json:"email"`
 	}
 	var p patch
 	if err := json.Unmarshal([]byte(`{"name":"alice"}`), &p); err != nil {
@@ -160,53 +153,5 @@ func TestUnmarshalJSON_OmittedFieldStaysClean(t *testing.T) {
 	}
 	if p.Email.IsDirty() {
 		t.Fatal("Email (omitted): want dirty=false, got true")
-	}
-}
-
-// --- ToMap ---
-
-type patchUser struct {
-	Name  value.Accessor[string] `json:"name"`
-	Age   value.Accessor[int]    `json:"age,omitempty"`
-	Email value.Accessor[string] `json:"-"`
-	NoTag value.Accessor[bool]
-	Fixed string `json:"fixed_data"`
-}
-
-func TestToDirtyMap_IncludesOnlyDirtyFields(t *testing.T) {
-	u := patchUser{}
-	u.Name.Set("leandro")
-	u.Email.Set("leandro@example.com")
-	u.NoTag.Set(true)
-
-	m := value.ToDirtyMap(u)
-
-	if m["name"] != "leandro" {
-		t.Fatalf("name: want %q, got %v", "leandro", m["name"])
-	}
-	if m["Email"] != "leandro@example.com" {
-		t.Fatalf("Email (tag=-): want fallback to field name, got %v", m["Email"])
-	}
-	if m["NoTag"] != true {
-		t.Fatalf("NoTag: want true, got %v", m["NoTag"])
-	}
-	if len(m) != 3 {
-		t.Fatalf("ToMap: want 3 entries, got %d: %v", len(m), m)
-	}
-}
-
-func TestToMap_PointerToStruct(t *testing.T) {
-	u := &patchUser{}
-	u.Age.Set(30)
-	m := value.ToDirtyMap(u)
-	if m["age"] != 30 {
-		t.Fatalf("age: want 30, got %v", m["age"])
-	}
-}
-
-func TestToMap_NonStructReturnsEmpty(t *testing.T) {
-	m := value.ToDirtyMap(123)
-	if len(m) != 0 {
-		t.Fatalf("ToMap(int): want empty map, got %v", m)
 	}
 }

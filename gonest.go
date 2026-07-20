@@ -15,6 +15,7 @@ import (
 	"time"
 	"unsafe"
 
+	"gonest.dev/gonest/internal/accessor"
 	"gonest.dev/gonest/internal/adapter/fiber"
 	"gonest.dev/gonest/internal/app"
 	"gonest.dev/gonest/internal/controller"
@@ -36,7 +37,6 @@ import (
 	"gonest.dev/gonest/internal/scheduler"
 	"gonest.dev/gonest/internal/schema"
 	"gonest.dev/gonest/internal/scope"
-	"gonest.dev/gonest/internal/value"
 )
 
 // ---------------------------------------------------------------------------
@@ -794,7 +794,7 @@ type Response = execution.Response
 //	body := gonest.MustParse[*UpdateUserDTO](req, updateUserSchema)
 //	body.Name.OnDirty(func(name string) { user.Name = name })
 //	body.Email.Apply(&user.Email)
-type Accessor[T any] = value.Accessor[T]
+type Accessor[T any] = accessor.Accessor[T]
 
 // NewAccessor creates an Accessor[T]. If an initial value is provided it
 // starts dirty; the zero-arg form creates a clean (not-dirty) value.
@@ -805,22 +805,7 @@ type Accessor[T any] = value.Accessor[T]
 //	name := gonest.NewAccessor("alice")  // dirty=true,  value="alice"
 //	age  := gonest.NewAccessor[int]()    // dirty=false, value=0
 func NewAccessor[T any](val ...T) Accessor[T] {
-	return value.New(val...)
-}
-
-// AccessorsToDirtyMap converts a struct (or pointer to struct) whose fields
-// are Accessor[T] into a map[string]any containing only the dirty fields,
-// keyed by their json struct tag (or field name when the tag is absent or
-// "-"). Non-Accessor fields are always ignored. Useful for building
-// partial-update queries without reflection on the caller's side.
-//
-// SPEC_DEVIATION (schema-value-support feature, T2): renamed from
-// ValueToDirtyMap, same reason as Accessor's own doc comment.
-//
-//	changes := gonest.AccessorsToDirtyMap(body)
-//	db.Model(&user).Updates(changes)
-func AccessorsToDirtyMap(obj any) map[string]any {
-	return value.ToDirtyMap(obj)
+	return accessor.New(val...)
 }
 
 // ---------------------------------------------------------------------------
