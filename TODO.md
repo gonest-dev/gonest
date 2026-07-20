@@ -30,7 +30,7 @@ Algumas features do Nest dependem de Decorators nativos, e no GoNest foram tradu
 - [x] **Event Emitter (`internal/emitter`)**: Disparo de eventos assíncronos dentro da aplicação (Padrão Pub/Sub local).
 - [x] **Task Scheduling (`internal/scheduler`)**: Cron jobs declarativos (`@Cron`, `@Timeout`, `@Interval`).
 - [x] **Lifecycle Hooks**: Equivalentes do `OnModuleInit`, `OnApplicationBootstrap`, `OnModuleDestroy`, `BeforeApplicationShutdown`, `OnApplicationShutdown`. Como inicializar DBs ou parar graceful shutdowns coordenados pelos módulos. (`Provider.OnModuleInit`/etc, Milestone 20 -- ver `.specs/project/ROADMAP.md`)
-- [ ] **Dynamic Modules**: Permite que módulos sejam customizados em tempo de inicialização usando `Register` ou `forRoot` recebendo configurações dinâmicas (ex: ConfigModule.forRoot()).
+- [x] **Dynamic Modules**: já funciona hoje sem código novo -- `Module` é valor Go comum, então "dynamic module" é só uma função que fecha sobre `options` e retorna `*gonest.Module` (sem decorator estático como o Nest, não precisa de escape hatch). Documentado em `/docs/core-concepts/modules#dynamic-modules` (site) e `INSIGHT-DYNAMIC.md`.
 - [ ] **Module Reference / Lazy Loading**: Busca manual de dependências e importação tardia para otimizar tempo de start ou resolver dependências circulares.
 
 ---
