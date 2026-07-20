@@ -79,6 +79,37 @@ func TestApply_WritesOnlyWhenDirty(t *testing.T) {
 	}
 }
 
+func TestSync_WritesOnlyWhenDirty(t *testing.T) {
+	target := value.New("original")
+
+	var clean value.Accessor[string]
+	clean.Sync(&target)
+	if target.Get() != "original" {
+		t.Fatalf("Sync on clean value: target must not change, got %q", target.Get())
+	}
+
+	dirty := value.New("updated")
+	dirty.Sync(&target)
+	if target.Get() != "updated" {
+		t.Fatalf("Sync on dirty value: want %q, got %q", "updated", target.Get())
+	}
+	if !target.IsDirty() {
+		t.Fatal("Sync on dirty value: target must be marked dirty")
+	}
+}
+
+func TestSync_MarksDestDirtyEvenIfDestWasClean(t *testing.T) {
+	var dest value.Accessor[int]
+	src := value.New(5)
+	src.Sync(&dest)
+	if !dest.IsDirty() {
+		t.Fatal("Sync: dest must become dirty after sync from dirty src")
+	}
+	if dest.Get() != 5 {
+		t.Fatalf("Sync: want 5, got %d", dest.Get())
+	}
+}
+
 // --- JSON integration ---
 
 func TestMarshalJSON_EmitsInnerValueDirectly(t *testing.T) {

@@ -63,6 +63,16 @@ func (v *Accessor[T]) Apply(ptr *T) {
 	}
 }
 
+// Sync writes the stored value into dest via dest.Set, only if the field is
+// dirty. Unlike Apply, dest is itself an Accessor[T], so the write also marks
+// dest as dirty -- useful for propagating a dirty field between two Accessor
+// structs (e.g. DTO -> entity) without losing dirty-tracking on dest.
+func (v *Accessor[T]) Sync(dest *Accessor[T]) {
+	if v.dirty {
+		dest.Set(v.value)
+	}
+}
+
 // GetAny returns the stored value as any. Used internally by ToMap.
 func (v *Accessor[T]) GetAny() any {
 	return v.value
