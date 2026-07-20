@@ -580,7 +580,7 @@ import (
 type UserCreatedEvent struct{ UserID int64 }
 
 var UserCreatedListener = gonest.NewListener(func(listener *gonest.Listener[UserCreatedEvent]) {
-  listener.On(func(ctx context.Context, event UserCreatedEvent) {
+  listener.MustOn(func(ctx context.Context, event UserCreatedEvent) {
     // ...
   })
 })

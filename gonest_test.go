@@ -3365,7 +3365,7 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 	ranCh := make(chan struct{})
 	userCreatedListener := NewListener(func(listener *Listener[insightUserCreatedEvent]) {
 		loggerDep := MustInject[*insightLoggerService](listener)
-		listener.On(func(ctx context.Context, event insightUserCreatedEvent) {
+		listener.MustOn(func(ctx context.Context, event insightUserCreatedEvent) {
 			loggerDep.Log("user created", event.UserID)
 			close(ranCh)
 		})

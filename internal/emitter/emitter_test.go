@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sync"
 	"testing"
@@ -62,6 +63,30 @@ func TestEmit_ListenerPanic_NeverPropagatesToCaller(t *testing.T) {
 	e.on(reflect.TypeOf(fooEvent{}), reflect.ValueOf(handler))
 
 	e.Emit(fooEvent{}) // must not panic here, even though the listener does
+
+	select {
+	case <-ran:
+	case <-time.After(time.Second):
+		t.Fatal("listener did not run")
+	}
+}
+
+// TestEmit_ListenerReturnsError_NeverPropagatesToCaller proves a listener's
+// non-nil error return gets the same swallow-and-continue treatment as a
+// recovered panic (see Emit's own doc comment) -- the error-returning
+// handler shape On/MustOn register (listener.go), exercised here directly
+// via e.on to keep this test scoped to Emit's own dispatch logic.
+func TestEmit_ListenerReturnsError_NeverPropagatesToCaller(t *testing.T) {
+	e := New()
+	ran := make(chan struct{})
+
+	handler := func(ctx context.Context, ev fooEvent) error {
+		defer close(ran)
+		return errors.New("boom")
+	}
+	e.on(reflect.TypeOf(fooEvent{}), reflect.ValueOf(handler))
+
+	e.Emit(fooEvent{}) // must not surface the error here
 
 	select {
 	case <-ran:

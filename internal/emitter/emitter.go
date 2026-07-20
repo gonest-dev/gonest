@@ -74,6 +74,11 @@ func (e *Emitter) handlersFor(t reflect.Type) []reflect.Value {
 // caller of Emit or to any other listener's goroutine -- the recovered
 // value is logged via internal/logger.Error (Nest's own equivalent
 // behavior: an event handler failing surfaces in the log, not silently).
+// A listener registered via On/MustOn always has the shape
+// func(context.Context, T) error (MustOn wraps a no-error handler into
+// exactly this shape before storing it, see listener.go) -- a non-nil
+// returned error gets the SAME log treatment as a recovered panic, never
+// propagated to Emit's own caller either.
 func (e *Emitter) Emit(event any) {
 	t := reflect.TypeOf(event)
 	eventValue := reflect.ValueOf(event)
@@ -86,7 +91,10 @@ func (e *Emitter) Emit(event any) {
 					logger.Error(fmt.Sprintf("listener for event %s panicked: %v", t, r))
 				}
 			}()
-			h.Call([]reflect.Value{reflect.ValueOf(context.Background()), eventValue})
+			out := h.Call([]reflect.Value{reflect.ValueOf(context.Background()), eventValue})
+			if len(out) == 1 && !out[0].IsNil() {
+				logger.Error(fmt.Sprintf("listener for event %s returned error: %v", t, out[0].Interface().(error)))
+			}
 		}()
 	}
 

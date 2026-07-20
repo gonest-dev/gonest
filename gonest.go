@@ -988,13 +988,15 @@ type Listener[EventType any] = emitter.Listener[EventType]
 
 // NewListener creates a Listener bound to EventType, deferring fn until
 // bootstrap runs it. fn receives the Listener itself and is expected to
-// call its On method exactly once, registering the actual per-event
+// call On or MustOn exactly once, registering the actual per-event
 // handler -- dependencies are resolved ONCE, at bootstrap time, then
-// closed over for every future event:
+// closed over for every future event. On's handler returns an error
+// (logged by Emit, same treatment a recovered panic gets); MustOn is the
+// convenience form for a handler that never fails:
 //
 //	NewListener(func(l *Listener[UserCreatedEvent]) {
 //	  logger := MustInject[*LoggerService](l)
-//	  l.On(func(ctx context.Context, event UserCreatedEvent) {
+//	  l.MustOn(func(ctx context.Context, event UserCreatedEvent) {
 //	    logger.Log("user created", event.UserID)
 //	  })
 //	})

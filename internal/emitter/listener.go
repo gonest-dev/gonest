@@ -37,7 +37,7 @@ type Listener[EventType any] struct {
 //
 //	NewListener(func(l *Listener[UserCreatedEvent]) {
 //	  logger := MustInject[*LoggerService](l)
-//	  l.On(func(ctx context.Context, event UserCreatedEvent) {
+//	  l.MustOn(func(ctx context.Context, event UserCreatedEvent) {
 //	    logger.Log("user created", event.UserID)
 //	  })
 //	})
@@ -49,15 +49,35 @@ func NewListener[EventType any](fn func(*Listener[EventType])) *Listener[EventTy
 	return &Listener[EventType]{fn: fn}
 }
 
-// On registers handler as this Listener's per-event callback. A regular
-// method, not a free function like the removed MustOn -- EventType is
+// On registers handler as this Listener's per-event callback -- the
+// error-returning form. A regular method, not a free function like the
+// removed MustOn (the old free-function one; see MustOn below for this
+// package's current, unrelated meaning of that name) -- EventType is
 // already bound to this *Listener[EventType] by NewListener, so On simply
 // uses it, introducing no type parameter of its own (see Listener's own
 // doc comment for why that distinction is what makes this a valid method).
-// Calling On more than once overwrites the previously registered handler;
-// NewListener's fn is expected to call it exactly once.
-func (l *Listener[EventType]) On(handler func(ctx context.Context, event EventType)) {
+// A non-nil error returned by handler is logged by Emit (internal/logger,
+// same treatment a recovered panic already gets), never propagated to
+// Emit's own caller -- Emit's fire-and-forget contract holds regardless of
+// whether a listener fails via panic or via a returned error. Calling On
+// (or MustOn) more than once overwrites the previously registered handler;
+// NewListener's fn is expected to call one of the two exactly once.
+func (l *Listener[EventType]) On(handler func(ctx context.Context, event EventType) error) {
 	l.handler = reflect.ValueOf(handler)
+}
+
+// MustOn registers handler as this Listener's per-event callback -- the
+// convenience form for a handler that never fails, so it doesn't have to
+// write "return nil" itself. Despite the name, MustOn does NOT panic on
+// anything (unlike this framework's other Must-prefixed functions, e.g.
+// MustInject/MustParse/MustListen, which all panic on failure) -- the name
+// was chosen deliberately anyway (confirmed with the user) purely to read
+// naturally alongside On, not to signal panic semantics.
+func (l *Listener[EventType]) MustOn(handler func(ctx context.Context, event EventType)) {
+	l.On(func(ctx context.Context, event EventType) error {
+		handler(ctx, event)
+		return nil
+	})
 }
 
 // Declare runs this listener's deferred fn exactly once -- idempotent, same
