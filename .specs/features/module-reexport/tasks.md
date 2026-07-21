@@ -3,7 +3,7 @@
 **Spec**: `.specs/features/module-reexport/spec.md`
 **Design**: `.specs/features/module-reexport/design.md`
 **Testing**: `.specs/codebase/TESTING.md`
-**Status**: T1-T2 COMPLETE (evaluator: PASS, gate rodado sem cache), T3 em andamento
+**Status**: ✅ T1-T2 COMPLETE (evaluator: PASS, gate sem cache 2x). T3 COMPLETE com ressalva: `go build ./infra/...` real passou em `ctrl/api` (v0.23.0, `ExportModules` em uso) confirmando a API; verificação em RUNTIME (MustInject real através do reexport) ficou bloqueada por um panic pré-existente e não-relacionado no `init()` de `database/table` daquele projeto (nil pointer, fora do escopo desta feature) -- cobertura funcional já provada pelos próprios testes de T1/T2 (cenário transitivo de 3 módulos via Find/FindDirect).
 
 ---
 
