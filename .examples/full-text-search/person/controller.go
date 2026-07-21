@@ -110,5 +110,4 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			res.Status(http.StatusCreated).Json(service.Create(body))
 		})
 	})
-
 })
