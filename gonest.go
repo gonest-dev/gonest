@@ -44,6 +44,48 @@ import (
 // Module Composition features)
 // ---------------------------------------------------------------------------
 
+// ProviderRef is the minimal marker interface *Provider satisfies --
+// exists purely because Module.Providers(refs ...ProviderRef) (below)
+// declares its variadic parameter in terms of it, and Module is a true
+// alias of internal/module.Module: without this root alias, hovering
+// Module.Providers from outside this package would show
+// `...module.ProviderRef` (the internal package's own name leaking through),
+// the exact same autocomplete/hover class of issue AD-046 in STATE.md
+// already fixed elsewhere (var NewX = pkg.New losing its root-aliased
+// signature). Devusers never implement ProviderRef themselves -- only
+// *Provider ever satisfies it in practice.
+type ProviderRef = module.ProviderRef
+
+// ControllerRef is ProviderRef's Controller equivalent, same rationale --
+// Module.Controllers(refs ...ControllerRef) needs a root-aliased parameter
+// type for the same hover-leak reason. Only *Controller satisfies it.
+type ControllerRef = module.ControllerRef
+
+// ResolverRef is ProviderRef's GraphqlResolver equivalent, same rationale --
+// Module.Resolvers(refs ...ResolverRef) needs a root-aliased parameter type.
+// Only *GraphqlResolver satisfies it.
+type ResolverRef = module.ResolverRef
+
+// MiddlewareRef is ProviderRef's Middleware equivalent, same rationale --
+// Module.Use(items ...MiddlewareRef) needs a root-aliased parameter type.
+// Only *Middleware satisfies it.
+type MiddlewareRef = module.MiddlewareRef
+
+// FilterRef is ProviderRef's Filter equivalent, same rationale --
+// Module.Filters(items ...FilterRef) needs a root-aliased parameter type.
+// Only *Filter satisfies it.
+type FilterRef = module.FilterRef
+
+// ListenerRef is ProviderRef's Listener equivalent, same rationale --
+// Module.Listeners(refs ...ListenerRef) needs a root-aliased parameter
+// type. Only *Listener[EventType] satisfies it.
+type ListenerRef = module.ListenerRef
+
+// SchedulerRef is ProviderRef's Scheduler equivalent, same rationale --
+// Module.Schedulers(refs ...SchedulerRef) needs a root-aliased parameter
+// type. Only *Scheduler satisfies it.
+type SchedulerRef = module.SchedulerRef
+
 // Module represents a declarative unit of the DI graph: its own providers
 // and controllers, the modules it imports, and the subset of its own
 // providers it exports to importers.
