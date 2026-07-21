@@ -11,10 +11,11 @@ import (
 
 // resultSchema documents the POST /person/_search response body
 // (Result[*Person]), built once from entity.PersonSchema (the same response
-// schema GET/POST/PUT already reference for a single Person).
-var resultSchema = search.ResultSchemaFor[*entity.Person](entity.PersonSchema, func(t *search.Result[*entity.Person], s *gonest.Schema) {
-	s.Title("search.Result")
-})
+// schema GET/POST/PUT already reference for a single Person). No explicit
+// Title() here -- ResultSchemaFor defaults to entity.PersonSchema's own
+// title + "Result" ("PersonEntityResult"), already unique per entity, so
+// this fn only needs to exist to satisfy the callback signature.
+var resultSchema = search.ResultSchemaFor[*entity.Person](entity.PersonSchema, func(t *search.Result[*entity.Person], s *gonest.Schema) {})
 
 var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/person")

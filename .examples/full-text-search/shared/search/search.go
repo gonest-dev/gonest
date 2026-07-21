@@ -562,6 +562,14 @@ func FieldsSchemaFor[T any](fn func(t *Fields[T], s *gonest.Schema)) *gonest.Sch
 		s.Property(&t.Select).Array().Items(itemsFn)
 		s.Property(&t.Remove).Array().Items(itemsFn)
 		fn(t, s)
+		// Only fall back to a T-derived default when fn didn't already set
+		// one -- lets a caller like QuerySchemaFor force its own base-
+		// derived title (still collision-free) while a standalone caller
+		// that skips Title() entirely still gets something unique per T
+		// rather than an empty, invalid-for-OpenAPI title.
+		if s.TitleText() == "" {
+			s.Title(reflect.TypeFor[T]().Name() + "Fields")
+		}
 	})
 }
 
@@ -608,16 +616,38 @@ type Query[TEntity any, TWhere any] struct {
 // written per entity, same as it always was -- Where has no meaning at this
 // generic layer, so QuerySchemaFor only wires the REFERENCE in, it doesn't
 // know how to build it).
+//
+// The Fields[T]/SortField[T] nested schemas title themselves off s's OWN
+// title (base + "Fields"/"Sort") rather than a fixed "search.Fields"/
+// "search.SortField" -- internal/openapi's registerSchema keys
+// components.schemas purely by TitleText(), NOT by Go type, so 2 different
+// entities' Query[EntityA,_]/Query[EntityB,_] sharing a fixed child title
+// would silently overwrite each other's nested schema the moment BOTH
+// entities' routes got documented in the same OpenAPI doc (found exactly
+// this way: a 2nd Query-based endpoint added to full-text-search collided
+// with person's). whereSchema gets the SAME base-derived title (base +
+// "Where") ONLY if the caller left it untitled (TitleText() == "") --
+// unlike Fields/SortField (always freshly built here, so always safe to
+// force), whereSchema arrives ALREADY BUILT by the caller and may already
+// carry its own deliberate, already-unique title (e.g.
+// "person.QueryDTOWhere") that this function has no business overriding.
+// s itself MUST already have its own Title() set (by the caller, BEFORE
+// calling QuerySchemaFor) for any of this derivation to produce a
+// non-empty, still-unique prefix.
 func QuerySchemaFor[T any, W any](s *gonest.Schema, q *Query[T, W], whereSchema *gonest.Schema) {
+	base := s.TitleText()
+	if whereSchema.TitleText() == "" {
+		whereSchema.Title(base + "Where")
+	}
 	s.Property(&q.Text).String()
 	s.Property(&q.Offset).Integer().Min(0)
 	s.Property(&q.Limit).Integer().Min(1)
 	s.Property(&q.Where).Object(func(om *gonest.ObjectSchema) { om.Schema(whereSchema) })
 	s.Property(&q.Fields).Object(func(om *gonest.ObjectSchema) {
-		om.Schema(FieldsSchemaFor[T](func(t *Fields[T], s *gonest.Schema) { s.Title("search.Fields") }))
+		om.Schema(FieldsSchemaFor[T](func(t *Fields[T], s *gonest.Schema) { s.Title(base + "Fields") }))
 	})
 	s.Property(&q.Sort).Array().Items(func(m *gonest.ArraySchema) {
-		m.Object(SortFieldSchemaFor[T](func(t *SortField[T], s *gonest.Schema) { s.Title("search.SortField") }))
+		m.Object(SortFieldSchemaFor[T](func(t *SortField[T], s *gonest.Schema) { s.Title(base + "Sort") }))
 	})
 }
 
@@ -657,6 +687,11 @@ func SortFieldSchemaFor[T any](fn func(t *SortField[T], s *gonest.Schema)) *gone
 		s.Property(&t.Field).String().Min(1).Required().Enum(FieldNames[T]()...)
 		s.Property(&t.Order).Integer().Required()
 		fn(t, s)
+		// Same "default only if fn left it unset" fallback as
+		// FieldsSchemaFor -- see that function's own doc comment.
+		if s.TitleText() == "" {
+			s.Title(reflect.TypeFor[T]().Name() + "Sort")
+		}
 	})
 }
 
@@ -683,10 +718,18 @@ func NewResult[I any]() *Result[I] {
 // receives it as a request body), so unlike Fields[T]/SortField[T]/Query[T]
 // there is no runtime validation angle here -- purely so a route's own
 // r.Response(200, func(r *gonest.RouteResponse) { r.Schema(...) }) can point
-// at something real instead of leaving the response body undocumented. fn
-// runs AFTER Items/Total/Offset/Limit are registered, against the SAME
-// (t, s) -- see FieldsSchemaFor's own doc comment for why this is a
-// callback rather than a bare `title string` param.
+// at something real instead of leaving the response body undocumented.
+//
+// fn runs AFTER Items/Total/Offset/Limit are registered, against the SAME
+// (t, s) -- if fn doesn't call Title itself, s.Title defaults to
+// itemRef.TitleText() + "Result" (e.g. entity.PersonSchema's "PersonEntity"
+// -> "PersonEntityResult") once fn returns. Same collision reasoning as
+// QuerySchemaFor's own doc comment (internal/openapi keys components.schemas
+// by TitleText() alone, not Go type, so a fixed "search.Result" title would
+// silently collide the moment a 2nd entity's Result[OtherEntity] got
+// documented in the same OpenAPI doc) -- fn can still set an explicit Title
+// if a caller genuinely wants one, but doesn't have to just to stay
+// collision-free.
 func ResultSchemaFor[I any](itemRef *gonest.Schema, fn func(t *Result[I], s *gonest.Schema)) *gonest.Schema {
 	return gonest.NewSchema(func(t *Result[I], s *gonest.Schema) {
 		s.Property(&t.Items).Array().Object(itemRef).Required()
@@ -694,6 +737,9 @@ func ResultSchemaFor[I any](itemRef *gonest.Schema, fn func(t *Result[I], s *gon
 		s.Property(&t.Offset).Integer().Required()
 		s.Property(&t.Limit).Integer().Required()
 		fn(t, s)
+		if s.TitleText() == "" {
+			s.Title(itemRef.TitleText() + "Result")
+		}
 	})
 }
 

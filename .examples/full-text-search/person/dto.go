@@ -90,7 +90,7 @@ var QueryDTOSchema = gonest.NewSchema(func(t *QueryDTO, s *gonest.Schema) {
 	// queryDTOWhereSchema is QueryDTOWhere's own schema, built once so
 	// QueryDTOSchema (below) can pass it straight into search.QuerySchemaFor.
 	search.QuerySchemaFor(s, t, gonest.NewSchema(func(t *QueryDTOWhere, s *gonest.Schema) {
-		s.Title("person.QueryDTOWhere")
+		s.Title("person.QueryDTO.Where")
 		s.Property(&t.ID).Object(objectSchemaFor[string]())
 		s.Property(&t.Name).Object(objectSchemaFor[string]())
 		s.Property(&t.Age).Object(objectSchemaFor[int]())
