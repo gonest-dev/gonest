@@ -303,8 +303,8 @@ func (am *ArraySchema) Nullable() *ArraySchema {
 // Description delegates to the embedded PropertyBuilder's own Description
 // (mutating the SHARED FIELD object, never am.item), then returns am. See
 // Required's doc comment for why this manual re-declaration exists.
-func (am *ArraySchema) Description(d string) *ArraySchema {
-	am.PropertyBuilder.Description(d)
+func (am *ArraySchema) Description(word string, words ...string) *ArraySchema {
+	am.PropertyBuilder.Description(word, words...)
 	return am
 }
 

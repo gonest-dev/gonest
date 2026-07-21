@@ -316,3 +316,69 @@ func TestNew_NonStructTypePanics(t *testing.T) {
 	}()
 	schema.New(reflect.TypeOf(42), 0)
 }
+
+// mixinA/mixinB/embeddedEntity reproduce the exact shape that exposed 2 real
+// bugs in findFieldByOffset (found dogfooding .examples/full-text-search's
+// entity.Person): a struct embedding MULTIPLE mixins, where at least one
+// mixin has more than one field.
+//
+// Bug 1: reflect.VisibleFields reports a promoted field's own Offset
+// relative to its IMMEDIATE parent struct, not cumulatively from
+// embeddedEntity -- Second/Third (mixinB's fields, NOT at offset 0 of
+// mixinB) exposed this; First (mixinA's only... well, first field, sitting
+// at offset 0 of mixinA) did not, since offset-0-of-parent coincidentally
+// equals the true cumulative offset too.
+//
+// Bug 2 (offset-only matching, once fixed to be cumulative, is STILL not
+// unique): First sits at the exact same cumulative offset as mixinA itself
+// (both start at embeddedEntity's own offset 0) -- reflect.VisibleFields
+// lists BOTH as separate entries, so an offset-only match can silently
+// return mixinA's own StructField (name "mixinA", type mixinA) instead of
+// First's (name "First", type string) when asked for &zero.First. Only
+// checking "no panic"/"count == 3" (this test's ORIGINAL, weaker form) does
+// NOT catch this -- both bugs happen to leave every registration reachable
+// without panicking or losing count, just under the WRONG StructField
+// identity. This test asserts the actual registered Field().Name for each
+// property to catch that class of bug specifically.
+type mixinA struct {
+	First string
+}
+
+type mixinB struct {
+	Second string
+	Third  int
+}
+
+type embeddedEntity struct {
+	mixinA
+	mixinB
+}
+
+func TestProperty_PromotedFieldNotAtParentOffsetZero_Found(t *testing.T) {
+	zero := &embeddedEntity{}
+	typ := reflect.TypeOf(*zero)
+	t.Cleanup(func() { schema.Deregister(typ) })
+	m := schema.New(typ, uintptr(unsafe.Pointer(zero)))
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Property panicked on a field that DOES belong to the type: %v", r)
+		}
+	}()
+	firstPB := m.Property(&zero.First)
+	secondPB := m.Property(&zero.Second)
+	thirdPB := m.Property(&zero.Third)
+
+	if got := len(m.OwnProperties()); got != 3 {
+		t.Fatalf("OwnProperties() = %d fields, want 3", got)
+	}
+	if got := firstPB.Field().Name; got != "First" {
+		t.Fatalf("Property(&zero.First).Field().Name = %q, want %q (offset collision with the embedding field mixinA itself)", got, "First")
+	}
+	if got := secondPB.Field().Name; got != "Second" {
+		t.Fatalf("Property(&zero.Second).Field().Name = %q, want %q", got, "Second")
+	}
+	if got := thirdPB.Field().Name; got != "Third" {
+		t.Fatalf("Property(&zero.Third).Field().Name = %q, want %q", got, "Third")
+	}
+}

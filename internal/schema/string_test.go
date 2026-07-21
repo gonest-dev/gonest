@@ -232,6 +232,56 @@ func TestStringSchema_InsightZipChain(t *testing.T) {
 	}
 }
 
+// TestStringSchema_EnumChainAndStoreCorrectly proves Enum stores its list
+// and returns the SAME *StringSchema, exercised as part of a chain alongside
+// the other common constraints.
+func TestStringSchema_EnumChainAndStoreCorrectly(t *testing.T) {
+	zero, m := newStringTestSchema(t)
+
+	sm := m.Property(&zero.Zip).String()
+	got := sm.Required().Enum("a", "b").Description("choice")
+
+	if got != sm {
+		t.Fatal("Required().Enum(...).Description(...) chain did not return the same *StringSchema")
+	}
+
+	values, ok := sm.EnumValues()
+	if !ok || !reflect.DeepEqual(values, []string{"a", "b"}) {
+		t.Errorf("EnumValues() = (%v, %v), want ([a b], true)", values, ok)
+	}
+}
+
+// TestStringSchema_EnumDefaultUnset proves EnumValues reports (nil, false)
+// when Enum was never called, distinguishing "never set" from "set to 0
+// items" -- same distinction MinValue/MaxValue already establish.
+func TestStringSchema_EnumDefaultUnset(t *testing.T) {
+	zero, m := newStringTestSchema(t)
+
+	sm := m.Property(&zero.Str).String()
+
+	if values, ok := sm.EnumValues(); ok || values != nil {
+		t.Errorf("EnumValues() = (%v, %v), want (nil, false) before Enum() was ever called", values, ok)
+	}
+}
+
+// TestStringSchema_EnumCalledTwiceLastWins proves calling Enum a second time
+// on the same *StringSchema keeps only the LAST list (last-call-wins, no
+// panic -- same convention every other branch method in this package
+// follows).
+func TestStringSchema_EnumCalledTwiceLastWins(t *testing.T) {
+	zero, m := newStringTestSchema(t)
+
+	sm := m.Property(&zero.Str).String()
+
+	sm.Enum("a", "b")
+	sm.Enum("c", "d", "e")
+
+	values, ok := sm.EnumValues()
+	if !ok || !reflect.DeepEqual(values, []string{"c", "d", "e"}) {
+		t.Errorf("EnumValues() = (%v, %v), want ([c d e], true) after calling Enum twice", values, ok)
+	}
+}
+
 // TestStringFamilyBranches_CalledTwiceLastWins proves calling two branch
 // methods in sequence on the SAME *PropertyBuilder does not panic, and
 // FormatValue reflects the LAST call (design.md's Error Handling Strategy:

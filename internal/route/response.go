@@ -1,6 +1,10 @@
 package route
 
-import "gonest.dev/gonest/internal/schema"
+import (
+	"strings"
+
+	"gonest.dev/gonest/internal/schema"
+)
 
 // RouteResponse is the per-status response builder passed to Route.Response's
 // optional callback -- lets a route configure that status's documented
@@ -36,9 +40,13 @@ func (r *RouteResponse) SchemaValue() (*schema.Schema, bool) {
 // whatever description generation would otherwise pick (empty string for
 // a schema-carrying response, or the auto-derived http.StatusText default
 // for an undocumented 4xx/5xx response -- see internal/openapi's
-// buildResponses/defaultErrorResponse). Returns r so calls can chain.
-func (r *RouteResponse) Description(s string) *RouteResponse {
-	r.description = s
+// buildResponses/defaultErrorResponse). Returns r so calls can chain. Takes
+// at least one word (word, words...) rather than a bare `...string`, same
+// reasoning as route.Route.Summary's own doc comment -- joined with a
+// single space so a long description can be split across multiple Go
+// string literals without manual concatenation.
+func (r *RouteResponse) Description(word string, words ...string) *RouteResponse {
+	r.description = strings.Join(append([]string{word}, words...), " ")
 	r.descriptionSet = true
 	return r
 }

@@ -142,9 +142,15 @@ func (r *Route) HasParam(name string) bool {
 }
 
 // Summary sets this Route's OpenAPI operation summary and returns r so calls
-// can chain.
-func (r *Route) Summary(s string) *Route {
-	r.summary = s
+// can chain. Takes at least one word (word, words...) rather than a bare
+// `...string` -- a zero-arg call would compile silently and set an empty
+// summary, indistinguishable from a caller mistake; requiring one argument
+// makes that state unreachable instead of guessing at it. Multiple words are
+// joined with a single space, letting a long summary split across several
+// Go string literals -- one per call-site line -- without manual "..." +
+// "..." concatenation.
+func (r *Route) Summary(word string, words ...string) *Route {
+	r.summary = strings.Join(append([]string{word}, words...), " ")
 	return r
 }
 
@@ -155,9 +161,10 @@ func (r *Route) SummaryText() string {
 }
 
 // Description sets this Route's OpenAPI operation description and returns r
-// so calls can chain.
-func (r *Route) Description(s string) *Route {
-	r.description = s
+// so calls can chain. See Summary's own doc comment for why this takes at
+// least one word (word, words...) instead of a bare `...string`.
+func (r *Route) Description(word string, words ...string) *Route {
+	r.description = strings.Join(append([]string{word}, words...), " ")
 	return r
 }
 

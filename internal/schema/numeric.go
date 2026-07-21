@@ -64,6 +64,30 @@ func (n *NumericSchema) MaxValue() (int, bool) {
 	return *n.max, true
 }
 
+// Enum restricts this field to the given allowed values and returns n so
+// calls can chain. Last-call-wins, no panic, same as every other branch
+// method (Min/Max) -- calling Enum a second time keeps only the latest list.
+// items is stored via a separate enumIntSet flag rather than a nil check
+// because a variadic call with zero arguments (`.Enum()`) produces a nil
+// slice in Go, indistinguishable from "never called" without that flag --
+// see EnumValues' own doc comment.
+func (n *NumericSchema) Enum(items ...int64) *NumericSchema {
+	n.enumInt = items
+	n.enumIntSet = true
+	return n
+}
+
+// EnumValues returns the allowed-value list set via Enum, and whether Enum
+// was ever called -- the bool return distinguishes "never called" from
+// "called with 0 items", same "never called" vs "called with 0" distinction
+// MinValue/MaxValue already establish for this family.
+func (n *NumericSchema) EnumValues() ([]int64, bool) {
+	if !n.enumIntSet {
+		return nil, false
+	}
+	return n.enumInt, true
+}
+
 // Required delegates to the embedded PropertyBuilder's own Required
 // (mutating the SHARED object), then returns n (not the embedded
 // PropertyBuilder) so Min/Max stay chainable afterward -- see this type's
@@ -85,8 +109,8 @@ func (n *NumericSchema) Nullable() *NumericSchema {
 // Description delegates to the embedded PropertyBuilder's own Description
 // (mutating the SHARED object), then returns n. See Required's doc comment
 // for why this manual re-declaration exists.
-func (n *NumericSchema) Description(d string) *NumericSchema {
-	n.PropertyBuilder.Description(d)
+func (n *NumericSchema) Description(word string, words ...string) *NumericSchema {
+	n.PropertyBuilder.Description(word, words...)
 	return n
 }
 

@@ -14,7 +14,10 @@
 // validation; those are Milestones 6-7, see spec.md's Out of Scope).
 package schema
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+)
 
 // Schema holds the whole-type description plus every field registered via
 // Property, for a single NewSchema[T] call (root package, out of scope
@@ -92,9 +95,15 @@ func (m *Schema) StructType() reflect.Type {
 
 // Description sets the whole-type description (the struct itself, not any
 // individual field -- see PropertyBuilder.Description for the field-level
-// equivalent) and returns m so calls can chain.
-func (m *Schema) Description(s string) *Schema {
-	m.description = s
+// equivalent) and returns m so calls can chain. Takes at least one word
+// (word, words...) rather than a bare `...string` -- a zero-arg call would
+// compile silently and set an empty description, indistinguishable from a
+// caller mistake; requiring one argument makes that state unreachable
+// instead of guessing at it. Multiple words are joined with a single space,
+// letting a long description split across several Go string literals --
+// one per call-site line -- without manual "..." + "..." concatenation.
+func (m *Schema) Description(word string, words ...string) *Schema {
+	m.description = strings.Join(append([]string{word}, words...), " ")
 	return m
 }
 
@@ -122,14 +131,15 @@ func (m *Schema) DescriptionText() string {
 // first's -- are genuinely ambiguous and INSIGHT.md never demonstrates
 // this case).
 func (m *Schema) Property(fieldPtr any) *PropertyBuilder {
-	fieldAddr := reflect.ValueOf(fieldPtr).Pointer()
+	ptrVal := reflect.ValueOf(fieldPtr)
+	fieldAddr := ptrVal.Pointer()
 	offset := fieldAddr - m.baseAddr
 
 	if _, exists := m.properties[offset]; exists {
 		panic("gonest: field already registered via Property")
 	}
 
-	field, ok := findFieldByOffset(m.structType, offset)
+	field, ok := findFieldByOffset(m.structType, offset, ptrVal.Type().Elem())
 	if !ok {
 		panic("gonest: Property(...) pointer does not belong to the type passed to NewSchema")
 	}
@@ -140,15 +150,69 @@ func (m *Schema) Property(fieldPtr any) *PropertyBuilder {
 }
 
 // findFieldByOffset searches t's own visible fields (reflect.VisibleFields,
-// which also flattens embedded fields) for the one whose Offset matches
-// offset.
-func findFieldByOffset(t reflect.Type, offset uintptr) (reflect.StructField, bool) {
+// which also flattens embedded fields, including through multiple levels of
+// embedding) for the one whose TRUE offset from t's own start matches
+// offset AND whose own Type matches want -- both are required to
+// disambiguate a real collision (see below), not just offset alone.
+//
+// BUGFIX 1 (found dogfooding .examples/full-text-search's entity.Person, a
+// struct embedding 5 mixins each with more than one field): f.Offset, as
+// reflect.VisibleFields reports it for a PROMOTED field (one reached
+// through embedding), is NOT cumulative from t -- it is the offset within
+// that field's OWN immediately-enclosing struct. For a field embedded at
+// depth 1 that happens to sit at offset 0 of its own sub-struct (e.g. the
+// first field of the first mixin), this coincidentally equals the real
+// offset from t, masking the bug -- but for any other promoted field (e.g.
+// the 2nd+ field of a mixin, or any field once a prior mixin has already
+// consumed some bytes) f.Offset silently does NOT match the real address
+// Property computes, so findFieldByOffset raced past it, dropped it
+// entirely, and Property panicked with "pointer does not belong to the
+// type" for a field that plainly DOES belong to it. Fixed by walking
+// f.Index (the embedding path VisibleFields already computed) and summing
+// each level's own field offset within ITS parent -- the only way to
+// recover the TRUE, cumulative offset from t.
+//
+// BUGFIX 2 (found immediately after BUGFIX 1, same dogfooding session):
+// offset alone is not always UNIQUE. reflect.VisibleFields lists BOTH an
+// anonymous embedded field itself (e.g. "Indexable", a struct-typed field)
+// AND that struct's own promoted leaf fields (e.g. "ID") as SEPARATE
+// entries -- when the leaf field is the FIRST field of its embedded struct,
+// its cumulative offset is IDENTICAL to the embedding field's own offset
+// (both start at the same address). Matching by offset alone silently
+// picked whichever of the two reflect.VisibleFields happened to list
+// first (empirically: the embedding field, e.g. "Indexable" instead of the
+// caller's actual target "ID"), so `s.Property(&t.ID).String()...` ended up
+// registering the WRONG StructField (name "Indexable", not "ID") --
+// wrong OpenAPI property name in generated docs, with no panic to signal
+// it. Fixed by additionally requiring f.Type == want (the caller's own
+// fieldPtr, dereferenced) -- "ID string" and "Indexable Indexable" have
+// different Types even at the identical offset, so this is a real,
+// non-heuristic disambiguator, not a tie-break guess.
+func findFieldByOffset(t reflect.Type, offset uintptr, want reflect.Type) (reflect.StructField, bool) {
 	for _, f := range reflect.VisibleFields(t) {
-		if f.Offset == offset {
+		if f.Type == want && cumulativeOffset(t, f.Index) == offset {
 			return f, true
 		}
 	}
 	return reflect.StructField{}, false
+}
+
+// cumulativeOffset walks index (a reflect.StructField.Index embedding path,
+// e.g. [4, 1] for "the 2nd field of the struct embedded at position 4")
+// starting from t, summing each level's own Offset within its immediate
+// parent -- recovering the field's TRUE offset from t itself, unlike a
+// promoted field's own raw StructField.Offset (see findFieldByOffset's doc
+// comment for why that raw value is insufficient beyond depth-1, offset-0
+// promoted fields).
+func cumulativeOffset(t reflect.Type, index []int) uintptr {
+	var total uintptr
+	cur := t
+	for _, i := range index {
+		sf := cur.Field(i)
+		total += sf.Offset
+		cur = sf.Type
+	}
+	return total
 }
 
 // OwnProperties returns a copy of every PropertyBuilder registered so far
@@ -213,6 +277,10 @@ type PropertyBuilder struct {
 	kind                 string           // OpenAPI "type": string/integer/number/boolean/array/object
 	min, max             *int             // String length / Numeric value / Array quantity
 	pattern              string           // String only
+	enumString           []string         // String's own Enum(...string) list
+	enumStringSet        bool             // whether Enum was ever called (distinct from "called with 0 items")
+	enumInt              []int64          // Numeric's own Enum(...int64) list
+	enumIntSet           bool             // whether Enum was ever called (distinct from "called with 0 items")
 	item                 *PropertyBuilder // Array's synthetic item builder
 	itemRef              *Schema          // Array's Object(ref)-as-item
 	ref                  *Schema          // Object's own Schema(ref)
@@ -270,9 +338,10 @@ func (p *PropertyBuilder) IsNullable() bool {
 
 // Description sets this field's own description (distinct from
 // Schema.Description, which sets the whole-type description) and returns
-// p so calls can chain.
-func (p *PropertyBuilder) Description(s string) *PropertyBuilder {
-	p.description = s
+// p so calls can chain. Takes at least one word (word, words...) for the
+// same reason as Schema.Description's own doc comment.
+func (p *PropertyBuilder) Description(word string, words ...string) *PropertyBuilder {
+	p.description = strings.Join(append([]string{word}, words...), " ")
 	return p
 }
 
@@ -583,6 +652,29 @@ func (p *PropertyBuilder) MaxValue() (int, bool) {
 // comment for why this lives on PropertyBuilder now.
 func (p *PropertyBuilder) PatternValue() string {
 	return p.pattern
+}
+
+// EnumStringValues returns the allowed-value list set via a String-family
+// branch's own Enum call, and whether Enum was ever called -- same "never
+// called" vs "called with 0 items" distinction as MinValue/MaxValue (a bool
+// flag rather than a nil check, since a variadic call with zero arguments
+// produces a nil slice indistinguishable from "never called" otherwise). See
+// MinValue's doc comment for why this lives on PropertyBuilder now.
+func (p *PropertyBuilder) EnumStringValues() ([]string, bool) {
+	if !p.enumStringSet {
+		return nil, false
+	}
+	return p.enumString, true
+}
+
+// EnumIntValues returns the allowed-value list set via a Numeric-family
+// branch's own Enum call, and whether Enum was ever called -- same "never
+// called" vs "called with 0 items" distinction as EnumStringValues.
+func (p *PropertyBuilder) EnumIntValues() ([]int64, bool) {
+	if !p.enumIntSet {
+		return nil, false
+	}
+	return p.enumInt, true
 }
 
 // ItemBuilder returns p's synthetic item *PropertyBuilder (set by Array),

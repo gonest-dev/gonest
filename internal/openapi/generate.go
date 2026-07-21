@@ -395,6 +395,9 @@ func schemaFor(p *schema.PropertyBuilder, doc *OpenAPI, visiting map[*schema.Sch
 		if pattern := p.PatternValue(); pattern != "" {
 			schema["pattern"] = pattern
 		}
+		if items, ok := p.EnumStringValues(); ok {
+			schema["enum"] = items
+		}
 		applyNullable(schema, p, true)
 
 	case "integer", "number":
@@ -407,6 +410,9 @@ func schemaFor(p *schema.PropertyBuilder, doc *OpenAPI, visiting map[*schema.Sch
 		}
 		if max, ok := p.MaxValue(); ok {
 			schema["maximum"] = max
+		}
+		if items, ok := p.EnumIntValues(); ok {
+			schema["enum"] = items
 		}
 		applyNullable(schema, p, true)
 

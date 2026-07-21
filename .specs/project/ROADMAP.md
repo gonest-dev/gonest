@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 19 (Config Loading) -- COMPLETE
-**Status:** Milestones 1-20 COMPLETE
+**Current Milestone:** 21 (Enum Branches) -- COMPLETE
+**Status:** Milestones 1-21 COMPLETE
 
 ---
 
@@ -410,6 +410,29 @@ verde, 25 pacotes, `.examples/lifecycle-hooks` demonstra o fluxo real)
 - Erro em qualquer hook aborta o restante da MESMA fase (bootstrap) ou da sequência INTEIRA de shutdown
   restante (destroy), sem swallow -- mesmo comportamento sequencial-await do Nest real
 - Ver `.specs/features/lifecycle-hooks/{spec,context,design,tasks}.md`, AD-044 em STATE.md
+
+---
+
+## Milestone 21: Enum Branches
+
+**Goal:** `StringSchema`/`NumericSchema` ganham `Enum(items ...T)`, chainable como `Min`/`Max`/`Pattern` --
+fecha um gap real encontrado dogfooding `.examples/full-text-search` (`search.FieldsSchemaFor[T]`
+precisou de um `Custom(fn)` pra validar "valor precisa ser um dos nomes de campo válidos" porque não
+existia mecanismo declarativo de enum).
+**Status:** COMPLETE (T1-T4 executados via subagentes Implementer/Evaluator (Planner = eu, tasks.md
+já granular o bastante), `go test ./... -race -count=1` verde, 24 pacotes core; `.examples/full-text-search`
+migrado e verificado ao vivo via curl -- ver AD-047 em STATE.md)
+
+### Features
+
+**Enum Branches** - COMPLETE
+- `StringSchema.Enum(items ...string)`, `NumericSchema.Enum(items ...int64)` -- por branch, não
+  `Enum(items ...any)` (perderia inferência de tipo no call site, rejeitado em brainstorming)
+- `internal/validate` rejeita valor fora da lista quando Enum setado, mesma postura "coleta toda
+  violação" do resto de `validatePrimitive`
+- `internal/openapi` emite `"enum": [...]` no schema gerado quando setado
+- `.examples/full-text-search`'s `search.FieldsSchemaFor` migra de `Custom(fn)` pro `Enum(...)` real
+- Ver `.specs/features/enum-branches/spec.md`
 
 ---
 

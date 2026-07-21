@@ -311,11 +311,11 @@ func validateValue(raw any, p *schema.PropertyBuilder, path string) []violation 
 // validatePrimitive checks raw's Go type (as decoded by encoding/json into
 // `any`: JSON strings -> string, JSON numbers -> float64, JSON booleans ->
 // bool) against what p.KindValue() expects, then applies
-// Min/Max/Pattern when the type matches. A type mismatch is recorded as a
-// SINGLE "wrong type" violation and stops there -- Min/Max/Pattern are not
-// attempted against a value of the wrong Go-level shape (design.md's Error
-// Handling Strategy: "does NOT attempt further format-specific checks on a
-// value of the wrong Go-level shape").
+// Min/Max/Pattern/Enum when the type matches. A type mismatch is recorded as
+// a SINGLE "wrong type" violation and stops there -- Min/Max/Pattern/Enum are
+// not attempted against a value of the wrong Go-level shape (design.md's
+// Error Handling Strategy: "does NOT attempt further format-specific checks
+// on a value of the wrong Go-level shape").
 //
 // SPEC_DEVIATION (design.md's own "your call how strict to be" note for
 // kind=="integer"): a JSON number with a non-zero fractional part (e.g.
@@ -358,6 +358,16 @@ func validatePrimitive(raw any, p *schema.PropertyBuilder, path string) []violat
 				violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must match pattern %s", pattern)})
 			}
 		}
+		// Enum() check runs LAST among string checks, same "collect
+		// everything, never short-circuit" convention as Min/Max/Pattern
+		// above -- a value can be simultaneously too short AND outside the
+		// allowed list, and both must surface. ok==false means Enum was
+		// never called on this property at all (PropertyBuilder's own
+		// "never called" vs "called with 0 items" distinction), which must
+		// NOT be mistaken for "empty allow-list, reject everything".
+		if allowed, ok := p.EnumStringValues(); ok && !stringSliceContains(allowed, s) {
+			violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must be one of %v", allowed)})
+		}
 		return violations
 
 	case "integer", "number":
@@ -375,6 +385,15 @@ func validatePrimitive(raw any, p *schema.PropertyBuilder, path string) []violat
 		if max, ok := p.MaxValue(); ok && f > float64(max) {
 			violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must be <= %d", max)})
 		}
+		// Enum() check against the []int64 allow-list -- f is still the raw
+		// float64 encoding/json decoded (this pipeline's established decode
+		// path, unchanged here), converted to int64 for the comparison since
+		// the non-integral case (kind=="integer") already returned above and
+		// kind=="number" enum members are also declared as int64 (NumericSchema
+		// has no separate float-enum branch).
+		if allowed, ok := p.EnumIntValues(); ok && !int64SliceContains(allowed, int64(f)) {
+			violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must be one of %v", allowed)})
+		}
 		return violations
 
 	case "boolean":
@@ -390,6 +409,30 @@ func validatePrimitive(raw any, p *schema.PropertyBuilder, path string) []violat
 		// never declared a shape for.
 		return nil
 	}
+}
+
+// stringSliceContains reports whether s appears in allowed -- shared linear-
+// scan helper for validatePrimitive's string Enum() check. Allow-lists are
+// dev-declared (Enum(...) call sites), not user input, so a small fixed list
+// scanned per request is not a perf concern worth a map here.
+func stringSliceContains(allowed []string, s string) bool {
+	for _, v := range allowed {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// int64SliceContains is stringSliceContains's counterpart for
+// validatePrimitive's integer/number Enum() check.
+func int64SliceContains(allowed []int64, n int64) bool {
+	for _, v := range allowed {
+		if v == n {
+			return true
+		}
+	}
+	return false
 }
 
 // validateArray type-asserts raw to []any, checks the ARRAY's own quantity

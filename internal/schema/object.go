@@ -75,8 +75,8 @@ func (om *ObjectSchema) Nullable() *ObjectSchema {
 // Description delegates to the embedded PropertyBuilder's own Description,
 // then returns om. See Required's doc comment for why this manual
 // re-declaration exists.
-func (om *ObjectSchema) Description(s string) *ObjectSchema {
-	om.PropertyBuilder.Description(s)
+func (om *ObjectSchema) Description(word string, words ...string) *ObjectSchema {
+	om.PropertyBuilder.Description(word, words...)
 	return om
 }
 

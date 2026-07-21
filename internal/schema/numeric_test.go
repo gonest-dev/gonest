@@ -109,6 +109,56 @@ func TestNumericSchema_MinMaxDefaultUnset(t *testing.T) {
 	}
 }
 
+// TestNumericSchema_EnumChainAndStoreCorrectly proves Enum stores its list
+// and returns the SAME *NumericSchema, exercised as part of a chain
+// alongside the other common constraints.
+func TestNumericSchema_EnumChainAndStoreCorrectly(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
+
+	nm := m.Property(&zero.Id).Integer()
+	got := nm.Required().Enum(1, 2, 3).Description("choice")
+
+	if got != nm {
+		t.Fatal("Required().Enum(...).Description(...) chain did not return the same *NumericSchema")
+	}
+
+	values, ok := nm.EnumValues()
+	if !ok || !reflect.DeepEqual(values, []int64{1, 2, 3}) {
+		t.Errorf("EnumValues() = (%v, %v), want ([1 2 3], true)", values, ok)
+	}
+}
+
+// TestNumericSchema_EnumDefaultUnset proves EnumValues reports (nil, false)
+// when Enum was never called, distinguishing "never set" from "set to 0
+// items" -- same distinction MinValue/MaxValue already establish.
+func TestNumericSchema_EnumDefaultUnset(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
+
+	nm := m.Property(&zero.Id).Integer()
+
+	if values, ok := nm.EnumValues(); ok || values != nil {
+		t.Errorf("EnumValues() = (%v, %v), want (nil, false) before Enum() was ever called", values, ok)
+	}
+}
+
+// TestNumericSchema_EnumCalledTwiceLastWins proves calling Enum a second
+// time on the same *NumericSchema keeps only the LAST list (last-call-wins,
+// no panic -- same convention every other branch method in this package
+// follows).
+func TestNumericSchema_EnumCalledTwiceLastWins(t *testing.T) {
+	zero, m := newNumericTestSchema(t)
+
+	nm := m.Property(&zero.Id).Integer()
+
+	nm.Enum(1, 2)
+	nm.Enum(3, 4, 5)
+
+	values, ok := nm.EnumValues()
+	if !ok || !reflect.DeepEqual(values, []int64{3, 4, 5}) {
+		t.Errorf("EnumValues() = (%v, %v), want ([3 4 5], true) after calling Enum twice", values, ok)
+	}
+}
+
 // TestNumericSchema_CommonConstraintsMutateSharedBuilderAndStayChainable is
 // the MOST CRITICAL test (per the task's own instructions): proves Required/
 // Nullable/Description/Examples called ON *NumericSchema (a) mutate the

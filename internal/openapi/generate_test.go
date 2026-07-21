@@ -309,6 +309,63 @@ func TestSchemaFor_Integer_MinMaxFormat(t *testing.T) {
 	}
 }
 
+type stringEnumBranchEntity struct {
+	Name string `json:"name"`
+}
+
+func TestSchemaFor_String_Enum(t *testing.T) {
+	var t1 stringEnumBranchEntity
+	base := reflect.ValueOf(&t1).Pointer()
+	m := schema.New(reflect.TypeOf(t1), base)
+	m.Property(&t1.Name).String().Enum("a", "b").Required()
+
+	doc := New("3.1.0", nil)
+	pb := m.OwnProperties()[0]
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
+
+	if enum, ok := schema["enum"].([]string); !ok || len(enum) != 2 || enum[0] != "a" || enum[1] != "b" {
+		t.Fatalf("enum = %v, want [a b]", schema["enum"])
+	}
+}
+
+type numericEnumBranchEntity struct {
+	Age int `json:"age"`
+}
+
+func TestSchemaFor_Integer_Enum(t *testing.T) {
+	var t1 numericEnumBranchEntity
+	base := reflect.ValueOf(&t1).Pointer()
+	m := schema.New(reflect.TypeOf(t1), base)
+	m.Property(&t1.Age).Integer().Enum(1, 2, 3)
+
+	doc := New("3.1.0", nil)
+	pb := m.OwnProperties()[0]
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
+
+	if enum, ok := schema["enum"].([]int64); !ok || len(enum) != 3 || enum[0] != 1 || enum[1] != 2 || enum[2] != 3 {
+		t.Fatalf("enum = %v, want [1 2 3]", schema["enum"])
+	}
+}
+
+type noEnumBranchEntity struct {
+	Name string `json:"name"`
+}
+
+func TestSchemaFor_NoEnum_KeyAbsent(t *testing.T) {
+	var t1 noEnumBranchEntity
+	base := reflect.ValueOf(&t1).Pointer()
+	m := schema.New(reflect.TypeOf(t1), base)
+	m.Property(&t1.Name).String().Required()
+
+	doc := New("3.1.0", nil)
+	pb := m.OwnProperties()[0]
+	schema := schemaFor(pb, doc, map[*schema.Schema]bool{})
+
+	if _, ok := schema["enum"]; ok {
+		t.Fatalf("enum key present but no Enum() was called: %v", schema["enum"])
+	}
+}
+
 type boolBranchEntity struct {
 	Active bool `json:"active"`
 }

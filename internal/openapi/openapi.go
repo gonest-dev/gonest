@@ -12,7 +12,11 @@
 // routes/Schema are separate ROADMAP features (spec.md's Out of Scope).
 package openapi
 
-import "gonest.dev/gonest/internal/schema"
+import (
+	"strings"
+
+	"gonest.dev/gonest/internal/schema"
+)
 
 // OpenAPI holds every document-level field INSIGHT.md's bootstrap
 // example sets. specVersion is the OpenAPI SPEC version passed to New (e.g.
@@ -84,9 +88,15 @@ func (b *OpenAPI) TitleText() string {
 }
 
 // Description sets the document's description and returns b so calls can
-// chain. Last-write-wins on repeat calls.
-func (b *OpenAPI) Description(s string) *OpenAPI {
-	b.description = s
+// chain. Last-write-wins on repeat calls. Takes at least one word (word,
+// words...) rather than a bare `...string` -- a zero-arg call would compile
+// silently and set an empty description, indistinguishable from a caller
+// mistake; requiring one argument makes that state unreachable instead of
+// guessing at it. Multiple words are joined with a single space, letting a
+// long description split across several Go string literals -- one per
+// call-site line -- without manual "..." + "..." concatenation.
+func (b *OpenAPI) Description(word string, words ...string) *OpenAPI {
+	b.description = strings.Join(append([]string{word}, words...), " ")
 	return b
 }
 

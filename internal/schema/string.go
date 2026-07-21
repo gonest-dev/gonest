@@ -85,6 +85,30 @@ func (s *StringSchema) PatternValue() string {
 	return s.pattern
 }
 
+// Enum restricts this field to the given allowed values and returns s so
+// calls can chain. Last-call-wins, no panic, same as every other branch
+// method (Min/Max/Pattern) -- calling Enum a second time keeps only the
+// latest list. items is stored via a separate enumStringSet flag rather than
+// a nil check because a variadic call with zero arguments (`.Enum()`)
+// produces a nil slice in Go, indistinguishable from "never called" without
+// that flag -- see EnumValues' own doc comment.
+func (s *StringSchema) Enum(items ...string) *StringSchema {
+	s.enumString = items
+	s.enumStringSet = true
+	return s
+}
+
+// EnumValues returns the allowed-value list set via Enum, and whether Enum
+// was ever called -- the bool return distinguishes "never called" from
+// "called with 0 items", same "never called" vs "called with 0" distinction
+// MinValue/MaxValue already establish for this family.
+func (s *StringSchema) EnumValues() ([]string, bool) {
+	if !s.enumStringSet {
+		return nil, false
+	}
+	return s.enumString, true
+}
+
 // Required delegates to the embedded PropertyBuilder's own Required
 // (mutating the SHARED object), then returns s (not the embedded
 // PropertyBuilder) so Min/Max/Pattern stay chainable afterward -- see this
@@ -106,8 +130,8 @@ func (s *StringSchema) Nullable() *StringSchema {
 // Description delegates to the embedded PropertyBuilder's own Description
 // (mutating the SHARED object), then returns s. See Required's doc comment
 // for why this manual re-declaration exists.
-func (s *StringSchema) Description(d string) *StringSchema {
-	s.PropertyBuilder.Description(d)
+func (s *StringSchema) Description(word string, words ...string) *StringSchema {
+	s.PropertyBuilder.Description(word, words...)
 	return s
 }
 
