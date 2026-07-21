@@ -2,7 +2,6 @@ package person
 
 import (
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -79,10 +78,9 @@ func (s *Service) Search(q QueryDTO) *search.Result[*entity.Person] {
 
 	if q.Text.IsDirty() {
 		if v := q.Text.Get(); v != nil && *v != "" {
-			needle := strings.ToLower(*v)
 			filtered := items[:0]
 			for _, p := range items {
-				if strings.Contains(strings.ToLower(p.Name.Get()), needle) {
+				if search.LikeMatch(p.Name.Get(), *v) {
 					filtered = append(filtered, p)
 				}
 			}
@@ -190,3 +188,7 @@ func paginationBounds(offsetAcc, limitAcc gonest.Accessor[*int64], total int64) 
 	}
 	return offset, limit
 }
+
+var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
+	provider.Constructor(func() *Service { return &Service{} })
+})

@@ -2,11 +2,31 @@ package search
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
 	"gonest.dev/gonest"
 )
+
+// LikeMatch reports whether pattern is found anywhere in value,
+// case-insensitively -- SQL `LIKE '%pattern%'`/JS
+// `new RegExp(pattern, "i").test(value)` semantics, backed by Go's real
+// regexp package rather than a hand-rolled strings.ToLower+Contains (which
+// MatchString's own LIKE/NLIKE operators used to do, case-SENSITIVELY,
+// inconsistent with query.text's separate manual-lowercase search -- both
+// now share this one implementation). pattern is regexp.QuoteMeta'd before
+// compiling so a filter value containing regex metacharacters (e.g. `a.b`,
+// `(x)`) is matched LITERALLY, not interpreted as regex syntax -- compiling
+// raw, unescaped user input as a live pattern is both a correctness footgun
+// (accidental metacharacters change what matches) and a ReDoS-shaped one
+// (a crafted pattern can make matching pathologically slow); QuoteMeta
+// closes both, and (since it escapes every character regexp.Compile could
+// ever reject) MustCompile here can never actually panic.
+func LikeMatch(value, pattern string) bool {
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(pattern))
+	return re.MatchString(value)
+}
 
 // #region OperatorMatchString
 
@@ -172,11 +192,11 @@ func (m *MatchString[T]) Match(value *T) bool {
 				return false
 			}
 		case OperatorMatchStringLIKE:
-			if !strings.Contains(string(v), string(target.Get())) {
+			if !LikeMatch(string(v), string(target.Get())) {
 				return false
 			}
 		case OperatorMatchStringNLIKE:
-			if strings.Contains(string(v), string(target.Get())) {
+			if LikeMatch(string(v), string(target.Get())) {
 				return false
 			}
 		}

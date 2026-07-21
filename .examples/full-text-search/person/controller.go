@@ -35,8 +35,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.RoutePost("/_search", func(r *gonest.Route) {
 		r.Summary("Search person entity using query")
 		r.Description(
-			"Generic query endpoint, modeled after github.com/leandroluk's Search.ts gist --",
-			"exercises gonest.Schema nested Object()/Array() refs, Enum-constrained Fields.Select/Remove",
+			"Generic query endpoint, modeled as deep, agnostic and generic query structure using",
+			"gonest.Schema nested Object()/Array() refs, Enum-constrained Fields.Select/Remove",
 			"and Sort.Field, and Accessor dirty-tracking on both write DTOs and the Where filter.")
 		r.RequestBody(QueryDTOSchema)
 		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(resultSchema) })
