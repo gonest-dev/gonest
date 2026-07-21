@@ -35,7 +35,7 @@ func TestWSProtocolAndSSEDistinct_SameSubscription_BothReceiveSameEmittedEvent(t
 
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onOrderCreated", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				ch := emitter.Subscribe[orderCreatedEvent](em, ctx.Done())
 				for ev := range ch {
 					emit(map[string]any{"orderId": ev.OrderId})

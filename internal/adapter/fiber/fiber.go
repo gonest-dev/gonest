@@ -34,11 +34,11 @@ import (
 // TCP connection.
 const wsCloseWriteWait = 5 * time.Second
 
-// FiberApp wraps a real *fiber.App and satisfies the minimal httpAdapter
+// App wraps a real *fiber.App and satisfies the minimal httpAdapter
 // contract NewApp[T] (future T8) needs: RegisterRoute and Listen. Kept as a
-// single unexported field, per design.md's Data Models -- FiberApp itself
+// single unexported field, per design.md's Data Models -- App itself
 // has no other state, it is purely a translation layer.
-type FiberApp struct {
+type App struct {
 	app *fiber.App
 }
 
@@ -50,17 +50,15 @@ type FiberApp struct {
 // instead. See coreapp.RegisterTestAdapter's own doc comment for the full
 // reasoning.
 func init() {
-	coreapp.RegisterTestAdapter(func() coreapp.HttpAdapter {
-		return &FiberApp{}
-	})
+	coreapp.RegisterTestAdapter(func() coreapp.HttpAdapter { return &App{} })
 }
 
 // New builds a FiberApp around a freshly constructed *fiber.App with default
 // config (equivalent to Init(coreapp.Options{})). Exported (rather than
 // requiring callers to reach into Fiber themselves) so T8's NewApp[T] can
 // construct one via reflection/generics without importing Fiber itself.
-func New() *FiberApp {
-	f := &FiberApp{}
+func New() *App {
+	f := &App{}
 	f.Init(coreapp.Options{})
 	return f
 }
@@ -88,7 +86,7 @@ func New() *FiberApp {
 // Form Streaming feature, AD-022 in STATE.md). fiber.Config is immutable
 // once fiber.New() returns, so this MUST happen here, at construction time
 // -- there is no later hook to flip it on.
-func (f *FiberApp) Init(opts coreapp.Options) {
+func (f *App) Init(opts coreapp.Options) {
 	if f.app == nil {
 		f.app = fiber.New(fiber.Config{
 			StreamRequestBody:            opts.EnableFormStreaming,
@@ -102,7 +100,7 @@ func (f *FiberApp) Init(opts coreapp.Options) {
 // own no-port-required test helper -- see TESTING.md) and for T8, which
 // needs to call Listen indirectly via the httpAdapter contract but may need
 // the raw app for anything the minimal contract doesn't cover yet.
-func (f *FiberApp) FiberApp() *fiber.App {
+func (f *App) FiberApp() *fiber.App {
 	return f.app
 }
 
@@ -173,7 +171,7 @@ func fiberMethod(method route.HttpMethod) string {
 // last-resort, best-effort write for a case where we deliberately know
 // nothing about the panic value and must not risk it leaking into the
 // response -- it never crashes the process and leaks no internal detail.
-func (f *FiberApp) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
+func (f *App) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
 	wrapped := func(c fiber.Ctx) error {
 		req, res := execution.New(&fiberResponder{c: c})
 
@@ -262,7 +260,7 @@ func (w *fiberWSConn) Query(name string) string {
 // Decisions table). onListen being nil means "no hook wanted": Fiber's own
 // Hooks().OnListen never gets called, so nothing is registered and no
 // nil-func-call panic risk exists.
-func (f *FiberApp) Listen(addr string, onListen func()) error {
+func (f *App) Listen(addr string, onListen func()) error {
 	if onListen != nil {
 		f.app.Hooks().OnListen(func(fiber.ListenData) error {
 			onListen()
@@ -288,7 +286,7 @@ func (f *FiberApp) Listen(addr string, onListen func()) error {
 // contract; the returned error is Fiber's own, unchanged (e.g. Fiber's
 // ErrNotRunning if Shutdown is called before any Listen ever bound a
 // listener).
-func (f *FiberApp) Shutdown(ctx context.Context) error {
+func (f *App) Shutdown(ctx context.Context) error {
 	return f.app.ShutdownWithContext(ctx)
 }
 
@@ -298,7 +296,7 @@ func (f *FiberApp) Shutdown(ctx context.Context) error {
 // Every test in this codebase already reaches this same underlying Fiber
 // method directly (via FiberApp() above); this is simply the generic,
 // HttpAdapter-interface-level path to it.
-func (f *FiberApp) Test(req *http.Request) (*http.Response, error) {
+func (f *App) Test(req *http.Request) (*http.Response, error) {
 	return f.app.Test(req)
 }
 

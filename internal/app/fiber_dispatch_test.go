@@ -263,7 +263,7 @@ func buildPipelineOrderingApp(t *testing.T, order *[]string, guardAllows, withFi
 
 // TestNewApp_FiberApp_RealEndToEndWiring proves the generic wiring truly
 // works with the real fiber.FiberApp adapter (not just the fake spy
-// above): coreapp.NewApp[fiber.FiberApp] constructs a genuinely usable FiberApp
+// above): coreapp.NewApp[fiber.App] constructs a genuinely usable FiberApp
 // (Init sets a non-nil *fiber.App, see internal/adapter/fiber/fiber.go),
 // registers a real route on it, and dispatches a real HTTP request through
 // Fiber's own app.Test -- proving reflect.New(...).Interface() + Init()
@@ -283,7 +283,7 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 		m.Controllers(pingController)
 	})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
@@ -291,7 +291,7 @@ func TestNewApp_FiberApp_RealEndToEndWiring(t *testing.T) {
 		t.Fatalf("coreapp.NewApp() returned nil *coreapp.App")
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -339,7 +339,7 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 
-		userService := inject.MustInject[*UserService](c)
+		userService := inject.Must[*UserService](c)
 
 		// QUERY /user/ -- List. INSIGHT.md uses gonest.HttpQuery for the
 		// list route; route.HttpQuery maps to fiber's "QUERY" method
@@ -423,12 +423,12 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 		m.Imports(userModule)
 	})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -593,12 +593,12 @@ func TestNewApp_UserControllerEndToEnd_AllFiveRoutesRespond(t *testing.T) {
 func TestMustListen_RealFiberApp_IntegrationSmoke(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -665,7 +665,7 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 
-		userService := inject.MustInject[*UserService](c)
+		userService := inject.Must[*UserService](c)
 
 		c.Route(route.HttpGet, "/:user_id", func(r *route.Route) {
 			r.HttpCode(200)
@@ -706,12 +706,12 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 		m.Imports(userModule)
 	})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -799,13 +799,13 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 // dispatchTestApp is a small shared helper: builds a *fiber.FiberApp
 // backed *coreapp.App from root, fails the test on any bootstrap error, and returns
 // the underlying *fiber.App ready for app.Test(req) dispatch.
-func dispatchTestApp(t *testing.T, root *module.Module) *fiber.FiberApp {
+func dispatchTestApp(t *testing.T, root *module.Module) *fiber.App {
 	t.Helper()
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -2397,7 +2397,7 @@ func TestNewApp_GraphqlQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 	userResolver := graphql.New(func(r *graphql.Resolver) {
 		r.Query("user", func(q *graphql.Query) {
 			q.Returns(userSchema)
-			q.Handler(func(ctx *graphql.GraphqlContext) any {
+			q.Handler(func(ctx *graphql.Context) any {
 				return map[string]any{"id": int64(1), "email": "john@example.com"}
 			})
 		})
@@ -2407,12 +2407,12 @@ func TestNewApp_GraphqlQuery_RealHTTPDispatch_HappyPath(t *testing.T) {
 		m.Resolvers(userResolver)
 	})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
 
-	fiberAdapter := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter := app.Adapter().(*fiber.App)
 
 	body, _ := json.Marshal(map[string]any{
 		"query": `{ user { id email } }`,
@@ -2463,7 +2463,7 @@ func TestNewApp_GraphqlMutation_InvalidArgs_ProducesGraphqlError(t *testing.T) {
 	userResolver := graphql.New(func(r *graphql.Resolver) {
 		r.Mutation("createUser", func(m *graphql.Mutation) {
 			m.Args(argsSchema)
-			m.Handler(func(ctx *graphql.GraphqlContext) any {
+			m.Handler(func(ctx *graphql.Context) any {
 				var args createUserArgs
 				if err := ctx.Args().ParseInto(&args, argsSchema); err != nil {
 					panic(err)
@@ -2477,12 +2477,12 @@ func TestNewApp_GraphqlMutation_InvalidArgs_ProducesGraphqlError(t *testing.T) {
 		m.Resolvers(userResolver)
 	})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
 
-	fiberAdapter := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter := app.Adapter().(*fiber.App)
 
 	body, _ := json.Marshal(map[string]any{
 		"query":     `mutation($email: String!) { createUser(email: $email) }`,
@@ -2511,7 +2511,7 @@ func TestNewApp_GraphqlMutation_InvalidArgs_ProducesGraphqlError(t *testing.T) {
 func TestNewApp_GraphqlPath_OverriddenViaAppOptions(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("ping", func(q *graphql.Query) {
-			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+			q.Handler(func(ctx *graphql.Context) any { return "pong" })
 		})
 	})
 
@@ -2519,11 +2519,11 @@ func TestNewApp_GraphqlPath_OverriddenViaAppOptions(t *testing.T) {
 		m.Resolvers(res)
 	})
 
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{GraphqlPath: "/api/gql"})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{GraphqlPath: "/api/gql"})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
-	fiberAdapter := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter := app.Adapter().(*fiber.App)
 
 	body, _ := json.Marshal(map[string]any{"query": `{ ping }`})
 
@@ -2574,13 +2574,13 @@ func newPingOnlyApp(t *testing.T) *coreapp.App {
 	t.Helper()
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("ping", func(q *graphql.Query) {
-			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+			q.Handler(func(ctx *graphql.Context) any { return "pong" })
 		})
 	})
 	root := module.New(func(m *module.Module) {
 		m.Resolvers(res)
 	})
-	app, err := coreapp.NewApp[fiber.FiberApp](root, coreapp.Options{})
+	app, err := coreapp.New[fiber.App](root, coreapp.Options{})
 	if err != nil {
 		t.Fatalf("coreapp.NewApp() error = %v", err)
 	}
@@ -2611,7 +2611,7 @@ func listenOnEphemeralPort(t *testing.T, app *coreapp.App) (addr string) {
 		listenErrCh <- app.Listen(addr, func() { close(fired) })
 	}()
 
-	fiberAdapter := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter := app.Adapter().(*fiber.App)
 	t.Cleanup(func() {
 		// ShutdownWithTimeout, not Shutdown: a graceful Shutdown() waits for
 		// every still-open connection to close on its own -- an abandoned

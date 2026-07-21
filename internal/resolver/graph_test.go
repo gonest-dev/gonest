@@ -57,7 +57,7 @@ func TestBuildGraph_SingleDependencyEdge(t *testing.T) {
 
 	// Simulate Stage 2: A's builder fn calls MustInject[*graphBService],
 	// recording a pending edge {owner: a, targetType: *graphBService}.
-	inject.MustInject[*graphBService](a)
+	inject.Must[*graphBService](a)
 
 	graph := BuildGraph()
 
@@ -83,7 +83,7 @@ func TestBuildGraph_ExcludesControllerOwnedEdges(t *testing.T) {
 	// A Controller's MustInject call must NOT become a graph node/edge --
 	// controllers are never a dependency-graph key (design.md: "Controller
 	// não entra no grafo de resolução").
-	inject.MustInject[*controllerOnlyService](ctrl)
+	inject.Must[*controllerOnlyService](ctrl)
 
 	graph := BuildGraph()
 

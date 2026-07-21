@@ -41,7 +41,7 @@ func TestMustInject_DirectResolver_Pointer_Found(t *testing.T) {
 	real := &fakeService{Name: "real"}
 	owner := &fakeDirectOwner{single: reflect.ValueOf(real), singleOK: true}
 
-	got := MustInject[*fakeService](owner)
+	got := Must[*fakeService](owner)
 	if got != real {
 		t.Fatalf("MustInject() = %v, want %v", got, real)
 	}
@@ -59,13 +59,13 @@ func TestMustInject_DirectResolver_Pointer_NotFound_Panics(t *testing.T) {
 			t.Fatalf("panic message = %q, missing expected substring", r)
 		}
 	}()
-	MustInject[*fakeService](owner)
+	Must[*fakeService](owner)
 }
 
 func TestMustInject_DirectResolver_Interface_SingleMatch_Resolves(t *testing.T) {
 	owner := &fakeDirectOwner{all: []reflect.Value{reflect.ValueOf(directImpl{name: "x"})}}
 
-	got := MustInject[directIface](owner)
+	got := Must[directIface](owner)
 	if got.Name() != "x" {
 		t.Fatalf("MustInject() = %v, want Name()==x", got)
 	}
@@ -83,7 +83,7 @@ func TestMustInject_DirectResolver_Interface_ZeroMatches_Panics(t *testing.T) {
 			t.Fatalf("panic message = %q, missing expected substring", r)
 		}
 	}()
-	MustInject[directIface](owner)
+	Must[directIface](owner)
 }
 
 func TestMustInject_DirectResolver_Interface_TwoMatches_PanicsAmbiguous(t *testing.T) {
@@ -102,7 +102,7 @@ func TestMustInject_DirectResolver_Interface_TwoMatches_PanicsAmbiguous(t *testi
 			t.Fatalf("panic message = %q, missing expected substrings", msg)
 		}
 	}()
-	MustInject[directIface](owner)
+	Must[directIface](owner)
 }
 
 func TestMustInjectAll_DirectResolver_ReturnsAllMatches(t *testing.T) {
@@ -111,7 +111,7 @@ func TestMustInjectAll_DirectResolver_ReturnsAllMatches(t *testing.T) {
 		reflect.ValueOf(directImpl{name: "b"}),
 	}}
 
-	got := MustInjectAll[directIface](owner)
+	got := MustAll[directIface](owner)
 	if len(got) != 2 {
 		t.Fatalf("MustInjectAll() len = %d, want 2", len(got))
 	}
@@ -123,7 +123,7 @@ func TestMustInjectAll_DirectResolver_ReturnsAllMatches(t *testing.T) {
 func TestMustInjectAll_DirectResolver_ZeroMatches_ReturnsEmptyNotPanic(t *testing.T) {
 	owner := &fakeDirectOwner{all: nil}
 
-	got := MustInjectAll[directIface](owner)
+	got := MustAll[directIface](owner)
 	if len(got) != 0 {
 		t.Fatalf("MustInjectAll() len = %d, want 0", len(got))
 	}
@@ -141,7 +141,7 @@ func TestMustInjectAll_PointerType_Panics(t *testing.T) {
 			t.Fatalf("panic message = %q, missing expected substring", r)
 		}
 	}()
-	MustInjectAll[*fakeService](owner)
+	MustAll[*fakeService](owner)
 }
 
 func TestMustInjectAll_FromProviderOwner_Panics(t *testing.T) {
@@ -156,5 +156,5 @@ func TestMustInjectAll_FromProviderOwner_Panics(t *testing.T) {
 			t.Fatalf("panic message = %q, missing expected substring", r)
 		}
 	}()
-	MustInjectAll[directIface](owner)
+	MustAll[directIface](owner)
 }

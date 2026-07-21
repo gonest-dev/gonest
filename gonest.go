@@ -51,7 +51,9 @@ type Module = module.Module
 
 // NewModule creates a Module that defers fn until Stage 1 assembly runs
 // during bootstrap.
-var NewModule = module.New
+func NewModule(fn func(*Module)) *Module {
+	return module.New(fn)
+}
 
 // Provider represents one resolvable type in the DI graph: it holds the
 // Scope, Constructor, and (after bootstrap) the resolved instance.
@@ -59,7 +61,9 @@ type Provider = provider.Provider
 
 // NewProvider creates a Provider that defers fn until Stage 2 builder
 // execution runs during bootstrap.
-var NewProvider = provider.New
+func NewProvider(fn func(*Provider)) *Provider {
+	return provider.New(fn)
+}
 
 // Scope defines the lifetime of a provider instance within the DI container.
 type Scope = scope.Scope
@@ -185,7 +189,9 @@ type Controller = controller.Controller
 
 // NewController creates a Controller that defers fn until bootstrap runs
 // it.
-var NewController = controller.New
+func NewController(fn func(*Controller)) *Controller {
+	return controller.New(fn)
+}
 
 // MustInject declares a dependency on type T from owner's builder fn --
 // used inside a Provider's, Controller's, Middleware's, Guard's,
@@ -206,7 +212,7 @@ var NewController = controller.New
 // re-export a generic function via var, so this is a real wrapper calling
 // the internal one.
 func MustInject[T any](owner any) T {
-	return inject.MustInject[T](owner)
+	return inject.Must[T](owner)
 }
 
 // MustInjectAll returns every provider whose resolved concrete type
@@ -219,7 +225,7 @@ func MustInject[T any](owner any) T {
 // to-Provider dependencies stay single-value via MustInject). Returns an
 // empty slice, never panics, if zero providers match.
 func MustInjectAll[T any](owner any) []T {
-	return inject.MustInjectAll[T](owner)
+	return inject.MustAll[T](owner)
 }
 
 // ---------------------------------------------------------------------------
@@ -243,29 +249,29 @@ type HttpAdapter = app.HttpAdapter
 // Deferred Ideas): no feature before this had added the root re-export,
 // even though it was already used as a literal call-site example
 // throughout INSIGHT.md.
-type FiberApp = fiber.FiberApp
+type FiberApp = fiber.App
 
 // AppOptions is Nest-parity bootstrap config for NewApp/MustNewApp
 // (BufferLogs, LogLevels). See internal/app.Options's doc comment for the
 // full contract.
 type AppOptions = app.Options
 
-// LogLevel identifies one of Nest's 5 standard log severities. See
-// internal/app.LogLevel's doc comment for the full contract (iota-based
+// LoggerLevel identifies one of Nest's 5 standard log severities. See
+// internal/app.LoggerLevel's doc comment for the full contract (iota-based
 // const block plus a debug-friendly String()).
-type LogLevel = app.LogLevel
+type LoggerLevel = logger.Level
 
 const (
-	// LogLevelError is the most severe level -- unrecoverable failures.
-	LogLevelError = app.LogLevelError
-	// LogLevelWarn signals a recoverable but noteworthy condition.
-	LogLevelWarn = app.LogLevelWarn
-	// LogLevelLog is Nest's default, general-purpose informational level.
-	LogLevelLog = app.LogLevelLog
-	// LogLevelDebug carries diagnostic detail useful during development.
-	LogLevelDebug = app.LogLevelDebug
-	// LogLevelVerbose is the most granular, chattiest level.
-	LogLevelVerbose = app.LogLevelVerbose
+	// LoggerLevelError is the most severe level -- unrecoverable failures.
+	LoggerLevelError = logger.LevelError
+	// LoggerLevelWarn signals a recoverable but noteworthy condition.
+	LoggerLevelWarn = logger.LevelWarn
+	// LoggerLevelLog is Nest's default, general-purpose informational level.
+	LoggerLevelLog = logger.LevelLog
+	// LoggerLevelDebug carries diagnostic detail useful during development.
+	LoggerLevelDebug = logger.LevelDebug
+	// LoggerLevelVerbose is the most granular, chattiest level.
+	LoggerLevelVerbose = logger.LevelVerbose
 )
 
 // OnListen is the "bind succeeded" callback shape passed to App.MustListen.
@@ -292,7 +298,7 @@ func NewApp[T any, PT interface {
 	*T
 	HttpAdapter
 }](root *Module, opts ...AppOptions) (*App, error) {
-	return app.NewApp[T, PT](root, opts...)
+	return app.New[T, PT](root, opts...)
 }
 
 // MustNewApp calls NewApp and panics if it returns an error.
@@ -315,8 +321,8 @@ type TestBuilder = app.TestBuilder
 // module tree NewApp produces, minus a real bound network port. Usable
 // directly with MustInject[T](tester) for unit-style tests (module-scoped,
 // override-aware, same as a Controller's own MustInject). See
-// internal/app.TestApp's own doc comment.
-type TestApp = app.TestApp
+// internal/app.Test's own doc comment.
+type TestApp = app.Test
 
 // MustOverride registers mockValue as the substitute for any Provider whose
 // resolved type exactly matches T (pointer override) or is implemented by
@@ -365,11 +371,13 @@ type HttpException = exception.HttpException
 // literal via the chainable SetStatus/SetName/SetMessage/SetDetails
 // methods, e.g.
 // `HttpException: gonest.NewHttpException().SetStatus(http.StatusConflict).SetName("DuplicateEmailException")`.
-// Unlike NewApp elsewhere in this package, NewHttpException is not
-// generic, so Go allows aliasing the plain func directly via var -- no
-// wrapper function is needed. See internal/exception.NewHttpException's doc
-// comment for the full contract.
-var NewHttpException = exception.NewHttpException
+// Wrapped (not var-aliased) so autocomplete/hover shows the root
+// HttpException alias in the return type instead of internal/exception's
+// own. See internal/exception.NewHttpException's doc comment for the full
+// contract.
+func NewHttpException() HttpException {
+	return exception.NewHttpException()
+}
 
 // ExceptionName returns exc.Name() if non-empty, otherwise a reflect-based
 // default derived from exc's own concrete type (e.g. a dev-defined
@@ -378,7 +386,9 @@ var NewHttpException = exception.NewHttpException
 // exposed here so a dev-defined Filter can apply the same fallback. See
 // internal/exception.EffectiveName's doc comment for why this can't live
 // inside HttpException.Name()/MarshalJSON() itself.
-var ExceptionName = exception.EffectiveName
+func ExceptionName(exc Exception) string {
+	return exception.EffectiveName(exc)
+}
 
 // NotFoundException is the framework's built-in exception for a missing
 // resource.
@@ -388,7 +398,9 @@ type NotFoundException = exception.NotFoundException
 // http.StatusNotFound with name "NotFoundException". See
 // internal/exception.NewNotFoundException's doc comment for the
 // pointer-return and empty-message rationale.
-var NewNotFoundException = exception.NewNotFoundException
+func NewNotFoundException(details any) *NotFoundException {
+	return exception.NewNotFoundException(details)
+}
 
 // BadRequestException is the framework's built-in exception for a malformed
 // or invalid request.
@@ -398,7 +410,9 @@ type BadRequestException = exception.BadRequestException
 // http.StatusBadRequest with name "BadRequestException". See
 // internal/exception.NewBadRequestException's doc comment for the
 // pointer-return and empty-message rationale.
-var NewBadRequestException = exception.NewBadRequestException
+func NewBadRequestException(details any) *BadRequestException {
+	return exception.NewBadRequestException(details)
+}
 
 // ConflictException is the framework's built-in exception for a request
 // that conflicts with the current state of a resource.
@@ -408,7 +422,9 @@ type ConflictException = exception.ConflictException
 // http.StatusConflict with name "ConflictException". See
 // internal/exception.NewConflictException's doc comment for the
 // pointer-return and empty-message rationale.
-var NewConflictException = exception.NewConflictException
+func NewConflictException(details any) *ConflictException {
+	return exception.NewConflictException(details)
+}
 
 // UnauthorizedException is the framework's built-in exception for a missing
 // or invalid authentication credential.
@@ -418,7 +434,9 @@ type UnauthorizedException = exception.UnauthorizedException
 // http.StatusUnauthorized with name "UnauthorizedException". See
 // internal/exception.NewUnauthorizedException's doc comment for the
 // pointer-return and empty-message rationale.
-var NewUnauthorizedException = exception.NewUnauthorizedException
+func NewUnauthorizedException(details any) *UnauthorizedException {
+	return exception.NewUnauthorizedException(details)
+}
 
 // ForbiddenException is the framework's built-in exception for a request
 // that is authenticated but not permitted.
@@ -428,7 +446,9 @@ type ForbiddenException = exception.ForbiddenException
 // http.StatusForbidden with name "ForbiddenException". See
 // internal/exception.NewForbiddenException's doc comment for the
 // pointer-return and empty-message rationale.
-var NewForbiddenException = exception.NewForbiddenException
+func NewForbiddenException(details any) *ForbiddenException {
+	return exception.NewForbiddenException(details)
+}
 
 // ---------------------------------------------------------------------------
 // Middleware (Middleware feature)
@@ -457,7 +477,9 @@ type Next = middleware.Next
 // no wrapper function is needed (root package is the only public door
 // since Go blocks external import of internal/*, per AD-004 in STATE.md).
 // See internal/middleware.New's doc comment for the full contract.
-var NewMiddleware = middleware.New
+func NewMiddleware(fn func(*Middleware)) *Middleware {
+	return middleware.New(fn)
+}
 
 // NewLoggerMiddleware creates a ready-made Middleware that logs one line per
 // request -- method, path, response status and duration -- once the rest of
@@ -546,7 +568,9 @@ type Guard = guard.Guard
 // package is the only public door since Go blocks external import of
 // internal/*, per AD-004 in STATE.md). See internal/guard.New's doc
 // comment for the full contract.
-var NewGuard = guard.New
+func NewGuard(fn func(*Guard)) *Guard {
+	return guard.New(fn)
+}
 
 // ---------------------------------------------------------------------------
 // Interceptor (Interceptor feature)
@@ -570,7 +594,9 @@ type Interceptor = interceptor.Interceptor
 // is needed (root package is the only public door since Go blocks
 // external import of internal/*, per AD-004 in STATE.md). See
 // internal/interceptor.New's doc comment for the full contract.
-var NewInterceptor = interceptor.New
+func NewInterceptor(fn func(*Interceptor)) *Interceptor {
+	return interceptor.New(fn)
+}
 
 // InterceptorNext is interceptor.Next's own root alias -- a package-own
 // type (NOT gonest.Next/middleware.Next, even though both share the
@@ -604,7 +630,9 @@ type Filter = filter.Filter
 // STATE.md for why this section lives in this consolidated file rather
 // than a separate filter.go). See internal/filter.New's doc comment for
 // the full contract.
-var NewFilter = filter.New
+func NewFilter(fn func(*Filter)) *Filter {
+	return filter.New(fn)
+}
 
 // ---------------------------------------------------------------------------
 // Schema (Schema Registration Core feature)
@@ -857,7 +885,7 @@ type FormFile = execution.FormFile
 // (a nil *T has nowhere for ParseInto to write into).
 func Parse[T any](src Parseable, m *Schema) (T, error) {
 	var zero T
-	if t := reflect.TypeOf(&zero).Elem(); t.Kind() == reflect.Pointer {
+	if t := reflect.TypeFor[T](); t.Kind() == reflect.Pointer {
 		ptr := reflect.New(t.Elem())
 		if err := src.ParseInto(ptr.Interface(), m); err != nil {
 			return zero, err
@@ -903,7 +931,9 @@ type OpenAPI = openapi.OpenAPI
 // is needed (same precedent as NewHttpException/NewMiddleware/NewGuard, see
 // AD-004 in STATE.md). See internal/openapi.New's doc comment for the full
 // contract.
-var NewOpenAPI = openapi.New
+func NewOpenAPI(specVersion string, fn func(*OpenAPI)) *OpenAPI {
+	return openapi.New(specVersion, fn)
+}
 
 // Route holds one HTTP method+path registration (see Controller.Route)
 // plus the documentation builder methods a caller uses to describe it for
@@ -927,7 +957,7 @@ type Route = route.Route
 // for the write-side of the (req, res) HTTP pair.
 type RouteResponse = route.RouteResponse
 
-// GenerateOpenApiSchema walks app's assembled module tree (via app.Root(),
+// OpenapiGenerate walks app's assembled module tree (via app.Root(),
 // recursing into every imported module -- see internal/app.App.Root's doc
 // comment) and populates doc's paths/components.schemas from every
 // registered Controller/Route's documentation (Controller.Tags/BearerAuth,
@@ -945,7 +975,7 @@ type RouteResponse = route.RouteResponse
 // forwards app.Root() to internal/openapi.Generate. See
 // internal/openapi.Generate's doc comment for the full walking/dedup
 // contract.
-func GenerateOpenApiSchema(app *App, doc *OpenAPI) {
+func OpenapiGenerate(app *App, doc *OpenAPI) {
 	openapi.Generate(doc, app.Root())
 }
 
@@ -1031,8 +1061,12 @@ func Subscribe[EventType any](e *Emitter, done <-chan struct{}) <-chan EventType
 type GraphqlResolver = graphql.Resolver
 
 // NewGraphqlResolver creates a GraphqlResolver that defers fn until
-// bootstrap runs it.
-var NewGraphqlResolver = graphql.New
+// bootstrap runs it. Wrapped (not var-aliased) so autocomplete/hover shows
+// the root GraphqlResolver alias in the param/return types instead of
+// internal/graphql's own.
+func NewGraphqlResolver(fn func(*GraphqlResolver)) *GraphqlResolver {
+	return graphql.New(fn)
+}
 
 // GraphqlQuery represents one declared GraphQL query field -- name, args
 // schema, return schema, handler, registered via
@@ -1057,7 +1091,7 @@ type GraphqlSubscription = graphql.Subscription
 // req.Params()/req.Query()/req.Body().Json() already are for REST;
 // ctx.Done() is a Subscription's own cancellation signal (nil for
 // Query/Mutation).
-type GraphqlContext = graphql.GraphqlContext
+type GraphqlContext = graphql.Context
 
 // ---------------------------------------------------------------------------
 // Scheduler (Milestone 10)
@@ -1069,7 +1103,9 @@ type GraphqlContext = graphql.GraphqlContext
 type Scheduler = scheduler.Scheduler
 
 // NewScheduler creates a Scheduler that defers fn until bootstrap runs it.
-var NewScheduler = scheduler.New
+func NewScheduler(fn func(*Scheduler)) *Scheduler {
+	return scheduler.New(fn)
+}
 
 // ---------------------------------------------------------------------------
 // Dotenv (dotenv-loading feature)
@@ -1088,4 +1124,6 @@ var NewScheduler = scheduler.New
 // wrapper function is needed (root package is the only public door since
 // Go blocks external import of internal/*, per AD-004 in STATE.md). See
 // internal/dotenv.Get's doc comment for the full contract.
-var Dotenv = dotenv.Get
+func Dotenv() *dotenv.Dotenv {
+	return dotenv.Get()
+}

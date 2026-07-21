@@ -14,7 +14,7 @@ func newExecTestSchema(t *testing.T) *graphql.Resolver {
 	t.Helper()
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("ping", func(q *graphql.Query) {
-			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+			q.Handler(func(ctx *graphql.Context) any { return "pong" })
 		})
 	})
 	res.Declare()

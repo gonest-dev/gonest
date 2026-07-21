@@ -15,7 +15,7 @@ type Query struct {
 	args        *schema.Schema
 	returns     *schema.Schema
 	returnsList bool
-	handler     func(ctx *GraphqlContext) any
+	handler     func(ctx *Context) any
 }
 
 // newQuery creates a *Query and runs fn on it immediately -- same
@@ -84,13 +84,13 @@ func (q *Query) ReturnsIsList() bool {
 // response's data -- no separate Response/write-side, unlike REST's
 // Route.Handler (context.md's D2: GraphQL resolvers have no status/headers
 // to justify one).
-func (q *Query) Handler(fn func(ctx *GraphqlContext) any) *Query {
+func (q *Query) Handler(fn func(ctx *Context) any) *Query {
 	q.handler = fn
 	return q
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler
 // was never called.
-func (q *Query) HandlerFunc() func(ctx *GraphqlContext) any {
+func (q *Query) HandlerFunc() func(ctx *Context) any {
 	return q.handler
 }

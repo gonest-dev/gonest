@@ -81,13 +81,13 @@ func TestDeclare_DoesNotRunFnTwiceOnRepeatedCalls(t *testing.T) {
 func TestResolver_QueryMutationSubscription_AccumulateAndRoundTrip(t *testing.T) {
 	r := New(func(r *Resolver) {
 		r.Query("hello", func(q *Query) {
-			q.Handler(func(ctx *GraphqlContext) any { return "world" })
+			q.Handler(func(ctx *Context) any { return "world" })
 		})
 		r.Mutation("createUser", func(m *Mutation) {
-			m.Handler(func(ctx *GraphqlContext) any { return nil })
+			m.Handler(func(ctx *Context) any { return nil })
 		})
 		r.Subscription("onUserCreated", func(s *Subscription) {
-			s.Handler(func(ctx *GraphqlContext, emit func(any)) {})
+			s.Handler(func(ctx *Context, emit func(any)) {})
 		})
 	})
 	r.Declare()

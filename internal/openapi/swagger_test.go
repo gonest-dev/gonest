@@ -76,12 +76,12 @@ func TestRenderSwaggerUIHTML_DifferentOptions_ProduceDifferentOutput(t *testing.
 func TestSetupSwagger_RealHTTPDispatch(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	a, err := app.NewApp[fiber.FiberApp](root, app.Options{})
+	a, err := app.New[fiber.App](root, app.Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := a.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := a.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("a.Adapter() is not a *fiber.FiberApp: %T", a.Adapter())
 	}
@@ -181,12 +181,12 @@ func TestSetupSwagger_RealHTTPDispatch(t *testing.T) {
 func TestSetupSwagger_EmptyDocument_StillReturnsValidJSON(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	a, err := app.NewApp[fiber.FiberApp](root, app.Options{})
+	a, err := app.New[fiber.App](root, app.Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := a.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := a.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("a.Adapter() is not a *fiber.FiberApp: %T", a.Adapter())
 	}

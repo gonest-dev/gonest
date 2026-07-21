@@ -107,7 +107,7 @@ func lookupJSONPath(decoded any, segments []string) (any, bool) {
 // ctx.Json/MustJsonBody already use elsewhere). Panics on a transport-level
 // failure -- never on a non-2xx status, which is for the caller's own
 // AssertStatus to check.
-func (a *TestApp) MustRequest(method route.HttpMethod, path string, body any) *TestResponse {
+func (a *Test) MustRequest(method route.HttpMethod, path string, body any) *TestResponse {
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)

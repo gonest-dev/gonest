@@ -21,7 +21,7 @@ func newSSEDistinctTestSchema(t *testing.T) *graphql.Resolver {
 	t.Helper()
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("ping", func(q *graphql.Query) {
-			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+			q.Handler(func(ctx *graphql.Context) any { return "pong" })
 		})
 	})
 	res.Declare()
@@ -126,7 +126,7 @@ func TestSSEDistinctHandler_InvalidQuery_RespondsNextWithErrorNot400(t *testing.
 func TestSSEDistinctHandler_Subscription_EmitsNextPerEmittedValue(t *testing.T) {
 	sub := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onCreated", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				emit("hello")
 				emit("world")
 			})
@@ -178,7 +178,7 @@ func TestSSEDistinctHandler_ClientDisconnects_HandlerGoroutineEnds(t *testing.T)
 	handlerReturned := make(chan struct{})
 	sub := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onCreated", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				gotDone = ctx.Done()
 				defer close(handlerReturned)
 				// Emits repeatedly so that AFTER the test simulates a client

@@ -56,7 +56,7 @@ func main() {
 		b.Version("1.0.0")
 		b.BearerAuth()
 	})
-	gonest.GenerateOpenApiSchema(app, doc)
+	gonest.OpenapiGenerate(app, doc)
 	if err := gonest.SetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
 		JsonDocumentUrl: "/openapi.json",
 		PersistAuth:     true,

@@ -198,10 +198,10 @@ func newProtoTestSchema(t *testing.T) *gql.Schema {
 	t.Helper()
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("ping", func(q *graphql.Query) {
-			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+			q.Handler(func(ctx *graphql.Context) any { return "pong" })
 		})
 		r.Mutation("bump", func(m *graphql.Mutation) {
-			m.Handler(func(ctx *graphql.GraphqlContext) any { return "bumped" })
+			m.Handler(func(ctx *graphql.Context) any { return "bumped" })
 		})
 	})
 	res.Declare()
@@ -394,9 +394,9 @@ func TestWSProtocolHandler_OperationBeforeAck_Closes4401(t *testing.T) {
 // ("count") whose Handler is supplied by the caller, matching how
 // registerGraphql wires a real Subscription's HandlerFunc into
 // WSProtocolHandler's own subs parameter.
-func newProtoSubTestSchema(t *testing.T, handler func(ctx *graphql.GraphqlContext, emit func(any))) map[string]*graphql.Subscription {
+func newProtoSubTestSchema(t *testing.T, handler func(ctx *graphql.Context, emit func(any))) map[string]*graphql.Subscription {
 	t.Helper()
-	return newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.GraphqlContext, emit func(any)){
+	return newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.Context, emit func(any)){
 		"count": handler,
 	})
 }
@@ -408,7 +408,7 @@ func newProtoSubTestSchema(t *testing.T, handler func(ctx *graphql.GraphqlContex
 // since driving that from a single shared field/handler would leave which
 // goroutine ran for which Subscribe id up to the Go scheduler, not the
 // test.
-func newProtoMultiSubTestSchema(t *testing.T, handlers map[string]func(ctx *graphql.GraphqlContext, emit func(any))) map[string]*graphql.Subscription {
+func newProtoMultiSubTestSchema(t *testing.T, handlers map[string]func(ctx *graphql.Context, emit func(any))) map[string]*graphql.Subscription {
 	t.Helper()
 	res := graphql.New(func(r *graphql.Resolver) {
 		for name, handler := range handlers {
@@ -428,7 +428,7 @@ func newProtoMultiSubTestSchema(t *testing.T, handlers map[string]func(ctx *grap
 
 func TestWSProtocolHandler_SubscribeSubscription_EmitsNextPerEmittedValue(t *testing.T) {
 	started := make(chan struct{})
-	subs := newProtoSubTestSchema(t, func(ctx *graphql.GraphqlContext, emit func(any)) {
+	subs := newProtoSubTestSchema(t, func(ctx *graphql.Context, emit func(any)) {
 		close(started)
 		emit(1)
 		emit(2)
@@ -496,12 +496,12 @@ func TestWSProtocolHandler_CompleteOneId_DoesNotAffectOtherActiveId(t *testing.T
 	// Two distinct Subscription fields (rather than reusing one field for
 	// both ids) so which stream is which is fixed by the query text itself,
 	// not by goroutine scheduling order.
-	subs := newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.GraphqlContext, emit func(any)){
-		"countA": func(ctx *graphql.GraphqlContext, emit func(any)) {
+	subs := newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.Context, emit func(any)){
+		"countA": func(ctx *graphql.Context, emit func(any)) {
 			<-ctx.Done()
 			close(doneCh1)
 		},
-		"countB": func(ctx *graphql.GraphqlContext, emit func(any)) {
+		"countB": func(ctx *graphql.Context, emit func(any)) {
 			<-ctx.Done()
 			close(doneCh2)
 		},
@@ -560,12 +560,12 @@ func TestWSProtocolHandler_CompleteOneId_DoesNotAffectOtherActiveId(t *testing.T
 func TestWSProtocolHandler_ConnectionDrops_StopsAllActiveSubscriptions(t *testing.T) {
 	stopped1 := make(chan struct{})
 	stopped2 := make(chan struct{})
-	subs := newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.GraphqlContext, emit func(any)){
-		"countA": func(ctx *graphql.GraphqlContext, emit func(any)) {
+	subs := newProtoMultiSubTestSchema(t, map[string]func(ctx *graphql.Context, emit func(any)){
+		"countA": func(ctx *graphql.Context, emit func(any)) {
 			<-ctx.Done()
 			close(stopped1)
 		},
-		"countB": func(ctx *graphql.GraphqlContext, emit func(any)) {
+		"countB": func(ctx *graphql.Context, emit func(any)) {
 			<-ctx.Done()
 			close(stopped2)
 		},
@@ -623,7 +623,7 @@ func TestWSProtocolHandler_TwoConcurrentOperationsDifferentIds_BothRunIndependen
 	sch := newProtoTestSchema(t)
 	started := make(chan struct{})
 	blockEmit := make(chan struct{})
-	subs := newProtoSubTestSchema(t, func(ctx *graphql.GraphqlContext, emit func(any)) {
+	subs := newProtoSubTestSchema(t, func(ctx *graphql.Context, emit func(any)) {
 		close(started)
 		emit(1)
 		<-blockEmit
@@ -741,7 +741,7 @@ func TestWSProtocolHandler_TwoConcurrentOperationsDifferentIds_BothRunIndependen
 // handler still running) must close the whole connection with 4409 rather
 // than being processed.
 func TestWSProtocolHandler_SubscribeWithIdAlreadyActive_Closes4409(t *testing.T) {
-	subs := newProtoSubTestSchema(t, func(ctx *graphql.GraphqlContext, emit func(any)) {
+	subs := newProtoSubTestSchema(t, func(ctx *graphql.Context, emit func(any)) {
 		<-ctx.Done()
 	})
 

@@ -104,7 +104,7 @@ func TestResolve_DependentProvider_WaitsForDependencyDone(t *testing.T) {
 
 	var dependent *provider.Provider
 	dependent = provider.New(func(p *provider.Provider) {
-		dep := inject.MustInject[*stage3AService](dependent)
+		dep := inject.Must[*stage3AService](dependent)
 		p.Constructor(func() *stage3DependentService {
 			dependentSawDepFinished.Store(depFinished.Load())
 			return &stage3DependentService{Dep: dep}
@@ -262,7 +262,7 @@ func TestResolve_CopyInPlace_PlaceholderReflectsRealData(t *testing.T) {
 	var placeholder *stage3AService
 	var dependent *provider.Provider
 	dependent = provider.New(func(p *provider.Provider) {
-		placeholder = inject.MustInject[*stage3AService](dependent)
+		placeholder = inject.Must[*stage3AService](dependent)
 		p.Constructor(func() *stage3DependentService {
 			return &stage3DependentService{}
 		})
@@ -303,11 +303,11 @@ func TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges(t *testing.T) 
 
 	var unrelatedA, unrelatedB *provider.Provider
 	unrelatedA = provider.New(func(p *provider.Provider) {
-		inject.MustInject[*unrelatedY](unrelatedA)
+		inject.Must[*unrelatedY](unrelatedA)
 		p.Constructor(func() *unrelatedX { return &unrelatedX{} })
 	})
 	unrelatedB = provider.New(func(p *provider.Provider) {
-		inject.MustInject[*unrelatedX](unrelatedB)
+		inject.Must[*unrelatedX](unrelatedB)
 		p.Constructor(func() *unrelatedY { return &unrelatedY{} })
 	})
 	unrelatedModule := module.New(func(m *module.Module) {

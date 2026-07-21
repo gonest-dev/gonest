@@ -315,7 +315,7 @@ type httpAdapterPtr[T any] interface {
 	HttpAdapter
 }
 
-// NewApp bootstraps root through all 3 DI stages plus Stage 2.5 (route
+// New bootstraps root through all 3 DI stages plus Stage 2.5 (route
 // collection/registration), in order:
 //
 //  1. Structural Assembly (root.Assemble): walks Imports, wires
@@ -350,16 +350,16 @@ type httpAdapterPtr[T any] interface {
 // Stage 3 (a Constructor's returned error or recovered panic), or Stage 2.5
 // (a duplicate route).
 //
-// NewApp calls inject.Reset() at the very start, before Stage 2, to clear
+// New calls inject.Reset() at the very start, before Stage 2, to clear
 // internal/inject's process-global pending-edge bookkeeping left over from
-// any previous NewApp call -- see inject.Reset's doc comment for the "one
+// any previous New call -- see inject.Reset's doc comment for the "one
 // bootstrap at a time per process" contract this establishes. Calling
-// NewApp concurrently from multiple goroutines in the same process is not
-// supported; NewApp is meant to run once, synchronously, at process
+// New concurrently from multiple goroutines in the same process is not
+// supported; New is meant to run once, synchronously, at process
 // startup.
 //
 // opts is optional (variadic, at most one) -- callers with no need for
-// BufferLogs/LogLevels/EnableFormStreaming/etc can call NewApp[T](root) and
+// BufferLogs/LogLevels/EnableFormStreaming/etc can call New[T](root) and
 // get the zero-value Options{}, same as passing Options{} explicitly.
 // Passing more than one opts panics -- there is no sane way to merge two
 // Options, and silently taking the first (or last) would hide a caller
@@ -367,7 +367,7 @@ type httpAdapterPtr[T any] interface {
 // completes, and does not influence any of them -- no Logger exists yet in
 // this codebase to act on BufferLogs/LogLevels (see Options' doc comment
 // in options.go).
-func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (*App, error) {
+func New[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (*App, error) {
 	if len(opts) > 1 {
 		panic("gonest: NewApp accepts at most one Options")
 	}
@@ -480,7 +480,7 @@ func countTree(modules []*module.Module) (moduleCount, controllerCount, routeCou
 // for callers (typically main) that treat bootstrap failure as fatal. opts
 // is optional, same contract as NewApp's.
 func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) *App {
-	app, err := NewApp[T, PT](root, opts...)
+	app, err := New[T, PT](root, opts...)
 	if err != nil {
 		panic(err)
 	}

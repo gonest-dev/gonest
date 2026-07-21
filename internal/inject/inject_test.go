@@ -24,7 +24,7 @@ func newOwner() module.Owner {
 func TestMustInject_ReturnsNonNilPlaceholderForPointerType(t *testing.T) {
 	owner := newOwner()
 
-	got := MustInject[*fakeService](owner)
+	got := Must[*fakeService](owner)
 
 	if got == nil {
 		t.Fatalf("MustInject[*fakeService] returned nil, want a non-nil allocated placeholder")
@@ -34,7 +34,7 @@ func TestMustInject_ReturnsNonNilPlaceholderForPointerType(t *testing.T) {
 func TestMustInject_PlaceholderIsUsable(t *testing.T) {
 	owner := newOwner()
 
-	got := MustInject[*fakeService](owner)
+	got := Must[*fakeService](owner)
 
 	// Confirm it's a genuinely usable *fakeService, not just a non-nil
 	// interface{} smuggled through -- write to a field and read it back.
@@ -62,7 +62,7 @@ func TestMustInject_NonPointerType_PanicsWithDynamicTypeName(t *testing.T) {
 		}
 	}()
 
-	MustInject[fakeService](owner)
+	Must[fakeService](owner)
 }
 
 func TestMustInject_NonPointerType_MessageIsDynamicNotHardcoded(t *testing.T) {
@@ -86,7 +86,7 @@ func TestMustInject_NonPointerType_MessageIsDynamicNotHardcoded(t *testing.T) {
 		}
 	}()
 
-	MustInject[otherService](owner)
+	Must[otherService](owner)
 }
 
 func TestMustInject_NonPointerBuiltinType_PanicsWithDynamicTypeName(t *testing.T) {
@@ -107,14 +107,14 @@ func TestMustInject_NonPointerBuiltinType_PanicsWithDynamicTypeName(t *testing.T
 		}
 	}()
 
-	MustInject[int](owner)
+	Must[int](owner)
 }
 
 func TestMustInject_RegistersExactlyOnePendingEdge(t *testing.T) {
 	resetPendingEdges()
 	owner := newOwner()
 
-	MustInject[*fakeService](owner)
+	Must[*fakeService](owner)
 
 	edges := pendingEdgesFor(owner)
 	if len(edges) != 1 {
@@ -130,7 +130,7 @@ func TestPendingEdges_ReturnsCopyNotAliasingInternalState(t *testing.T) {
 	resetPendingEdges()
 	owner := newOwner()
 
-	MustInject[*fakeService](owner)
+	Must[*fakeService](owner)
 
 	got := PendingEdges()
 	if len(got) != 1 {
@@ -156,7 +156,7 @@ func TestPendingEdge_RetainsPlaceholderUsableForCopyInPlace(t *testing.T) {
 	resetPendingEdges()
 	owner := newOwner()
 
-	got := MustInject[*fakeService](owner)
+	got := Must[*fakeService](owner)
 
 	edges := pendingEdgesFor(owner)
 	if len(edges) != 1 {
@@ -181,7 +181,7 @@ func TestReset_ClearsAllPendingEdges(t *testing.T) {
 	resetPendingEdges()
 	owner := newOwner()
 
-	MustInject[*fakeService](owner)
+	Must[*fakeService](owner)
 	if got := len(PendingEdges()); got == 0 {
 		t.Fatalf("PendingEdges() len = 0 before Reset(), want > 0 (setup didn't record an edge)")
 	}
@@ -198,9 +198,9 @@ func TestMustInject_MultipleCallsDoNotCollide(t *testing.T) {
 	ownerA := newOwner()
 	ownerB := newOwner()
 
-	MustInject[*fakeService](ownerA)
-	MustInject[*otherService](ownerA)
-	MustInject[*fakeService](ownerB)
+	Must[*fakeService](ownerA)
+	Must[*otherService](ownerA)
+	Must[*fakeService](ownerB)
 
 	edgesA := pendingEdgesFor(ownerA)
 	edgesB := pendingEdgesFor(ownerB)

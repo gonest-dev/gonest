@@ -117,7 +117,7 @@ func Build(queries []*Query, mutations []*Mutation, subscriptions []*Subscriptio
 // therefore built HERE, at schema-construction time, wrapping handler --
 // internal/app's own role (T7) is only to invoke gql.Do itself and
 // translate its result to an HTTP response, not to dispatch per-field.
-func (b *builder) buildField(name string, args, returns *schema.Schema, returnsList bool, handler func(ctx *GraphqlContext) any) (*gql.Field, error) {
+func (b *builder) buildField(name string, args, returns *schema.Schema, returnsList bool, handler func(ctx *Context) any) (*gql.Field, error) {
 	outType, err := b.outputType(returns)
 	if err != nil {
 		return nil, err

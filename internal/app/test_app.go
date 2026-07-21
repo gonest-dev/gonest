@@ -52,37 +52,37 @@ func MustOverride[T any](b *TestBuilder, mockValue T) {
 	b.overrides[t] = reflect.ValueOf(mockValue)
 }
 
-// TestApp is MustNewTestApp's return value: the same fully-bootstrapped
+// Test is MustNewTestApp's return value: the same fully-bootstrapped
 // module tree NewApp produces (providers resolved override-aware, routes
 // registered on an adapter), except no real network port is bound (no
 // Listen call) -- see MustNewTestApp's own doc comment for the full
 // 3-phase sequence this reuses.
-type TestApp struct {
+type Test struct {
 	root    *module.Module
 	adapter HttpAdapter
 }
 
 // Adapter returns the HttpAdapter routes were registered on, for a future
 // "HTTP Test Client" feature (MustRequest) to dispatch requests against.
-func (a *TestApp) Adapter() HttpAdapter { return a.adapter }
+func (a *Test) Adapter() HttpAdapter { return a.adapter }
 
 // Close is a no-op today -- MustNewTestApp never binds a real network port,
 // so there is nothing live to release. Exists so INSIGHT.md's `defer
 // tester.Close()` call shape compiles and reads naturally, ahead of any
 // future resource MustNewTestApp might need to release.
-func (a *TestApp) Close() {}
+func (a *Test) Close() {}
 
 // ResolveDirect satisfies internal/inject's directResolver interface,
 // scoped to root ONLY (single-module scope, same as *controller.Controller's
 // own ResolveDirect) -- so gonest.MustInject[T](tester) resolves exactly
 // like a Controller's own MustInject would (spec.md P3 AC5).
-func (a *TestApp) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+func (a *Test) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
 	return resolver.FindDirect([]*module.Module{a.root}, t)
 }
 
 // ResolveDirectAll satisfies internal/inject's directResolver interface,
 // same single-module scope as ResolveDirect.
-func (a *TestApp) ResolveDirectAll(t reflect.Type) []reflect.Value {
+func (a *Test) ResolveDirectAll(t reflect.Type) []reflect.Value {
 	return resolver.FindDirectAll([]*module.Module{a.root}, t)
 }
 
@@ -96,7 +96,7 @@ func (a *TestApp) ResolveDirectAll(t reflect.Type) []reflect.Value {
 // still registered (for a future "HTTP Test Client" feature to dispatch
 // against), but no real network port is bound. Panics on any bootstrap
 // error (same "Must"-prefixed convention as MustNewApp).
-func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp {
+func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *Test {
 	b := &TestBuilder{overrides: make(map[reflect.Type]reflect.Value)}
 	if configure != nil {
 		configure(b)
@@ -135,5 +135,5 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *TestApp 
 		panic(err)
 	}
 
-	return &TestApp{root: root, adapter: adapter}
+	return &Test{root: root, adapter: adapter}
 }

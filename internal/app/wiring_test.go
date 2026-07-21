@@ -41,7 +41,7 @@ func TestNewApp_InvokesModuleInitAndApplicationBootstrapHooks(t *testing.T) {
 		m.Providers(p)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
+	if _, err := New[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -69,7 +69,7 @@ func TestNewApp_ModuleInitHookError_AbortsNewApp(t *testing.T) {
 		m.Providers(p)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root, Options{})
+	_, err := New[recordingFakeAdapter](root, Options{})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("NewApp() error = %v, want %v", err, wantErr)
 	}
@@ -93,7 +93,7 @@ func TestNewApp_ApplicationBootstrapHookError_AbortsNewApp(t *testing.T) {
 		m.Providers(p)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root, Options{})
+	_, err := New[recordingFakeAdapter](root, Options{})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("NewApp() error = %v, want %v", err, wantErr)
 	}

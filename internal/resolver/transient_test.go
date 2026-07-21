@@ -40,13 +40,13 @@ func TestResolve_TransientProvider_ResolvesPerEdge(t *testing.T) {
 
 	var consumerA, consumerB *provider.Provider
 	consumerA = provider.New(func(p *provider.Provider) {
-		dep := inject.MustInject[*transientService](consumerA)
+		dep := inject.Must[*transientService](consumerA)
 		p.Constructor(func() *transientConsumerA {
 			return &transientConsumerA{Value: dep}
 		})
 	})
 	consumerB = provider.New(func(p *provider.Provider) {
-		dep := inject.MustInject[*transientService](consumerB)
+		dep := inject.Must[*transientService](consumerB)
 		p.Constructor(func() *transientConsumerB {
 			return &transientConsumerB{Value: dep}
 		})
@@ -85,13 +85,13 @@ func TestResolve_TransientProvider_TwoResolutionsReturnDifferentPointers(t *test
 	var consumerA, consumerB *provider.Provider
 	var placeholderA, placeholderB *transientService
 	consumerA = provider.New(func(p *provider.Provider) {
-		placeholderA = inject.MustInject[*transientService](consumerA)
+		placeholderA = inject.Must[*transientService](consumerA)
 		p.Constructor(func() *transientConsumerA {
 			return &transientConsumerA{Value: placeholderA}
 		})
 	})
 	consumerB = provider.New(func(p *provider.Provider) {
-		placeholderB = inject.MustInject[*transientService](consumerB)
+		placeholderB = inject.Must[*transientService](consumerB)
 		p.Constructor(func() *transientConsumerB {
 			return &transientConsumerB{Value: placeholderB}
 		})
@@ -138,7 +138,7 @@ func TestResolve_TransientProvider_SingletonDependencyIsSharedAcrossEdges(t *tes
 	var transient *provider.Provider
 	transient = provider.New(func(p *provider.Provider) {
 		p.Scope(scope.Transient)
-		dep := inject.MustInject[*transientSingletonDep](transient)
+		dep := inject.Must[*transientSingletonDep](transient)
 		p.Constructor(func() *transientWithDepService {
 			return &transientWithDepService{Dep: dep}
 		})
@@ -147,13 +147,13 @@ func TestResolve_TransientProvider_SingletonDependencyIsSharedAcrossEdges(t *tes
 	var consumerA, consumerB *provider.Provider
 	var gotA, gotB *transientWithDepService
 	consumerA = provider.New(func(p *provider.Provider) {
-		gotA = inject.MustInject[*transientWithDepService](consumerA)
+		gotA = inject.Must[*transientWithDepService](consumerA)
 		p.Constructor(func() *transientConsumerA {
 			return &transientConsumerA{}
 		})
 	})
 	consumerB = provider.New(func(p *provider.Provider) {
-		gotB = inject.MustInject[*transientWithDepService](consumerB)
+		gotB = inject.Must[*transientWithDepService](consumerB)
 		p.Constructor(func() *transientConsumerB {
 			return &transientConsumerB{}
 		})
@@ -209,13 +209,13 @@ func TestResolve_SingletonProvider_StillResolvesOncePerNode_Regression(t *testin
 	var consumerA, consumerB *provider.Provider
 	var placeholderA, placeholderB *transientService
 	consumerA = provider.New(func(p *provider.Provider) {
-		placeholderA = inject.MustInject[*transientService](consumerA)
+		placeholderA = inject.Must[*transientService](consumerA)
 		p.Constructor(func() *transientConsumerA {
 			return &transientConsumerA{Value: placeholderA}
 		})
 	})
 	consumerB = provider.New(func(p *provider.Provider) {
-		placeholderB = inject.MustInject[*transientService](consumerB)
+		placeholderB = inject.Must[*transientService](consumerB)
 		p.Constructor(func() *transientConsumerB {
 			return &transientConsumerB{Value: placeholderB}
 		})

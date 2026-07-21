@@ -12,7 +12,7 @@ type Subscription struct {
 	name    string
 	args    *schema.Schema
 	returns *schema.Schema
-	handler func(ctx *GraphqlContext, emit func(any))
+	handler func(ctx *Context, emit func(any))
 }
 
 // newSubscription creates a *Subscription and runs fn on it immediately --
@@ -61,13 +61,13 @@ func (s *Subscription) ReturnsSchema() *schema.Schema {
 // returns s so calls can chain. emit publishes one value at a time to the
 // connected client; fn only returns when the subscription ends (typically
 // by observing <-ctx.Done()).
-func (s *Subscription) Handler(fn func(ctx *GraphqlContext, emit func(any))) *Subscription {
+func (s *Subscription) Handler(fn func(ctx *Context, emit func(any))) *Subscription {
 	s.handler = fn
 	return s
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler
 // was never called.
-func (s *Subscription) HandlerFunc() func(ctx *GraphqlContext, emit func(any)) {
+func (s *Subscription) HandlerFunc() func(ctx *Context, emit func(any)) {
 	return s.handler
 }

@@ -15,6 +15,7 @@ import (
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
 	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/provider"
 	"gonest.dev/gonest/internal/route"
@@ -144,14 +145,14 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 
 	var userService *UserService
 	consumer := provider.New(func(p *provider.Provider) {
-		userService = inject.MustInject[*UserService](p)
+		userService = inject.Must[*UserService](p)
 		p.Constructor(func() *consumerMarker {
 			return &consumerMarker{}
 		})
 	})
 	appModule.Providers(consumer)
 
-	app, err := NewApp[recordingFakeAdapter](appModule, Options{})
+	app, err := New[recordingFakeAdapter](appModule, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -185,7 +186,7 @@ func TestNewApp_UserProviderExample_ResolvesUsableUserService(t *testing.T) {
 func TestNewApp_NoOptsArgument_BehavesLikeZeroValueAppOptions(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	app, err := NewApp[recordingFakeAdapter](root)
+	app, err := New[recordingFakeAdapter](root)
 	if err != nil {
 		t.Fatalf("NewApp() with no opts error = %v", err)
 	}
@@ -221,7 +222,7 @@ func TestNewApp_TwoOptsArguments_Panics(t *testing.T) {
 		}
 	}()
 
-	NewApp[recordingFakeAdapter](root, Options{}, Options{})
+	New[recordingFakeAdapter](root, Options{}, Options{})
 }
 
 type consumerMarker struct{}
@@ -273,11 +274,11 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 
 	var pa, pb *provider.Provider
 	pa = provider.New(func(p *provider.Provider) {
-		inject.MustInject[*cycleB](pa)
+		inject.Must[*cycleB](pa)
 		p.Constructor(func() *cycleA { return &cycleA{} })
 	})
 	pb = provider.New(func(p *provider.Provider) {
-		inject.MustInject[*cycleA](pb)
+		inject.Must[*cycleA](pb)
 		p.Constructor(func() *cycleB { return &cycleB{} })
 	})
 
@@ -285,7 +286,7 @@ func TestNewApp_CircularDependency_ReturnsError(t *testing.T) {
 		m.Providers(pa, pb)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root, Options{})
+	_, err := New[recordingFakeAdapter](root, Options{})
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want circular dependency error")
 	}
@@ -314,7 +315,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 		m.Providers(firstProvider)
 	})
 
-	firstApp, err := NewApp[recordingFakeAdapter](firstRoot, Options{})
+	firstApp, err := New[recordingFakeAdapter](firstRoot, Options{})
 	if err != nil {
 		t.Fatalf("first NewApp() error = %v", err)
 	}
@@ -339,7 +340,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 	})
 	var consumer *provider.Provider
 	consumer = provider.New(func(p *provider.Provider) {
-		resolved = inject.MustInject[*secondTreeService](consumer)
+		resolved = inject.Must[*secondTreeService](consumer)
 		p.Constructor(func() *consumerMarker {
 			return &consumerMarker{}
 		})
@@ -348,7 +349,7 @@ func TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges(t *testing.T) 
 		m.Providers(secondProvider, consumer)
 	})
 
-	secondApp, err := NewApp[recordingFakeAdapter](secondRoot, Options{})
+	secondApp, err := New[recordingFakeAdapter](secondRoot, Options{})
 	if err != nil {
 		t.Fatalf("second NewApp() error = %v, want nil -- must not be affected by the first call's leftover state", err)
 	}
@@ -375,7 +376,7 @@ func TestNewApp_ConstructorError_ReturnsError(t *testing.T) {
 		m.Providers(p)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root, Options{})
+	_, err := New[recordingFakeAdapter](root, Options{})
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want the Constructor's returned error surfaced")
 	}
@@ -410,7 +411,7 @@ func TestNewApp_ControllerWithRoutes_RegistersEachOnAdapter(t *testing.T) {
 		m.Controllers(userController)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -455,7 +456,7 @@ func TestNewApp_DuplicateRoute_ReturnsErrorBeforeRegistering(t *testing.T) {
 		m.Controllers(dupeController, otherDupeController)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root, Options{})
+	_, err := New[recordingFakeAdapter](root, Options{})
 	if err == nil {
 		t.Fatalf("NewApp() error = nil, want a duplicate route error")
 	}
@@ -481,7 +482,7 @@ func TestNewApp_ZeroControllers_BootstrapsNormally(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -508,7 +509,7 @@ func TestNewApp_EmptyPathPrefix_RegistersRouteWithBarePath(t *testing.T) {
 		m.Controllers(noPrefixController)
 	})
 
-	_, err := NewApp[recordingFakeAdapter](root, Options{})
+	_, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -568,7 +569,7 @@ func TestNewApp_ZeroValueAppOptions_BootstrapsIdenticallyToPreT2Behavior(t *test
 		m.Controllers(userController)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -603,10 +604,10 @@ func TestNewApp_NonZeroAppOptions_StoredOnApp(t *testing.T) {
 
 	opts := Options{
 		BufferLogs: true,
-		LogLevels:  []LogLevel{LogLevelWarn, LogLevelError},
+		LogLevels:  []logger.Level{logger.LevelWarn, logger.LevelError},
 	}
 
-	app, err := NewApp[recordingFakeAdapter](root, opts)
+	app, err := New[recordingFakeAdapter](root, opts)
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -617,7 +618,7 @@ func TestNewApp_NonZeroAppOptions_StoredOnApp(t *testing.T) {
 	if app.opts.BufferLogs != true {
 		t.Fatalf("app.opts.BufferLogs = %v, want true", app.opts.BufferLogs)
 	}
-	if len(app.opts.LogLevels) != 2 || app.opts.LogLevels[0] != LogLevelWarn || app.opts.LogLevels[1] != LogLevelError {
+	if len(app.opts.LogLevels) != 2 || app.opts.LogLevels[0] != logger.LevelWarn || app.opts.LogLevels[1] != logger.LevelError {
 		t.Fatalf("app.opts.LogLevels = %+v, want [Warn Error]", app.opts.LogLevels)
 	}
 }
@@ -844,7 +845,7 @@ func newBarFilterException() *barFilterException {
 func TestNewApp_Root_ReturnsSameModulePassedToNewApp(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -885,7 +886,7 @@ func TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes(t *testing.T) 
 		m.Controllers(rootController)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}

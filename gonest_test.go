@@ -39,7 +39,7 @@ import (
 func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -54,9 +54,9 @@ func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app := MustNewApp[fiber.FiberApp](root, AppOptions{
+	app := MustNewApp[fiber.App](root, AppOptions{
 		BufferLogs: true,
-		LogLevels:  []LogLevel{LogLevelWarn, LogLevelError},
+		LogLevels:  []LoggerLevel{LoggerLevelWarn, LoggerLevelError},
 	})
 	if app == nil {
 		t.Fatalf("MustNewApp() returned nil *App")
@@ -71,12 +71,12 @@ func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -122,12 +122,12 @@ func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -360,12 +360,12 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -469,12 +469,12 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -670,12 +670,12 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -727,12 +727,12 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration(t *te
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -790,12 +790,12 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -920,12 +920,12 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -1090,12 +1090,12 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -1223,12 +1223,12 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -1473,11 +1473,11 @@ func TestNewGraphqlResolver_RootAlias_RealHTTPDispatch(t *testing.T) {
 		m.Resolvers(userResolver)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -2454,12 +2454,12 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		m.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -2743,7 +2743,7 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		m.Controllers(userController)
 	})
 
-	app, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -2753,7 +2753,7 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		b.Version("1.0.0")
 	})
 
-	GenerateOpenApiSchema(app, doc)
+	OpenapiGenerate(app, doc)
 
 	document := doc.Document()
 
@@ -2833,12 +2833,12 @@ func mapKeys(m map[string]any) []string {
 func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 	root := NewModule(func(m *Module) {})
 
-	appInstance, err := NewApp[fiber.FiberApp](root, AppOptions{})
+	appInstance, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := appInstance.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := appInstance.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("appInstance.Adapter() is not a *fiber.FiberApp: %T", appInstance.Adapter())
 	}
@@ -2985,12 +2985,12 @@ func TestMustInjectAll_RootAlias_InsightConnectableExample(t *testing.T) {
 		module.Controllers(systemController)
 	})
 
-	app, err := NewApp[fiber.FiberApp](systemModule, AppOptions{})
+	app, err := NewApp[fiber.App](systemModule, AppOptions{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}
@@ -3032,7 +3032,7 @@ func TestMustInjectAll_ZeroMatches_ReturnsEmptySlice(t *testing.T) {
 		m.Controllers(c)
 	})
 
-	if _, err := NewApp[fiber.FiberApp](root, AppOptions{}); err != nil {
+	if _, err := NewApp[fiber.App](root, AppOptions{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -3059,7 +3059,7 @@ func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
 		m.Controllers(c)
 	})
 
-	MustNewApp[fiber.FiberApp](root, AppOptions{})
+	MustNewApp[fiber.App](root, AppOptions{})
 }
 
 // ---------------------------------------------------------------------------
@@ -3163,7 +3163,7 @@ func TestMustNewTestApp_OverrideByInterface_RealHTTPDispatch(t *testing.T) {
 	})
 	defer tester.Close()
 
-	fiberAdapter, ok := tester.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := tester.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("tester.Adapter() is not a *fiber.FiberApp: %T", tester.Adapter())
 	}
@@ -3249,7 +3249,7 @@ func TestMustNewTestApp_NilConfigure_BehavesLikeNewAppMinusListen(t *testing.T) 
 	tester := MustNewTestApp(newInsightTestUserModule(), nil)
 	defer tester.Close()
 
-	fiberAdapter, ok := tester.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := tester.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("tester.Adapter() is not a *fiber.FiberApp: %T", tester.Adapter())
 	}
@@ -3416,7 +3416,7 @@ func TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration(t *testing.T) {
 		m.Controllers(c)
 	})
 
-	if _, err := NewApp[fiber.FiberApp](root, AppOptions{}); err != nil {
+	if _, err := NewApp[fiber.App](root, AppOptions{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -3695,7 +3695,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 
 	app := MustNewApp[FiberApp](uploadModule, AppOptions{EnableFormStreaming: true})
 
-	fiberAdapter, ok := app.Adapter().(*fiber.FiberApp)
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
 	}

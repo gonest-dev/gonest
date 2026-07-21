@@ -153,7 +153,7 @@ type directResolver interface {
 	ResolveDirectAll(t reflect.Type) []reflect.Value
 }
 
-// MustInject declares a dependency on type T from owner's builder fn.
+// Must declares a dependency on type T from owner's builder fn.
 // owner is typed any (not module.Owner) specifically because
 // Middleware/Guard/Interceptor/Filter values have no single owning Module
 // (their ownership is the UNION of every referencing module, discovered
@@ -177,7 +177,7 @@ type directResolver interface {
 // reflect and returned immediately, and a PendingEdge is recorded for
 // internal/resolver's Stage 3 (topological/errgroup/cycle-detecting) to
 // resolve and copy-in-place later.
-func MustInject[T any](owner any) T {
+func Must[T any](owner any) T {
 	t := reflect.TypeFor[T]()
 
 	if v, ok := GlobalSingletonFor(t); ok {
@@ -222,7 +222,7 @@ func MustInject[T any](owner any) T {
 	return placeholder.Interface().(T)
 }
 
-// MustInjectAll returns every provider in owner's scope whose resolved
+// MustAll returns every provider in owner's scope whose resolved
 // value satisfies interface T, as []T. T must be an interface kind (panics
 // otherwise -- multi-binding only makes sense for interfaces, a pointer
 // type has no "multiple implementations" concept, see MustInject's
@@ -232,7 +232,7 @@ func MustInject[T any](owner any) T {
 // empty slice, never panics, if zero providers match -- "give me all of
 // them" reasonably tolerates "there are none", unlike MustInject[T]'s
 // single-match contract.
-func MustInjectAll[T any](owner any) []T {
+func MustAll[T any](owner any) []T {
 	t := reflect.TypeFor[T]()
 
 	if t.Kind() != reflect.Interface {

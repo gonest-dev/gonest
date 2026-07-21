@@ -21,7 +21,7 @@ func newSSESingleTestSchema(t *testing.T) *graphql.Resolver {
 	t.Helper()
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("ping", func(q *graphql.Query) {
-			q.Handler(func(ctx *graphql.GraphqlContext) any { return "pong" })
+			q.Handler(func(ctx *graphql.Context) any { return "pong" })
 		})
 	})
 	res.Declare()
@@ -142,7 +142,7 @@ func TestSSESingleOperationHandler_QueryOperation_RoutesNextCompleteToToken(t *t
 func TestSSESingleOperationHandler_SubscriptionOperation_RoutesMultipleNextToToken(t *testing.T) {
 	sub := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onCreated", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				for i := 0; i < 3; i++ {
 					emit(map[string]any{"n": i})
 				}
@@ -248,7 +248,7 @@ func TestSSESingleOperationHandler_ConcurrentOperations_NoRace(t *testing.T) {
 
 	sub := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onCreated", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				ticker := time.NewTicker(5 * time.Millisecond)
 				defer ticker.Stop()
 				for {
@@ -421,7 +421,7 @@ func TestSSESingleCancelHandler_ActiveOperationId_StopsThatSubscriptionOnly(t *t
 	stopped := make(chan struct{})
 	sub := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onCreated", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				<-ctx.Done()
 				close(stopped)
 			})
@@ -431,7 +431,7 @@ func TestSSESingleCancelHandler_ActiveOperationId_StopsThatSubscriptionOnly(t *t
 
 	other := graphql.New(func(r *graphql.Resolver) {
 		r.Subscription("onOther", func(s *graphql.Subscription) {
-			s.Handler(func(ctx *graphql.GraphqlContext, emit func(any)) {
+			s.Handler(func(ctx *graphql.Context, emit func(any)) {
 				ticker := time.NewTicker(5 * time.Millisecond)
 				defer ticker.Stop()
 				for {

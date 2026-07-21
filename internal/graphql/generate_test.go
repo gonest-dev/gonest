@@ -33,7 +33,7 @@ func TestBuild_SimpleQuery_ProducesValidSchema(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("user", func(qb *graphql.Query) {
 			qb.Returns(userSchema)
-			qb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
+			qb.Handler(func(ctx *graphql.Context) any { return nil })
 		})
 	})
 	res.Declare()
@@ -78,7 +78,7 @@ func TestBuild_EmailFormat_ProducesEmailCustomScalar(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("me", func(qb *graphql.Query) {
 			qb.Returns(m)
-			qb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
+			qb.Handler(func(ctx *graphql.Context) any { return nil })
 		})
 	})
 	res.Declare()
@@ -111,7 +111,7 @@ func TestBuild_MutationWithArgs_ArgsBecomeFieldConfigArgument(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Mutation("createUser", func(mb *graphql.Mutation) {
 			mb.Args(argsSchema)
-			mb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
+			mb.Handler(func(ctx *graphql.Context) any { return nil })
 		})
 	})
 	res.Declare()
@@ -143,10 +143,10 @@ func TestBuild_MutationWithArgs_ArgsBecomeFieldConfigArgument(t *testing.T) {
 func TestBuild_DuplicateQueryName_ReturnsError(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("dup", func(qb *graphql.Query) {
-			qb.Handler(func(ctx *graphql.GraphqlContext) any { return 1 })
+			qb.Handler(func(ctx *graphql.Context) any { return 1 })
 		})
 		r.Query("dup", func(qb *graphql.Query) {
-			qb.Handler(func(ctx *graphql.GraphqlContext) any { return 2 })
+			qb.Handler(func(ctx *graphql.Context) any { return 2 })
 		})
 	})
 	res.Declare()
@@ -170,7 +170,7 @@ func TestBuild_CustomWithoutGraphqlScalar_ReturnsError(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("bad", func(qb *graphql.Query) {
 			qb.Returns(m)
-			qb.Handler(func(ctx *graphql.GraphqlContext) any { return nil })
+			qb.Handler(func(ctx *graphql.Context) any { return nil })
 		})
 	})
 	res.Declare()
@@ -201,7 +201,7 @@ func TestBuild_QueryReturningStruct_ResolvesFieldsCorrectly(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("post", func(qb *graphql.Query) {
 			qb.Returns(postSchema)
-			qb.Handler(func(ctx *graphql.GraphqlContext) any {
+			qb.Handler(func(ctx *graphql.Context) any {
 				// A REAL struct value, NOT a map[string]any -- graphql-go's
 				// own DEFAULT field resolver (used when Field.Resolve is
 				// nil) only knows how to read a map by key, so this used to
@@ -248,7 +248,7 @@ func TestBuild_QueryReturnsList_ProducesArrayOfResults(t *testing.T) {
 	res := graphql.New(func(r *graphql.Resolver) {
 		r.Query("posts", func(qb *graphql.Query) {
 			qb.ReturnsList(postSchema)
-			qb.Handler(func(ctx *graphql.GraphqlContext) any {
+			qb.Handler(func(ctx *graphql.Context) any {
 				return []*genPostEntity{{Id: 1, Title: "A"}, {Id: 2, Title: "B"}}
 			})
 		})

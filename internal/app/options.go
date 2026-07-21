@@ -21,9 +21,9 @@ type Options struct {
 	// a Logger is attached later (Nest's own BufferLogs semantics). Stored
 	// only -- no buffering mechanism exists yet to act on it.
 	BufferLogs bool
-	// LogLevels restricts which LogLevel values the real internal/logger
+	// LogLevels restricts which logger.Level values the real internal/logger
 	// package emits -- see NewApp's own call to logger.Configure(opts.LogLevels).
-	LogLevels []LogLevel
+	LogLevels []logger.Level
 	// DisableBanner, when true, skips MustListen's own "Gonest" ASCII
 	// banner + version line -- the 3 structured [INFO] log lines still
 	// print regardless (those carry actual operational information: bind
@@ -59,25 +59,6 @@ type Options struct {
 	// share this SAME path -- overriding it moves all of them consistently.
 	GraphqlPath string
 }
-
-// LogLevel is internal/logger.Level's own alias -- kept under this name
-// (rather than requiring every Options caller to import internal/logger
-// directly) since Options/NewApp/MustNewApp already lived under this name
-// before the real Logger existed.
-type LogLevel = logger.Level
-
-const (
-	// LogLevelError is the most severe level -- unrecoverable failures.
-	LogLevelError = logger.LevelError
-	// LogLevelWarn signals a recoverable but noteworthy condition.
-	LogLevelWarn = logger.LevelWarn
-	// LogLevelLog is Nest's default, general-purpose informational level.
-	LogLevelLog = logger.LevelLog
-	// LogLevelDebug carries diagnostic detail useful during development.
-	LogLevelDebug = logger.LevelDebug
-	// LogLevelVerbose is the most granular, chattiest level.
-	LogLevelVerbose = logger.LevelVerbose
-)
 
 // OnListen is the "bind succeeded" callback shape passed to App.MustListen.
 // Declared as a named type -- rather than used inline as func() everywhere

@@ -113,7 +113,7 @@ func TestLifecycleE2E_FullSequenceViaNewAppAndClose(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
@@ -187,7 +187,7 @@ func TestLifecycleE2E_CloseWithoutShutdownHooksEnabled(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app, err := NewApp[recordingFakeAdapter](root, Options{})
+	app, err := New[recordingFakeAdapter](root, Options{})
 	if err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}

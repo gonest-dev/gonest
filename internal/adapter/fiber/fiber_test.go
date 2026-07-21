@@ -90,7 +90,7 @@ func TestFiberMethod_UnknownHttpMethod_Panics(t *testing.T) {
 // produce inside NewApp[T] in internal/app, T8) -- without Init, RegisterRoute
 // on a zero-value FiberApp would nil-panic dereferencing a nil f.app.
 func TestInit_ZeroValueFiberApp_BecomesUsable(t *testing.T) {
-	app := &FiberApp{}
+	app := &App{}
 
 	app.Init(coreapp.Options{})
 

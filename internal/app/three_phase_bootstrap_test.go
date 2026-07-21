@@ -57,14 +57,14 @@ func TestThreePhaseBootstrap_ProvidersFullyResolveBeforeControllerDeclares(t *te
 		})
 	})
 	providerB := provider.New(func(p *provider.Provider) {
-		inject.MustInject[*tpProviderC](p)
+		inject.Must[*tpProviderC](p)
 		p.Constructor(func() *tpProviderB {
 			log.add("providerB")
 			return &tpProviderB{}
 		})
 	})
 	providerA := provider.New(func(p *provider.Provider) {
-		inject.MustInject[*tpProviderB](p)
+		inject.Must[*tpProviderB](p)
 		p.Constructor(func() *tpProviderA {
 			log.add("providerA")
 			return &tpProviderA{}
@@ -72,7 +72,7 @@ func TestThreePhaseBootstrap_ProvidersFullyResolveBeforeControllerDeclares(t *te
 	})
 
 	ctrl := controller.New(func(c *controller.Controller) {
-		inject.MustInject[*tpProviderA](c)
+		inject.Must[*tpProviderA](c)
 		log.add("controllerDeclared")
 	})
 
@@ -81,7 +81,7 @@ func TestThreePhaseBootstrap_ProvidersFullyResolveBeforeControllerDeclares(t *te
 		m.Controllers(ctrl)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
+	if _, err := New[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -115,8 +115,8 @@ func TestThreePhaseBootstrap_GuardReferencedByTwoModules_DeclaresOnceWithUnionSc
 
 	sharedGuard := guard.New(func(g *guard.Guard) {
 		declareCount++
-		sawX = inject.MustInject[*tpProviderX](g) != nil
-		sawY = inject.MustInject[*tpProviderY](g) != nil
+		sawX = inject.Must[*tpProviderX](g) != nil
+		sawY = inject.Must[*tpProviderY](g) != nil
 		g.Handler(func(req *execution.Request, res *execution.Response) bool { return true })
 	})
 
@@ -152,7 +152,7 @@ func TestThreePhaseBootstrap_GuardReferencedByTwoModules_DeclaresOnceWithUnionSc
 		m.Imports(moduleA, moduleB)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
+	if _, err := New[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 
@@ -195,7 +195,7 @@ func TestThreePhaseBootstrap_DeclareIdempotent_AcrossAllFourPipelineStageTypes(t
 		m.Controllers(ctrlA, ctrlB)
 	})
 
-	if _, err := NewApp[recordingFakeAdapter](root, Options{}); err != nil {
+	if _, err := New[recordingFakeAdapter](root, Options{}); err != nil {
 		t.Fatalf("NewApp() error = %v", err)
 	}
 

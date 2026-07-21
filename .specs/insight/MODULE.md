@@ -462,7 +462,7 @@ func main() {
 func bootstrap() error {
   app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{
     BufferLogs: true,
-    LogLevels:  []gonest.LogLevel{gonest.LogLevelError, gonest.LogLevelWarn},
+    LogLevels:  []gonest.LoggerLevel{gonest.LoggerLevelError, gonest.LoggerLevelWarn},
   })
 
   // grafo já resolvido pelo NewApp acima — MustInject aqui é leitura direta, sem espera.
