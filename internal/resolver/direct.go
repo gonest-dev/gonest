@@ -40,7 +40,7 @@ func candidateProviders(scope []*module.Module) []module.ProviderRef {
 			add(p)
 		}
 		for _, imported := range m.ImportedModules() {
-			for _, p := range imported.ExportedProviders() {
+			for _, p := range imported.EffectiveExports() {
 				add(p)
 			}
 		}

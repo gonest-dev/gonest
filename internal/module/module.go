@@ -116,16 +116,17 @@ type SchedulerRef interface {
 type Module struct {
 	fn func(*Module)
 
-	name        string
-	imports     []*Module
-	providers   []ProviderRef
-	controllers []ControllerRef
-	resolvers   []ResolverRef
-	exports     []ProviderRef
-	middleware  []MiddlewareRef
-	filters     []FilterRef
-	listeners   []ListenerRef
-	schedulers  []SchedulerRef
+	name            string
+	imports         []*Module
+	providers       []ProviderRef
+	controllers     []ControllerRef
+	resolvers       []ResolverRef
+	exports         []ProviderRef
+	exportedModules []*Module
+	middleware      []MiddlewareRef
+	filters         []FilterRef
+	listeners       []ListenerRef
+	schedulers      []SchedulerRef
 }
 
 // New creates a Module that defers fn until Stage 1 assembly runs. fn is
@@ -172,6 +173,17 @@ func (m *Module) Resolvers(rs ...ResolverRef) {
 // end of Stage 1 assembly.
 func (m *Module) Exports(ps ...ProviderRef) {
 	m.exports = append(m.exports, ps...)
+}
+
+// ExportModules registers whole modules to re-export: every provider that
+// mods themselves expose (via their own Exports, transitively through their
+// own re-exported modules) becomes visible through this module too, without
+// this module needing to name each provider individually. Every module
+// passed here must also have been passed to Imports on this same module --
+// validated at the end of Stage 1 assembly, symmetric to how Exports
+// requires its providers to also be in Providers.
+func (m *Module) ExportModules(mods ...*Module) {
+	m.exportedModules = append(m.exportedModules, mods...)
 }
 
 // Use registers middleware owned by this module. Go cannot restrict this
@@ -283,4 +295,66 @@ func (m *Module) ImportedModules() []*Module {
 // importers.
 func (m *Module) ExportedProviders() []ProviderRef {
 	return append([]ProviderRef(nil), m.exports...)
+}
+
+// OwnExportedModules returns a copy of the modules registered on this
+// module via ExportModules. Read-only: mutating the returned slice does not
+// affect this Module's internal state. Used by Stage 1 assembly to validate
+// that every re-exported module was also imported, and by EffectiveExports
+// to walk the re-export chain.
+func (m *Module) OwnExportedModules() []*Module {
+	return append([]*Module(nil), m.exportedModules...)
+}
+
+// EffectiveExports returns the full set of providers visible to an importer
+// of this module: this module's own Exports, plus -- for every module
+// registered via ExportModules -- that module's own EffectiveExports,
+// walked transitively. Unlike ExportedProviders (this module's own Exports
+// only), EffectiveExports follows re-export chains of arbitrary depth, so
+// an importer of B can reach a provider exported by D even when B only
+// re-exports C and C re-exports D.
+//
+// A provider that is merely declared via Providers on a re-exported module
+// -- but never itself passed to that module's own Exports -- is never
+// included: re-exporting a module only propagates what that module already
+// chose to make visible, it does not implicitly expose everything the
+// module owns.
+//
+// The result is deduplicated by ProviderRef identity, and cycles in the
+// re-export graph (a module re-exporting itself, directly or through a
+// mutual chain) terminate safely: a module is only ever expanded once
+// across the whole walk.
+func (m *Module) EffectiveExports() []ProviderRef {
+	return effectiveExports(m, map[*Module]bool{})
+}
+
+// effectiveExports is EffectiveExports's recursive worker. visited is
+// carried across the entire walk (not reset per branch) so that a cycle --
+// including a module re-exporting itself -- terminates: once a module has
+// been expanded, revisiting it (from any branch) returns nil instead of
+// recursing again.
+func effectiveExports(m *Module, visited map[*Module]bool) []ProviderRef {
+	if visited[m] {
+		return nil
+	}
+	visited[m] = true
+
+	seen := make(map[ProviderRef]bool, len(m.exports))
+	var out []ProviderRef
+	add := func(p ProviderRef) {
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+
+	for _, p := range m.exports {
+		add(p)
+	}
+	for _, re := range m.exportedModules {
+		for _, p := range effectiveExports(re, visited) {
+			add(p)
+		}
+	}
+	return out
 }

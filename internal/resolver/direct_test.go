@@ -159,6 +159,90 @@ func TestFindDirect_UnexportedImports_NotVisible(t *testing.T) {
 	}
 }
 
+// TestFindDirect_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
+// is direct.go's counterpart to resolver_test.go's re-export test: C
+// owns+exports a resolved provider, B imports C and re-exports it via
+// ExportModules (contributing no providers of its own), and A imports ONLY
+// B. candidateProviders now walks imported.EffectiveExports() instead of
+// imported.ExportedProviders(), so FindDirect on a scope containing only A
+// must still find C's provider.
+func TestFindDirect_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports(t *testing.T) {
+	pc := newResolved(fooType(), &fooService{})
+	c := module.New(func(m *module.Module) {
+		m.Providers(pc)
+		m.Exports(pc)
+	})
+	b := module.New(func(m *module.Module) {
+		m.Imports(c)
+		m.ExportModules(c)
+	})
+	a := module.New(func(m *module.Module) {
+		m.Imports(b)
+	})
+	a.Assemble()
+
+	v, ok := FindDirect([]*module.Module{a}, fooType())
+	if !ok {
+		t.Fatalf("FindDirect() ok=false, want true (C's provider reached transitively via B's re-export of C)")
+	}
+	if v.Interface().(*fooService) != pc.value {
+		t.Fatalf("FindDirect() = %v, want %v", v.Interface(), pc.value)
+	}
+}
+
+// TestFindDirectAll_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
+// is the FindDirectAll/interface-kind variant of the above, since
+// internal/inject's MustInject[T] for interface T goes through
+// FindDirectAll specifically, a genuinely different call path than
+// FindDirect worth covering separately.
+func TestFindDirectAll_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports(t *testing.T) {
+	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{})
+	c := module.New(func(m *module.Module) {
+		m.Providers(cat)
+		m.Exports(cat)
+	})
+	b := module.New(func(m *module.Module) {
+		m.Imports(c)
+		m.ExportModules(c)
+	})
+	a := module.New(func(m *module.Module) {
+		m.Imports(b)
+	})
+	a.Assemble()
+
+	matches := FindDirectAll([]*module.Module{a}, animalIfaceType())
+	if len(matches) != 1 {
+		t.Fatalf("FindDirectAll() = %d matches, want 1 (C's implementor reached transitively via B's re-export of C)", len(matches))
+	}
+	if matches[0].Interface().(animalIface).Talk() != "meow" {
+		t.Fatalf("FindDirectAll() resolved wrong value")
+	}
+}
+
+// TestFindDirect_ImportedNotReExported_StillInvisible is the regression
+// counterpart: B imports C but never calls ExportModules(C), so C's
+// exported provider must stay invisible to a scope built from A alone --
+// re-export stays strictly opt-in for the direct-injection path too, not
+// just Find's own path.
+func TestFindDirect_ImportedNotReExported_StillInvisible(t *testing.T) {
+	pc := newResolved(fooType(), &fooService{})
+	c := module.New(func(m *module.Module) {
+		m.Providers(pc)
+		m.Exports(pc)
+	})
+	b := module.New(func(m *module.Module) {
+		m.Imports(c) // no ExportModules(c): re-export not opted in
+	})
+	a := module.New(func(m *module.Module) {
+		m.Imports(b)
+	})
+	a.Assemble()
+
+	if _, ok := FindDirect([]*module.Module{a}, fooType()); ok {
+		t.Fatalf("FindDirect() found C's provider though B never re-exported C, want not visible")
+	}
+}
+
 func TestResolveWithOverrides_MatchingPointerOverride_SkipsRealConstructor(t *testing.T) {
 	realConstructorRan := false
 	p := provider.New(func(p *provider.Provider) {

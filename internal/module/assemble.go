@@ -73,7 +73,10 @@ func assemble(root *Module) ([]*Module, error) {
 }
 
 // validateExports ensures every provider in m.Exports was also registered
-// via m.Providers on the same module.
+// via m.Providers on the same module, and every module in m.exportedModules
+// was also registered via m.Imports on the same module -- symmetric checks,
+// since ExportModules re-exports a whole module the same way Exports
+// re-exposes an individual provider.
 func validateExports(m *Module) error {
 	declared := make(map[ProviderRef]bool, len(m.providers))
 	for _, p := range m.providers {
@@ -83,6 +86,17 @@ func validateExports(m *Module) error {
 	for _, p := range m.exports {
 		if !declared[p] {
 			return fmt.Errorf("module %s exports provider %v it does not declare", moduleName(m), p)
+		}
+	}
+
+	imported := make(map[*Module]bool, len(m.imports))
+	for _, im := range m.imports {
+		imported[im] = true
+	}
+
+	for _, re := range m.exportedModules {
+		if !imported[re] {
+			return fmt.Errorf("module %s re-exports module %s it does not import", moduleName(m), moduleName(re))
 		}
 	}
 

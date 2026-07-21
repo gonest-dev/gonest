@@ -201,3 +201,99 @@ func TestFind_DiamondImport_DirectImporterResolvesSharedProvider(t *testing.T) {
 		t.Fatalf("Find() = %v, want %v (B directly imports D)", got, p)
 	}
 }
+
+// TestFind_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
+// covers this task's core change: C owns+exports a provider, B imports C
+// and re-exports it via ExportModules (contributing no providers of its
+// own), and A imports ONLY B -- never touching C directly. Find(A, ...)
+// must still resolve C's provider, because findExported now walks B's
+// EffectiveExports (own exports + re-exported modules' exports) rather
+// than just B's own ExportedProviders.
+func TestFind_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports(t *testing.T) {
+	pc := &fakeProvider{resolved: fooType()}
+	c := module.New(func(m *module.Module) {
+		m.Providers(pc)
+		m.Exports(pc)
+	})
+	b := module.New(func(m *module.Module) {
+		m.Imports(c)
+		m.ExportModules(c)
+	})
+	a := module.New(func(m *module.Module) {
+		m.Imports(b)
+	})
+	a.Assemble()
+
+	got := Find(a, fooType())
+	if got != module.ProviderRef(pc) {
+		t.Fatalf("Find() = %v, want %v (C's provider, reached transitively via B's re-export of C)", got, pc)
+	}
+}
+
+// TestFind_ImportedNotReExported_StillPanics_NoProviderRegistered is the
+// regression-safety counterpart: B imports C but does NOT call
+// ExportModules(C), so re-export stays strictly opt-in -- C's exported
+// provider must remain invisible to A even though B sits between them.
+// Since the target isn't declared on B itself either, this hits the
+// generic "not registered anywhere" panic, not the "exists but not
+// exported" one (B never owns the type at all).
+func TestFind_ImportedNotReExported_StillPanics_NoProviderRegistered(t *testing.T) {
+	pc := &fakeProvider{resolved: fooType()}
+	c := module.New(func(m *module.Module) {
+		m.Providers(pc)
+		m.Exports(pc)
+	})
+	b := module.New(func(m *module.Module) {
+		m.Imports(c) // no ExportModules(c): re-export not opted in
+	})
+	a := module.New(func(m *module.Module) {
+		m.Imports(b)
+	})
+	a.Assemble()
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("Find() did not panic: C's provider should stay invisible to A since B never re-exported C")
+		}
+		msg, ok := r.(string)
+		want := "gonest: no provider registered for type *resolver.fooService"
+		if !ok || msg != want {
+			t.Fatalf("panic value = %v, want %q", r, want)
+		}
+	}()
+
+	Find(a, fooType())
+}
+
+// TestFind_PlainNotExported_StillPanicsExistsButNotExported is a regression
+// test for Find's OTHER panic branch (hasOwnUnexported), proving this
+// task's change to findExported -- swapping ExportedProviders() for
+// EffectiveExports() -- left the plain non-re-export "exists in module %s
+// but is not exported" path completely untouched: an imported module that
+// owns the target but never exported it (and never re-exports anything)
+// still produces that specific panic message, not the generic one.
+func TestFind_PlainNotExported_StillPanicsExistsButNotExported(t *testing.T) {
+	p := &fakeProvider{resolved: barType()}
+	child := module.New(func(m *module.Module) {
+		m.Providers(p) // declared, never exported, no re-exports involved
+	})
+	root := module.New(func(m *module.Module) {
+		m.Imports(child)
+	})
+	root.Assemble()
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("Find() did not panic for type owned by imported module but not exported")
+		}
+		msg, ok := r.(string)
+		want := "gonest: type *resolver.barService exists in module " + ModuleName(child) + " but is not exported"
+		if !ok || msg != want {
+			t.Fatalf("panic value = %v, want %q", r, want)
+		}
+	}()
+
+	Find(root, barType())
+}
