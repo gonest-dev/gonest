@@ -22,6 +22,29 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	service := gonest.MustInject[*Service](controller)
 
+	// POST /person/_search (Elasticsearch-style path), not the HTTP QUERY
+	// method (gonest.HttpQuery/RouteQuery) -- OpenAPI's Path Item Object
+	// (3.0 AND 3.1) only defines fixed operation fields for the standard
+	// verbs (get/put/post/delete/options/head/patch/trace); QUERY is still
+	// an IETF draft RFC with no OpenAPI representation at all, so a route
+	// registered under it never shows up in Swagger UI (silently ignored --
+	// found live testing /docs against this same example). A real POST to
+	// a dedicated sub-path sidesteps the gap entirely instead of working
+	// around it in the generated doc.
+	controller.RoutePost("/_search", func(r *gonest.Route) {
+		r.Summary("Search person entity using query")
+		r.Description(
+			"Generic query endpoint, modeled after github.com/leandroluk's Search.ts gist --",
+			"exercises gonest.Schema nested Object()/Array() refs, Enum-constrained Fields.Select/Remove",
+			"and Sort.Field, and Accessor dirty-tracking on both write DTOs and the Where filter.")
+		r.RequestBody(QueryDTOSchema)
+		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(resultSchema) })
+		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+			q := gonest.MustParse[QueryDTO](req.Body().Json(), QueryDTOSchema)
+			res.Json(service.Search(q))
+		})
+	})
+
 	controller.RouteGet("/:person_id", func(r *gonest.Route) {
 		r.Summary("Get a person by id")
 		r.Params(ParamsDTOSchema)
@@ -36,17 +59,6 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 				panic(gonest.NewNotFoundException(nil))
 			}
 			res.Json(person)
-		})
-	})
-
-	controller.RoutePost("/", func(r *gonest.Route) {
-		r.Summary("Create a person")
-		r.HttpCode(http.StatusCreated)
-		r.RequestBody(BodyCreateDTOSchema)
-		r.Response(http.StatusCreated, func(response *gonest.RouteResponse) { response.Schema(entity.PersonSchema) })
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
-			body := gonest.MustParse[BodyCreateDTO](req.Body().Json(), BodyCreateDTOSchema)
-			res.Status(http.StatusCreated).Json(service.Create(body))
 		})
 	})
 
@@ -88,26 +100,15 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		})
 	})
 
-	// POST /person/_search (Elasticsearch-style path), not the HTTP QUERY
-	// method (gonest.HttpQuery/RouteQuery) -- OpenAPI's Path Item Object
-	// (3.0 AND 3.1) only defines fixed operation fields for the standard
-	// verbs (get/put/post/delete/options/head/patch/trace); QUERY is still
-	// an IETF draft RFC with no OpenAPI representation at all, so a route
-	// registered under it never shows up in Swagger UI (silently ignored --
-	// found live testing /docs against this same example). A real POST to
-	// a dedicated sub-path sidesteps the gap entirely instead of working
-	// around it in the generated doc.
-	controller.RoutePost("/_search", func(r *gonest.Route) {
-		r.Summary("Search person entity using query")
-		r.Description(
-			"Generic query endpoint, modeled after github.com/leandroluk's Search.ts gist --",
-			"exercises gonest.Schema nested Object()/Array() refs, Enum-constrained Fields.Select/Remove",
-			"and Sort.Field, and Accessor dirty-tracking on both write DTOs and the Where filter.")
-		r.RequestBody(QueryDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(resultSchema) })
+	controller.RoutePost("/", func(r *gonest.Route) {
+		r.Summary("Create a person")
+		r.HttpCode(http.StatusCreated)
+		r.RequestBody(BodyCreateDTOSchema)
+		r.Response(http.StatusCreated, func(response *gonest.RouteResponse) { response.Schema(entity.PersonSchema) })
 		r.Handler(func(req *gonest.Request, res *gonest.Response) {
-			q := gonest.MustParse[QueryDTO](req.Body().Json(), QueryDTOSchema)
-			res.Json(service.Search(q))
+			body := gonest.MustParse[BodyCreateDTO](req.Body().Json(), BodyCreateDTOSchema)
+			res.Status(http.StatusCreated).Json(service.Create(body))
 		})
 	})
+
 })
