@@ -1405,6 +1405,42 @@ func TestNewSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 	}
 }
 
+// TestSchemaFor_ReturnsSameSchemaRegisteredByNewSchema proves SchemaFor[T]
+// finds the exact *Schema an earlier NewSchema[T] call registered -- the
+// whole point (a caller in a different package/file than the NewSchema[T]
+// declaration can still reach it, INSIGHT-REFLECT.md's own motivating case).
+func TestSchemaFor_ReturnsSameSchemaRegisteredByNewSchema(t *testing.T) {
+	type schemaForEntity struct {
+		Name string
+	}
+
+	want := NewSchema(func(e *schemaForEntity, m *Schema) {
+		m.Title("schemaForEntity")
+	})
+
+	got := SchemaFor[schemaForEntity]()
+	if got != want {
+		t.Fatalf("SchemaFor[schemaForEntity]() = %p, want the same *Schema NewSchema returned (%p)", got, want)
+	}
+	if got.TitleText() != "schemaForEntity" {
+		t.Fatalf("SchemaFor[schemaForEntity]().TitleText() = %q, want %q", got.TitleText(), "schemaForEntity")
+	}
+}
+
+// TestSchemaFor_UnregisteredType_Panics proves SchemaFor fails loud (not a
+// nil-pointer crash later) when asked for a type NewSchema was never called
+// for.
+func TestSchemaFor_UnregisteredType_Panics(t *testing.T) {
+	type neverRegisteredEntity struct{}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected SchemaFor to panic for an unregistered type, got none")
+		}
+	}()
+	SchemaFor[neverRegisteredEntity]()
+}
+
 // TestNewValue_RootAlias_CpfExample reproduces spec.md's own API Sketch
 // example verbatim (schema-value-support feature): a standalone `string`
 // value schema, no struct wrapping it, built via NewValue instead of

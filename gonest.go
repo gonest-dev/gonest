@@ -686,6 +686,31 @@ func NewSchema[T any](fn func(t *T, m *Schema)) *Schema {
 	return m
 }
 
+// SchemaFor returns the *Schema already registered for T via an earlier
+// NewSchema[T] call, looked up by T's own reflect.Type (internal/schema's
+// registry -- the same one MustJsonBody-family callers already rely on
+// implicitly). Panics if T was never registered, same "fail loud, don't
+// guess" stance as MustInject's own single/zero-match panics -- a caller
+// asking for a schema that doesn't exist is a coding error, not a request-
+// time condition to recover from.
+//
+// Exists so a Provider/Controller declared in one package (e.g. an entity's
+// own dao/service file) can reach an entity's schema declared elsewhere
+// (e.g. its own entity.go) WITHOUT that second package needing to export
+// and thread a `var Schema = gonest.NewSchema(...)` value through an
+// explicit import -- INSIGHT-REFLECT.md's own motivating case, reflection
+// standing in for the plumbing. Go cannot re-export a generic function via
+// var, so this is a real wrapper calling the internal one (same pattern as
+// NewSchema itself, see AD-004 in STATE.md).
+func SchemaFor[T any]() *Schema {
+	t := reflect.TypeFor[T]()
+	m, ok := schema.Lookup(t)
+	if !ok {
+		panic("gonest: no schema registered for type " + t.String() + " (call NewSchema[" + t.String() + "] first)")
+	}
+	return m
+}
+
 // Value is the builder handed to NewValue's callback -- a true Go type
 // alias of PropertyBuilder (schema-value-support feature), since a
 // standalone value needs none of PropertyBuilder's struct-field bookkeeping,
