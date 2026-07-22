@@ -162,7 +162,7 @@ func TestFindDirect_UnexportedImports_NotVisible(t *testing.T) {
 // TestFindDirect_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
 // is direct.go's counterpart to resolver_test.go's re-export test: C
 // owns+exports a resolved provider, B imports C and re-exports it via
-// ExportModules (contributing no providers of its own), and A imports ONLY
+// Exports (contributing no providers of its own), and A imports ONLY
 // B. candidateProviders now walks imported.EffectiveExports() instead of
 // imported.ExportedProviders(), so FindDirect on a scope containing only A
 // must still find C's provider.
@@ -174,7 +174,7 @@ func TestFindDirect_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
 	})
 	b := module.New(func(m *module.Module) {
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	})
 	a := module.New(func(m *module.Module) {
 		m.Imports(b)
@@ -203,7 +203,7 @@ func TestFindDirectAll_ReExportedModule_ResolvesTransitivelyThroughEffectiveExpo
 	})
 	b := module.New(func(m *module.Module) {
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	})
 	a := module.New(func(m *module.Module) {
 		m.Imports(b)
@@ -220,7 +220,7 @@ func TestFindDirectAll_ReExportedModule_ResolvesTransitivelyThroughEffectiveExpo
 }
 
 // TestFindDirect_ImportedNotReExported_StillInvisible is the regression
-// counterpart: B imports C but never calls ExportModules(C), so C's
+// counterpart: B imports C but never calls Exports(C), so C's
 // exported provider must stay invisible to a scope built from A alone --
 // re-export stays strictly opt-in for the direct-injection path too, not
 // just Find's own path.
@@ -231,7 +231,7 @@ func TestFindDirect_ImportedNotReExported_StillInvisible(t *testing.T) {
 		m.Exports(pc)
 	})
 	b := module.New(func(m *module.Module) {
-		m.Imports(c) // no ExportModules(c): re-export not opted in
+		m.Imports(c) // no Exports(c): re-export not opted in
 	})
 	a := module.New(func(m *module.Module) {
 		m.Imports(b)

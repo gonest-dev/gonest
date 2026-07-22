@@ -2,14 +2,14 @@ package module
 
 import "testing"
 
-// TestModule_ExportModules_StoresReExportedModules verifies ExportModules
+// TestModule_ExportModules_StoresReExportedModules verifies Exports
 // appends to exportedModules and OwnExportedModules reflects it -- same
 // registration/getter shape as Imports/ImportedModules.
 func TestModule_ExportModules_StoresReExportedModules(t *testing.T) {
 	child := New(func(m *Module) {})
 	root := New(func(m *Module) {
 		m.Imports(child)
-		m.ExportModules(child)
+		m.Exports(child)
 	})
 
 	if _, err := assemble(root); err != nil {
@@ -30,7 +30,7 @@ func TestModule_OwnExportedModules_ReturnsCopyNotInternalSlice(t *testing.T) {
 	other := New(func(m *Module) {})
 	root := New(func(m *Module) {
 		m.Imports(child)
-		m.ExportModules(child)
+		m.Exports(child)
 	})
 
 	if _, err := assemble(root); err != nil {
@@ -78,7 +78,7 @@ func TestModule_EffectiveExports_TwoHopChain_IncludesReExportedModulesOwnExports
 	})
 	b := New(func(m *Module) {
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	})
 
 	if _, err := assemble(b); err != nil {
@@ -102,11 +102,11 @@ func TestModule_EffectiveExports_ThreeHopChain_IsTransitive(t *testing.T) {
 	})
 	c := New(func(m *Module) {
 		m.Imports(d)
-		m.ExportModules(d)
+		m.Exports(d)
 	})
 	b := New(func(m *Module) {
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	})
 
 	if _, err := assemble(b); err != nil {
@@ -131,7 +131,7 @@ func TestModule_EffectiveExports_UndeclaredExportOnReExportedModule_NotIncluded(
 	})
 	b := New(func(m *Module) {
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	})
 
 	if _, err := assemble(b); err != nil {
@@ -156,15 +156,15 @@ func TestModule_EffectiveExports_Diamond_DedupesSharedReExportedModule(t *testin
 	})
 	c := New(func(m *Module) {
 		m.Imports(e)
-		m.ExportModules(e)
+		m.Exports(e)
 	})
 	d := New(func(m *Module) {
 		m.Imports(e)
-		m.ExportModules(e)
+		m.Exports(e)
 	})
 	b := New(func(m *Module) {
 		m.Imports(c, d)
-		m.ExportModules(c, d)
+		m.Exports(c, d)
 	})
 
 	if _, err := assemble(b); err != nil {
@@ -192,7 +192,7 @@ func TestModule_EffectiveExports_SelfReExport_DoesNotHang(t *testing.T) {
 		m.Providers(p)
 		m.Exports(p)
 		m.Imports(b)
-		m.ExportModules(b)
+		m.Exports(b)
 	})
 
 	if _, err := assemble(b); err != nil {
@@ -217,13 +217,13 @@ func TestModule_EffectiveExports_MutualReExportCycle_DoesNotHang(t *testing.T) {
 		m.Providers(pb)
 		m.Exports(pb)
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	}
 	c.fn = func(m *Module) {
 		m.Providers(pc)
 		m.Exports(pc)
 		m.Imports(b)
-		m.ExportModules(b)
+		m.Exports(b)
 	}
 
 	if _, err := assemble(b); err != nil {
@@ -237,12 +237,12 @@ func TestModule_EffectiveExports_MutualReExportCycle_DoesNotHang(t *testing.T) {
 }
 
 // TestAssemble_ExportModulesNotImported_ReturnsError verifies assemble
-// rejects ExportModules(X) when X was never passed to Imports, symmetric to
+// rejects Exports(X) when X was never passed to Imports, symmetric to
 // the existing check for Exports(p) without Providers(p).
 func TestAssemble_ExportModulesNotImported_ReturnsError(t *testing.T) {
 	other := New(func(m *Module) {})
 	m := New(func(m *Module) {
-		m.ExportModules(other)
+		m.Exports(other)
 	})
 
 	_, err := assemble(m)
@@ -257,7 +257,7 @@ func TestAssemble_ExportModulesImported_NoError(t *testing.T) {
 	other := New(func(m *Module) {})
 	m := New(func(m *Module) {
 		m.Imports(other)
-		m.ExportModules(other)
+		m.Exports(other)
 	})
 
 	if _, err := assemble(m); err != nil {

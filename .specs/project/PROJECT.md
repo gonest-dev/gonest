@@ -7,6 +7,7 @@
 ## Goals
 
 - DX percebida como "Nest, só que Go" — dev NestJS lê um exemplo do gonest e reconhece o padrão sem precisar de doc extra.
+- **Paridade de API com NestJS vence pureza idiomática Go quando os dois colidem.** Onde o Nest usa uma API unificada (ex: `@Module({ exports: [...] })` aceitando providers E módulos no mesmo array), gonest replica essa forma mesmo que o equivalente Go "puro" preferisse métodos separados por tipo — o objetivo é baixar atrito de quem já pensa em Nest, não maximizar idiomaticidade Go isolada. Ver AD-052 (`.specs/project/STATE.md`) para o caso concreto que fixou esta premissa.
 - Zero reflect em runtime crítico (validação/DI) onde builder explícito resolver — reflect só onde Go genuinely não permite alternativa (ex: tipo de campo em `Property(&t.X)`).
 - Cobertura das primitivas centrais do Nest (módulo, DI, pipeline de request, validação+OpenAPI) documentadas em INSIGHT.md antes de qualquer código de produção.
 

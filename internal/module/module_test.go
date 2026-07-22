@@ -30,6 +30,8 @@ type fakeProvider struct {
 
 func (*fakeProvider) IsProvider() {}
 
+func (*fakeProvider) IsExportable() {}
+
 func (p *fakeProvider) ResolvedType() reflect.Type {
 	return p.resolved
 }

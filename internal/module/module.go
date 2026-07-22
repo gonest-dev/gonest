@@ -8,6 +8,17 @@ import (
 	"reflect"
 )
 
+// ExportableRef is a minimal marker interface satisfied by anything that
+// can be passed to Module.Exports: either a ProviderRef (an individual
+// provider) or a *Module (a whole re-exported module). Mirrors NestJS's
+// `@Module({ exports: [...] })`, which accepts both providers and modules
+// in the same array -- see this feature's (unified-exportable-refs)
+// design.md for why Go-purity lost to Nest-parity here, reversing AD-051's
+// original two-method split (ExportModules vs Exports).
+type ExportableRef interface {
+	IsExportable()
+}
+
 // ProviderRef is a minimal marker interface satisfied by the real
 // *provider.Provider type (owned by internal/provider). Module never needs
 // to know the concrete provider type — it only tracks registered
@@ -21,7 +32,11 @@ import (
 // never satisfy an unexported isProvider() declared here, even with an
 // identical signature. Exporting the interface — not the marker method
 // itself — is what makes cross-package satisfaction possible.
+//
+// Embeds ExportableRef so every ProviderRef already satisfies it -- no
+// extra work needed at call sites passing a provider to Exports.
 type ProviderRef interface {
+	ExportableRef
 	IsProvider()
 	// ResolvedType returns the reflect.Type this provider resolves (its
 	// Constructor's first return value's type), used by internal/resolver
@@ -167,24 +182,30 @@ func (m *Module) Resolvers(rs ...ResolverRef) {
 	m.resolvers = append(m.resolvers, rs...)
 }
 
-// Exports registers the subset of this module's own providers that are
-// visible to importing modules. Every exported provider must have also
-// been registered via Providers on this same module -- validated at the
-// end of Stage 1 assembly.
-func (m *Module) Exports(ps ...ProviderRef) {
-	m.exports = append(m.exports, ps...)
+// Exports registers what this module makes visible to importing modules --
+// accepting both individual providers (ProviderRef) and whole modules to
+// re-export (*Module) in the same call, mirroring NestJS's
+// `exports: [...]`. A ProviderRef argument must have also been registered
+// via Providers on this same module; a *Module argument must have also been
+// passed to Imports on this same module -- both validated at the end of
+// Stage 1 assembly. Re-exporting a module makes every provider IT exposes
+// (via its own Exports, transitively through its own re-exported modules)
+// visible through this module too, without needing to name each provider
+// individually.
+func (m *Module) Exports(refs ...ExportableRef) {
+	for _, ref := range refs {
+		switch v := ref.(type) {
+		case *Module:
+			m.exportedModules = append(m.exportedModules, v)
+		case ProviderRef:
+			m.exports = append(m.exports, v)
+		}
+	}
 }
 
-// ExportModules registers whole modules to re-export: every provider that
-// mods themselves expose (via their own Exports, transitively through their
-// own re-exported modules) becomes visible through this module too, without
-// this module needing to name each provider individually. Every module
-// passed here must also have been passed to Imports on this same module --
-// validated at the end of Stage 1 assembly, symmetric to how Exports
-// requires its providers to also be in Providers.
-func (m *Module) ExportModules(mods ...*Module) {
-	m.exportedModules = append(m.exportedModules, mods...)
-}
+// IsExportable is a marker method that satisfies ExportableRef, so *Module
+// can be passed to Exports alongside individual ProviderRef values.
+func (m *Module) IsExportable() {}
 
 // Use registers middleware owned by this module. Go cannot restrict this
 // method to "the root module only" at the type level -- any *Module can
@@ -298,21 +319,21 @@ func (m *Module) ExportedProviders() []ProviderRef {
 }
 
 // OwnExportedModules returns a copy of the modules registered on this
-// module via ExportModules. Read-only: mutating the returned slice does not
-// affect this Module's internal state. Used by Stage 1 assembly to validate
-// that every re-exported module was also imported, and by EffectiveExports
-// to walk the re-export chain.
+// module via Exports (the *Module-typed arguments). Read-only: mutating the
+// returned slice does not affect this Module's internal state. Used by
+// Stage 1 assembly to validate that every re-exported module was also
+// imported, and by EffectiveExports to walk the re-export chain.
 func (m *Module) OwnExportedModules() []*Module {
 	return append([]*Module(nil), m.exportedModules...)
 }
 
 // EffectiveExports returns the full set of providers visible to an importer
 // of this module: this module's own Exports, plus -- for every module
-// registered via ExportModules -- that module's own EffectiveExports,
-// walked transitively. Unlike ExportedProviders (this module's own Exports
-// only), EffectiveExports follows re-export chains of arbitrary depth, so
-// an importer of B can reach a provider exported by D even when B only
-// re-exports C and C re-exports D.
+// registered via Exports (the *Module-typed arguments) -- that module's own
+// EffectiveExports, walked transitively. Unlike ExportedProviders (this
+// module's own Exports only), EffectiveExports follows re-export chains of
+// arbitrary depth, so an importer of B can reach a provider exported by D
+// even when B only re-exports C and C re-exports D.
 //
 // A provider that is merely declared via Providers on a re-exported module
 // -- but never itself passed to that module's own Exports -- is never

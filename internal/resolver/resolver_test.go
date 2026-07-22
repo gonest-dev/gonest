@@ -17,6 +17,8 @@ type fakeProvider struct {
 
 func (*fakeProvider) IsProvider() {}
 
+func (*fakeProvider) IsExportable() {}
+
 func (p *fakeProvider) ResolvedType() reflect.Type {
 	return p.resolved
 }
@@ -204,7 +206,7 @@ func TestFind_DiamondImport_DirectImporterResolvesSharedProvider(t *testing.T) {
 
 // TestFind_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
 // covers this task's core change: C owns+exports a provider, B imports C
-// and re-exports it via ExportModules (contributing no providers of its
+// and re-exports it via Exports (contributing no providers of its
 // own), and A imports ONLY B -- never touching C directly. Find(A, ...)
 // must still resolve C's provider, because findExported now walks B's
 // EffectiveExports (own exports + re-exported modules' exports) rather
@@ -217,7 +219,7 @@ func TestFind_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports(t *te
 	})
 	b := module.New(func(m *module.Module) {
 		m.Imports(c)
-		m.ExportModules(c)
+		m.Exports(c)
 	})
 	a := module.New(func(m *module.Module) {
 		m.Imports(b)
@@ -232,7 +234,7 @@ func TestFind_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports(t *te
 
 // TestFind_ImportedNotReExported_StillPanics_NoProviderRegistered is the
 // regression-safety counterpart: B imports C but does NOT call
-// ExportModules(C), so re-export stays strictly opt-in -- C's exported
+// Exports(C), so re-export stays strictly opt-in -- C's exported
 // provider must remain invisible to A even though B sits between them.
 // Since the target isn't declared on B itself either, this hits the
 // generic "not registered anywhere" panic, not the "exists but not
@@ -244,7 +246,7 @@ func TestFind_ImportedNotReExported_StillPanics_NoProviderRegistered(t *testing.
 		m.Exports(pc)
 	})
 	b := module.New(func(m *module.Module) {
-		m.Imports(c) // no ExportModules(c): re-export not opted in
+		m.Imports(c) // no Exports(c): re-export not opted in
 	})
 	a := module.New(func(m *module.Module) {
 		m.Imports(b)

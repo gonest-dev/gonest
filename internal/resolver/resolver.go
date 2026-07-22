@@ -60,7 +60,8 @@ func findOwn(m *module.Module, target reflect.Type) module.ProviderRef {
 }
 
 // findExported searches m's EFFECTIVE exports (its own exports plus every
-// provider re-exported transitively via ExportModules) for one resolving
+// provider re-exported transitively via Exports's *Module arguments) for
+// one resolving
 // target -- an imported module's re-exports are visible to importers exactly
 // as if the re-exporting module had exported the provider itself.
 func findExported(m *module.Module, target reflect.Type) module.ProviderRef {

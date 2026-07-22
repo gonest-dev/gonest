@@ -44,6 +44,15 @@ import (
 // Module Composition features)
 // ---------------------------------------------------------------------------
 
+// ExportableRef is the minimal marker interface satisfied by anything
+// Module.Exports(refs ...ExportableRef) (below) accepts: a ProviderRef (an
+// individual provider) or a *Module (a whole re-exported module) -- same
+// root-aliasing rationale as ProviderRef's own doc comment (Module.Exports'
+// signature would otherwise leak `...module.ExportableRef` on hover).
+// ProviderRef embeds it, so *Provider already satisfies it; *Module
+// implements it directly.
+type ExportableRef = module.ExportableRef
+
 // ProviderRef is the minimal marker interface *Provider satisfies --
 // exists purely because Module.Providers(refs ...ProviderRef) (below)
 // declares its variadic parameter in terms of it, and Module is a true
