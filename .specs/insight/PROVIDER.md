@@ -10,11 +10,12 @@ golang mas ainda tenha uma assinatura simples e amigável como o verdadeiro nest
 > de `internal/resolver/direct.go`; Milestone 23 fechou a convenção `Thing_` pra vars
 > de builder, formalizada em README.md, e migrou `.examples/notification-driver` --
 > ver `.specs/features/provider-interface-export/{spec,tasks}.md`). O
-> `Module.Lazy`/`l.Imports(...)` do exemplo abaixo (`database/module.go`) mira
-> replicar o `DynamicModule.forRootAsync` do NestJS -- continua OUT OF SCOPE dessa
-> spec de propósito (mexe em ordem de bootstrap, categoria de maior risco do
-> projeto -- ver AD-015 em `.specs/project/STATE.md`), registrado aqui como reflexão
-> viva até virar spec própria.
+> `Module.Lazy`/`l.Imports(...)` do exemplo abaixo (`database/module.go`) mirava
+> replicar o `DynamicModule.forRootAsync` do NestJS -- SHIPPED (Milestone 24
+> completo: `gonest.LazyModule`/`(*Module).Lazy` são código real, não mais
+> hipótese; `.examples/notification-driver` migrado de `ModuleForRoot(driver)`
+> pra `notifier.Config_` + `m.Lazy(...)` -- ver
+> `.specs/features/module-lazy-loading/{spec,design,tasks}.md`).
 
 ## exemplo de declaração de um provider simples com registro em módulo
 

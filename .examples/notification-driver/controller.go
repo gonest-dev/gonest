@@ -26,6 +26,12 @@ var NotificationController_ = gonest.NewController(func(controller *gonest.Contr
 	controller.Path("/notifications")
 
 	notify := gonest.MustInject[notifier.Port](controller)
+	// *notifier.Config is exported unconditionally by notifier.Module_ (see
+	// its own doc comment) -- resolved here DIRECTLY (Controller phase runs
+	// after Stage 3, no placeholder), same single *Config instance
+	// notifier.Module_'s own Lazy callback already eagerly constructed
+	// (LAZY-03: its Constructor never runs twice).
+	config := gonest.MustInject[*notifier.Config](controller)
 
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.Summary("Send a notification through whichever driver is active")

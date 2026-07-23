@@ -7,11 +7,13 @@
 package inject
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
 
 	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/scope"
 )
 
 // PendingEdge records that Owner requested resolution of TargetType via
@@ -37,6 +39,55 @@ var (
 	pendingEdgesMu sync.Mutex
 	pendingEdges   []PendingEdge
 )
+
+// lazyResolved records, for the CURRENT bootstrap only, every
+// module.ProviderRef that mustLazy already eagerly constructed via
+// Module.Lazy's MustInject[T](l) dispatch branch (see mustLazy below),
+// keyed by the ref's own identity, alongside the exact reflect.Value it
+// produced.
+//
+// SPEC_DEVIATION (module-lazy-loading feature, T3): design.md's Stage 3
+// skip-if-already-resolved check was specified to read
+// *provider.Provider's OWN ResolvedValue()/SetResolvedValue() -- reasoning
+// "before this feature, ResolvedValue() could only ever return ok=false at
+// this point in Stage 3 (nothing sets it earlier)". That is false once
+// touched against the real test suite: invokeAndCopy (internal/resolver/
+// stage3.go) ALREADY calls SetResolvedValue unconditionally on every
+// successful resolution (pre-existing, for FindDirect/FindDirectAll's
+// post-Stage-3 reads), and that value is NEVER cleared afterward -- a
+// package-level *provider.Provider var reused across multiple separate
+// NewApp calls in the same process (a long-established, explicitly
+// documented-safe pattern in this codebase, see inject.Reset's own doc
+// comment and TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges)
+// would therefore short-circuit on its 2nd+ NewApp call, reusing a STALE
+// value from a previous bootstrap instead of constructing fresh -- observed
+// as a real regression across internal/app's existing test suite
+// (UserProvider-sharing tests) once Stage 3 started consulting
+// ResolvedValue() directly.
+//
+// The smallest safe fix: track "eagerly resolved via Lazy, THIS bootstrap
+// only" separately, in this package (already scoped per-bootstrap via
+// Reset(), the same contract pendingEdges/globalSingletons already rely
+// on), instead of conflating it with Provider's own permanent
+// post-resolution cache. Stage 3 consults LazyResolvedValue (below)
+// instead of node's own ResolvedValue().
+var (
+	lazyResolvedMu sync.Mutex
+	lazyResolved   map[module.ProviderRef]reflect.Value
+)
+
+// LazyResolvedValue returns the value mustLazy already eagerly constructed
+// for ref during THIS bootstrap's Module.Lazy callback(s), and whether one
+// exists. Exported so internal/resolver's Stage 3 (invokeAndCopy) can skip
+// re-invoking ref's Constructor -- see lazyResolved's own doc comment for
+// why this is a separate, bootstrap-scoped registry rather than Provider's
+// own ResolvedValue().
+func LazyResolvedValue(ref module.ProviderRef) (reflect.Value, bool) {
+	lazyResolvedMu.Lock()
+	defer lazyResolvedMu.Unlock()
+	v, ok := lazyResolved[ref]
+	return v, ok
+}
 
 // globalSingletons holds framework-provided singletons (today: only
 // *emitter.Emitter, see internal/emitter) that MUST resolve via
@@ -113,6 +164,10 @@ func Reset() {
 	globalSingletonsMu.Lock()
 	globalSingletons = nil
 	globalSingletonsMu.Unlock()
+
+	lazyResolvedMu.Lock()
+	lazyResolved = nil
+	lazyResolvedMu.Unlock()
 }
 
 // resetPendingEdges is Reset, kept under its original unexported name for
@@ -135,6 +190,148 @@ func pendingEdgesFor(owner module.Owner) []PendingEdge {
 		}
 	}
 	return out
+}
+
+// declarable is satisfied by *provider.Provider. Declared here, unexported,
+// same cross-package rationale as internal/resolver/stage3.go's/internal/
+// app's own private mirrors of *provider.Provider's methods -- this
+// package cannot import internal/provider (provider already imports
+// module, and internal/inject already imports module too; importing
+// provider from here would additionally require provider to expose
+// exactly the methods below, achievable structurally without a real
+// import). Used by the Lazy dispatch branch below to run Declare on every
+// own-module provider so ResolvedType() becomes available for matching.
+type declarable interface {
+	Declare()
+}
+
+// constructable is satisfied by *provider.Provider, mirroring internal/
+// resolver/stage3.go's own private interface of the same name/shape (see
+// its doc comment for the full cross-package rationale). Used by the Lazy
+// dispatch branch below to invoke a matched provider's Constructor
+// directly.
+type constructable interface {
+	ConstructorFunc() reflect.Value
+}
+
+// lazyScoped mirrors internal/resolver/stage3.go's own private `scoped`
+// interface (renamed here only to avoid colliding with this package's own
+// unrelated identifiers) -- same *provider.Provider method, same
+// cross-package rationale.
+type lazyScoped interface {
+	ResolvedScope() scope.Scope
+}
+
+// lazyResolvedSetter mirrors internal/resolver/stage3.go's own private
+// resolvedSetter interface -- same *provider.Provider method
+// (SetResolvedValue), same cross-package rationale. Named with a lazy
+// prefix only to avoid any future collision with this package's own
+// identifiers. Calling SetResolvedValue here is purely additive to
+// Provider's existing post-resolution cache (used by internal/resolver's
+// FindDirect/FindDirectAll, post-Stage-3 reads) -- LAZY-08/LAZY-03's own
+// "already resolved, reuse it" short-circuits are checked against
+// lazyResolved (this package's own bootstrap-scoped bookkeeping) instead,
+// see lazyResolved's own doc comment for why.
+type lazyResolvedSetter interface {
+	SetResolvedValue(v reflect.Value)
+}
+
+// lazyContextType mirrors internal/provider's own contextType constant
+// (and internal/resolver/stage3.go's own copy of the same), used to decide
+// whether a Constructor wants a context.Context as its sole argument.
+// Duplicated rather than imported -- see design.md's Tech Decisions
+// (internal/inject cannot import internal/provider or internal/resolver
+// without creating an import cycle).
+var lazyContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
+
+// mustLazy implements Must[T]'s 3rd dispatch branch: owner is a
+// *module.LazyModule (see .specs/features/module-lazy-loading/design.md's
+// Components section, "inject.Must[T]'s Lazy dispatch branch", for the
+// full 10-step algorithm this mirrors exactly).
+//
+// T must be a pointer type -- Lazy injection is scoped to concrete
+// config-like values, the same pointer-only rule the existing
+// Provider-to-Provider path below already enforces, not the interface
+// path directResolver above handles.
+//
+// Only providers registered on lm's OWN module, via Providers earlier in
+// the same Lazy callback's enclosing fn, are visible -- see LazyModule's
+// own doc comment for why imports are never searched (they are not
+// finalized yet, Lazy is literally what decides them).
+func mustLazy[T any](lm *module.LazyModule, t reflect.Type) T {
+	if t.Kind() != reflect.Pointer {
+		panic(fmt.Sprintf("gonest: MustInject[T](l) requires T to be a pointer type, got %s", t.String()))
+	}
+
+	var match module.ProviderRef
+	for _, p := range lm.OwnProviders() {
+		if d, ok := p.(declarable); ok {
+			d.Declare()
+		}
+		if p.ResolvedType() == t {
+			match = p
+		}
+	}
+
+	if match == nil {
+		panic(fmt.Sprintf("gonest: MustInject[T](l) found no provider for type %s registered via this module's own Providers(...) earlier in the same fn -- Lazy only sees this module's own providers", t.String()))
+	}
+
+	// LAZY-08's repeated-call short-circuit is checked against lazyResolved
+	// (this bootstrap only), NOT match's own ResolvedValue() -- see
+	// lazyResolved's own doc comment (SPEC_DEVIATION) for why a permanent,
+	// never-cleared cache on *provider.Provider itself would incorrectly
+	// short-circuit a LATER, separate bootstrap reusing the same
+	// package-level Provider var.
+	if v, ok := LazyResolvedValue(match); ok {
+		return v.Interface().(T)
+	}
+
+	if sc, ok := match.(lazyScoped); ok && sc.ResolvedScope() != scope.Singleton {
+		panic(fmt.Sprintf("gonest: MustInject[T](l) requires a ScopeSingleton provider, type %s is scoped %v", t.String(), sc.ResolvedScope()))
+	}
+
+	c, ok := match.(constructable)
+	if !ok {
+		panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s does not expose a Constructor", t.String()))
+	}
+	fn := c.ConstructorFunc()
+	if !fn.IsValid() {
+		panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s has no Constructor registered", t.String()))
+	}
+
+	before := len(PendingEdges())
+
+	var args []reflect.Value
+	if fn.Type().NumIn() == 1 && fn.Type().In(0) == lazyContextType {
+		args = []reflect.Value{reflect.ValueOf(context.Background())}
+	}
+	out := fn.Call(args)
+
+	var real reflect.Value
+	if len(out) == 2 {
+		if errVal := out[1]; !errVal.IsNil() {
+			panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s returned an error during eager Lazy construction: %v", t.String(), errVal.Interface()))
+		}
+	}
+	real = out[0]
+
+	if len(PendingEdges()) != before {
+		panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s recorded a new dependency during eager construction -- Lazy only supports self-contained providers with no MustInject calls of their own", t.String()))
+	}
+
+	if rs, ok := match.(lazyResolvedSetter); ok {
+		rs.SetResolvedValue(real)
+	}
+
+	lazyResolvedMu.Lock()
+	if lazyResolved == nil {
+		lazyResolved = make(map[module.ProviderRef]reflect.Value)
+	}
+	lazyResolved[match] = real
+	lazyResolvedMu.Unlock()
+
+	return real.Interface().(T)
 }
 
 // directResolver is satisfied by *controller.Controller (once Provider
@@ -182,6 +379,10 @@ func Must[T any](owner any) T {
 
 	if v, ok := GlobalSingletonFor(t); ok {
 		return v.Interface().(T)
+	}
+
+	if lm, ok := owner.(*module.LazyModule); ok {
+		return mustLazy[T](lm, t)
 	}
 
 	if dr, ok := owner.(directResolver); ok {

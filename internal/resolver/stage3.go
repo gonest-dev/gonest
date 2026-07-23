@@ -310,6 +310,33 @@ func allProviders(modules []*module.Module) []module.ProviderRef {
 func invokeAndCopy(ctx context.Context, node module.ProviderRef, overrides map[reflect.Type]reflect.Value) (err error) {
 	real, overridden := overrideFor(overrides, node)
 	if !overridden {
+		// A node can already carry a resolved value here if it went
+		// through internal/inject's Lazy eager-resolution path (Module.Lazy
+		// -> MustInject[T](l), see .specs/features/module-lazy-loading's
+		// design.md) before Stage 3 ever ran -- LAZY-03 requires its
+		// Constructor never run a second time.
+		//
+		// SPEC_DEVIATION (module-lazy-loading feature, T3): design.md
+		// specified checking node's own resolvedGetter (Provider.
+		// ResolvedValue) here, reasoning that before this feature nothing
+		// could set it this early. That assumption breaks against the real
+		// test suite: invokeAndCopy ALREADY calls SetResolvedValue
+		// unconditionally below on every successful resolution (pre-
+		// existing, for FindDirect/FindDirectAll's post-Stage-3 reads), and
+		// it is never cleared -- a package-level *provider.Provider var
+		// reused across multiple separate NewApp calls in the same process
+		// (an established, documented-safe pattern elsewhere in this
+		// codebase) would incorrectly reuse a STALE value from a PRIOR
+		// bootstrap instead of constructing fresh. inject.LazyResolvedValue
+		// is scoped to the current bootstrap only (cleared by inject.Reset,
+		// same contract as PendingEdges/globalSingletons), so it is used
+		// here instead -- a real no-op for every provider except one Lazy
+		// eagerly resolved THIS bootstrap.
+		if v, ok := inject.LazyResolvedValue(node); ok {
+			real, overridden = v, true
+		}
+	}
+	if !overridden {
 		real, err = callConstructor(ctx, node)
 		if err != nil {
 			return err

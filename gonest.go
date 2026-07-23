@@ -100,6 +100,16 @@ type SchedulerRef = module.SchedulerRef
 // providers it exports to importers.
 type Module = module.Module
 
+// LazyModule is the callback argument to (*Module).Lazy -- a module's
+// own Config-like provider (registered via Providers earlier in the same
+// fn) decides, synchronously and from INSIDE the DI graph, which
+// sibling module(s) to Imports/Exports (module-lazy-loading feature,
+// Milestone 24; mirrors NestJS's DynamicModule.forRootAsync). Same
+// root-aliasing rationale as every other internal type re-exported here --
+// Lazy itself needs no separate wrapper function, it's already a method on
+// the aliased Module type above.
+type LazyModule = module.LazyModule
+
 // NewModule creates a Module that defers fn until Stage 1 assembly runs
 // during bootstrap.
 func NewModule(fn func(*Module)) *Module {

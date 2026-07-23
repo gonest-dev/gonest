@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 23 (Thing_ Naming Convention) -- COMPLETE
-**Status:** Milestones 1-23 COMPLETE
+**Current Milestone:** 24 (Module Lazy Loading) -- COMPLETE
+**Status:** Milestones 1-24 COMPLETE
 
 ---
 
@@ -505,6 +505,76 @@ buildam)
 - `.specs/insight/PROVIDER.md`'s blockquote de status atualizado pra "SHIPPED" (Milestone 22
   completo), mantendo o tangent de `Module.Lazy`/`l.Imports(...)` só como forward-pointer (fora de
   escopo, spec própria futura)
+
+---
+
+## Milestone 24: Module Lazy Loading
+
+**Goal:** `Module.Lazy(fn func(l *LazyModule))` -- um módulo escolhe QUAL módulo(s) irmão(s)
+importar/exportar a partir de um valor de config resolvido DE DENTRO do próprio grafo de DI, em
+tempo de bootstrap, mirando o `DynamicModule.forRootAsync` do NestJS (`.specs/insight/PROVIDER.md`'s
+`database/module.go` sketch). Substitui `.examples/notification-driver`'s `ModuleForRoot(driver
+string) *gonest.Module` (função livre chamada de `main.go`, decisão fora do grafo de DI) por
+`notifier.Config_` (`Provider`/`Schema` real, `env:"NOTIFICATION_DRIVER"`) lido dentro de
+`m.Lazy(...)`.
+**Status:** COMPLETE (T1-T8 executados, `go test ./... -race -count=1` verde, 24 pacotes,
+`.examples/notification-driver` migrado e verificado ao vivo pros 2 valores de driver)
+
+### Features
+
+**`LazyModule` + `Module.Lazy`** - COMPLETE
+- `internal/module/lazy.go` (novo): `LazyModule` struct (`owner *Module` não-exportado),
+  `(*Module).Lazy(fn func(l *LazyModule))` chama `fn(l)` IMEDIATAMENTE (não deferido) -- seguro
+  porque `Lazy` só é chamado de DENTRO do próprio `fn` já-deferido de um módulo (Stage 1's BFS em
+  `assemble.go` chama `m.fn(m)`, depois lê `m.imports`/`m.exports` na sequência). `LazyModule.
+  Imports`/`Exports`/`OwnProviders` delegam pro `owner`
+
+**`inject.Must[T]`'s 3º branch de dispatch (Lazy)** - COMPLETE
+- `internal/inject/inject.go`'s `mustLazy` implementa o algoritmo de 10 passos: `T` deve ser
+  ponteiro; `Declare()`-a todo provider próprio do módulo pra popular `ResolvedType()`; acha o
+  provider por match exato de tipo (panic LAZY-05 se não achar); short-circuit se já resolvido
+  nesse bootstrap (LAZY-08); panic se não for `ScopeSingleton` (LAZY-07); invoca o `Constructor`
+  diretamente via reflect (mesma lógica de 4 assinaturas de `stage3.go`'s `callConstructor`,
+  duplicada -- ciclo de import impede reuso); panic se o `Constructor` registrar um novo
+  `PendingEdge` (LAZY-06, providers com dependência própria não são suportados); `SetResolvedValue`
+  + registro em `lazyResolved` (bookkeeping por-bootstrap desse pacote)
+
+**Stage 3 skip-if-already-resolved** - COMPLETE
+- `internal/resolver/stage3.go`'s `invokeAndCopy` (path Singleton) checa `inject.LazyResolvedValue`
+  antes de invocar `callConstructor` -- garante LAZY-03 (Constructor eager-resolvido via `Lazy`
+  nunca roda 2x)
+- **SPEC_DEVIATION**: design.md original mirava reusar `Provider.ResolvedValue()`/`SetResolvedValue`
+  diretamente pro skip-check; achado real ao tocar o código: `SetResolvedValue` já era chamado
+  incondicionalmente em todo `invokeAndCopy` bem-sucedido (pré-existente, pra leituras de
+  `FindDirect`/`FindDirectAll` pós-Stage-3) e NUNCA era limpo -- um `*provider.Provider`
+  package-level reusado por múltiplas chamadas `NewApp` separadas no mesmo processo (padrão já
+  usado e documentado como seguro em vários testes desse repo) reusaria um valor FANTASMA de um
+  bootstrap anterior. Corrigido com um registro novo, escopado por-bootstrap, dentro do próprio
+  `internal/inject` (`lazyResolved`, limpo por `Reset()` -- mesmo contrato de `pendingEdges`), em
+  vez do cache permanente de `Provider`
+
+**`gonest.LazyModule` root alias** - COMPLETE
+- `gonest.go`: `type LazyModule = module.LazyModule` -- `(*gonest.Module).Lazy(...)` já funciona
+  automaticamente via o alias existente de `Module`, sem wrapper extra (`Lazy` é método, não função
+  genérica livre)
+
+**Prova de integração LAZY-04** - COMPLETE
+- `internal/app/lazy_module_test.go` (novo): app real via `coreapp.New[fiber.App]`, `Lazy` escolhe
+  entre 2 módulos irmãos por valor de config, cada branch com dispatch HTTP real via `app.Test`
+  provando registro de rota + resolução de DI ponta a ponta; teste dedicado prova o Constructor do
+  provider config roda EXATAMENTE 1 vez pros 2 valores de driver (LAZY-03)
+
+**`.examples/notification-driver` migrado** - COMPLETE
+- `notifier/config.go` (novo): `Config_` (`Provider` + `Schema`, `env:"NOTIFICATION_DRIVER"`,
+  `Enum("email","sms").Default("email")`) -- mesmo padrão de `.examples/config-dotenv`
+- `notifier/module.go`: `ModuleForRoot` removido; `Module_` registra+exporta `Config_`
+  incondicionalmente e usa `m.Lazy(...)` pra escolher `email.Module_`/`sms.Module_`
+- `main.go`: não lê mais `NOTIFICATION_DRIVER` nem escolhe módulo -- só chama
+  `gonest.Dotenv().MustLoad("./.env")` antes de `NewApp` (mesma ordem de `.examples/config-dotenv`)
+  e importa `AppModule_`
+- `controller.go`: injeta `*notifier.Config` diretamente (exportado por `Module_`) em vez de ler um
+  var `config` package-level de `main.go`
+- Verificado ao vivo via `curl` contra os 2 valores de `NOTIFICATION_DRIVER` (sms e email/default)
 
 ---
 

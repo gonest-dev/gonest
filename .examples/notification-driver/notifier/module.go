@@ -10,12 +10,18 @@ import (
 
 type Port = port.Notifier
 
-// ModuleForRoot is a dynamic module (see /docs/core-concepts/modules --
-// "Dynamic modules"): a plain function closing over a config value, run
-// ONCE at package-init time, that picks which real adapter module answers
-// for Notifier. AppModule_ (../module.go) imports ONLY this function's
-// result -- it never imports email.Module_ or sms.Module_ directly, so
-// swapping the driver never touches AppModule_'s own wiring.
+// Module_ picks -- via Module.Lazy, from INSIDE the DI graph -- which real
+// adapter module (email.Module_ or sms.Module_) answers for Notifier,
+// mirroring NestJS's DynamicModule.forRootAsync (module-lazy-loading
+// feature, Milestone 24). Config_ (config.go) is this module's OWN
+// Schema-validated Provider (env:"NOTIFICATION_DRIVER"); Lazy reads it via
+// gonest.MustInject[*Config](l) -- eagerly, synchronously, right here at
+// Stage 1 assembly time -- and Imports/Exports the winning driver module
+// before assemble.go's BFS ever looks at this module's Imports/Exports.
+//
+// Replaces the old ModuleForRoot(driver string) free function: AppModule_
+// (../module.go) now just imports this single Module_ var, and never reads
+// NOTIFICATION_DRIVER itself.
 //
 // email/sms's own Provider_.Constructor returns a CONCRETE type (*Service),
 // not notifier.Notifier -- each impl's own module.go explicitly registers
@@ -27,14 +33,23 @@ type Port = port.Notifier
 // what avoids an import cycle (this package already imports email/sms to
 // reference their Module_ vars; if they imported this package back, that
 // would cycle).
-//
-// driver must already be validated (../config.go's Enum("email", "sms"))
-// -- this function trusts its input, it does not re-validate.
-func ModuleForRoot(driver string) *gonest.Module {
-	switch driver {
-	case "sms":
-		return sms.Module_
-	default:
-		return email.Module_
-	}
-}
+var Module_ = gonest.NewModule(func(m *gonest.Module) {
+	m.Providers(Config_)
+	// Exported unconditionally (unlike the driver-specific email/sms
+	// re-export below, decided inside Lazy) so a consumer outside this
+	// module -- e.g. ../controller.go, which used to read a package-level
+	// `config` var straight out of main.go -- can inject *Config directly
+	// instead.
+	m.Exports(Config_)
+	m.Lazy(func(l *gonest.LazyModule) {
+		config := gonest.MustInject[*Config](l)
+		switch config.Driver {
+		case "sms":
+			l.Imports(sms.Module_)
+			l.Exports(sms.Module_)
+		default:
+			l.Imports(email.Module_)
+			l.Exports(email.Module_)
+		}
+	})
+})
