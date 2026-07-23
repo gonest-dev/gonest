@@ -47,3 +47,41 @@
 - Recursos: time pequeno/solo — tasks precisam ser atômicas e sequenciais, sem paralelismo de execução assumido por padrão.
 - Timeline: sem deadline fixo — prioridade é acertar a DX (design da API) antes de crescer escopo.
 - Técnico: Go não tem parâmetro de tipo em método (só em func/tipo livre) — todo design de builder precisa respeitar essa limitação (já resolvido no metadata builder via valor capturado em vez de `[T]` em método).
+
+## Workflow Conventions
+
+Regras de processo, não de código — como qualquer sessão (humana ou agente) deve conduzir
+trabalho neste repo, independente da feature. Valem pra toda sessão futura, não só a que as
+escreveu.
+
+- **Idioma da fala do agente: pt-br.** Toda comunicação conversacional (respostas, updates,
+  resumos) do agente é em português brasileiro. Código, commits, nomes de identificador,
+  comentários no código e conteúdo do README.md continuam em inglês (convenção já
+  estabelecida, não muda) — só a FALA do agente com o usuário é pt-br.
+- **Trabalho sempre separado por milestone.** Nenhum lote de trabalho mistura 2+ milestones
+  num único commit/PR — cada milestone fecha (Specify→Design→Tasks→Execute conforme o
+  tamanho) antes do próximo começar. Commit + push acontece ao fim de CADA milestone, não só
+  no fim de uma sessão inteira.
+- **Cada milestone gera uma tag de versão nova.** Ao fechar um milestone (commit já na
+  `main`), cortar e dar push numa tag `vX.Y.Z` (`v0.{major}.{minor}` — ver "Next Steps" do
+  README.md pro esquema de versionamento) referenciando o commit daquele milestone
+  especificamente, não um commit posterior que já inclui outro milestone.
+- **Sempre usar subagentes quando possível.** Pesquisa, design, implementação de tasks e
+  atualização de docs do site devem ser delegadas a subagentes (papel Implementer, seguindo o
+  padrão Planner/Implementer/Evaluator já estabelecido — ver "Subagent workflow convention"
+  em STATE.md) em vez de feitas inline pela sessão orquestradora, sempre que a tarefa permitir
+  isolamento de contexto. A sessão orquestradora mantém os papéis de Planner (specify/design) e
+  Evaluator (rodar gate checks, revisar diff, decidir commit).
+- **README.md sempre atualizado.** Todo milestone que adiciona/muda API pública precisa
+  refletir no README.md (seção "Implementation Status" quando aplicável, mais qualquer seção
+  de "Documentation" relevante ao recurso) como parte do PRÓPRIO milestone, não como débito
+  posterior.
+- **Novo recurso relevante ganha `.examples/`.** Feature nova com superfície de uso real
+  (não puramente interna) ganha um exemplo runnable em `.examples/` demonstrando o fluxo
+  ponta a ponta, verificado ao vivo (curl/dispatch real) antes do milestone ser considerado
+  fechado — mesmo padrão já seguido por toda feature anterior deste projeto.
+- **Mudança documental → atualizar o site.** Qualquer mudança em `.specs/`, README.md, ou
+  comportamento de API pública que afete a documentação pública dispara atualização do repo
+  irmão `C:\dev\gonest-dev\site` (Next.js/fumadocs, `gonest.dev`) — commit + push separado
+  desse repo, nos 3 idiomas mantidos (en/pt/es), seguindo o padrão de commit `docs: ...` já
+  em uso lá.
