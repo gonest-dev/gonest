@@ -9,7 +9,7 @@ import (
 // NotificationConfig is built from real process env vars (populated by
 // .env, loaded via gonest.Dotenv().MustLoad in main -- see main.go) before
 // any Module exists, so the resolved Driver can decide WHICH module gets
-// wired into AppModule below (see module.go).
+// wired into AppModule_ below (see module.go).
 type NotificationConfig struct {
 	// Driver picks the notification backend. Enum restricts it to the 2
 	// modules this example actually wires (email.go/sms.go) -- an invalid

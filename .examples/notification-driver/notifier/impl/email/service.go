@@ -1,6 +1,6 @@
 // Package email is a Notifier adapter. It does NOT import
-// notification-driver/notifier -- its Provider returns the concrete
-// *Service type; module.go's AsNotifier explicitly registers it as
+// notification-driver/notifier -- its Provider_ returns the concrete
+// *Service type; module.go's AsNotifier_ explicitly registers it as
 // port.Notifier via gonest.ProviderAs, see notifier/module.go's doc
 // comment for why that matters here.
 package email
@@ -23,6 +23,6 @@ func (s *Service) Send(to, message string) error {
 	return nil
 }
 
-var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
+var Provider_ = gonest.NewProvider(func(provider *gonest.Provider) {
 	provider.Constructor(func() *Service { return &Service{} })
 })

@@ -2,8 +2,8 @@
 // value: injection across a DIFFUSE scope decided by config, not by source
 // code. NOTIFICATION_DRIVER (loaded via gonest.Dotenv, validated+defaulted
 // via a Schema with Enum+Default, see config.go) picks, at bootstrap,
-// whether notifier/module.go wires notifier/email.Module or
-// notifier/sms.Module into AppModule. NotificationController
+// whether notifier/module.go wires notifier/email.Module_ or
+// notifier/sms.Module_ into AppModule_. NotificationController_
 // (controller.go) injects notifier.Notifier -- the INTERFACE only -- so
 // its handler code is identical no matter which driver actually answers.
 //
@@ -33,7 +33,7 @@ func main() {
 	// .env is already loaded -- module.go's package-level `var config =
 	// LoadNotificationConfig()` (config.go) ran before main() even
 	// started, and it loads ./.env itself for exactly that reason.
-	app, err := gonest.NewApp[gonest.FiberApp](AppModule)
+	app, err := gonest.NewApp[gonest.FiberApp](AppModule_)
 	if err != nil {
 		panic(err)
 	}

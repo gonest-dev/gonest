@@ -6,8 +6,8 @@
 // answers.
 package port
 
-// Type is the ONLY type consumer code ever depends on. email.Provider
-// and sms.Provider both satisfy it structurally -- neither adapter package
+// Type is the ONLY type consumer code ever depends on. email.Provider_
+// and sms.Provider_ both satisfy it structurally -- neither adapter package
 // imports this one (see module.go's doc comment for why that matters).
 type Notifier interface {
 	Send(to, message string) error

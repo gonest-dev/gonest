@@ -18,11 +18,11 @@ var sendBodySchema = gonest.NewSchema(func(t *sendBody, s *gonest.Schema) {
 	s.Property(&t.Message).String().Required()
 })
 
-// NotificationController depends on notifier.Notifier ONLY -- it has no
+// NotificationController_ depends on notifier.Notifier ONLY -- it has no
 // idea whether NOTIFICATION_DRIVER resolved to "email" or "sms" (see
 // module.go). Same handler code, 2 different real backends, decided once
 // at bootstrap from an env var.
-var NotificationController = gonest.NewController(func(controller *gonest.Controller) {
+var NotificationController_ = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/notifications")
 
 	notify := gonest.MustInject[notifier.Port](controller)

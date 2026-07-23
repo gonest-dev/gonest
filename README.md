@@ -27,6 +27,7 @@
 - [Next Steps](#next-steps)
 - [About the Project](#about-the-project)
 - [Documentation](#documentation)
+  - [Naming Convention](#naming-convention)
   - [Modules, Providers, Controllers](#modules-providers-controllers)
   - [Exceptions](#exceptions)
   - [Middleware, Guard, Interceptor, Filter](#middleware-guard-interceptor-filter)
@@ -163,6 +164,13 @@ history of design decisions.
 ---
 
 ## Documentation
+
+### Naming Convention
+
+Every exported package-level var produced by a gonest builder (`NewProvider`, `NewController`,
+`NewModule`, `NewListener`, `NewScheduler`, `NewResolver`) gets a trailing underscore --
+`Person_`, `NotificationController_` -- unconditionally, not only when a same-named struct/type
+happens to collide. One rule instead of a case-by-case judgment call.
 
 ### Modules, Providers, Controllers
 

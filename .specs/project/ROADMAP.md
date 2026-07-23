@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 21 (Enum Branches) -- COMPLETE
-**Status:** Milestones 1-21 COMPLETE
+**Current Milestone:** 23 (Thing_ Naming Convention) -- COMPLETE
+**Status:** Milestones 1-23 COMPLETE
 
 ---
 
@@ -433,6 +433,78 @@ migrado e verificado ao vivo via curl -- ver AD-047 em STATE.md)
 - `internal/openapi` emite `"enum": [...]` no schema gerado quando setado
 - `.examples/full-text-search`'s `search.FieldsSchemaFor` migra de `Custom(fn)` pro `Enum(...)` real
 - Ver `.specs/features/enum-branches/spec.md`
+
+---
+
+## Milestone 22: Provider Interface Export
+
+**Goal:** `gonest.ProviderAs[TInterface](ref)` -- resolução de interface passa a ser EXCLUSIVAMENTE
+explícita, fechando 3 gaps reais de `INSIGHT-PROVIDER.md`: nenhuma leitura de módulo revelava qual
+interface um provider exportava, nenhum jeito de escolher qual interface um struct multi-interface
+expõe, e o matching estrutural (`reflect.Type.Implements()`) produzia falso positivo contra
+interfaces de mesma forma, mas sem relação nenhuma (ex: `gonest.Accessor[T]`).
+**Status:** COMPLETE (commit `d58f4a3`, `go test ./... -race -count=1` verde, 25 pacotes)
+
+### Features
+
+**ProviderAs[T] Core** - COMPLETE
+- `providerAsRef` (`internal/module/provider_as.go`) -- view fina, não-constructable, que embrulha
+  um `ProviderRef` já existente e reporta `TInterface` como seu próprio `ResolvedType()`; panica se
+  `T` não é interface, panica em chaining (embrulhar outro `ProviderAs`, PROVAS-05)
+- `validateProviderAsRefs` (`internal/app/provider_as_validate.go`) -- passo de validação novo,
+  rodado entre `declareProviders` (Stage 2) e `resolver.Resolve` (Stage 3): falha alto em
+  `NewApp`/`MustNewApp` se o `ProviderRef` concreto embrulhado nunca foi registrado separadamente
+  via `Providers(...)`, ou se ele não implementa `TInterface` de verdade
+- Stage 3 (`internal/resolver/stage3.go`'s `allProviders`) exclui qualquer ref satisfazendo o
+  marker `isProviderAsView` do pass de construção -- nunca bate no erro "does not expose a
+  Constructor" que continua sendo um invariante real pra qualquer OUTRO tipo de ref não-constructable
+- `gonest.ProviderAs[T any](ref ProviderRef) ProviderRef` (`gonest.go`) -- re-export público, mesmo
+  padrão de wrapper genérico de `MustInject`
+
+**Fallback estrutural removido** - COMPLETE
+- `findDirectMatches` (`internal/resolver/direct.go`) perde por inteiro o bloco
+  `reflect.Type.Implements()` -- `MustInject[T]`/`MustInjectAll[T]` só resolvem interface via
+  `ProviderAs[T]` explícito, breaking change aceito (framework pré-1.0)
+- ~6 testes de `internal/resolver/direct_test.go` + `gonest_test.go`'s
+  `MustInjectAll[insightConnectable]`/`[insightPingable]` reescritos contra registro explícito,
+  mesmo contrato comportamental (1 match resolve, 2+ ambíguo, 0 not-found)
+
+**`.examples/notification-driver` migrado** - COMPLETE
+- `email.Service_`/`sms.Service_` (renomeados pra `Provider_`/`AsNotifier_` no Milestone 23, ver
+  abaixo) embrulhados via `gonest.ProviderAs[port.Notifier](...)` dentro de cada impl's próprio
+  `module.go`, substituindo o match implícito antigo (`controller.go`'s comentário já documentava
+  isso como deliberado-mas-frágil)
+- Verificado ao vivo via `curl` contra os 2 valores de `NOTIFICATION_DRIVER`
+
+---
+
+## Milestone 23: Thing_ Naming Convention
+
+**Goal:** Formalizar `Thing_` (sufixo underscore no fim) como a convenção de nome pra TODO var
+package-level exportado produzido por um builder gonest (`NewProvider`/`NewController`/
+`NewModule`/`NewListener`/`NewScheduler`/`NewResolver`) -- aplicada incondicionalmente, não só
+quando existe colisão real com um struct de mesmo nome. Uma regra só, sem julgamento caso a caso.
+**Status:** COMPLETE (docs + rename mecânico, `go test ./... -race -count=1` verde, `.examples/*`
+buildam)
+
+### Features
+
+**Documentação da convenção** - COMPLETE
+- README.md ganha subseção nova "Naming Convention" (perto do overview de API existente): regra +
+  1 linha de racional (evita julgamento caso a caso, uma regra em vez de uma condicional)
+
+**Auditoria de `.examples/notification-driver`** - COMPLETE
+- Todo var builder exportado do example (`Provider`/`Module`/`AsNotifier` em `notifier/impl/{email,sms}`,
+  `AppModule`/`NotifierModule` em `module.go`, `NotificationController` em `controller.go`) NÃO seguia
+  a convenção -- renomeados pra `Provider_`/`Module_`/`AsNotifier_`/`AppModule_`/`NotifierModule_`/
+  `NotificationController_`, todos os call sites correspondentes atualizados no mesmo commit
+- `go build ./...`/`go vet ./...` limpos dentro de `.examples/notification-driver`
+
+**Limpeza dos insight docs** - COMPLETE
+- `INSIGHT-LAZY.md` (raiz) confirmado já deletado, `.specs/insight/LAZY.md` é o local atual
+- `.specs/insight/PROVIDER.md`'s blockquote de status atualizado pra "SHIPPED" (Milestone 22
+  completo), mantendo o tangent de `Module.Lazy`/`l.Imports(...)` só como forward-pointer (fora de
+  escopo, spec própria futura)
 
 ---
 
