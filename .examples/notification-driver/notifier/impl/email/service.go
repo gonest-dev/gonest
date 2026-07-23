@@ -1,8 +1,8 @@
 // Package email is a Notifier adapter. It does NOT import
 // notification-driver/notifier -- its Provider returns the concrete
-// *Service type, and gonest's resolver matches MustInject[notifier.Notifier]
-// against it structurally (reflect.Type.Implements()), see
-// notifier/module.go's doc comment for why that matters here.
+// *Service type; module.go's AsNotifier explicitly registers it as
+// port.Notifier via gonest.ProviderAs, see notifier/module.go's doc
+// comment for why that matters here.
 package email
 
 import (

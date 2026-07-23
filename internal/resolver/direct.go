@@ -49,12 +49,13 @@ func candidateProviders(scope []*module.Module) []module.ProviderRef {
 	return out
 }
 
-// findDirectMatches returns every candidate in scope whose resolved value
-// satisfies t: for a pointer t, every EXACT ResolvedType() match; for an
-// interface t, an EXACT match if one exists (returned ALONE, never combined
-// with Implements() matches -- an override registered AS the interface type
-// itself takes precedence, per spec.md's own edge case), otherwise every
-// provider whose ResolvedType() satisfies reflect.Type.Implements(t).
+// findDirectMatches returns every candidate in scope whose ResolvedType()
+// EXACTLY matches t -- for a pointer t, its own concrete type; for an
+// interface t, only a provider explicitly registered as t (see
+// gonest.ProviderAs[T], which reports T as ResolvedType() regardless of the
+// wrapped ref's own concrete type). There is no structural
+// reflect.Type.Implements() fallback: interface resolution is exclusively
+// explicit, per this feature's (provider-interface-export) spec.md PROVAS-02.
 // Candidates with no resolved value yet (should not happen once phase 1 has
 // completed, per this feature's bootstrap ordering) are silently skipped
 // rather than erroring -- an implementation invariant, not a user-facing
@@ -71,25 +72,7 @@ func findDirectMatches(scope []*module.Module, t reflect.Type) []reflect.Value {
 			exact = append(exact, v)
 		}
 	}
-	if len(exact) > 0 {
-		return exact
-	}
-
-	if t.Kind() != reflect.Interface {
-		return nil
-	}
-
-	var implementing []reflect.Value
-	for _, p := range candidates {
-		rt := p.ResolvedType()
-		if rt == nil || !rt.Implements(t) {
-			continue
-		}
-		if v, ok := resolvedValueOf(p); ok {
-			implementing = append(implementing, v)
-		}
-	}
-	return implementing
+	return exact
 }
 
 // FindDirect returns the single value in scope resolving t, and whether

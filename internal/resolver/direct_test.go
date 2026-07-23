@@ -84,9 +84,18 @@ func TestFindDirect_UnionScope_FindsProviderFromEitherModule(t *testing.T) {
 	}
 }
 
+// TestFindDirect_Interface_SingleImplementor_Resolves proves interface
+// resolution now goes exclusively through an explicit module.ProviderAs
+// registration -- cat's concrete provider is registered AND wrapped via
+// ProviderAs[animalIface], both passed to Providers (see
+// module.ProviderAs's own doc comment: the wrapper never drives Stage 3
+// construction, only the concrete registration does -- this test only
+// exercises FindDirect directly, no Stage 3 involved, so registering both
+// is enough to prove the exact-match path finds the wrapper).
 func TestFindDirect_Interface_SingleImplementor_Resolves(t *testing.T) {
 	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{})
-	m := module.New(func(m *module.Module) { m.Providers(cat) })
+	catAsAnimal := module.ProviderAs[animalIface](cat)
+	m := module.New(func(m *module.Module) { m.Providers(cat, catAsAnimal) })
 	m.Assemble()
 
 	v, ok := FindDirect([]*module.Module{m}, animalIfaceType())
@@ -98,10 +107,17 @@ func TestFindDirect_Interface_SingleImplementor_Resolves(t *testing.T) {
 	}
 }
 
+// TestFindDirect_Interface_TwoImplementors_AmbiguousNotFoundHere proves 2
+// DIFFERENT concrete providers, each explicitly wrapped via
+// ProviderAs[animalIface], are still ambiguous in one scope -- same
+// ambiguity-via-exact-match-count contract as before, just reached via 2
+// explicit registrations instead of 2 structural matches (PROVAS-06).
 func TestFindDirect_Interface_TwoImplementors_AmbiguousNotFoundHere(t *testing.T) {
 	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{})
 	dog := newResolved(reflect.TypeOf(dogAnimal{}), dogAnimal{})
-	m := module.New(func(m *module.Module) { m.Providers(cat, dog) })
+	catAsAnimal := module.ProviderAs[animalIface](cat)
+	dogAsAnimal := module.ProviderAs[animalIface](dog)
+	m := module.New(func(m *module.Module) { m.Providers(cat, dog, catAsAnimal, dogAsAnimal) })
 	m.Assemble()
 
 	_, ok := FindDirect([]*module.Module{m}, animalIfaceType())
@@ -110,22 +126,34 @@ func TestFindDirect_Interface_TwoImplementors_AmbiguousNotFoundHere(t *testing.T
 	}
 }
 
+// TestFindDirect_Interface_ExactMatchTakesPrecedenceOverImplements proves
+// structural implementation ALONE (cat implements animalIface but is never
+// wrapped via ProviderAs) is not enough to resolve -- only the explicitly
+// wrapped provider (exact) is found, confirming there is no
+// reflect.Type.Implements() fallback for a provider that merely happens to
+// satisfy the interface (PROVAS-02).
 func TestFindDirect_Interface_ExactMatchTakesPrecedenceOverImplements(t *testing.T) {
-	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{})
-	exactIface := newResolved(animalIfaceType(), catAnimal{})
-	m := module.New(func(m *module.Module) { m.Providers(cat, exactIface) })
+	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{}) // implements animalIface structurally, never wrapped
+	exact := newResolved(reflect.TypeOf(dogAnimal{}), dogAnimal{})
+	exactAsAnimal := module.ProviderAs[animalIface](exact)
+	m := module.New(func(m *module.Module) { m.Providers(cat, exact, exactAsAnimal) })
 	m.Assemble()
 
 	matches := FindDirectAll([]*module.Module{m}, animalIfaceType())
 	if len(matches) != 1 {
-		t.Fatalf("FindDirectAll() = %d matches, want 1 (exact match should suppress Implements() matches)", len(matches))
+		t.Fatalf("FindDirectAll() = %d matches, want 1 (only the explicitly ProviderAs-wrapped provider should resolve)", len(matches))
 	}
 }
 
+// TestFindDirectAll_Interface_ReturnsEveryImplementor proves every
+// explicitly ProviderAs-wrapped provider in scope is returned (PROVAS-07's
+// multi-binding contract).
 func TestFindDirectAll_Interface_ReturnsEveryImplementor(t *testing.T) {
 	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{})
 	dog := newResolved(reflect.TypeOf(dogAnimal{}), dogAnimal{})
-	m := module.New(func(m *module.Module) { m.Providers(cat, dog) })
+	catAsAnimal := module.ProviderAs[animalIface](cat)
+	dogAsAnimal := module.ProviderAs[animalIface](dog)
+	m := module.New(func(m *module.Module) { m.Providers(cat, dog, catAsAnimal, dogAsAnimal) })
 	m.Assemble()
 
 	matches := FindDirectAll([]*module.Module{m}, animalIfaceType())
@@ -197,9 +225,10 @@ func TestFindDirect_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports
 // FindDirect worth covering separately.
 func TestFindDirectAll_ReExportedModule_ResolvesTransitivelyThroughEffectiveExports(t *testing.T) {
 	cat := newResolved(reflect.TypeOf(catAnimal{}), catAnimal{})
+	catAsAnimal := module.ProviderAs[animalIface](cat)
 	c := module.New(func(m *module.Module) {
-		m.Providers(cat)
-		m.Exports(cat)
+		m.Providers(cat, catAsAnimal)
+		m.Exports(catAsAnimal)
 	})
 	b := module.New(func(m *module.Module) {
 		m.Imports(c)

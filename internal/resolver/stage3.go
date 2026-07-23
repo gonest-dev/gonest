@@ -256,10 +256,29 @@ func scopedGraph(nodes []module.ProviderRef) map[module.ProviderRef][]module.Pro
 	return scoped
 }
 
+// isProviderAsView is satisfied by *module.providerAsRef (unexported,
+// internal/module/provider_as.go) via its exported IsProviderAsView()
+// marker method (exported so cross-package type assertion works at all --
+// see module.providerAsRef's own doc comment). Declared here -- not
+// imported -- for the same cross-package reason constructable/scoped/
+// resolvedSetter above are: a providerAsRef is a thin, read-only VIEW that
+// reports another provider's interface, never its own Constructor -- it
+// must be excluded from Stage 3's construction pass entirely, not fed to
+// callConstructor (which would hard-error with "does not expose a
+// Constructor", a real invariant violation for any OTHER kind of
+// non-constructable ProviderRef, but not for this deliberately-non-
+// constructable one).
+type isProviderAsView interface {
+	IsProviderAsView()
+}
+
 // allProviders collects every module.ProviderRef registered (via
-// Providers) across modules, deduplicated by identity. Order is stable
-// (first-seen) but not otherwise significant -- Resolve's goroutines run
-// concurrently regardless of this slice's order.
+// Providers) across modules, deduplicated by identity, EXCLUDING any
+// ProviderAs view (see isProviderAsView above) -- the concrete ref it
+// wraps drives its own construction via its own registration, the view
+// itself never does. Order is stable (first-seen) but not otherwise
+// significant -- Resolve's goroutines run concurrently regardless of this
+// slice's order.
 func allProviders(modules []*module.Module) []module.ProviderRef {
 	seen := make(map[module.ProviderRef]bool)
 	var out []module.ProviderRef
@@ -270,6 +289,9 @@ func allProviders(modules []*module.Module) []module.ProviderRef {
 				continue
 			}
 			seen[p] = true
+			if _, ok := p.(isProviderAsView); ok {
+				continue
+			}
 			out = append(out, p)
 		}
 	}

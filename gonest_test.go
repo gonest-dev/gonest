@@ -2973,6 +2973,13 @@ var insightPostgresProvider = NewProvider(func(provider *Provider) {
 	provider.Constructor(func() *insightPostgres { return &insightPostgres{} })
 })
 
+// insightPostgresAsConnectable explicitly registers insightPostgresProvider
+// as insightConnectable -- interface resolution (MustInject/MustInjectAll)
+// is exclusively explicit now, via ProviderAs, no structural
+// reflect.Type.Implements() fallback (provider-interface-export feature,
+// PROVAS-02/PROVAS-07).
+var insightPostgresAsConnectable = ProviderAs[insightConnectable](insightPostgresProvider)
+
 type insightRedis struct{}
 
 var _ insightConnectable = (*insightRedis)(nil)
@@ -2982,6 +2989,10 @@ func (d *insightRedis) Ping() bool { return true }
 var insightRedisProvider = NewProvider(func(provider *Provider) {
 	provider.Constructor(func() *insightRedis { return &insightRedis{} })
 })
+
+// insightRedisAsConnectable is insightPostgresAsConnectable's Redis
+// counterpart -- see its own doc comment.
+var insightRedisAsConnectable = ProviderAs[insightConnectable](insightRedisProvider)
 
 type insightConnectableService struct {
 	connectables []insightConnectable
@@ -3017,7 +3028,7 @@ func TestMustInjectAll_RootAlias_InsightConnectableExample(t *testing.T) {
 	})
 
 	systemModule := NewModule(func(module *Module) {
-		module.Providers(insightPostgresProvider, insightRedisProvider)
+		module.Providers(insightPostgresProvider, insightRedisProvider, insightPostgresAsConnectable, insightRedisAsConnectable)
 		module.Controllers(systemController)
 	})
 
@@ -3160,6 +3171,14 @@ func newInsightTestUserModule() *Module {
 			return &insightTestUserService{list: []*insightTestUserEntity{{ID: 42}}}
 		})
 	})
+	// Explicit interface registration -- MustInject[insightTestIUserService]
+	// below only finds it via ProviderAs now (PROVAS-02). MustOverride's own
+	// override mechanism (ResolveWithOverrides/overrideFor) is a genuinely
+	// separate, unaffected code path -- it still matches provider's own
+	// concrete ResolvedType() against the interface override key via
+	// reflect.Type.Implements(), by this feature's own design (see
+	// design.md's overrideFor Tech Decision).
+	providerAsUserService := ProviderAs[insightTestIUserService](provider)
 
 	controller := NewController(func(controller *Controller) {
 		controller.Path("/user")
@@ -3176,7 +3195,7 @@ func newInsightTestUserModule() *Module {
 	})
 
 	return NewModule(func(module *Module) {
-		module.Providers(provider)
+		module.Providers(provider, providerAsUserService)
 		module.Controllers(controller)
 	})
 }
@@ -3262,7 +3281,7 @@ func TestMustNewTestApp_RealProviderConstructor_NeverRunsWhenOverridden(t *testi
 		MustInject[insightTestIUserService](controller)
 	})
 	m := NewModule(func(module *Module) {
-		module.Providers(p)
+		module.Providers(p, ProviderAs[insightTestIUserService](p))
 		module.Controllers(c)
 	})
 
@@ -3506,6 +3525,10 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 	redisProvider := NewProvider(func(provider *Provider) {
 		provider.Constructor(func() *insightHealthRedis { return &insightHealthRedis{} })
 	})
+	// Explicit interface registrations -- MustInjectAll[insightPingable]
+	// below only finds providers wrapped via ProviderAs now (PROVAS-07).
+	dbAsPingable := ProviderAs[insightPingable](dbProvider)
+	redisAsPingable := ProviderAs[insightPingable](redisProvider)
 
 	healthController := NewController(func(controller *Controller) {
 		controller.Path("/health")
@@ -3538,7 +3561,7 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 	})
 
 	return NewModule(func(module *Module) {
-		module.Providers(dbProvider, redisProvider)
+		module.Providers(dbProvider, redisProvider, dbAsPingable, redisAsPingable)
 		module.Controllers(healthController)
 	})
 }

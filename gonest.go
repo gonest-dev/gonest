@@ -116,6 +116,32 @@ func NewProvider(fn func(*Provider)) *Provider {
 	return provider.New(fn)
 }
 
+// ProviderAs wraps ref, returning a ProviderRef that resolves as
+// TInterface -- via MustInject[TInterface]/MustInjectAll[TInterface] --
+// wherever it is registered (Module.Providers and/or Module.Exports),
+// instead of ref's own concrete type. This is now the ONLY way an
+// interface type resolves: MustInject/MustInjectAll no longer fall back to
+// structural reflect.Type.Implements() matching (see this feature's
+// (provider-interface-export) spec.md PROVAS-02).
+//
+// TInterface must be an interface kind -- panics immediately otherwise
+// (`"gonest: ProviderAs[T] requires T to be an interface type, got %s"`).
+// ref's concrete type must ALSO be registered via Module.Providers on its
+// own, in addition to being wrapped here -- ProviderAs never drives
+// construction itself, only the concrete registration does; a wrapped ref
+// whose concrete registration is missing, or whose concrete type does not
+// actually implement TInterface, fails loud at NewApp/MustNewApp bootstrap
+// time (a dedicated post-declare validation pass), not at first
+// MustInject[TInterface] call. Wrapping a ProviderRef that is ITSELF the
+// result of another ProviderAs call (chaining) panics immediately -- wrap
+// the original concrete ProviderRef separately for each interface it needs
+// to be resolvable as. Go cannot re-export a generic function via var, so
+// this is a real wrapper calling the internal one (same as MustInject's
+// own doc comment explains).
+func ProviderAs[T any](ref ProviderRef) ProviderRef {
+	return module.ProviderAs[T](ref)
+}
+
 // Scope defines the lifetime of a provider instance within the DI container.
 type Scope = scope.Scope
 
@@ -251,10 +277,11 @@ func NewController(fn func(*Controller)) *Controller {
 // owning Module (see internal/inject.MustInject's own doc comment) -- only
 // Provider/Controller happen to also implement module.Owner.
 //
-// For an interface T, resolves to the one registered provider whose
-// concrete type implements T (exact match or reflect.Type.Implements()),
-// panicking on zero or 2+ matches (ambiguous -- use MustInjectAll). For a
-// pointer T, resolves via exact type match, panicking if not found. Called
+// For an interface T, resolves to the one registered provider explicitly
+// wrapped via ProviderAs[T] (see its own doc comment -- structural
+// reflect.Type.Implements() matching is not a fallback), panicking on zero
+// or 2+ matches (ambiguous -- use MustInjectAll). For a pointer T, resolves
+// via exact type match, panicking if not found. Called
 // from a Controller/Middleware/Guard/Interceptor/Filter builder fn, this is
 // a DIRECT lookup against the already-resolved provider graph (no
 // placeholder); called from a Provider's own builder fn (Provider-to-

@@ -390,6 +390,19 @@ func New[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (*Ap
 	// .specs/features/test-app-bootstrap/design.md's Architecture Overview.
 	declareProviders(modules)
 
+	// New validation pass (provider-interface-export feature): every
+	// ProviderAs view's wrapped ref must have a reliable ResolvedType() by
+	// now (declareProviders, just above, ran every provider's Declare) and
+	// must actually implement the view's target interface. Positioned here
+	// -- after declareProviders, before resolver.Resolve -- per this
+	// feature's design.md "Validation timing" Tech Decision: this is the
+	// earliest point ResolvedType() is reliable, and still well before
+	// resolver.Resolve would otherwise silently exclude a broken view from
+	// Stage 3 with no explanation.
+	if err := validateProviderAsRefs(modules); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), bootstrapTimeout)
 	defer cancel()
 
