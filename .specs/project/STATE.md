@@ -63,6 +63,46 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 
 ## Recent Decisions (Last 60 days)
 
+### AD-056: `TokenRef` unifica TODOS os markers de `Module` (não só Providers/Exports) -- Milestone 25, T1 (2026-07-24)
+
+**Decision:** `TokenRef interface { IsToken() }` novo (`internal/module/module.go`), base de TODOS
+os markers existentes (`ProviderRef`/`ControllerRef`/`ResolverRef`/`MiddlewareRef`/`FilterRef`/
+`ListenerRef`/`SchedulerRef` passam a embutir `TokenRef` em vez de métodos soltos) e implementado
+diretamente por `*Module`. Os 9 métodos builder de `Module`
+(`Imports`/`Providers`/`Controllers`/`Resolvers`/`Use`/`Filters`/`Listeners`/`Schedulers`/
+`Exports`) migram de assinatura tipada individual pra `...TokenRef`, roteando internamente via
+type-switch/type-assert com `panic` fail-fast (mensagem nomeando `Module.Xxx` + `%T` do tipo
+recebido) no case inesperado -- inclusive `Exports`, que ANTES ignorava silenciosamente um tipo
+desconhecido (switch sem `default`), agora panica também, por consistência. `ExportableRef` (AD-052)
+é REMOVIDO por inteiro, sem alias/deprecated.
+**Reason:** achado REAL no consumer `erc` (não hipotético): `system/module.go`/`auth/module.go`/
+`infra/database/module.go` declaravam `var providers = []gonest.ProviderRef{...}`, passavam pra
+`m.Providers(providers...)` e tentavam reusar a MESMA slice em
+`m.Exports(any(providers).([]gonest.ExportableRef)...)` -- panicava em runtime (`interface
+conversion: interface {} is []module.ProviderRef, not []module.ExportableRef`), porque Go não é
+covariante em slice de interface (mesmo `ProviderRef` satisfazendo `ExportableRef` via embed,
+`[]ProviderRef` nunca vira `[]ExportableRef` por type-assert nem spread `...`). Usuário rejeitou
+explicitamente um helper de conversão aditivo (`gonest.AsExportable(...)`) como gambiarra em cima do
+sintoma ("resolve o sintoma, não a causa") e pediu escopo MÁXIMO -- unificar TODOS os builders (não
+só `Providers`/`Exports`), paridade total com o "provider token" do NestJS, onde
+providers/imports/exports/controllers referenciam os mesmos tokens de forma intercambiável.
+**Trade-off:** perda de checagem em tempo de compilação nos builders -- hoje `m.Controllers(algumProvider)`
+não compila (tipo errado); depois desta feature, compila (qualquer `TokenRef` é aceito) e só panica
+em runtime na primeira execução daquele código. Aceito porque (a) o panic é imediato e nomeia
+método+tipo, mesma postura fail-loud de `MustInject`, não é bug silencioso; (b) é o preço estrutural
+de Go não ter union types -- mesmo preço que `Exports` já pagava sozinho desde AD-052, agora
+generalizado pros outros 8 métodos. `internal/module/lazy.go`'s `LazyModule.Imports`/`Exports`
+também migrados pra `...TokenRef` (não previsto no design.md original, achado necessário só pra
+compilar contra a assinatura nova de `Module.Imports`/`Exports` que delegam).
+**Impact:** `internal/module/{module.go,lazy.go,assemble.go,provider_as.go,module_test.go}`,
+`internal/provider/provider.go`, `internal/controller/controller.go`,
+`internal/graphql/resolver.go`, `internal/middleware/middleware.go`, `internal/filter/filter.go`,
+`internal/emitter/listener.go`, `internal/scheduler/scheduler.go`,
+`internal/resolver/resolver_test.go`, `gonest.go`. `go build ./...`/`go vet ./...`/
+`go test ./... -race -count=1` verdes, 24 pacotes, 9 testes novos de panic path, zero asserção
+pré-existente alterada. `.specs/features/unified-token-ref/{spec,design,tasks}.md` com
+traceability marcada Implementing → Verified. Consumer `erc` migrado em seguida (T2).
+
 ### AD-055: Workflow Conventions formalizadas em PROJECT.md -- fala em pt-br, separação por milestone, tag por milestone, subagentes sempre, README.md + `.examples/` sempre atualizados, site sempre em sincronia (2026-07-23)
 
 **Decision:** Nova seção "## Workflow Conventions" em `.specs/project/PROJECT.md` (base load de toda sessão), formalizando 6 regras de processo pedidas explicitamente pelo usuário: (1) fala do agente em pt-br, código/commits/README continuam em inglês; (2) trabalho sempre separado por milestone, commit+push ao fim de CADA um, nunca misturando 2+ num commit; (3) cada milestone fechado ganha tag `vX.Y.Z` própria, referenciando o commit exato daquele milestone; (4) subagentes usados sempre que possível (pesquisa/design/implementação/docs do site), sessão orquestradora mantém só Planner+Evaluator; (5) README.md atualizado como parte do PRÓPRIO milestone que muda API pública, não como débito; (6) feature nova com uso real ganha `.examples/` verificado ao vivo; (7) mudança documental dispara atualização do repo irmão `C:\dev\gonest-dev\site` (en/pt/es).

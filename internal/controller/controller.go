@@ -74,6 +74,11 @@ func (c *Controller) Declare() {
 // packages.
 func (c *Controller) IsController() {}
 
+// IsToken is a marker method that satisfies module.TokenRef (via
+// module.ControllerRef, which embeds it), so *Controller can be passed to
+// any of Module's builder methods.
+func (c *Controller) IsToken() {}
+
 // SetOwnerModule associates this controller with the module that owns it.
 // It is called by module assembly once ownership is known (structural
 // assembly walks Module.Controllers registrations); a later task wires

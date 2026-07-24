@@ -119,6 +119,11 @@ func (l *Listener[EventType]) Declare() {
 // module needing to import this package.
 func (l *Listener[EventType]) IsListener() {}
 
+// IsToken is a marker method that satisfies module.TokenRef (via
+// module.ListenerRef, which embeds it), so *Listener[EventType] can be
+// passed to any of Module's builder methods.
+func (l *Listener[EventType]) IsToken() {}
+
 // SetOwnerModule associates this listener with the module that owns it.
 // Called by module assembly (Stage 1) once ownership is known.
 func (l *Listener[EventType]) SetOwnerModule(m *module.Module) {

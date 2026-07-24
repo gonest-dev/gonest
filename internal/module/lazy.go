@@ -30,15 +30,16 @@ func (m *Module) Lazy(fn func(l *LazyModule)) {
 }
 
 // Imports delegates to the owning Module's own Imports -- same semantics,
-// same storage, just reached through the callback argument instead of the
-// *Module directly.
-func (l *LazyModule) Imports(mods ...*Module) {
-	l.owner.Imports(mods...)
+// same storage (including its ...TokenRef panic-on-wrong-kind contract),
+// just reached through the callback argument instead of the *Module
+// directly.
+func (l *LazyModule) Imports(refs ...TokenRef) {
+	l.owner.Imports(refs...)
 }
 
 // Exports delegates to the owning Module's own Exports -- same semantics,
-// same storage.
-func (l *LazyModule) Exports(refs ...ExportableRef) {
+// same storage (including its ...TokenRef panic-on-wrong-kind contract).
+func (l *LazyModule) Exports(refs ...TokenRef) {
 	l.owner.Exports(refs...)
 }
 

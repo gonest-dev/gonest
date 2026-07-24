@@ -78,6 +78,11 @@ func (s *Scheduler) Declare() {
 // needing to import this package.
 func (s *Scheduler) IsScheduler() {}
 
+// IsToken is a marker method that satisfies module.TokenRef (via
+// module.SchedulerRef, which embeds it), so *Scheduler can be passed to
+// any of Module's builder methods.
+func (s *Scheduler) IsToken() {}
+
 // SetOwnerModule associates this scheduler with the module that owns it.
 // Called by module assembly (Stage 1) once ownership is known.
 func (s *Scheduler) SetOwnerModule(m *module.Module) {

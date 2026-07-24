@@ -69,6 +69,11 @@ func (m *Middleware) Declare(scope []*module.Module) {
 // module's interface across packages.
 func (m *Middleware) IsMiddleware() {}
 
+// IsToken is a marker method that satisfies module.TokenRef (via
+// module.MiddlewareRef, which embeds it), so *Middleware can be passed to
+// any of Module's builder methods.
+func (m *Middleware) IsToken() {}
+
 // ResolveDirect satisfies internal/inject's directResolver interface,
 // delegating to internal/resolver's FindDirect using the scope Declare
 // stored.

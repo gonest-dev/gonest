@@ -77,10 +77,10 @@ func (p *Provider) Declare() {
 // never satisfy module's interface across packages.
 func (p *Provider) IsProvider() {}
 
-// IsExportable is a marker method that satisfies module.ExportableRef (via
+// IsToken is a marker method that satisfies module.TokenRef (via
 // module.ProviderRef, which embeds it), so *Provider can be passed to
 // (*module.Module).Exports alongside *module.Module re-export arguments.
-func (p *Provider) IsExportable() {}
+func (p *Provider) IsToken() {}
 
 // SetOwnerModule associates this provider with the module that owns it.
 // It is called by module assembly once ownership is known (structural

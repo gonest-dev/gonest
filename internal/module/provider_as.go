@@ -83,10 +83,10 @@ func (p *providerAsRef) InnerRef() ProviderRef {
 // IsProvider satisfies ProviderRef.
 func (p *providerAsRef) IsProvider() {}
 
-// IsExportable satisfies ExportableRef (via ProviderRef), so a
-// providerAsRef can be passed to Module.Exports alongside plain providers
-// and *Module re-export arguments.
-func (p *providerAsRef) IsExportable() {}
+// IsToken satisfies TokenRef (via ProviderRef), so a providerAsRef can be
+// passed to Module.Exports alongside plain providers and *Module re-export
+// arguments.
+func (p *providerAsRef) IsToken() {}
 
 // ResolvedType returns the interface type this view was constructed for
 // (captured at ProviderAs[T] call time), NOT computed from the wrapped

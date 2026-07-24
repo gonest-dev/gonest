@@ -17,7 +17,7 @@ type fakeProvider struct {
 
 func (*fakeProvider) IsProvider() {}
 
-func (*fakeProvider) IsExportable() {}
+func (*fakeProvider) IsToken() {}
 
 func (p *fakeProvider) ResolvedType() reflect.Type {
 	return p.resolved

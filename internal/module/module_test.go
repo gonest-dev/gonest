@@ -3,6 +3,7 @@ package module
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -15,10 +16,12 @@ import (
 type fakeMiddleware struct{}
 
 func (*fakeMiddleware) IsMiddleware() {}
+func (*fakeMiddleware) IsToken()      {}
 
 type fakeFilter struct{}
 
 func (*fakeFilter) IsFilter() {}
+func (*fakeFilter) IsToken()  {}
 
 // fakeProvider is a minimal stand-in for the real *provider.Provider type.
 // It only needs to satisfy ProviderRef.
@@ -30,7 +33,7 @@ type fakeProvider struct {
 
 func (*fakeProvider) IsProvider() {}
 
-func (*fakeProvider) IsExportable() {}
+func (*fakeProvider) IsToken() {}
 
 func (p *fakeProvider) ResolvedType() reflect.Type {
 	return p.resolved
@@ -47,6 +50,7 @@ type fakeController struct {
 }
 
 func (*fakeController) IsController() {}
+func (*fakeController) IsToken()      {}
 
 func (c *fakeController) SetOwnerModule(m *Module) {
 	c.ownerModule = m
@@ -57,9 +61,36 @@ type fakeResolver struct {
 }
 
 func (*fakeResolver) IsResolver() {}
+func (*fakeResolver) IsToken()    {}
 
 func (r *fakeResolver) SetOwnerModule(m *Module) {
 	r.ownerModule = m
+}
+
+// fakeListener is a minimal stand-in for the real *emitter.Listener[T]
+// type. It only needs to satisfy ListenerRef.
+type fakeListener struct {
+	ownerModule *Module
+}
+
+func (*fakeListener) IsListener() {}
+func (*fakeListener) IsToken()    {}
+
+func (l *fakeListener) SetOwnerModule(m *Module) {
+	l.ownerModule = m
+}
+
+// fakeScheduler is a minimal stand-in for the real *scheduler.Scheduler
+// type. It only needs to satisfy SchedulerRef.
+type fakeScheduler struct {
+	ownerModule *Module
+}
+
+func (*fakeScheduler) IsScheduler() {}
+func (*fakeScheduler) IsToken()     {}
+
+func (s *fakeScheduler) SetOwnerModule(m *Module) {
+	s.ownerModule = m
 }
 
 func TestNew_DoesNotExecuteFnOnCall(t *testing.T) {
@@ -470,4 +501,154 @@ func TestAssemble_AutoWiresOwnerModuleOnControllers(t *testing.T) {
 	if c.ownerModule != m {
 		t.Fatalf("assemble did not auto-wire OwnerModule on controller: got %v, want %v", c.ownerModule, m)
 	}
+}
+
+// --- TokenRef panic path: each of Module's 9 builder methods panics
+// immediately when handed a TokenRef whose concrete kind it does not
+// expect, naming both the method and the received type (unified-token-ref
+// feature, TOKEN-04). Follows the same recover()+message-check pattern
+// TestProviderAs_NonInterfaceT_Panics (provider_as_test.go) already uses.
+
+func TestModule_Imports_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Imports to panic when given a non-*Module TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Imports") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Imports and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Imports(&fakeProvider{})
+}
+
+func TestModule_Providers_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Providers to panic when given a non-ProviderRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Providers") || !strings.Contains(msg, "*module.fakeController") {
+			t.Fatalf("panic message = %q, want it to name Module.Providers and *module.fakeController", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Providers(&fakeController{})
+}
+
+func TestModule_Controllers_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Controllers to panic when given a non-ControllerRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Controllers") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Controllers and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Controllers(&fakeProvider{})
+}
+
+func TestModule_Resolvers_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Resolvers to panic when given a non-ResolverRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Resolvers") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Resolvers and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Resolvers(&fakeProvider{})
+}
+
+func TestModule_Use_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Use to panic when given a non-MiddlewareRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Use") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Use and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Use(&fakeProvider{})
+}
+
+func TestModule_Filters_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Filters to panic when given a non-FilterRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Filters") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Filters and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Filters(&fakeProvider{})
+}
+
+func TestModule_Listeners_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Listeners to panic when given a non-ListenerRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Listeners") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Listeners and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Listeners(&fakeProvider{})
+}
+
+func TestModule_Schedulers_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Schedulers to panic when given a non-SchedulerRef TokenRef")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Schedulers") || !strings.Contains(msg, "*module.fakeProvider") {
+			t.Fatalf("panic message = %q, want it to name Module.Schedulers and *module.fakeProvider", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Schedulers(&fakeProvider{})
+}
+
+func TestModule_Exports_WrongTokenKind_Panics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected Module.Exports to panic when given a TokenRef that is neither a ProviderRef nor a *Module")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "Module.Exports") || !strings.Contains(msg, "*module.fakeMiddleware") {
+			t.Fatalf("panic message = %q, want it to name Module.Exports and *module.fakeMiddleware", msg)
+		}
+	}()
+
+	m := New(func(m *Module) {})
+	m.Exports(&fakeMiddleware{})
 }

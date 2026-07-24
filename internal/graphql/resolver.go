@@ -66,6 +66,11 @@ func (r *Resolver) Declare() {
 // interface methods to the declaring package.
 func (r *Resolver) IsResolver() {}
 
+// IsToken is a marker method that satisfies module.TokenRef (via
+// module.ResolverRef, which embeds it), so *Resolver can be passed to any
+// of Module's builder methods.
+func (r *Resolver) IsToken() {}
+
 // SetOwnerModule associates this resolver with the module that owns it.
 func (r *Resolver) SetOwnerModule(m *module.Module) {
 	r.owner = m

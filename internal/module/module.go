@@ -5,18 +5,29 @@
 package module
 
 import (
+	"fmt"
 	"reflect"
 )
 
-// ExportableRef is a minimal marker interface satisfied by anything that
-// can be passed to Module.Exports: either a ProviderRef (an individual
-// provider) or a *Module (a whole re-exported module). Mirrors NestJS's
-// `@Module({ exports: [...] })`, which accepts both providers and modules
-// in the same array -- see this feature's (unified-exportable-refs)
-// design.md for why Go-purity lost to Nest-parity here, reversing AD-051's
-// original two-method split (ExportModules vs Exports).
-type ExportableRef interface {
-	IsExportable()
+// TokenRef is the minimal marker interface satisfied by anything
+// registrable on a Module -- a provider, a controller, a resolver, a
+// middleware, a filter, a listener, a scheduler, or a whole *Module. Every
+// other marker interface in this file (ProviderRef, ControllerRef,
+// ResolverRef, MiddlewareRef, FilterRef, ListenerRef, SchedulerRef) embeds
+// it, and *Module implements it directly, so ALL 9 of Module's builder
+// methods (Imports/Providers/Controllers/Resolvers/Use/Filters/Listeners/
+// Schedulers/Exports) accept ...TokenRef and route internally via a
+// type-switch/type-assert -- letting a caller declare ONE typed slice and
+// reuse it across multiple builder calls (e.g. the same []TokenRef passed
+// to both Providers and Exports) with no manual conversion. Mirrors
+// NestJS's "provider token" concept, where providers/imports/exports/
+// controllers reference the same tokens interchangeably. Replaces the
+// narrower ExportableRef (AD-052, Provider-or-Module only) -- see this
+// feature's (unified-token-ref) design.md and AD-056 in STATE.md for the
+// full rationale, including why passing the wrong concrete kind to a
+// builder panics immediately instead of failing to compile.
+type TokenRef interface {
+	IsToken()
 }
 
 // ProviderRef is a minimal marker interface satisfied by the real
@@ -33,10 +44,10 @@ type ExportableRef interface {
 // identical signature. Exporting the interface — not the marker method
 // itself — is what makes cross-package satisfaction possible.
 //
-// Embeds ExportableRef so every ProviderRef already satisfies it -- no
-// extra work needed at call sites passing a provider to Exports.
+// Embeds TokenRef so every ProviderRef already satisfies it -- no extra
+// work needed at call sites passing a provider to any builder method.
 type ProviderRef interface {
-	ExportableRef
+	TokenRef
 	IsProvider()
 	// ResolvedType returns the reflect.Type this provider resolves (its
 	// Constructor's first return value's type), used by internal/resolver
@@ -52,6 +63,7 @@ type ProviderRef interface {
 // ResolvedType (a Controller does not itself resolve a type). Same
 // cross-package rationale.
 type ControllerRef interface {
+	TokenRef
 	IsController()
 	// SetOwnerModule associates this controller with the module that owns
 	// it. Called by assemble during Stage 1.
@@ -72,6 +84,7 @@ type Owner interface {
 // than importing that package directly for the same reason ControllerRef
 // avoids importing internal/controller.
 type ResolverRef interface {
+	TokenRef
 	IsResolver()
 	// SetOwnerModule associates this resolver with the module that owns
 	// it. Called by assemble during Stage 1.
@@ -90,12 +103,14 @@ type ResolverRef interface {
 // above (exported marker method, not just an exported interface, since Go
 // ties unexported interface methods to the declaring package).
 type MiddlewareRef interface {
+	TokenRef
 	IsMiddleware()
 }
 
 // FilterRef is the Filter equivalent of MiddlewareRef, same rationale (see
 // MiddlewareRef's own doc comment).
 type FilterRef interface {
+	TokenRef
 	IsFilter()
 }
 
@@ -106,6 +121,7 @@ type FilterRef interface {
 // Module.Providers/Controllers), unlike Middleware/Guard/Interceptor/
 // Filter's union-of-referencing-modules ownership.
 type ListenerRef interface {
+	TokenRef
 	IsListener()
 	// SetOwnerModule associates this listener with the module that owns
 	// it. Called by assemble during Stage 1, same as ProviderRef/
@@ -117,6 +133,7 @@ type ListenerRef interface {
 // single-module ownership rationale (a Scheduler is registered directly
 // via Module.Schedulers, same level as Providers/Controllers/Listeners).
 type SchedulerRef interface {
+	TokenRef
 	IsScheduler()
 	SetOwnerModule(m *Module)
 }
@@ -161,25 +178,65 @@ func (m *Module) Name(name string) *Module {
 	return m
 }
 
-// Imports registers modules this module depends on.
-func (m *Module) Imports(mods ...*Module) {
-	m.imports = append(m.imports, mods...)
+// Imports registers modules this module depends on. Accepts ...TokenRef
+// (see TokenRef's own doc comment) but only a *Module is a valid argument
+// here -- any other concrete kind panics immediately, naming both the
+// method and the received type, since Go can no longer reject it at
+// compile time.
+func (m *Module) Imports(refs ...TokenRef) {
+	for _, ref := range refs {
+		mod, ok := ref.(*Module)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Imports received a TokenRef that is not a *Module (%T)", ref))
+		}
+		m.imports = append(m.imports, mod)
+	}
 }
 
-// Providers registers providers owned by this module.
-func (m *Module) Providers(ps ...ProviderRef) {
-	m.providers = append(m.providers, ps...)
+// Providers registers providers owned by this module. Accepts ...TokenRef
+// (see TokenRef's own doc comment) but only a ProviderRef is a valid
+// argument here -- any other concrete kind panics immediately, naming both
+// the method and the received type, since Go can no longer reject it at
+// compile time.
+func (m *Module) Providers(refs ...TokenRef) {
+	for _, ref := range refs {
+		p, ok := ref.(ProviderRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Providers received a TokenRef that is not a ProviderRef (%T)", ref))
+		}
+		m.providers = append(m.providers, p)
+	}
 }
 
-// Controllers registers controllers owned by this module.
-func (m *Module) Controllers(cs ...ControllerRef) {
-	m.controllers = append(m.controllers, cs...)
+// Controllers registers controllers owned by this module. Accepts
+// ...TokenRef (see TokenRef's own doc comment) but only a ControllerRef is
+// a valid argument here -- any other concrete kind panics immediately,
+// naming both the method and the received type, since Go can no longer
+// reject it at compile time.
+func (m *Module) Controllers(refs ...TokenRef) {
+	for _, ref := range refs {
+		c, ok := ref.(ControllerRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Controllers received a TokenRef that is not a ControllerRef (%T)", ref))
+		}
+		m.controllers = append(m.controllers, c)
+	}
 }
 
 // Resolvers registers GraphQL resolvers owned by this module (graphql-
 // support feature, Milestone 17) -- same registration shape as Controllers.
-func (m *Module) Resolvers(rs ...ResolverRef) {
-	m.resolvers = append(m.resolvers, rs...)
+// Accepts ...TokenRef (see TokenRef's own doc comment) but only a
+// ResolverRef is a valid argument here -- any other concrete kind panics
+// immediately, naming both the method and the received type, since Go can
+// no longer reject it at compile time.
+func (m *Module) Resolvers(refs ...TokenRef) {
+	for _, ref := range refs {
+		r, ok := ref.(ResolverRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Resolvers received a TokenRef that is not a ResolverRef (%T)", ref))
+		}
+		m.resolvers = append(m.resolvers, r)
+	}
 }
 
 // Exports registers what this module makes visible to importing modules --
@@ -191,21 +248,26 @@ func (m *Module) Resolvers(rs ...ResolverRef) {
 // Stage 1 assembly. Re-exporting a module makes every provider IT exposes
 // (via its own Exports, transitively through its own re-exported modules)
 // visible through this module too, without needing to name each provider
-// individually.
-func (m *Module) Exports(refs ...ExportableRef) {
+// individually. Accepts ...TokenRef (see TokenRef's own doc comment); any
+// concrete kind that is neither a ProviderRef nor a *Module panics
+// immediately, naming both the method and the received type.
+func (m *Module) Exports(refs ...TokenRef) {
 	for _, ref := range refs {
 		switch v := ref.(type) {
 		case *Module:
 			m.exportedModules = append(m.exportedModules, v)
 		case ProviderRef:
 			m.exports = append(m.exports, v)
+		default:
+			panic(fmt.Sprintf("gonest: Module.Exports received a TokenRef that is neither a ProviderRef nor a *Module (%T)", ref))
 		}
 	}
 }
 
-// IsExportable is a marker method that satisfies ExportableRef, so *Module
-// can be passed to Exports alongside individual ProviderRef values.
-func (m *Module) IsExportable() {}
+// IsToken is a marker method that satisfies TokenRef, so *Module can be
+// passed to any of Module's builder methods (Imports/Exports being the two
+// that actually accept a *Module argument; the others panic if handed one).
+func (m *Module) IsToken() {}
 
 // Use registers middleware owned by this module. Go cannot restrict this
 // method to "the root module only" at the type level -- any *Module can
@@ -215,9 +277,18 @@ func (m *Module) IsExportable() {}
 // module's middleware is actually CONSULTED during dispatch -- today only
 // the root module's is, imported modules' Use registrations are not
 // cascaded -- is decided later, by the code that reads OwnMiddleware (a
-// later task), not by this method.
-func (m *Module) Use(items ...MiddlewareRef) {
-	m.middleware = append(m.middleware, items...)
+// later task), not by this method. Accepts ...TokenRef (see TokenRef's own
+// doc comment) but only a MiddlewareRef is a valid argument here -- any
+// other concrete kind panics immediately, naming both the method and the
+// received type, since Go can no longer reject it at compile time.
+func (m *Module) Use(refs ...TokenRef) {
+	for _, ref := range refs {
+		mw, ok := ref.(MiddlewareRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Use received a TokenRef that is not a MiddlewareRef (%T)", ref))
+		}
+		m.middleware = append(m.middleware, mw)
+	}
 }
 
 // Filters registers filters owned by this module. Go cannot restrict this
@@ -228,9 +299,18 @@ func (m *Module) Use(items ...MiddlewareRef) {
 // CONSULTED during dispatch -- and whether that consultation cascades
 // across imported modules or is limited to the root module -- is decided
 // later, by the code that reads OwnFilters (a later task), not by this
-// method.
-func (m *Module) Filters(items ...FilterRef) {
-	m.filters = append(m.filters, items...)
+// method. Accepts ...TokenRef (see TokenRef's own doc comment) but only a
+// FilterRef is a valid argument here -- any other concrete kind panics
+// immediately, naming both the method and the received type, since Go can
+// no longer reject it at compile time.
+func (m *Module) Filters(refs ...TokenRef) {
+	for _, ref := range refs {
+		f, ok := ref.(FilterRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Filters received a TokenRef that is not a FilterRef (%T)", ref))
+		}
+		m.filters = append(m.filters, f)
+	}
 }
 
 // OwnProviders returns a copy of the providers registered on this module
@@ -276,9 +356,18 @@ func (m *Module) OwnFilters() []FilterRef {
 // Listeners registers listeners owned by this module -- same registration
 // level as Providers/Controllers (a Listener has exactly ONE owning
 // module, unlike Middleware/Guard/Interceptor/Filter's union-of-
-// referencing-modules ownership).
-func (m *Module) Listeners(ls ...ListenerRef) {
-	m.listeners = append(m.listeners, ls...)
+// referencing-modules ownership). Accepts ...TokenRef (see TokenRef's own
+// doc comment) but only a ListenerRef is a valid argument here -- any
+// other concrete kind panics immediately, naming both the method and the
+// received type, since Go can no longer reject it at compile time.
+func (m *Module) Listeners(refs ...TokenRef) {
+	for _, ref := range refs {
+		l, ok := ref.(ListenerRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Listeners received a TokenRef that is not a ListenerRef (%T)", ref))
+		}
+		m.listeners = append(m.listeners, l)
+	}
 }
 
 // OwnListeners returns a copy of the listeners registered on this module
@@ -289,9 +378,19 @@ func (m *Module) OwnListeners() []ListenerRef {
 }
 
 // Schedulers registers schedulers owned by this module -- same
-// registration level as Providers/Controllers/Listeners.
-func (m *Module) Schedulers(ss ...SchedulerRef) {
-	m.schedulers = append(m.schedulers, ss...)
+// registration level as Providers/Controllers/Listeners. Accepts
+// ...TokenRef (see TokenRef's own doc comment) but only a SchedulerRef is
+// a valid argument here -- any other concrete kind panics immediately,
+// naming both the method and the received type, since Go can no longer
+// reject it at compile time.
+func (m *Module) Schedulers(refs ...TokenRef) {
+	for _, ref := range refs {
+		s, ok := ref.(SchedulerRef)
+		if !ok {
+			panic(fmt.Sprintf("gonest: Module.Schedulers received a TokenRef that is not a SchedulerRef (%T)", ref))
+		}
+		m.schedulers = append(m.schedulers, s)
+	}
 }
 
 // OwnSchedulers returns a copy of the schedulers registered on this module

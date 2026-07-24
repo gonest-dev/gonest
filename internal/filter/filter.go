@@ -76,6 +76,11 @@ func (f *Filter) Declare(scope []*module.Module) {
 // module's interface across packages.
 func (f *Filter) IsFilter() {}
 
+// IsToken is a marker method that satisfies module.TokenRef (via
+// module.FilterRef, which embeds it), so *Filter can be passed to any of
+// Module's builder methods.
+func (f *Filter) IsToken() {}
+
 // ResolveDirect satisfies internal/inject's directResolver interface,
 // delegating to internal/resolver's FindDirect using the scope Declare
 // stored.

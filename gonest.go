@@ -44,14 +44,16 @@ import (
 // Module Composition features)
 // ---------------------------------------------------------------------------
 
-// ExportableRef is the minimal marker interface satisfied by anything
-// Module.Exports(refs ...ExportableRef) (below) accepts: a ProviderRef (an
-// individual provider) or a *Module (a whole re-exported module) -- same
-// root-aliasing rationale as ProviderRef's own doc comment (Module.Exports'
-// signature would otherwise leak `...module.ExportableRef` on hover).
-// ProviderRef embeds it, so *Provider already satisfies it; *Module
-// implements it directly.
-type ExportableRef = module.ExportableRef
+// TokenRef is the minimal marker interface satisfied by anything
+// registrable on a Module -- a provider, a controller, a resolver, a
+// middleware, a filter, a listener, a scheduler, or a whole *Module -- and
+// is now the base every XxxRef alias below embeds, so a single []TokenRef
+// slice can be declared once and reused across multiple Module builder
+// calls (e.g. both Providers and Exports) with no manual conversion. Same
+// root-aliasing rationale as ProviderRef's own doc comment (Module's
+// builder methods would otherwise leak `...module.TokenRef` on hover).
+// Replaces the narrower ExportableRef (AD-052) -- see AD-056 in STATE.md.
+type TokenRef = module.TokenRef
 
 // ProviderRef is the minimal marker interface *Provider satisfies --
 // exists purely because Module.Providers(refs ...ProviderRef) (below)

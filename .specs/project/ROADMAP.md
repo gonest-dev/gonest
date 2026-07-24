@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 24 (Module Lazy Loading) -- COMPLETE
-**Status:** Milestones 1-24 COMPLETE
+**Current Milestone:** 25 (Unified Token / TokenRef) -- COMPLETE
+**Status:** Milestones 1-25 COMPLETE
 
 ---
 
@@ -575,6 +575,48 @@ string) *gonest.Module` (função livre chamada de `main.go`, decisão fora do g
 - `controller.go`: injeta `*notifier.Config` diretamente (exportado por `Module_`) em vez de ler um
   var `config` package-level de `main.go`
 - Verificado ao vivo via `curl` contra os 2 valores de `NOTIFICATION_DRIVER` (sms e email/default)
+
+---
+
+## Milestone 25: Unified Token (TokenRef)
+
+**Goal:** um marker `TokenRef interface { IsToken() }` novo, base de TODOS os markers existentes
+(`ProviderRef`/`ControllerRef`/`ResolverRef`/`MiddlewareRef`/`FilterRef`/`ListenerRef`/
+`SchedulerRef`) e implementado por `*Module` -- os 9 métodos builder de `Module`
+(`Imports`/`Providers`/`Controllers`/`Resolvers`/`Use`/`Filters`/`Listeners`/`Schedulers`/
+`Exports`) passam a aceitar `...TokenRef` uniformemente, roteando por type-switch/type-assert
+interno com panic fail-fast no tipo inesperado. Substitui o `ExportableRef` mais restrito (AD-052,
+só Provider-or-Module), corrigindo um achado real no consumer `erc`: `[]gonest.ProviderRef` não
+convertia pra `[]gonest.ExportableRef` via type-assert nem spread (Go não é covariante em slice de
+interface), panicando em runtime (`interface conversion: interface {} is []module.ProviderRef, not
+[]module.ExportableRef`).
+**Status:** COMPLETE (T1 -- gonest core; `go test ./... -race -count=1` verde, 24 pacotes, zero
+asserção pré-existente alterada)
+
+### Features
+
+**`TokenRef` core + 9 builders migrados** - COMPLETE
+- `internal/module/module.go`: `TokenRef` novo; `ExportableRef` removido por inteiro (sem
+  alias/deprecated); `ProviderRef`/`ControllerRef`/`ResolverRef`/`MiddlewareRef`/`FilterRef`/
+  `ListenerRef`/`SchedulerRef` embutem `TokenRef` em vez de métodos soltos; `*Module.IsExportable()`
+  vira `*Module.IsToken()`; os 9 builders reescritos pra `...TokenRef` com type-switch/type-assert +
+  `panic` fail-fast (mensagem nomeia `Module.Xxx` + `%T` do tipo recebido) no case inesperado;
+  `Exports` mantém seus 2 cases válidos (`*Module`/`ProviderRef`) e ganha o `default: panic` que
+  faltava (antes ignorava tipo desconhecido silenciosamente)
+- `internal/module/lazy.go`: `LazyModule.Imports`/`Exports` migrados pra `...TokenRef` também
+  (delegam pro `owner`, mesmo contrato) -- necessário pra compilar contra a assinatura nova de
+  `Module.Imports`/`Exports`
+- `internal/provider/provider.go`, `internal/module/provider_as.go`: `IsExportable()` → `IsToken()`
+- `internal/controller/controller.go`, `internal/graphql/resolver.go`,
+  `internal/middleware/middleware.go`, `internal/filter/filter.go`,
+  `internal/emitter/listener.go`, `internal/scheduler/scheduler.go`: cada tipo concreto ganha
+  `IsToken()` novo, ao lado do marker method que já tinha
+- `gonest.go`: alias `ExportableRef` removido, `TokenRef = module.TokenRef` novo (mesmo bloco dos
+  outros 7 alias `XxxRef`)
+- Getters (`OwnProviders`/`OwnControllers`/etc), `assemble.go`/`validateExports`, `internal/resolver`
+  inalterados -- só a ENTRADA dos builders mudou, leitura continua por tipo concreto de sempre
+- 9 testes novos de panic path (1 por builder, `internal/module/module_test.go`), mesmo padrão
+  `recover()`+checagem de mensagem que `TestProviderAs_NonInterfaceT_Panics` já usava
 
 ---
 

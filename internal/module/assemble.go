@@ -76,7 +76,10 @@ func assemble(root *Module) ([]*Module, error) {
 // registered via m.Providers on the same module, and every module passed to
 // m.Exports was also registered via m.Imports on the same module --
 // symmetric checks, since Exports re-exports a whole module the same call
-// re-exposes an individual provider through.
+// re-exposes an individual provider through. Runs against the already
+// type-asserted m.exports/m.exportedModules fields Module.Exports
+// populates -- unaffected by that method's own parameter type having moved
+// from ExportableRef to TokenRef.
 func validateExports(m *Module) error {
 	declared := make(map[ProviderRef]bool, len(m.providers))
 	for _, p := range m.providers {
