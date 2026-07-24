@@ -63,6 +63,36 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 
 ## Recent Decisions (Last 60 days)
 
+### AD-058: `HttpException.Error()` cai pra JSON de `Details()` quando `Message()` nunca foi setado (2026-07-24)
+
+**Decision:** `internal/exception/exception.go`'s `HttpException.Error()` (satisfaz `error`, usado
+por qualquer `%v`/`.Error()` sobre uma exception -- inclusive quando ela vira `panic(err)` em
+`MustParse`/`MustJsonBody`/etc, ou quando um `error` sobe até `internal/resolver`'s
+`callConstructor` e é reformatado como `"gonest: provider for type X panicked during resolution:
+%v"`) deixa de retornar SEMPRE `e.message` cru. Agora: se `message` foi setado explicitamente
+(`SetMessage`), retorna ele; senão, se `details` não é nil, retorna `json.Marshal(details)`; senão
+(nem message nem details), retorna `""` como antes.
+**Reason:** achado real do usuário -- `panic: gonest: provider for type *config.DatabaseConfig
+panicked during resolution:` sem NADA depois dos dois-pontos, escondendo que a causa real era um
+nome de env var errado. Raiz: `NewBadRequestException`/`NewNotFoundException`/`NewConflictException`/
+`NewUnauthorizedException`/`NewForbiddenException` (`internal/exception/builtin.go`) NUNCA chamam
+`SetMessage` -- só `SetDetails` -- então `Message()`/`Error()` sempre foi `""` por design em toda
+falha de validação (`internal/validate`'s família inteira: env/query/params/headers/form/body),
+gap já documentado (mas nunca corrigido) num comentário de `SPEC_DEVIATION` em
+`internal/validate/graphql_args.go` sobre esse mesmo sintoma achado antes num contexto GraphQL.
+**Trade-off:** nenhum técnico -- puramente aditivo (`message` setado explicitamente continua
+vencendo sempre, comportamento existente pra quem já usa `SetMessage` inalterado).
+`internal/exception` não pode importar `internal/validate` (cycle: validate já importa exception),
+então o fallback é genérico via `encoding/json` sobre `details` (`any`), não uma formatação
+específica pra `[]violation` -- ainda assim, um dump JSON das violações é sempre mais útil que uma
+string vazia. `MarshalJSON` (o corpo HTTP real enviado ao client) NÃO muda -- continua serializando
+`message` cru (mesmo que `""`); esse fallback é só pro texto de erro Go (`Error()`), não pro
+contrato de resposta HTTP, que fica fora de escopo desta decisão.
+**Impact:** `internal/exception/exception.go` (`Error()` reescrito), `internal/exception/exception_test.go`
+(3 testes novos: message vence details, fallback pra JSON de details, string vazia quando nem um
+nem outro), `internal/validate/graphql_args.go` (comentário `SPEC_DEVIATION` atualizado, referencia
+esta AD). `go build ./...`/`go vet ./...`/`go test ./... -race -count=1` verdes, 24 pacotes.
+
 ### AD-057: Mensagem de panic de lifecycle hook nomeia provider (T) + assinatura recebida + assinaturas aceitas (2026-07-24)
 
 **Decision:** `internal/provider/lifecycle.go`'s `validateHookFunc`/`validateSignalHookFunc` passam a

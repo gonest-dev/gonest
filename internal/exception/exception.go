@@ -115,8 +115,30 @@ func (e HttpException) Details() any {
 // mechanism as Status/Name/Message/Details/MarshalJSON. Lets the non-
 // panicking ParseRest* family (internal/validate) return a *BadRequestException
 // etc. directly as a plain `error`, with no separate wrapper type needed.
+//
+// Falls back to a JSON rendering of Details() when Message() was never set
+// (the framework's own NewBadRequestException/NewNotFoundException/etc, in
+// internal/exception/builtin.go, never call SetMessage -- the structured
+// violation/reason data always lives in Details() instead). Without this
+// fallback, Error() returned "" for every one of those, which is exactly
+// what made a wrapped panic like "gonest: provider for type X panicked
+// during resolution: %v" render with nothing useful after the colon --
+// found via a real env-validation failure whose actual reason (a missing
+// env var) was silently swallowed. Falling back to raw Details() (rather
+// than leaving Error() empty) keeps the fix generic: this package cannot
+// import internal/validate's violation type without an import cycle, and
+// does not need to -- a JSON dump of whatever Details() holds is always
+// more useful than "".
 func (e HttpException) Error() string {
-	return e.message
+	if e.message != "" {
+		return e.message
+	}
+	if e.details != nil {
+		if b, err := json.Marshal(e.details); err == nil {
+			return string(b)
+		}
+	}
+	return ""
 }
 
 // MarshalJSON encodes e as {"name","message","details"} -- deliberately

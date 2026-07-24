@@ -219,3 +219,29 @@ func TestEffectiveName_FallsBackToConcreteTypeName_WhenNameUnset(t *testing.T) {
 		t.Fatalf("EffectiveName() = %q, want fooExampleName type name \"fooExampleError\"", got)
 	}
 }
+
+func TestHttpException_Error_ReturnsMessageWhenSet(t *testing.T) {
+	e := NewHttpException().SetMessage("explicit message").SetDetails("ignored, message wins")
+	if got := e.Error(); got != "explicit message" {
+		t.Fatalf("Error() = %q, want %q", got, "explicit message")
+	}
+}
+
+func TestHttpException_Error_FallsBackToJSONDetails_WhenMessageUnset(t *testing.T) {
+	type violation struct {
+		Field   string `json:"field"`
+		Message string `json:"message"`
+	}
+	e := NewHttpException().SetDetails([]violation{{Field: "DSN", Message: "required"}})
+	want := `[{"field":"DSN","message":"required"}]`
+	if got := e.Error(); got != want {
+		t.Fatalf("Error() = %q, want %q", got, want)
+	}
+}
+
+func TestHttpException_Error_EmptyWhenNoMessageAndNoDetails(t *testing.T) {
+	e := NewHttpException()
+	if got := e.Error(); got != "" {
+		t.Fatalf("Error() = %q, want empty string", got)
+	}
+}

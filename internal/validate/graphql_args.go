@@ -53,8 +53,11 @@ func (s *mapArgsSource) ParseInto(dst any, schemaArg any) error {
 // encoding/json's own json.Unmarshal(..., &any{}) produces for a JSON
 // number. Left unnormalized, EVERY integer/float GraphQL arg failed
 // validation with a confusing, near-silent "expected number" violation
-// (surfacing as an EMPTY error message, since NewBadRequestException's
-// default Message() is "" when never explicitly set).
+// (at the time this was found, surfacing as an EMPTY error message, since
+// NewBadRequestException's default Message() is "" when never explicitly
+// set -- HttpException.Error() now falls back to a JSON dump of Details()
+// in that case, AD-058, but the violation itself is still the real bug
+// this comment documents).
 func normalizeGraphqlValue(v any) any {
 	switch x := v.(type) {
 	case map[string]any:
