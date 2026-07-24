@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"gonest.dev/gonest/internal/scope"
@@ -54,13 +55,13 @@ func TestHookRegistration_InvalidShapes(t *testing.T) {
 		"not a func":                  42,
 	}
 
-	wantMsg := map[string]string{
-		"OnModuleInit":           "gonest: invalid OnModuleInit signature",
-		"OnApplicationBootstrap": "gonest: invalid OnApplicationBootstrap signature",
-		"OnModuleDestroy":        "gonest: invalid OnModuleDestroy signature",
+	wantPrefix := map[string]string{
+		"OnModuleInit":           "gonest: invalid OnModuleInit signature for provider <unknown -- Constructor not registered yet> -- got ",
+		"OnApplicationBootstrap": "gonest: invalid OnApplicationBootstrap signature for provider <unknown -- Constructor not registered yet> -- got ",
+		"OnModuleDestroy":        "gonest: invalid OnModuleDestroy signature for provider <unknown -- Constructor not registered yet> -- got ",
 	}
 
-	for hookName, want := range wantMsg {
+	for hookName, wantPfx := range wantPrefix {
 		for shapeName, fn := range invalid {
 			t.Run(hookName+"/"+shapeName, func(t *testing.T) {
 				p := New(nil)
@@ -70,8 +71,12 @@ func TestHookRegistration_InvalidShapes(t *testing.T) {
 					if r == nil {
 						t.Fatalf("expected panic, got none")
 					}
-					if r != want {
-						t.Fatalf("panic message = %v, want %v", r, want)
+					msg, ok := r.(string)
+					if !ok || !strings.HasPrefix(msg, wantPfx) {
+						t.Fatalf("panic message = %v, want prefix %q", r, wantPfx)
+					}
+					if !strings.Contains(msg, "expected one of: func(T), func(T) error, func(T, context.Context), func(T, context.Context) error") {
+						t.Fatalf("panic message = %v, missing expected-shapes list", r)
 					}
 				}()
 				reg(fn)
@@ -277,12 +282,12 @@ func TestSignalHookRegistration_InvalidShapes(t *testing.T) {
 		"not a func":                  42,
 	}
 
-	wantMsg := map[string]string{
-		"BeforeApplicationShutdown": "gonest: invalid BeforeApplicationShutdown signature",
-		"OnApplicationShutdown":     "gonest: invalid OnApplicationShutdown signature",
+	wantPrefix := map[string]string{
+		"BeforeApplicationShutdown": "gonest: invalid BeforeApplicationShutdown signature for provider <unknown -- Constructor not registered yet> -- got ",
+		"OnApplicationShutdown":     "gonest: invalid OnApplicationShutdown signature for provider <unknown -- Constructor not registered yet> -- got ",
 	}
 
-	for hookName, want := range wantMsg {
+	for hookName, wantPfx := range wantPrefix {
 		for shapeName, fn := range invalid {
 			t.Run(hookName+"/"+shapeName, func(t *testing.T) {
 				p := New(nil)
@@ -292,8 +297,12 @@ func TestSignalHookRegistration_InvalidShapes(t *testing.T) {
 					if r == nil {
 						t.Fatalf("expected panic, got none")
 					}
-					if r != want {
-						t.Fatalf("panic message = %v, want %v", r, want)
+					msg, ok := r.(string)
+					if !ok || !strings.HasPrefix(msg, wantPfx) {
+						t.Fatalf("panic message = %v, want prefix %q", r, wantPfx)
+					}
+					if !strings.Contains(msg, "expected one of: func(T, string), func(T, string) error, func(T, context.Context, string), func(T, context.Context, string) error") {
+						t.Fatalf("panic message = %v, missing expected-shapes list", r)
 					}
 				}()
 				reg(fn)
@@ -433,4 +442,54 @@ func TestRunSignalXxx_NoopWhenResolvedValueNotSet(t *testing.T) {
 	if calls != 0 {
 		t.Fatalf("hook invoked %d times, want 0 (no resolved value set)", calls)
 	}
+}
+
+// TestHookRegistration_PanicMessage_NamesProviderTypeAndReceivedSignature
+// covers the exact content of an invalid-signature panic once Constructor
+// has already been registered: the message must name the provider's real
+// resolved type (not the placeholder), the actual signature that was
+// passed in, and (for the "not a function" case) say so explicitly instead
+// of printing a bare Go type.
+func TestHookRegistration_PanicMessage_NamesProviderTypeAndReceivedSignature(t *testing.T) {
+	p := New(nil)
+	p.Constructor(func() *lifecycleWidget { return &lifecycleWidget{} })
+
+	defer func() {
+		r := recover()
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("expected string panic, got %v", r)
+		}
+		wantSubstrings := []string{
+			"gonest: invalid OnModuleInit signature",
+			"provider *provider.lifecycleWidget",
+			"got func(int) string",
+			"expected one of: func(T), func(T) error, func(T, context.Context), func(T, context.Context) error",
+		}
+		for _, sub := range wantSubstrings {
+			if !strings.Contains(msg, sub) {
+				t.Fatalf("panic message = %q, want substring %q", msg, sub)
+			}
+		}
+	}()
+	p.OnModuleInit(func(int) string { return "" })
+}
+
+// TestHookRegistration_PanicMessage_NotAFunction covers the "not a
+// function" case specifically -- describeGivenFunc must say so in plain
+// words, not just print the underlying Go type.
+func TestHookRegistration_PanicMessage_NotAFunction(t *testing.T) {
+	p := New(nil)
+
+	defer func() {
+		r := recover()
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("expected string panic, got %v", r)
+		}
+		if !strings.Contains(msg, "got int (not a function)") {
+			t.Fatalf("panic message = %q, want substring %q", msg, "got int (not a function)")
+		}
+	}()
+	p.OnModuleDestroy(42)
 }

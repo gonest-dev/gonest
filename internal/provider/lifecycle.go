@@ -45,16 +45,47 @@ func isValidHookSignature(t reflect.Type) bool {
 	}
 }
 
-// validateHookFunc reflects on fn, panicking with "gonest: invalid <name>
-// signature" if it does not match one of the 4 shapes isValidHookSignature
-// accepts, and otherwise returns fn's reflect.Value ready to be stored and
-// later invoked by fn.Call.
-func validateHookFunc(fn any, name string) reflect.Value {
+// validateHookFunc reflects on fn, panicking with a message naming the hook
+// (name), the provider it was registered on (owner.ResolvedType(), or a
+// placeholder if Constructor has not been called yet), the actual signature
+// received, and the 4 accepted shapes, if fn does not match one of the 4
+// shapes isValidHookSignature accepts. Otherwise returns fn's reflect.Value
+// ready to be stored and later invoked by fn.Call.
+func validateHookFunc(fn any, name string, owner *Provider) reflect.Value {
 	v := reflect.ValueOf(fn)
 	if v.Kind() != reflect.Func || !isValidHookSignature(v.Type()) {
-		panic("gonest: invalid " + name + " signature")
+		panic(fmt.Sprintf(
+			"gonest: invalid %s signature for provider %s -- got %s, expected one of: func(T), func(T) error, func(T, context.Context), func(T, context.Context) error",
+			name, providerTypeLabel(owner), describeGivenFunc(v),
+		))
 	}
 	return v
+}
+
+// providerTypeLabel returns owner's resolved type (the T lifecycle hooks
+// close over) for use in a panic message, or a placeholder when Constructor
+// has not been registered yet -- ResolvedType() returns nil in that case,
+// which would otherwise render as the confusing literal "<nil>".
+func providerTypeLabel(owner *Provider) string {
+	if t := owner.ResolvedType(); t != nil {
+		return t.String()
+	}
+	return "<unknown -- Constructor not registered yet>"
+}
+
+// describeGivenFunc renders v (the value passed to a hook setter) for a
+// panic message: the reflect type if v is a func, "<type> (not a function)"
+// if it is some other concrete type, or "nil" if v is the zero Value (fn was
+// a nil interface) -- reflect.Value.Type() panics on a zero Value, so nil
+// must be special-cased before it reaches v.Type().
+func describeGivenFunc(v reflect.Value) string {
+	if !v.IsValid() {
+		return "nil"
+	}
+	if v.Kind() != reflect.Func {
+		return fmt.Sprintf("%s (not a function)", v.Type())
+	}
+	return v.Type().String()
 }
 
 // stringType is used alongside contextType/errorType (declared in
@@ -103,14 +134,18 @@ func isValidSignalHookSignature(t reflect.Type) bool {
 }
 
 // validateSignalHookFunc is validateHookFunc's counterpart for the
-// signal-carrying hooks: it panics with "gonest: invalid <name> signature"
-// if fn does not match one of the 4 shapes isValidSignalHookSignature
-// accepts, and otherwise returns fn's reflect.Value ready to be stored and
-// later invoked by fn.Call.
-func validateSignalHookFunc(fn any, name string) reflect.Value {
+// signal-carrying hooks: it panics with the same kind of message (hook
+// name, owning provider's type, actual signature received, accepted
+// shapes) if fn does not match one of the 4 shapes
+// isValidSignalHookSignature accepts, and otherwise returns fn's
+// reflect.Value ready to be stored and later invoked by fn.Call.
+func validateSignalHookFunc(fn any, name string, owner *Provider) reflect.Value {
 	v := reflect.ValueOf(fn)
 	if v.Kind() != reflect.Func || !isValidSignalHookSignature(v.Type()) {
-		panic("gonest: invalid " + name + " signature")
+		panic(fmt.Sprintf(
+			"gonest: invalid %s signature for provider %s -- got %s, expected one of: func(T, string), func(T, string) error, func(T, context.Context, string), func(T, context.Context, string) error",
+			name, providerTypeLabel(owner), describeGivenFunc(v),
+		))
 	}
 	return v
 }
@@ -128,10 +163,11 @@ func validateSignalHookFunc(fn any, name string) reflect.Value {
 //	func(T, context.Context)
 //	func(T, context.Context) error
 //
-// where T is this provider's resolved type. Any other shape panics with
-// "gonest: invalid OnModuleInit signature".
+// where T is this provider's resolved type. Any other shape panics, naming
+// OnModuleInit, this provider's T, the signature actually received, and the
+// 4 accepted shapes.
 func (p *Provider) OnModuleInit(fn any) {
-	p.onModuleInit = validateHookFunc(fn, "OnModuleInit")
+	p.onModuleInit = validateHookFunc(fn, "OnModuleInit", p)
 }
 
 // OnApplicationBootstrap registers fn to run once, after every provider in
@@ -140,18 +176,20 @@ func (p *Provider) OnModuleInit(fn any) {
 // provider's setup logic needs to assume every OTHER provider is already
 // fully initialized, not just itself. Accepted shapes are identical to
 // OnModuleInit's; see that method's doc comment. Any other shape panics
-// with "gonest: invalid OnApplicationBootstrap signature".
+// with the same kind of message (method name, provider's T, signature
+// received, accepted shapes).
 func (p *Provider) OnApplicationBootstrap(fn any) {
-	p.onApplicationBootstrap = validateHookFunc(fn, "OnApplicationBootstrap")
+	p.onApplicationBootstrap = validateHookFunc(fn, "OnApplicationBootstrap", p)
 }
 
 // OnModuleDestroy registers fn to run once during application shutdown,
 // giving a provider a chance to release resources (close connections, flush
 // buffers, etc.) using its already-resolved instance. Accepted shapes are
 // identical to OnModuleInit's; see that method's doc comment. Any other
-// shape panics with "gonest: invalid OnModuleDestroy signature".
+// shape panics with the same kind of message (method name, provider's T,
+// signature received, accepted shapes).
 func (p *Provider) OnModuleDestroy(fn any) {
-	p.onModuleDestroy = validateHookFunc(fn, "OnModuleDestroy")
+	p.onModuleDestroy = validateHookFunc(fn, "OnModuleDestroy", p)
 }
 
 // BeforeApplicationShutdown registers fn to run once, right after a
@@ -170,10 +208,11 @@ func (p *Provider) OnModuleDestroy(fn any) {
 //
 // where T is this provider's resolved type and the string is the shutdown
 // signal. Any other shape -- including one of OnModuleInit's 4
-// no-signal shapes -- panics with "gonest: invalid BeforeApplicationShutdown
-// signature".
+// no-signal shapes -- panics, naming BeforeApplicationShutdown, this
+// provider's T, the signature actually received, and the 4 accepted
+// signal-carrying shapes.
 func (p *Provider) BeforeApplicationShutdown(fn any) {
-	p.beforeApplicationShutdown = validateSignalHookFunc(fn, "BeforeApplicationShutdown")
+	p.beforeApplicationShutdown = validateSignalHookFunc(fn, "BeforeApplicationShutdown", p)
 }
 
 // OnApplicationShutdown registers fn to run once during final application
@@ -181,9 +220,10 @@ func (p *Provider) BeforeApplicationShutdown(fn any) {
 // mirroring Nest's OnApplicationShutdown, this is the last hook to fire
 // before the process exits. Accepted shapes are identical to
 // BeforeApplicationShutdown's; see that method's doc comment. Any other
-// shape panics with "gonest: invalid OnApplicationShutdown signature".
+// shape panics with the same kind of message (method name, provider's T,
+// signature received, accepted shapes).
 func (p *Provider) OnApplicationShutdown(fn any) {
-	p.onApplicationShutdown = validateSignalHookFunc(fn, "OnApplicationShutdown")
+	p.onApplicationShutdown = validateSignalHookFunc(fn, "OnApplicationShutdown", p)
 }
 
 // RunModuleInit invokes the hook registered via OnModuleInit against this

@@ -63,6 +63,33 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 
 ## Recent Decisions (Last 60 days)
 
+### AD-057: Mensagem de panic de lifecycle hook nomeia provider (T) + assinatura recebida + assinaturas aceitas (2026-07-24)
+
+**Decision:** `internal/provider/lifecycle.go`'s `validateHookFunc`/`validateSignalHookFunc` passam a
+receber o `*Provider` dono (`owner`) além de `fn`/`name`, e a mensagem de panic vira
+`"gonest: invalid <Hook> signature for provider <T> -- got <assinatura recebida>, expected one of:
+<as 4 formas aceitas>"` em vez do genérico `"gonest: invalid <Hook> signature"` de antes -- aplicado
+aos 5 hooks (`OnModuleInit`/`OnApplicationBootstrap`/`OnModuleDestroy`/`BeforeApplicationShutdown`/
+`OnApplicationShutdown`). 2 helpers novos: `providerTypeLabel(owner)` (retorna `owner.ResolvedType()`
+formatado, ou um placeholder `"<unknown -- Constructor not registered yet>"` se `Constructor` ainda
+não foi chamado -- convenção real de uso sempre chama `Constructor` antes dos hooks dentro do mesmo
+`fn(p *Provider)`, mas a ordem não é garantida pelo tipo) e `describeGivenFunc(v)` (mensagem legível
+pro valor recebido -- assinatura de função se for func, `"<tipo> (not a function)"` se não for,
+`"nil"` se for interface nil, tratado à parte porque `reflect.Value.Type()` panica em zero Value).
+**Reason:** achado real do usuário rodando um app `erc` real -- `panic: gonest: invalid
+OnApplicationShutdown signature` sem NENHUM contexto (nem o tipo do provider, nem a assinatura
+recebida, nem as aceitas), forçando abrir o código-fonte do gonest pra entender o que era esperado.
+Pedido explícito: "seria bom o erro indicar melhor qual assinatura e de qual método está errado e se
+possível de onde vem".
+**Trade-off:** nenhum técnico -- puramente aditivo na mensagem, comportamento de validação
+(`isValidHookSignature`/`isValidSignalHookSignature`) inalterado. Testes existentes que comparavam a
+mensagem por igualdade exata (`lifecycle_test.go`) migraram pra checagem de prefixo + substring (a
+mensagem agora varia por shape recebida, não é mais uma string fixa por hook).
+**Impact:** `internal/provider/lifecycle.go` (mensagem + 2 helpers novos), `internal/provider/lifecycle_test.go`
+(testes de shape inválida migrados pra prefix/substring match, 2 testes novos cobrindo o conteúdo
+exato da mensagem — tipo do provider resolvido de verdade e caso "not a function"). `go build ./...`/
+`go vet ./...`/`go test ./... -race -count=1` verdes, 24 pacotes.
+
 ### AD-056: `TokenRef` unifica TODOS os markers de `Module` (não só Providers/Exports) -- Milestone 25, T1 (2026-07-24)
 
 **Decision:** `TokenRef interface { IsToken() }` novo (`internal/module/module.go`), base de TODOS
