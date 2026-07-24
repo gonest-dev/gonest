@@ -949,6 +949,15 @@ func NewAccessor[T any](val ...T) Accessor[T] {
 	return accessor.New(val...)
 }
 
+// SyncAccessorFields inspects src and dst (which must be structs or pointers to structs).
+// For every exported field in src that is an Accessor[T] and is dirty (IsDirty() == true),
+// it locates the matching field in dst (by struct field name or json tag name) and sets its value.
+// If the field in dst is also an Accessor[T], it calls Set(val) on it.
+// If the field in dst is a raw type T or *T, it assigns the value directly.
+func SyncAccessorFields(dst any, src any) {
+	accessor.SyncAccessorFields(dst, src)
+}
+
 // ---------------------------------------------------------------------------
 // Validation (Unified Parse API feature)
 // ---------------------------------------------------------------------------

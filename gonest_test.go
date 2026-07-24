@@ -4005,3 +4005,37 @@ func TestMustParse_PointerT_ReturnsPointerToParsedStruct(t *testing.T) {
 		t.Fatalf("got.Port = %d, want %d", got.Port, 5432)
 	}
 }
+
+type rootSyncPersonProps struct {
+	Name Accessor[string] `json:"name"`
+	Age  Accessor[int]    `json:"age"`
+}
+
+type rootSyncPersonEntity struct {
+	rootSyncPersonProps
+}
+
+func TestSyncAccessorFields_RootExport(t *testing.T) {
+	dst := &rootSyncPersonEntity{
+		rootSyncPersonProps: rootSyncPersonProps{
+			Name: NewAccessor("old name"),
+			Age:  NewAccessor(20),
+		},
+	}
+
+	src := &rootSyncPersonProps{
+		Name: NewAccessor("new name"),
+	}
+
+	SyncAccessorFields(dst, src)
+
+	if dst.Name.Get() != "new name" {
+		t.Fatalf("expected Name to be 'new name', got %q", dst.Name.Get())
+	}
+	if !dst.Name.IsDirty() {
+		t.Fatalf("expected Name to be dirty in dst")
+	}
+	if dst.Age.Get() != 20 {
+		t.Fatalf("expected Age to remain 20, got %d", dst.Age.Get())
+	}
+}
