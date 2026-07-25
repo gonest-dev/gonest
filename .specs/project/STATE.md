@@ -63,6 +63,23 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 
 ## Recent Decisions (Last 60 days)
 
+### AD-059: banner de startup mostra `localhost:PORT`, não `0.0.0.0:PORT`, pra addr sem host (2026-07-24)
+
+**Decision:** `internal/app/app.go`'s `displayAddr` (usado só pela linha `"Listening on: http://%s"` do
+banner de `Listen`/`MustListen`) reescreve um addr tipo `":3000"` (shorthand do Go pra "todas as
+interfaces") pra `"localhost:3000"` em vez de `"0.0.0.0:3000"`. O BIND real (`net.Listen`/adapter)
+continua idêntico -- só o texto IMPRESSO muda.
+**Reason:** achado real do usuário -- banner mostrava `http://0.0.0.0:3000`, mas colar essa URL no
+navegador não conecta (`0.0.0.0` é endereço de BIND/wildcard, não um destino válido pra a maioria
+dos SOs); só `127.0.0.1`/`localhost` funcionavam. `localhost` sempre alcança um server bindado em
+todas as interfaces (loopback é uma delas), então a troca nunca fica "errada", só mais estreita que
+o real (o IP da LAN também funciona, só não aparece no banner).
+**Trade-off:** nenhum técnico -- puramente cosmético, `net.Listen`/adapter continuam recebendo o
+addr original (`":3000"`) sem qualquer mudança de comportamento de bind.
+**Impact:** `internal/app/app.go` (`displayAddr` + doc comment), `internal/app/app_test.go` (2 testes
+novos: bare-port vira `localhost:PORT`, addr com host explícito passa direto). `go build ./...`/
+`go vet ./...`/`go test ./... -race -count=1` verdes, 24 pacotes.
+
 ### AD-058: `HttpException.Error()` cai pra JSON de `Details()` quando `Message()` nunca foi setado (2026-07-24)
 
 **Decision:** `internal/exception/exception.go`'s `HttpException.Error()` (satisfaz `error`, usado

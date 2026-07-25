@@ -1015,3 +1015,23 @@ func TestListen_VariadicNoOnListen_DoesNotPanic(t *testing.T) {
 		t.Fatal("Listen(addr) with zero OnListen args did not return")
 	}
 }
+
+// TestDisplayAddr_BarePort_PrintsLocalhostNotWildcard proves displayAddr
+// renders a bare ":PORT" addr as "localhost:PORT" for the startup banner,
+// not "0.0.0.0:PORT" -- 0.0.0.0 is a wildcard BIND address, not something a
+// browser can connect to, so printing it produces a URL a dev can paste and
+// get a connection failure from (the real bug found in a live erc session).
+func TestDisplayAddr_BarePort_PrintsLocalhostNotWildcard(t *testing.T) {
+	if got := displayAddr(":3000"); got != "localhost:3000" {
+		t.Fatalf("displayAddr(%q) = %q, want %q", ":3000", got, "localhost:3000")
+	}
+}
+
+// TestDisplayAddr_ExplicitHost_PassesThroughUnchanged proves displayAddr
+// only rewrites the bare-":PORT" shorthand -- an addr with an explicit host
+// (already meaningful to a human/browser) is returned as-is.
+func TestDisplayAddr_ExplicitHost_PassesThroughUnchanged(t *testing.T) {
+	if got := displayAddr("127.0.0.1:3000"); got != "127.0.0.1:3000" {
+		t.Fatalf("displayAddr(%q) = %q, want unchanged", "127.0.0.1:3000", got)
+	}
+}

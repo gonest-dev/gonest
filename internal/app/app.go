@@ -219,14 +219,22 @@ func printBanner() {
 }
 
 // displayAddr rewrites a bare ":PORT" addr (Go's own net.Listen shorthand
-// for "all interfaces") into "0.0.0.0:PORT" for the startup log line --
+// for "all interfaces") into "localhost:PORT" for the startup log line --
 // "http://:3000" is technically what was passed to Listen, but reads as a
-// typo/missing host to a human, and every adapter's own default banner
-// this replaces (e.g. Fiber's) already showed a real host, not a bare
-// colon.
+// typo/missing host to a human. Deliberately "localhost", not "0.0.0.0":
+// the actual bind is still all interfaces (this only changes what gets
+// PRINTED, never what gets passed to the adapter's real Listen call), but
+// "0.0.0.0" is a wildcard bind address, not something a browser can
+// actually connect to on most OSes -- printing it produces a URL a dev
+// pastes into their browser and gets a connection failure from, exactly
+// the confusion found in a real erc session ("a mensagem aponta pro
+// 0.0.0.0:3000 mas só entra com 127.0.0.1/localhost"). "localhost" is
+// always reachable for a server bound to all interfaces (loopback is one
+// of them), so it is never wrong, only sometimes narrower than what is
+// actually listening (e.g. the LAN IP also works, just isn't printed).
 func displayAddr(addr string) string {
 	if strings.HasPrefix(addr, ":") {
-		return "0.0.0.0" + addr
+		return "localhost" + addr
 	}
 	return addr
 }
