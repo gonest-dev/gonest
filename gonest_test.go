@@ -203,7 +203,7 @@ var idParamsSchema = NewSchema(func(t *idParams, m *Schema) {
 // and valid, populates T via MustParams[T] without panic.
 func TestMustParams_RootPackage_HappyPath(t *testing.T) {
 
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/users/:id", func(r *route.Route) {})
 
 	res := newParamFakeResponder()
 	res.params["id"] = "42"
@@ -222,7 +222,7 @@ func TestMustParams_RootPackage_HappyPath(t *testing.T) {
 // false) is collected as a violation and panics *BadRequestException.
 func TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) {
 
-	r := route.New(route.HttpGet, "/users", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/users", func(r *route.Route) {})
 
 	res := newParamFakeResponder()
 	ctx, _ := execution.New(res)
@@ -248,7 +248,7 @@ func TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) 
 // (integer) is collected as a violation and panics *BadRequestException.
 func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
 
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/users/:id", func(r *route.Route) {})
 
 	res := newParamFakeResponder()
 	res.params["id"] = "not-a-number"
@@ -272,7 +272,7 @@ func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
 // MustParseRestParams, just surfaced as a return value for callers that
 // want to handle it themselves.
 func TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking(t *testing.T) {
-	r := route.New(route.HttpGet, "/users/:id", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/users/:id", func(r *route.Route) {})
 
 	t.Run("invalid", func(t *testing.T) {
 		res := newParamFakeResponder()
@@ -3384,6 +3384,115 @@ func TestMustNewTestApp_NilConfigure_BehavesLikeNewAppMinusListen(t *testing.T) 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d (real, non-overridden UserService resolving user 42)", resp.StatusCode, http.StatusOK)
 	}
+}
+
+// routeMustInjectUsecase is a tiny per-route dependency, deliberately
+// distinct from insightTestUserService above -- proving MustInject[T](r)
+// resolves ITS OWN matching provider, not merely reusing whatever the
+// Controller already resolved.
+type routeMustInjectUsecase struct{}
+
+func (u *routeMustInjectUsecase) Greeting() string { return "hello from route" }
+
+// TestMustInject_RouteCallback_ResolvesFromOwningControllerScope proves
+// route-must-inject feature's AC1/R1: gonest.MustInject[T](r) called from
+// INSIDE a route callback (the fn passed to RouteGet, not the Controller's
+// own outer builder fn) resolves T from the owning Controller's module scope
+// and does not panic, verified via a real HTTP dispatch (spec.md AC6-style
+// verification, same app.Test mechanism every other HTTP test in this file
+// uses).
+func TestMustInject_RouteCallback_ResolvesFromOwningControllerScope(t *testing.T) {
+	provider := NewProvider(func(p *Provider) {
+		p.Constructor(func() *routeMustInjectUsecase { return &routeMustInjectUsecase{} })
+	})
+
+	controller := NewController(func(c *Controller) {
+		c.Path("/greet")
+		c.RouteGet("/hello", func(r *Route) {
+			usecase := MustInject[*routeMustInjectUsecase](r)
+			r.Handler(func(c *HttpContext) {
+				c.Response().Json(map[string]string{"message": usecase.Greeting()})
+			})
+		})
+	})
+
+	module := NewModule(func(m *Module) {
+		m.Providers(provider)
+		m.Controllers(controller)
+	})
+
+	tester := MustNewTestApp(module, nil)
+	defer tester.Close()
+
+	fiberAdapter, ok := tester.Adapter().(*fiber.App)
+	if !ok {
+		t.Fatalf("tester.Adapter() is not a *fiber.FiberApp: %T", tester.Adapter())
+	}
+	t.Cleanup(func() { _ = fiberAdapter.FiberApp().Shutdown() })
+
+	req := httptest.NewRequest(http.MethodGet, "/greet/hello", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	var got map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+	if got["message"] != "hello from route" {
+		t.Fatalf(`body["message"] = %q, want "hello from route"`, got["message"])
+	}
+}
+
+// TestMustInject_RouteCallback_PanicsWhenNoProviderRegistered proves
+// route-must-inject feature's AC2: MustInject[T](r) inside a route callback
+// panics with the SAME "no provider registered for type ..." message shape
+// MustInject[T](c) already produces for a Controller, when no matching
+// provider exists in scope -- Route now dispatches through the exact same
+// internal/inject.Must pointer-kind path a Controller owner does (via
+// Route.ResolveDirect delegating to the owning Controller).
+//
+// MustInject[T](r) is called directly in the route's own callback (the fn
+// passed to RouteGet), the same place Controller's own MustInject[T](c)
+// calls live -- so it panics synchronously during MustNewTestApp's bootstrap
+// (Controller.Declare running this Controller's fn, which runs
+// route.New(c, ...)'s fn immediately, see route.go's own New doc comment),
+// not during a later HTTP dispatch. That is also why this test recovers
+// around MustNewTestApp itself, rather than around a simulated request:
+// internal/adapter/fiber's RegisterRoute only wraps DISPATCHED Handler calls
+// in its own recover (converting a panic into an HTTP response, see fiber.go's
+// own doc comment) -- it never runs for a panic that happens this early.
+func TestMustInject_RouteCallback_PanicsWhenNoProviderRegistered(t *testing.T) {
+	controller := NewController(func(c *Controller) {
+		c.Path("/missing")
+		c.RouteGet("/hello", func(r *Route) {
+			MustInject[*routeMustInjectUsecase](r)
+		})
+	})
+
+	module := NewModule(func(m *Module) {
+		m.Controllers(controller)
+	})
+
+	defer func() {
+		rec := recover()
+		msg, ok := rec.(string)
+		if !ok {
+			t.Fatalf("expected a string panic, got %T: %v", rec, rec)
+		}
+		if !strings.Contains(msg, "no provider registered for type") {
+			t.Fatalf("panic message = %q, want it to contain %q", msg, "no provider registered for type")
+		}
+	}()
+
+	tester := MustNewTestApp(module, nil)
+	defer tester.Close()
 }
 
 // ---------------------------------------------------------------------------

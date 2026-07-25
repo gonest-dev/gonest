@@ -47,7 +47,7 @@ func (f *fakeResponder) Upgrade(handler func(conn execution.WSConn), subprotocol
 // Stage 2, so there is no further stage left to defer to).
 func TestNew_RunsFnImmediately(t *testing.T) {
 	ran := false
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		ran = true
 	})
 
@@ -61,7 +61,7 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 
 // TestHttpCode_StoresStatus proves HttpCode stores the default status code.
 func TestHttpCode_StoresStatus(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		r.HttpCode(201)
 	})
 
@@ -74,7 +74,7 @@ func TestHttpCode_StoresStatus(t *testing.T) {
 // defaults to 200 (per design.md's Data Models comment: "default 200,
 // sobrescrito por HttpCode()").
 func TestHttpCode_DefaultsTo200(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	if got := r.Code(); got != 200 {
 		t.Fatalf("expected default HttpCode to be 200, got %d", got)
@@ -85,7 +85,7 @@ func TestHttpCode_DefaultsTo200(t *testing.T) {
 // (and callable) later.
 func TestHandler_StoresFn(t *testing.T) {
 	called := false
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		r.Handler(func(c *execution.HttpContext) {
 			called = true
 		})
@@ -107,7 +107,7 @@ func TestHandler_StoresFn(t *testing.T) {
 // rely on to distinguish "genuinely absent from this route" from "present
 // but empty string".
 func TestHasParam_TrueForDeclaredPathSegment(t *testing.T) {
-	r := New(HttpGet, "/users/:id/orders/:orderId", func(r *Route) {})
+	r := New(nil, HttpGet, "/users/:id/orders/:orderId", func(r *Route) {})
 
 	if !r.HasParam("id") {
 		t.Fatal("expected HasParam(\"id\") to be true, path declares :id")
@@ -120,7 +120,7 @@ func TestHasParam_TrueForDeclaredPathSegment(t *testing.T) {
 // TestHasParam_FalseForUndeclaredName proves HasParam is false for a name
 // that isn't a ":name" segment in the Route's declared path.
 func TestHasParam_FalseForUndeclaredName(t *testing.T) {
-	r := New(HttpGet, "/users/:id", func(r *Route) {})
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {})
 
 	if r.HasParam("nonexistent") {
 		t.Fatal("expected HasParam(\"nonexistent\") to be false, path does not declare it")
@@ -132,7 +132,7 @@ func TestHasParam_FalseForUndeclaredName(t *testing.T) {
 // build a method+path collision key without reaching into Route's
 // unexported fields.
 func TestMethod_ReturnsConstructedMethod(t *testing.T) {
-	r := New(HttpPost, "/users", func(r *Route) {})
+	r := New(nil, HttpPost, "/users", func(r *Route) {})
 
 	if got := r.Method(); got != HttpPost {
 		t.Fatalf("Method() = %v, want %v", got, HttpPost)
@@ -144,7 +144,7 @@ func TestMethod_ReturnsConstructedMethod(t *testing.T) {
 // PathPrefix + route Path) for both collision detection and adapter
 // registration.
 func TestPath_ReturnsConstructedPath(t *testing.T) {
-	r := New(HttpGet, "/users/:id", func(r *Route) {})
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {})
 
 	if got := r.Path(); got != "/users/:id" {
 		t.Fatalf("Path() = %q, want %q", got, "/users/:id")
@@ -178,7 +178,7 @@ func newTestSchemaForRoute(t *testing.T) *schema.Schema {
 // SummaryText, and returns r so calls can chain.
 func TestSummary_StoresAndReturnsSelf(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		got = r.Summary("List users")
 	})
 
@@ -193,7 +193,7 @@ func TestSummary_StoresAndReturnsSelf(t *testing.T) {
 // TestSummary_DefaultsEmpty proves SummaryText returns "" before Summary is
 // ever called.
 func TestSummary_DefaultsEmpty(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	if r.SummaryText() != "" {
 		t.Errorf("SummaryText() = %q, want \"\"", r.SummaryText())
@@ -204,7 +204,7 @@ func TestSummary_DefaultsEmpty(t *testing.T) {
 // returned by DescriptionText, and returns r so calls can chain.
 func TestDescription_StoresAndReturnsSelf(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		got = r.Description("Lists every user")
 	})
 
@@ -219,7 +219,7 @@ func TestDescription_StoresAndReturnsSelf(t *testing.T) {
 // TestDescription_DefaultsEmpty proves DescriptionText returns "" before
 // Description is ever called.
 func TestDescription_DefaultsEmpty(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	if r.DescriptionText() != "" {
 		t.Errorf("DescriptionText() = %q, want \"\"", r.DescriptionText())
@@ -230,7 +230,7 @@ func TestDescription_DefaultsEmpty(t *testing.T) {
 // returned by OperationIdText, and returns r so calls can chain.
 func TestOperationId_StoresAndReturnsSelf(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		got = r.OperationId("listUsers")
 	})
 
@@ -245,7 +245,7 @@ func TestOperationId_StoresAndReturnsSelf(t *testing.T) {
 // TestOperationId_DefaultsEmpty proves OperationIdText returns "" before
 // OperationId is ever called.
 func TestOperationId_DefaultsEmpty(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	if r.OperationIdText() != "" {
 		t.Errorf("OperationIdText() = %q, want \"\"", r.OperationIdText())
@@ -257,7 +257,7 @@ func TestOperationId_DefaultsEmpty(t *testing.T) {
 // controller's" from "called" (design.md's Route documentation builder
 // methods component).
 func TestTags_NeverCalled_ReportsUnset(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	tags, set := r.OwnTags()
 	if set {
@@ -272,7 +272,7 @@ func TestTags_NeverCalled_ReportsUnset(t *testing.T) {
 // after Tags is called, overriding the controller's own value entirely.
 func TestTags_Called_ReportsSetWithValue(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		got = r.Tags("admin", "internal")
 	})
 
@@ -293,7 +293,7 @@ func TestTags_Called_ReportsSetWithValue(t *testing.T) {
 // (false, false) before BearerAuth is ever called -- distinguishing "never
 // called, inherit controller's" from "explicitly called".
 func TestBearerAuth_NeverCalled_ReportsUnset(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	value, set := r.HasBearerAuth()
 	if set {
@@ -309,7 +309,7 @@ func TestBearerAuth_NeverCalled_ReportsUnset(t *testing.T) {
 // can chain.
 func TestBearerAuth_Called_ReportsSetTrue(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		got = r.BearerAuth()
 	})
 
@@ -333,7 +333,7 @@ func TestRequestBody_StoresAndReportsSet(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	var got *Route
-	r := New(HttpPost, "/users", func(r *Route) {
+	r := New(nil, HttpPost, "/users", func(r *Route) {
 		got = r.RequestBody(m)
 	})
 
@@ -353,7 +353,7 @@ func TestRequestBody_StoresAndReportsSet(t *testing.T) {
 // TestRequestBody_NeverCalled_ReportsUnset proves RequestBodySchema
 // returns (nil, false) before RequestBody is ever called.
 func TestRequestBody_NeverCalled_ReportsUnset(t *testing.T) {
-	r := New(HttpPost, "/users", func(r *Route) {})
+	r := New(nil, HttpPost, "/users", func(r *Route) {})
 
 	gotMeta, set := r.RequestBodySchema()
 	if set {
@@ -371,7 +371,7 @@ func TestRequestBody_NeverCalled_ReportsUnset(t *testing.T) {
 // (spec.md AC3).
 func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
 	var got *Route
-	r := New(HttpDelete, "/users/:id", func(r *Route) {
+	r := New(nil, HttpDelete, "/users/:id", func(r *Route) {
 		got = r.Response(204)
 	})
 
@@ -399,7 +399,7 @@ func TestResponse_ZeroArgs_DocumentsNoBodyButKeepsStatusKey(t *testing.T) {
 func TestResponse_OneArg_StoresBody(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
-	r := New(HttpGet, "/users/:id", func(r *Route) {
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, func(response *Response) {
 			response.Schema(m)
 		})
@@ -425,7 +425,7 @@ func TestResponse_DifferentStatuses_Accumulates(t *testing.T) {
 	okMeta := newTestSchemaFor(t, &okBody{})
 	errMeta := newTestSchemaFor(t, &errBody{})
 
-	r := New(HttpGet, "/users/:id", func(r *Route) {
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, func(response *Response) { response.Schema(okMeta) })
 		r.Response(404, func(response *Response) { response.Schema(errMeta) })
 	})
@@ -451,7 +451,7 @@ func TestResponse_SameStatusTwice_Overwrites(t *testing.T) {
 	firstMeta := newTestSchemaFor(t, &firstBody{})
 	secondMeta := newTestSchemaFor(t, &secondBody{})
 
-	r := New(HttpGet, "/users/:id", func(r *Route) {
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, func(response *Response) { response.Schema(firstMeta) })
 		r.Response(200, func(response *Response) { response.Schema(secondMeta) })
 	})
@@ -470,7 +470,7 @@ func TestResponse_SameStatusTwice_Overwrites(t *testing.T) {
 func TestResponses_ReturnsCopyNotInternalMap(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
-	r := New(HttpGet, "/users/:id", func(r *Route) {
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {
 		r.Response(200, func(response *Response) { response.Schema(m) })
 	})
 
@@ -493,7 +493,7 @@ func TestParams_StoresAndReportsSet(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	var got *Route
-	r := New(HttpGet, "/users/:id", func(r *Route) {
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {
 		got = r.Params(m)
 	})
 
@@ -513,7 +513,7 @@ func TestParams_StoresAndReportsSet(t *testing.T) {
 // TestParams_NeverCalled_ReportsUnset proves ParamsSchema returns
 // (nil, false) before Params is ever called.
 func TestParams_NeverCalled_ReportsUnset(t *testing.T) {
-	r := New(HttpGet, "/users/:id", func(r *Route) {})
+	r := New(nil, HttpGet, "/users/:id", func(r *Route) {})
 
 	gotMeta, set := r.ParamsSchema()
 	if set {
@@ -530,7 +530,7 @@ func TestQuery_StoresAndReportsSet(t *testing.T) {
 	m := newTestSchemaForRoute(t)
 
 	var got *Route
-	r := New(HttpGet, "/users", func(r *Route) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {
 		got = r.Query(m)
 	})
 
@@ -550,7 +550,7 @@ func TestQuery_StoresAndReportsSet(t *testing.T) {
 // TestQuery_NeverCalled_ReportsUnset proves QuerySchema returns (nil,
 // false) before Query is ever called.
 func TestQuery_NeverCalled_ReportsUnset(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	gotMeta, set := r.QuerySchema()
 	if set {
@@ -565,7 +565,7 @@ func TestQuery_NeverCalled_ReportsUnset(t *testing.T) {
 // by IsExcludedFromDocs, and returns r so calls can chain.
 func TestExcludeFromDocs_SetsFlag(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/internal/health", func(r *Route) {
+	r := New(nil, HttpGet, "/internal/health", func(r *Route) {
 		got = r.ExcludeFromDocs()
 	})
 
@@ -580,7 +580,7 @@ func TestExcludeFromDocs_SetsFlag(t *testing.T) {
 // TestIsExcludedFromDocs_DefaultsFalse proves IsExcludedFromDocs returns
 // false before ExcludeFromDocs is ever called.
 func TestIsExcludedFromDocs_DefaultsFalse(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	if r.IsExcludedFromDocs() {
 		t.Fatal("IsExcludedFromDocs() = true, want false before ExcludeFromDocs() was ever called")
@@ -591,7 +591,7 @@ func TestIsExcludedFromDocs_DefaultsFalse(t *testing.T) {
 // IsDeprecated, and returns r so calls can chain.
 func TestDeprecated_SetsFlag(t *testing.T) {
 	var got *Route
-	r := New(HttpGet, "/users/legacy", func(r *Route) {
+	r := New(nil, HttpGet, "/users/legacy", func(r *Route) {
 		got = r.Deprecated()
 	})
 
@@ -606,9 +606,109 @@ func TestDeprecated_SetsFlag(t *testing.T) {
 // TestIsDeprecated_DefaultsFalse proves IsDeprecated returns false before
 // Deprecated is ever called.
 func TestIsDeprecated_DefaultsFalse(t *testing.T) {
-	r := New(HttpGet, "/users", func(r *Route) {})
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
 
 	if r.IsDeprecated() {
 		t.Fatal("IsDeprecated() = true, want false before Deprecated() was ever called")
+	}
+}
+
+// fakeResolverOwner is a minimal test double satisfying this package's own
+// unexported resolver interface (ResolveDirect/ResolveDirectAll) -- standing
+// in for a real *controller.Controller without route_test.go needing to
+// import internal/controller (which would create the exact import cycle
+// route.go's own resolver doc comment explains route must avoid).
+type fakeResolverOwner struct {
+	directValue reflect.Value
+	directOk    bool
+	allValues   []reflect.Value
+}
+
+func (f *fakeResolverOwner) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+	return f.directValue, f.directOk
+}
+
+func (f *fakeResolverOwner) ResolveDirectAll(t reflect.Type) []reflect.Value {
+	return f.allValues
+}
+
+// TestResolveDirect_OwnerSatisfiesResolver_Delegates proves a Route built
+// with an owner satisfying this package's resolver interface delegates
+// ResolveDirect to that owner -- the mechanism that lets
+// gonest.MustInject[T](r) inside a route callback resolve from the owning
+// Controller's own scope (route-must-inject feature, R1).
+func TestResolveDirect_OwnerSatisfiesResolver_Delegates(t *testing.T) {
+	want := reflect.ValueOf(&struct{ X int }{X: 7})
+	owner := &fakeResolverOwner{directValue: want, directOk: true}
+
+	r := New(owner, HttpGet, "/users", func(r *Route) {})
+
+	got, ok := r.ResolveDirect(reflect.TypeOf(want.Interface()))
+	if !ok {
+		t.Fatal("ResolveDirect() ok = false, want true (owner satisfies resolver and reports a match)")
+	}
+	if got.Interface() != want.Interface() {
+		t.Fatalf("ResolveDirect() = %v, want %v (the exact value owner.ResolveDirect returned)", got, want)
+	}
+}
+
+// TestResolveDirectAll_OwnerSatisfiesResolver_Delegates mirrors
+// TestResolveDirect_OwnerSatisfiesResolver_Delegates for the
+// MustInjectAll[T](r) / interface-kind path (R2).
+func TestResolveDirectAll_OwnerSatisfiesResolver_Delegates(t *testing.T) {
+	want := []reflect.Value{reflect.ValueOf(&struct{ X int }{X: 1}), reflect.ValueOf(&struct{ X int }{X: 2})}
+	owner := &fakeResolverOwner{allValues: want}
+
+	r := New(owner, HttpGet, "/users", func(r *Route) {})
+
+	got := r.ResolveDirectAll(reflect.TypeOf(want))
+	if len(got) != len(want) {
+		t.Fatalf("ResolveDirectAll() returned %d values, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].Interface() != want[i].Interface() {
+			t.Fatalf("ResolveDirectAll()[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+// TestResolveDirect_NilOwner_ReturnsNotFoundNotPanic proves a Route built
+// with a nil owner (every pre-existing call site outside
+// internal/controller) reports not-found -- not a panic -- keeping
+// MustInject's own "no provider registered" panic message intact instead of
+// crashing here.
+func TestResolveDirect_NilOwner_ReturnsNotFoundNotPanic(t *testing.T) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
+
+	_, ok := r.ResolveDirect(reflect.TypeOf(0))
+	if ok {
+		t.Fatal("ResolveDirect() ok = true, want false when owner is nil")
+	}
+}
+
+// TestResolveDirectAll_NilOwner_ReturnsNilNotPanic mirrors
+// TestResolveDirect_NilOwner_ReturnsNotFoundNotPanic for ResolveDirectAll.
+func TestResolveDirectAll_NilOwner_ReturnsNilNotPanic(t *testing.T) {
+	r := New(nil, HttpGet, "/users", func(r *Route) {})
+
+	got := r.ResolveDirectAll(reflect.TypeOf(0))
+	if got != nil {
+		t.Fatalf("ResolveDirectAll() = %v, want nil when owner is nil", got)
+	}
+}
+
+// TestResolveDirect_OwnerDoesNotSatisfyResolver_ReturnsNotFound proves a
+// non-nil owner that simply doesn't implement resolver (e.g. an unrelated
+// type, not even a pointer) behaves the same as a nil owner -- not-found,
+// not a panic.
+func TestResolveDirect_OwnerDoesNotSatisfyResolver_ReturnsNotFound(t *testing.T) {
+	r := New("not a resolver", HttpGet, "/users", func(r *Route) {})
+
+	_, ok := r.ResolveDirect(reflect.TypeOf(0))
+	if ok {
+		t.Fatal("ResolveDirect() ok = true, want false when owner does not satisfy resolver")
+	}
+	if got := r.ResolveDirectAll(reflect.TypeOf(0)); got != nil {
+		t.Fatalf("ResolveDirectAll() = %v, want nil when owner does not satisfy resolver", got)
 	}
 }

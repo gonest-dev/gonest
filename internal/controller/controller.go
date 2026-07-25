@@ -124,11 +124,16 @@ func (c *Controller) PathPrefix() string {
 	return c.pathPrefix
 }
 
-// Route creates a *route.Route via route.New(method, path, fn) -- which
+// Route creates a *route.Route via route.New(c, method, path, fn) -- which
 // runs fn immediately, see route.New's own doc comment -- and appends it to
-// this controller's internal route list.
+// this controller's internal route list. Passing c as owner is what lets
+// gonest.MustInject[T](r) resolve from inside a route callback (the fn
+// argument here): Route.ResolveDirect/ResolveDirectAll (internal/route)
+// delegate to whatever owner was given, and c already implements that exact
+// method pair (ResolveDirect/ResolveDirectAll, above) for its own
+// MustInject[T](c) support -- see route-must-inject feature's spec.md.
 func (c *Controller) Route(method route.HttpMethod, path string, fn func(*route.Route)) {
-	c.routes = append(c.routes, route.New(method, path, fn))
+	c.routes = append(c.routes, route.New(c, method, path, fn))
 }
 
 // RouteGet is shorthand for Route(route.HttpGet, path, fn).

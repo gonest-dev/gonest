@@ -225,6 +225,18 @@ method argument: `controller.RouteGet(path, fn)`, `RoutePost`, `RoutePut`, `Rout
 `RouteDelete`, `RouteHead`, `RouteOptions`, `RouteTrace`, `RouteConnect`, `RouteQuery` -- same
 registration, less repetition.
 
+`gonest.MustInject[T](route)` also works from *inside* a route's own callback (the `route` argument
+above), not just from the Controller's outer builder fn -- it resolves `T` from the exact same
+module scope `gonest.MustInject[T](controller)` would, useful for a per-route dependency you don't
+want every other route on the same Controller to also pay for:
+
+```go
+controller.RouteGet("/:id", func(route *gonest.Route) {
+  usecase := gonest.MustInject[*GetUserUsecase](route) // same module scope as MustInject(controller)
+  route.Handler(func(c *gonest.HttpContext) { c.Response().Json(usecase.Run(c.Request())) })
+})
+```
+
 ### Exceptions
 
 ```go

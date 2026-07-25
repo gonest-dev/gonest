@@ -1,6 +1,7 @@
 package route
 
 import (
+	"reflect"
 	"strings"
 
 	"gonest.dev/gonest/internal/execution"
@@ -62,6 +63,40 @@ type Route struct {
 
 	excluded   bool
 	deprecated bool
+
+	// owner is the value passed to New -- in practice always the
+	// *controller.Controller that declared this Route (via Controller.Route),
+	// or nil for every existing test call site that never needs resolution.
+	// Typed any, not module.Owner or some route-local named type, for the
+	// same reason internal/inject's own Must[T](owner any) is: internal/
+	// controller already imports internal/route (Controller.Route builds a
+	// *Route), so route cannot import controller back without an import
+	// cycle -- there is no concrete type route.go could name here even if it
+	// wanted to. owner is consulted only by ResolveDirect/ResolveDirectAll
+	// below, both driven by structural (not named) interface satisfaction, so
+	// route never needs to know controller.Controller exists at all.
+	owner any
+}
+
+// resolver is a package-private structural mirror of internal/inject's own
+// unexported directResolver interface (ResolveDirect/ResolveDirectAll, same
+// two methods, same signatures). It exists here, duplicated rather than
+// imported, for the same reason declarable/constructable/lazyScoped are
+// duplicated in internal/inject itself: route cannot import inject (inject
+// already imports module, and importing inject from route buys nothing route
+// doesn't already get for free via Go's structural typing), and inject
+// cannot import route without inverting the controller -> route -> ??? import
+// direction. Naming this interface identically in shape (not name) to
+// inject.directResolver is exactly what lets owner -- typed any above --
+// satisfy it via *controller.Controller's ALREADY-EXISTING ResolveDirect/
+// ResolveDirectAll methods (see controller.go), with zero changes required in
+// either internal/controller or internal/inject: Go interfaces are satisfied
+// structurally, not by declared conformance, so a *Route whose owner is a
+// *controller.Controller transparently becomes a directResolver itself the
+// moment Route gains the same two methods below.
+type resolver interface {
+	ResolveDirect(t reflect.Type) (reflect.Value, bool)
+	ResolveDirectAll(t reflect.Type) []reflect.Value
 }
 
 // New creates a Route and runs fn on it immediately -- unlike
@@ -71,8 +106,16 @@ type Route struct {
 // invoked during Stage 2 after the module tree is fully assembled -- there
 // is no further stage left to usefully defer to, so New runs fn right away
 // (see design.md's "Route (declaração de rota)" component).
-func New(method HttpMethod, path string, fn func(*Route)) *Route {
+//
+// owner is stored on r BEFORE fn runs (not after), because fn is exactly
+// where a route callback calls gonest.MustInject[T](r) -- see
+// ResolveDirect/ResolveDirectAll below, which read r.owner. Passing owner as
+// nil (every pre-existing call site outside internal/controller) is safe and
+// unchanged: ResolveDirect/ResolveDirectAll simply report not-found instead
+// of panicking, the same as before this field existed.
+func New(owner any, method HttpMethod, path string, fn func(*Route)) *Route {
 	r := &Route{
+		owner:    owner,
 		method:   method,
 		path:     path,
 		httpCode: defaultHttpCode,
@@ -81,6 +124,38 @@ func New(method HttpMethod, path string, fn func(*Route)) *Route {
 		fn(r)
 	}
 	return r
+}
+
+// ResolveDirect lets *Route satisfy internal/inject's unexported
+// directResolver interface (see this package's own resolver interface's doc
+// comment for why the two are structurally identical without either package
+// importing the other). It delegates to owner's own ResolveDirect when owner
+// satisfies resolver -- for a Route built via Controller.Route, that is the
+// owning *controller.Controller, so gonest.MustInject[T](r) inside a route
+// callback resolves from the EXACT SAME single-module scope
+// gonest.MustInject[T](c) would for that Controller (spec.md's route-
+// must-inject feature, R1). Returns a zero reflect.Value and false when owner
+// is nil or does not satisfy resolver -- MustInject then panics with its own
+// "not a pointer/no provider registered" message, not a crash here.
+func (r *Route) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
+	dr, ok := r.owner.(resolver)
+	if !ok {
+		return reflect.Value{}, false
+	}
+	return dr.ResolveDirect(t)
+}
+
+// ResolveDirectAll mirrors ResolveDirect, for the interface-kind /
+// MustInjectAll[T](r) path (spec.md's route-must-inject feature, R2).
+// Returns nil, not a panic, when owner is nil or does not satisfy resolver --
+// MustInjectAll's own dispatch then reports zero matches instead of crashing
+// here.
+func (r *Route) ResolveDirectAll(t reflect.Type) []reflect.Value {
+	dr, ok := r.owner.(resolver)
+	if !ok {
+		return nil
+	}
+	return dr.ResolveDirectAll(t)
 }
 
 // Method returns this Route's HTTP method, as passed to New. Used by Stage

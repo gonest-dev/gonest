@@ -14,6 +14,7 @@
 //
 //	curl -X POST localhost:3000/todos -d '{"title":"buy milk"}'
 //	curl localhost:3000/todos
+//	curl localhost:3000/todos/stats
 //	curl -X PUT localhost:3000/todos/1 -d '{"title":"buy milk","done":true}'
 //	curl -X DELETE localhost:3000/todos/1
 package main

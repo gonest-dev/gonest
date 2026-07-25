@@ -117,7 +117,7 @@ func (f *paramFakeResponder) Upgrade(handler func(conn execution.WSConn), subpro
 // *route.Route built from pathPattern (e.g. "/user/:user_id/order/:order_id"),
 // mirroring how a real dispatched request would look (Request.WithRoute).
 func newParamCtx(pathPattern string, params map[string]string) *execution.Request {
-	r := route.New(route.HttpGet, pathPattern, func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, pathPattern, func(r *route.Route) {})
 	req, _ := execution.New(&paramFakeResponder{params: params})
 	return req.WithRoute(r)
 }
@@ -276,7 +276,7 @@ func TestMustParams_MismatchedSchema_PanicsBeforeReadingAnyParam(t *testing.T) {
 
 func TestMustParams_RealHTTPDispatch_HappyPath(t *testing.T) {
 	app := fiber.New()
-	r := route.New(route.HttpGet, "/user/:user_id/order/:order_id", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/user/:user_id/order/:order_id", func(r *route.Route) {})
 	app.Get("/user/:user_id/order/:order_id", func(c fiber.Ctx) (err error) {
 		ctx, _ := execution.New(&httpFiberResponder{c: c})
 		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
@@ -320,7 +320,7 @@ func TestMustParams_RealHTTPDispatch_HappyPath(t *testing.T) {
 
 func TestMustParams_RealHTTPDispatch_InvalidOneParam(t *testing.T) {
 	app := fiber.New()
-	r := route.New(route.HttpGet, "/user/:user_id/order/:order_id", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/user/:user_id/order/:order_id", func(r *route.Route) {})
 	app.Get("/user/:user_id/order/:order_id", func(c fiber.Ctx) (err error) {
 		ctx, _ := execution.New(&httpFiberResponder{c: c})
 		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))
@@ -363,7 +363,7 @@ func TestMustParams_RealHTTPDispatch_InvalidOneParam(t *testing.T) {
 
 func TestMustParams_RealHTTPDispatch_CustomFunc(t *testing.T) {
 	app := fiber.New()
-	r := route.New(route.HttpGet, "/codes/:code", func(r *route.Route) {})
+	r := route.New(nil, route.HttpGet, "/codes/:code", func(r *route.Route) {})
 	app.Get("/codes/:code", func(c fiber.Ctx) (err error) {
 		ctx, _ := execution.New(&httpFiberResponder{c: c})
 		ctx.WithSources(nil, nil, nil, execution.NewBodySource(ctx, nil, nil))

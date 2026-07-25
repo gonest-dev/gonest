@@ -174,7 +174,7 @@ func TestOwnRoutes_ReturnsCopyNotInternalSlice(t *testing.T) {
 	c.Declare()
 
 	got := c.OwnRoutes()
-	got[0] = route.New(route.HttpPost, "/mutated", nil)
+	got[0] = route.New(nil, route.HttpPost, "/mutated", nil)
 
 	got2 := c.OwnRoutes()
 	if got2[0].Code() != 200 || len(got2) != 1 {

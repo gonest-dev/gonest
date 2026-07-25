@@ -44,6 +44,19 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 		})
 	})
 
+	// This route resolves *TodoService itself, directly, via
+	// gonest.MustInject[T](r) -- not through the Controller-level `service`
+	// variable above -- proving Route resolves from the exact same
+	// module scope a Controller would (route-must-inject feature). Only
+	// this one route pays for building a TodoStatsUsecase; every other
+	// route on TodoController never constructs one.
+	controller.Route(gonest.HttpGet, "/stats", func(r *gonest.Route) {
+		statsUsecase := &TodoStatsUsecase{service: gonest.MustInject[*TodoService](r)}
+		r.Handler(func(c *gonest.HttpContext) {
+			c.Response().Json(statsUsecase.Run())
+		})
+	})
+
 	controller.Route(gonest.HttpGet, "/:id", func(r *gonest.Route) {
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
