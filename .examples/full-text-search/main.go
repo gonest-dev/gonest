@@ -45,12 +45,10 @@ func main() {
 		b.Version("1.0.0")
 	})
 	gonest.OpenapiGenerate(app, doc)
-	if err := gonest.SetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
+	gonest.MustSetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
 		JsonDocumentUrl: "/openapi.json",
 		DocExpansion:    "list",
-	}); err != nil {
-		panic(err)
-	}
+	})
 
 	app.MustListen(":3002")
 }

@@ -2950,6 +2950,60 @@ func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 	})
 }
 
+// TestMustSetupSwagger_Success_DoesNotPanic_RegistersRoutes proves
+// MustSetupSwagger behaves exactly like a successful SetupSwagger call --
+// same 2 routes registered, no panic -- for the common (no error) path.
+func TestMustSetupSwagger_Success_DoesNotPanic_RegistersRoutes(t *testing.T) {
+	root := NewModule(func(m *Module) {})
+
+	appInstance, err := NewApp[fiber.App](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := appInstance.Adapter().(*fiber.App)
+	if !ok {
+		t.Fatalf("appInstance.Adapter() is not a *fiber.FiberApp: %T", appInstance.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	doc := NewOpenAPI("3.1.0", func(b *OpenAPI) {
+		b.Title("Example API")
+		b.Version("1.0.0")
+	})
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("MustSetupSwagger() panicked unexpectedly: %v", r)
+		}
+	}()
+	MustSetupSwagger(appInstance, "/docs", doc, SwaggerOptions{JsonDocumentUrl: "/openapi.json"})
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	resp, err := fiberAdapter.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+}
+
+// MustSetupSwagger's error/panic branch (SetupSwagger returning a non-nil
+// error) has no dedicated test here: RegisterRoute on the real Fiber
+// adapter (internal/adapter/fiber's App.RegisterRoute) never returns a
+// non-nil error today -- fiber.App.Add itself is fire-and-forget -- so
+// SetupSwagger has no realistic failure path to trigger from a black-box
+// test in this (root) package, same as SetupSwagger's own test file
+// (internal/openapi/swagger_test.go) has no error-path test either. The
+// panic branch itself is a 1-line fmt.Sprintf wrap, same pattern already
+// covered by MustListen's own panic test (internal/app/app_test.go's
+// TestMustListen_ListenError_PanicsWithAddrAndError, which CAN inject a
+// failing adapter since it is a whitebox test inside internal/app).
+
 // ---------------------------------------------------------------------------
 // MustInjectAll (multi-binding por interface)
 // ---------------------------------------------------------------------------

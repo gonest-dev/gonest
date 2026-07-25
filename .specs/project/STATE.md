@@ -63,6 +63,29 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 
 ## Recent Decisions (Last 60 days)
 
+### AD-060: `gonest.MustSetupSwagger` -- panic-on-error convenience wrapper (2026-07-24)
+
+**Decision:** `gonest.MustSetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions)`
+novo (`gonest.go`) -- chama `SetupSwagger` e panica (`"gonest: failed to setup swagger at %q: %v"`,
+nomeando `uiPath` + erro) se ele retornar erro, mesma convenção `Must`-prefixed de
+`MustListen`/`MustInject`/`MustParse`/`MustNewApp`.
+**Reason:** pedido direto do usuário -- `SetupSwagger` era o único builder de bootstrap "final"
+(chamado uma vez, sem recovery real disponível no caller) que ainda retornava `error` cru, forçando
+todo call site a escrever `if err := gonest.SetupSwagger(...); err != nil { panic(err) }` (visto
+literalmente em `.examples/full-text-search/main.go`) -- exatamente o boilerplate que toda outra
+API "final" do framework já evita via seu próprio `Must*`.
+**Trade-off:** nenhum técnico -- puramente aditivo, `SetupSwagger` continua existindo e retornando
+`error` pra quem quiser tratar. Sem teste dedicado pro panic branch: `RegisterRoute` do adapter Fiber
+real (`internal/adapter/fiber`) nunca retorna erro não-nil hoje (`fiber.App.Add` é fire-and-forget),
+então `SetupSwagger` não tem caminho de falha realista disparável de um teste black-box neste pacote
+-- mesma lacuna que o próprio `SetupSwagger` já tinha (`internal/openapi/swagger_test.go` também não
+cobre esse branch), documentada inline no teste novo em vez de forjar uma falha sintética.
+**Impact:** `gonest.go` (`MustSetupSwagger` novo), `gonest_test.go` (2 testes: sucesso não panica +
+nota explicando a lacuna do panic branch), `README.md` (exemplo de bootstrap + "Implementation
+Status" atualizados pra `MustSetupSwagger`), `.examples/full-text-search/main.go` migrado (perde o
+`if err != nil { panic(err) }` manual). `go build ./...`/`go vet ./...`/`go test ./... -race
+-count=1` verdes, 24 pacotes, `.examples/full-text-search` builda limpo.
+
 ### AD-059: banner de startup mostra `localhost:PORT`, não `0.0.0.0:PORT`, pra addr sem host (2026-07-24)
 
 **Decision:** `internal/app/app.go`'s `displayAddr` (usado só pela linha `"Listening on: http://%s"` do

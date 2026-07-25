@@ -1126,6 +1126,21 @@ func SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions)
 	return openapi.SetupSwagger(app, uiPath, doc, options)
 }
 
+// MustSetupSwagger calls SetupSwagger and panics, using the same
+// "Must"-prefixed panic-on-error convention as MustListen/MustInject/
+// MustParse/MustNewApp elsewhere in this package, if it returns an error --
+// the panic message contains both uiPath and the underlying error. For a
+// caller that has no recovery path for a failed route registration (the
+// only way SetupSwagger can fail -- see internal/openapi.SetupSwagger's doc
+// comment) this saves the `if err := ...; err != nil { panic(err) }`
+// boilerplate every other Must-prefixed call in this package already
+// avoids.
+func MustSetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions) {
+	if err := SetupSwagger(app, uiPath, doc, options); err != nil {
+		panic(fmt.Sprintf("gonest: failed to setup swagger at %q: %v", uiPath, err))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Emitter (Emitter & Listener feature, Milestone 9)
 // ---------------------------------------------------------------------------

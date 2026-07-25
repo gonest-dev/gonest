@@ -103,7 +103,7 @@ and [`.examples/blog-graphql`](.examples/blog-graphql) for GraphQL (Query/Mutati
 - [x] M4 - Schema Builder — Primitives (`NewSchema[T]`, `String`/`Integer`/`Boolean`/etc branches)
 - [x] M5 - Schema Builder — Array & Object (nested schemas, `$ref`-style reuse)
 - [x] M6 - Runtime Validation (`gonest.Parse[T]`/`gonest.MustParse[T]`, `Custom(fn)`)
-- [x] M7 - OpenAPI Generation (`OpenapiGenerate`, `SetupSwagger`)
+- [x] M7 - OpenAPI Generation (`OpenapiGenerate`, `SetupSwagger`/`MustSetupSwagger`)
 - [x] M8 - Testing Helpers (`MustNewTestApp`, `MustOverride`, `MustRequest`)
 - [x] M9 - Event Emitter (`gonest.Emitter`, `NewListener[EventType]`)
 - [x] M10 - Scheduler (`Cron`/`Interval`/`Timeout`, `Stop`)
@@ -518,7 +518,7 @@ func main() {
   })
   gonest.OpenapiGenerate(app, doc) // walks the whole module tree, populates paths/components.schemas
 
-  gonest.SetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
+  gonest.MustSetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
     JsonDocumentUrl: "/openapi.json",
     PersistAuth:     true,
   })
