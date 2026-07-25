@@ -110,7 +110,7 @@ type controllableListenAdapter struct {
 }
 
 func (f *controllableListenAdapter) Init(opts Options) {}
-func (f *controllableListenAdapter) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
+func (f *controllableListenAdapter) RegisterRoute(method route.HttpMethod, path string, h func(c *execution.HttpContext)) error {
 	return nil
 }
 func (f *controllableListenAdapter) Listen(addr string, onListen func()) error {

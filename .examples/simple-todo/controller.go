@@ -38,13 +38,15 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	service := gonest.MustInject[*TodoService](controller)
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			res := c.Response()
 			res.Json(service.List())
 		})
 	})
 
 	controller.Route(gonest.HttpGet, "/:id", func(r *gonest.Route) {
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
 			todo := service.Get(p.ID)
 			if todo == nil {
@@ -56,14 +58,16 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.HttpCode(http.StatusCreated)
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			body := gonest.MustParse[createTodoBody](req.Body().Json(), createTodoBodySchema)
 			res.Status(http.StatusCreated).Json(service.Create(body.Title))
 		})
 	})
 
 	controller.Route(gonest.HttpPut, "/:id", func(r *gonest.Route) {
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
 			body := gonest.MustParse[updateTodoBody](req.Body().Json(), updateTodoBodySchema)
 			todo := service.Update(p.ID, body.Title, body.Done)
@@ -76,7 +80,8 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpDelete, "/:id", func(r *gonest.Route) {
 		r.HttpCode(http.StatusNoContent)
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
 			if !service.Delete(p.ID) {
 				panic(gonest.NewNotFoundException(nil))

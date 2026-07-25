@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 25 (Unified Token / TokenRef) -- COMPLETE
-**Status:** Milestones 1-25 COMPLETE
+**Current Milestone:** 26 (HttpContext Unification) -- COMPLETE
+**Status:** Milestones 1-26 COMPLETE
 
 ---
 
@@ -617,6 +617,33 @@ asserção pré-existente alterada)
   inalterados -- só a ENTRADA dos builders mudou, leitura continua por tipo concreto de sempre
 - 9 testes novos de panic path (1 por builder, `internal/module/module_test.go`), mesmo padrão
   `recover()`+checagem de mensagem que `TestProviderAs_NonInterfaceT_Panics` já usava
+
+---
+
+## Milestone 26: HttpContext Unification
+
+**Goal:** `internal/execution.HttpContext` novo -- exatamente 2 métodos, `Request()`/`Response()`
+-- vira o único parâmetro de todo `Handler`/`Guard`/`Middleware`/`Interceptor`/`Filter.Catch`,
+substituindo o par `(req, res)` que o Milestone 14 (Request/Response Split) introduziu. Junto,
+`Response` (write-side, AD-030) renomeado pra `Reply` (precedente Fastify) e `RouteResponse`
+(builder de documentação OpenAPI) recupera o nome `Response` (vocabulário OpenAPI 3.x) -- resolve
+uma colisão de nome real que confundia dev lendo controller+doc Swagger lado a lado.
+**Status:** COMPLETE (`go test ./... -race -count=1` verde, 24 pacotes, todo `.examples/*`
+buildando, README recompilado via scratch real)
+
+### Features
+
+**`HttpContext` + `Reply`/`Response` rename** - COMPLETE
+- `internal/execution/reply.go` (era `response.go`): `Response`→`Reply`
+- `internal/execution/httpcontext.go` novo: `HttpContext{req, res}`, `NewHttpContext`,
+  `Request()`/`Response() *Reply`
+- `internal/route/response.go`: `RouteResponse`→`Response` (método `Route.Response(status, fn)`
+  inalterado)
+- Toda assinatura pública migrada pra `func(c *execution.HttpContext)` (Route/Guard/Middleware/
+  Interceptor/Filter/`HttpAdapter.RegisterRoute`/GraphQL realtime SSE+WS/`SetupSwagger`)
+- `gonest.go`: `Reply`/`Response`/`HttpContext` alias novos/realocados
+- `.examples/*` (6 de 7, `blog-graphql` inalterado) + README.md (14 blocos recompilados)
+  migrados
 
 ---
 

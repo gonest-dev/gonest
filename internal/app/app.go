@@ -271,7 +271,7 @@ type HttpAdapter interface {
 	// RegisterRoute wires one route (method + full path) onto the real
 	// underlying HTTP engine, translating h into whatever handler shape
 	// that engine expects.
-	RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error
+	RegisterRoute(method route.HttpMethod, path string, h func(c *execution.HttpContext)) error
 	// Listen starts the underlying HTTP engine serving on addr, blocking
 	// until it stops. onListen, if non-nil, is invoked exactly once, after
 	// the underlying engine has successfully bound addr but before Listen's
@@ -574,7 +574,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 	type collected struct {
 		method  route.HttpMethod
 		path    string
-		handler func(req *execution.Request, res *execution.Response)
+		handler func(c *execution.HttpContext)
 	}
 
 	var routes []collected
@@ -617,7 +617,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 				// route, to avoid shadowing the internal/route package
 				// import used elsewhere in this function/file.
 				currentRoute := r
-				withRoute := func(req *execution.Request, res *execution.Response) {
+				withRoute := func(ctx *execution.HttpContext) {
+					req := ctx.Request()
 					req.WithRoute(currentRoute)
 					// Wires the unified-parse-api's Parseable sources onto
 					// req BEFORE the composed handler chain runs, so a
@@ -641,7 +642,7 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 							},
 						),
 					)
-					composedHandler(req, res)
+					composedHandler(ctx)
 				}
 				// filteredHandler is the NEW outermost layer of all: it wraps
 				// withRoute (which already wraps everything else) in its own
@@ -681,8 +682,8 @@ func registerRoutes(adapter HttpAdapter, root *module.Module, modules []*module.
 // error, panic(nil)'s *runtime.PanicNilError, etc.) is re-panicked
 // immediately, without ever consulting any Filter's Catch map -- Filters only
 // ever catch structured exception.Exception values.
-func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next func(c *execution.HttpContext)) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
 		defer func() {
 			r := recover()
 			if r == nil {
@@ -691,18 +692,18 @@ func filteredHandler(controllerFilters, globalFilters []*filter.Filter, next fun
 			if exc, ok := r.(exception.Exception); ok {
 				excType := reflect.TypeOf(exc)
 				if h, found := findCatch(controllerFilters, excType); found {
-					h.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
+					h.Call([]reflect.Value{reflect.ValueOf(c), reflect.ValueOf(exc)})
 					return
 				}
 				if h, found := findCatch(globalFilters, excType); found {
-					h.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
+					h.Call([]reflect.Value{reflect.ValueOf(c), reflect.ValueOf(exc)})
 					return
 				}
 			}
 			panic(r) // not caught by any Filter -- re-panic, the adapter's
 			// own EXISTING recover (unchanged) applies the default formatting
 		}()
-		next(req, res)
+		next(c)
 	}
 }
 
@@ -736,14 +737,14 @@ func findCatch(filters []*filter.Filter, excType reflect.Type) (reflect.Value, b
 // controllerGuards is empty, the loop runs zero iterations and routeHandler
 // runs immediately -- behaviorally identical to calling routeHandler
 // directly (zero regression for controllers that never call Guards).
-func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(c *execution.HttpContext)) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
 		for _, g := range controllerGuards {
-			if !g.HandlerFunc()(req, res) {
+			if !g.HandlerFunc()(c) {
 				panic(exception.NewForbiddenException(nil))
 			}
 		}
-		routeHandler(req, res)
+		routeHandler(c)
 	}
 }
 
@@ -767,15 +768,15 @@ func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(req *execut
 // is empty, the loop runs zero iterations and the returned func behaves
 // identically to calling routeHandler directly -- zero regression for
 // controllers that never call Interceptors.
-func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
+func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, routeHandler func(c *execution.HttpContext)) func(c *execution.HttpContext) {
 	next := interceptor.Next(routeHandler)
 	for i := len(controllerInterceptors) - 1; i >= 0; i-- {
 		it := controllerInterceptors[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
-		next = func(req *execution.Request, res *execution.Response) { it.HandlerFunc()(req, res, captured) }
+		next = func(c *execution.HttpContext) { it.HandlerFunc()(c, captured) }
 	}
 
-	return func(req *execution.Request, res *execution.Response) { next(req, res) }
+	return func(c *execution.HttpContext) { next(c) }
 }
 
 // composeHandler builds the final handler for one route: global middleware
@@ -787,17 +788,17 @@ func interceptedHandler(controllerInterceptors []*interceptor.Interceptor, route
 // Use() calls anywhere), the loop body never runs and the returned func
 // behaves identically to registering handler directly -- zero regression
 // per design.md's Error Handling Strategy table.
-func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(req *execution.Request, res *execution.Response)) func(req *execution.Request, res *execution.Response) {
+func composeHandler(globalMiddleware, controllerMiddleware []*middleware.Middleware, handler func(c *execution.HttpContext)) func(c *execution.HttpContext) {
 	chain := append(append([]*middleware.Middleware{}, globalMiddleware...), controllerMiddleware...)
 
 	next := middleware.Next(handler)
 	for i := len(chain) - 1; i >= 0; i-- {
 		mw := chain[i]
 		captured := next // capture per-iteration -- classic Go closure-loop-variable bug otherwise
-		next = func(req *execution.Request, res *execution.Response) { mw.HandlerFunc()(req, res, captured) }
+		next = func(c *execution.HttpContext) { mw.HandlerFunc()(c, captured) }
 	}
 
-	return func(req *execution.Request, res *execution.Response) { next(req, res) }
+	return func(c *execution.HttpContext) { next(c) }
 }
 
 // asMiddleware converts root's []module.MiddlewareRef (module stores these

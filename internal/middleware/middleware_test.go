@@ -99,15 +99,13 @@ func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
 // and HandlerFunc returns exactly that function, genuinely callable with
 // both req/res and next parameters reaching the handler body correctly.
 func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
-	var gotReq *execution.Request
-	var gotRes *execution.Response
+	var gotCtx *execution.HttpContext
 	nextCalled := false
 
 	m := New(func(m *Middleware) {
-		m.Handler(func(req *execution.Request, res *execution.Response, next Next) {
-			gotReq = req
-			gotRes = res
-			next(req, res)
+		m.Handler(func(c *execution.HttpContext, next Next) {
+			gotCtx = c
+			next(c)
 		})
 	})
 	m.Declare(nil)
@@ -118,15 +116,13 @@ func TestHandler_HandlerFunc_RoundTrip(t *testing.T) {
 	}
 
 	req, res := execution.New(newFakeResponder())
-	fn(req, res, func(req *execution.Request, res *execution.Response) {
+	ctx := execution.NewHttpContext(req, res)
+	fn(ctx, func(c *execution.HttpContext) {
 		nextCalled = true
 	})
 
-	if gotReq != req {
-		t.Fatal("expected req passed to the returned handler to reach the handler body unchanged")
-	}
-	if gotRes != res {
-		t.Fatal("expected res passed to the returned handler to reach the handler body unchanged")
+	if gotCtx != ctx {
+		t.Fatal("expected c passed to the returned handler to reach the handler body unchanged")
 	}
 	if !nextCalled {
 		t.Fatal("expected next passed to the returned handler to be callable and reach the handler body")
@@ -146,22 +142,22 @@ func TestHandlerFunc_NilWhenNeverCalled(t *testing.T) {
 }
 
 // TestNext_TypeIdentityWithRouteHandlerSignature proves a plain
-// func(req *execution.Request, res *execution.Response) value is directly
-// assignable to a Next variable with zero conversion code -- the
-// type-identity design.md relies on for composing route Handlers as the
-// innermost Next.
+// func(c *execution.HttpContext) value is directly assignable to a Next
+// variable with zero conversion code -- the type-identity design.md relies
+// on for composing route Handlers as the innermost Next.
 func TestNext_TypeIdentityWithRouteHandlerSignature(t *testing.T) {
 	called := false
-	someFunc := func(req *execution.Request, res *execution.Response) {
+	someFunc := func(c *execution.HttpContext) {
 		called = true
 	}
 
 	var n Next = someFunc
 
 	req, res := execution.New(newFakeResponder())
-	n(req, res)
+	ctx := execution.NewHttpContext(req, res)
+	n(ctx)
 
 	if !called {
-		t.Fatal("expected Next-typed variable assigned from a plain func(req *execution.Request, res *execution.Response) to be callable")
+		t.Fatal("expected Next-typed variable assigned from a plain func(c *execution.HttpContext) to be callable")
 	}
 }

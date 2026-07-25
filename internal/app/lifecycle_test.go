@@ -660,7 +660,7 @@ type fakeShutdownAdapter struct {
 }
 
 func (f *fakeShutdownAdapter) Init(opts Options) {}
-func (f *fakeShutdownAdapter) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
+func (f *fakeShutdownAdapter) RegisterRoute(method route.HttpMethod, path string, h func(c *execution.HttpContext)) error {
 	return nil
 }
 func (f *fakeShutdownAdapter) Listen(addr string, onListen func()) error { return nil }

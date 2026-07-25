@@ -13,7 +13,8 @@ var StatusController = gonest.NewController(func(controller *gonest.Controller) 
 	db := gonest.MustInject[*DbService](controller)
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			res := c.Response()
 			res.Json(map[string]bool{"ready": db.Ready()})
 		})
 	})

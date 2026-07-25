@@ -1,7 +1,7 @@
 // Package guard implements the declarative Guard API: the reusable
-// authorization-check unit with a `func(req, res) bool` shape -- true
-// continues the request, false (or a panic'd exception.Exception) stops it.
-// See design.md's "Guard" component.
+// authorization-check unit with a `func(c *execution.HttpContext) bool`
+// shape -- true continues the request, false (or a panic'd
+// exception.Exception) stops it. See design.md's "Guard" component.
 package guard
 
 import (
@@ -13,12 +13,12 @@ import (
 )
 
 // Guard represents a single authorization-check unit: it holds the
-// req/res-in/bool-out handler function registered via Handler. Unlike
+// context-in/bool-out handler function registered via Handler. Unlike
 // Middleware, a Guard doesn't decorate/wrap a continuation -- it gates:
 // true means continue, false means stop.
 type Guard struct {
 	fn      func(*Guard)
-	handler func(req *execution.Request, res *execution.Response) bool
+	handler func(c *execution.HttpContext) bool
 
 	scope    []*module.Module
 	declared bool
@@ -67,14 +67,14 @@ func (g *Guard) ResolveDirectAll(t reflect.Type) []reflect.Value {
 	return resolver.FindDirectAll(g.scope, t)
 }
 
-// Handler stores h as this Guard's req/res-in/bool-out handler function.
-func (g *Guard) Handler(h func(req *execution.Request, res *execution.Response) bool) {
+// Handler stores h as this Guard's context-in/bool-out handler function.
+func (g *Guard) Handler(h func(c *execution.HttpContext) bool) {
 	g.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors middleware.Middleware.HandlerFunc()'s zero-value
 // contract).
-func (g *Guard) HandlerFunc() func(req *execution.Request, res *execution.Response) bool {
+func (g *Guard) HandlerFunc() func(c *execution.HttpContext) bool {
 	return g.handler
 }

@@ -68,8 +68,8 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
   userService := gonest.MustInject[*UserService](controller)
 
   controller.RouteGet("/", func(route *gonest.Route) {
-    route.Handler(func(req *gonest.Request, res *gonest.Response) {
-      res.Json(userService.List())
+    route.Handler(func(c *gonest.HttpContext) {
+      c.Response().Json(userService.List())
     })
   })
 })
@@ -110,7 +110,7 @@ and [`.examples/blog-graphql`](.examples/blog-graphql) for GraphQL (Query/Mutati
 - [x] M11 - Terminus / health checks (`MustInjectAll[Pingable]` pattern, no dedicated bootstrap type needed)
 - [x] M12 - Multipart Form Streaming (`req.Body().Form(onFile)`, true streaming file upload -- see below)
 - [x] M13 - Unified Parse API (`gonest.Parse[T]`/`MustParse[T]`, `Parseable`, `req.Params()`/`Query()`/`Headers()`/`Body()`)
-- [x] M14 - Request/Response Split (`gonest.Request`/`gonest.Response`, Express-style handler signature)
+- [x] M14 - Request/Response Split (`gonest.Request`/`gonest.Reply`, single `*gonest.HttpContext` handler parameter)
 - [x] M15 - Schema Value Support (`gonest.NewValue[T]`/`gonest.Value` for standalone primitive schemas, `gonest.Accessor[T]` dirty-tracking wrapper -- renamed from `Value[T]`)
 - [x] M16 - Schema Sanitize/Refine (`PropertyBuilder.Sanitize(fn)` pre-processing, `Schema.Refine(fn)` cross-field post-processing)
 - [x] M17 - GraphQL Support (`gonest.NewGraphqlResolver`/`Query`/`Mutation`/`Subscription`, SDL generation -- see below)
@@ -196,7 +196,7 @@ var UserController = gonest.NewController(func(controller *gonest.Controller) {
 
   controller.RouteGet("/", func(route *gonest.Route) {
     route.Summary("List users")
-    route.Handler(func(req *gonest.Request, res *gonest.Response) { res.Json(userService.List()) })
+    route.Handler(func(c *gonest.HttpContext) { c.Response().Json(userService.List()) })
   })
 })
 
@@ -268,35 +268,39 @@ just for a status code.
 ```go
 package ex
 
-import "gonest.dev/gonest"
+import (
+  "net/http"
+
+  "gonest.dev/gonest"
+)
 
 // Middleware: runs before routing (raw request/response), like Express middleware.
 var RequestIdMiddleware = gonest.NewMiddleware(func(middleware *gonest.Middleware) {
-  middleware.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.Next) {
-    res.SetHeader("X-Request-Id", "...")
-    next(req, res)
+  middleware.Handler(func(c *gonest.HttpContext, next gonest.Next) {
+    c.Response().SetHeader("X-Request-Id", "...")
+    next(c)
   })
 })
 
 // Guard: decides whether the request proceeds. false = automatic 403 Forbidden;
 // panic with an Exception for a custom message instead.
 var AuthGuard = gonest.NewGuard(func(guard *gonest.Guard) {
-  guard.Handler(func(req *gonest.Request, res *gonest.Response) bool {
-    return req.Header("Authorization") != ""
+  guard.Handler(func(c *gonest.HttpContext) bool {
+    return c.Request().Header("Authorization") != ""
   })
 })
 
 // Interceptor: wraps the handler's execution (before/after), like AOP.
 var TimingInterceptor = gonest.NewInterceptor(func(interceptor *gonest.Interceptor) {
-  interceptor.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.InterceptorNext) {
-    next(req, res)
+  interceptor.Handler(func(c *gonest.HttpContext, next gonest.InterceptorNext) {
+    next(c)
   })
 })
 
 // Filter: catches specific exception types and customizes the response.
 var FooFilter = gonest.NewFilter(func(filter *gonest.Filter) {
-  filter.Catch(&FooError{}, func(req *gonest.Request, res *gonest.Response, exc *FooError) {
-    res.Status(http.StatusTeapot).Json(map[string]any{"custom": true})
+  filter.Catch(&FooError{}, func(c *gonest.HttpContext, exc *FooError) {
+    c.Response().Status(http.StatusTeapot).Json(map[string]any{"custom": true})
   })
 })
 
@@ -413,16 +417,16 @@ var userIdParamsSchema = gonest.NewSchema[UserIdParams](func(t *UserIdParams, s 
 var UserController = gonest.NewController(func(controller *gonest.Controller) {
   controller.RouteGet("/:user_id", func(route *gonest.Route) {
     route.Params(userIdParamsSchema)                     // documents it in OpenAPI
-    route.Response(gonest.HttpStatusOk, func(response *gonest.RouteResponse) {
+    route.Response(gonest.HttpStatusOk, func(response *gonest.Response) {
       response.Schema(userEntitySchema)
     })
 
-    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+    route.Handler(func(c *gonest.HttpContext) {
       // gonest.MustParse uses the SAME Schema for runtime validation --
       // the Schema value must be passed explicitly (a compile-time guarantee
       // that it's never forgotten, not a hidden global-registry lookup).
-      params := gonest.MustParse[UserIdParams](req.Params(), userIdParamsSchema)
-      res.Json(params)
+      params := gonest.MustParse[UserIdParams](c.Request().Params(), userIdParamsSchema)
+      c.Response().Json(params)
     })
   })
 })
@@ -483,12 +487,12 @@ var PostController = gonest.NewController(func(controller *gonest.Controller) {
     // -- "file" becomes {type: string, format: binary}, so Swagger UI renders
     // a real file-upload widget for this route.
     route.FormBody(createPostFormSchema, "file")
-    route.Handler(func(req *gonest.Request, res *gonest.Response) {
-      form := gonest.MustParse[CreatePostForm](req.Body().Form(func(f *gonest.FormFile) error {
+    route.Handler(func(c *gonest.HttpContext) {
+      form := gonest.MustParse[CreatePostForm](c.Request().Body().Form(func(f *gonest.FormFile) error {
         // f.Reader() is the still-unconsumed part -- pipe it straight to S3/etc.
         return uploadToS3(f.Filename(), f.ContentType(), f.Reader())
       }), createPostFormSchema)
-      res.Json(map[string]string{"title": form.Title})
+      c.Response().Json(map[string]string{"title": form.Title})
     })
   })
 })
@@ -662,14 +666,14 @@ var HealthController = gonest.NewController(func(controller *gonest.Controller) 
   pingables := gonest.MustInjectAll[Pingable](controller)
 
   controller.RouteGet("/readyz", func(route *gonest.Route) {
-    route.Handler(func(req *gonest.Request, res *gonest.Response) {
+    route.Handler(func(c *gonest.HttpContext) {
       status := gonest.HttpStatusOk
       for _, p := range pingables {
         if p.Ping(context.Background()) != nil {
           status = gonest.HttpStatusServiceUnavailable
         }
       }
-      res.Status(status).Json(map[string]string{"status": "ok"})
+      c.Response().Status(status).Json(map[string]string{"status": "ok"})
     })
   })
 })

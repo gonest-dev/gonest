@@ -2,36 +2,40 @@ package execution
 
 import "bufio"
 
-// Response encapsulates the WRITE side of an HTTP request/response cycle for
+// Reply encapsulates the WRITE side of an HTTP request/response cycle for
 // a single route Handler -- request-response-split feature (replaces the
-// write-side half of the old single Context type). Response holds a
+// write-side half of the old single Context type). Reply holds a
 // reference back to the Request that originated it (context.md's Decision:
 // "não vejo problema response conhecer request internamente") -- useful for
 // logging/decisions that need request data from a write-side callsite (e.g.
 // gonest.NewLoggerMiddleware reading req.Method()/req.Path() after res
-// already ran).
-type Response struct {
+// already ran). Named Reply, not Response, to avoid colliding with
+// route.Response (the OpenAPI per-status documentation builder) -- reached
+// via HttpContext.Response() in every Handler/Guard/Middleware/Interceptor/
+// Filter.Catch. Same (request, reply) naming Fastify uses for this exact
+// role, a real precedent in the Node ecosystem this framework targets.
+type Reply struct {
 	req *Request
 	res Responder
 }
 
-// New builds a Request and a Response around the given Responder, the
-// Response holding a reference to the freshly built Request. Exported so
-// other packages (namely internal/route, which needs to attach a *Route to
-// a Request) can construct the pair in their own tests without a real
+// New builds a Request and a Reply around the given Responder, the Reply
+// holding a reference to the freshly built Request. Exported so other
+// packages (namely internal/route, which needs to attach a *Route to a
+// Request) can construct the pair in their own tests without a real
 // Fiber-backed Responder existing yet.
-func New(res Responder) (*Request, *Response) {
+func New(res Responder) (*Request, *Reply) {
 	req := newRequest(res)
-	return req, &Response{req: req, res: res}
+	return req, &Reply{req: req, res: res}
 }
 
-// Request returns the *Request that originated this Response.
-func (res *Response) Request() *Request {
+// Request returns the *Request that originated this Reply.
+func (res *Reply) Request() *Request {
 	return res.req
 }
 
 // Status sets the response status code and returns res for chaining.
-func (res *Response) Status(code int) *Response {
+func (res *Reply) Status(code int) *Reply {
 	res.res.SetStatus(code)
 	return res
 }
@@ -39,20 +43,20 @@ func (res *Response) Status(code int) *Response {
 // StatusCode returns the response status code currently set on this
 // request -- the underlying HTTP framework's own default (200) if Status
 // was never called. Used by a Logger middleware (gonest.NewLoggerMiddleware)
-// to read back the status AFTER next(req, res) runs the rest of the chain,
-// since Status/SetStatus are otherwise write-only.
-func (res *Response) StatusCode() int {
+// to read back the status AFTER next(c) runs the rest of the chain, since
+// Status/SetStatus are otherwise write-only.
+func (res *Reply) StatusCode() int {
 	return res.res.GetStatus()
 }
 
 // SetHeader sets the named response header to value.
-func (res *Response) SetHeader(name, value string) {
+func (res *Reply) SetHeader(name, value string) {
 	res.res.SetHeaderValue(name, value)
 }
 
 // Json writes value as the JSON response body -- forces the underlying
 // framework's default JSON Content-Type.
-func (res *Response) Json(value any) error {
+func (res *Reply) Json(value any) error {
 	return res.res.JSON(value)
 }
 
@@ -62,7 +66,7 @@ func (res *Response) Json(value any) error {
 // Decision: project already prefers "Json" over "JSON" elsewhere, e.g.
 // BodyJsonSchema). Used by SetupSwagger (internal/openapi) to serve the
 // Swagger UI's HTML page.
-func (res *Response) Html(s string) error {
+func (res *Reply) Html(s string) error {
 	return res.res.HTML(s)
 }
 
@@ -72,7 +76,7 @@ func (res *Response) Html(s string) error {
 // setting any Content-Type), Text forces its content-type explicitly, same
 // as Json/Html each force their own (context.md's Decision: "a ideia do
 // Html/Text/Json é forçar os content types relacionados").
-func (res *Response) Text(s string) error {
+func (res *Reply) Text(s string) error {
 	res.res.SetHeaderValue("Content-Type", "text/plain")
 	return res.res.SendString(s)
 }
@@ -83,7 +87,7 @@ func (res *Response) Text(s string) error {
 // Json/Html/Text's "one full body, written once" contract. Used by
 // internal/gqltransport's SSE handler to keep a GraphQL Subscription's
 // connection open, writing one `data: ...\n\n` frame per emitted event.
-func (res *Response) Stream(fn func(w *bufio.Writer)) {
+func (res *Reply) Stream(fn func(w *bufio.Writer)) {
 	res.res.WriteStream(fn)
 }
 
@@ -96,6 +100,6 @@ func (res *Response) Stream(fn func(w *bufio.Writer)) {
 // comment for why this matters. One-line delegation, same pattern as
 // Stream/Json/Html/Text. Callers should check Request.IsWebSocketUpgrade()
 // first.
-func (res *Response) UpgradeWebSocket(handler func(conn WSConn), subprotocols ...string) {
+func (res *Reply) UpgradeWebSocket(handler func(conn WSConn), subprotocols ...string) {
 	res.res.Upgrade(handler, subprotocols...)
 }

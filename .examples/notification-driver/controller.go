@@ -37,7 +37,8 @@ var NotificationController_ = gonest.NewController(func(controller *gonest.Contr
 		r.Summary("Send a notification through whichever driver is active")
 		r.RequestBody(sendBodySchema)
 
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			body := gonest.MustParse[sendBody](req.Body().Json(), sendBodySchema)
 
 			if err := notify.Send(body.To, body.Message); err != nil {

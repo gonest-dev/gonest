@@ -400,10 +400,10 @@ func TestNewApp_ControllerWithRoutes_RegistersEachOnAdapter(t *testing.T) {
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 		c.Route(route.HttpPost, "/", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 
@@ -442,13 +442,13 @@ func TestNewApp_DuplicateRoute_ReturnsErrorBeforeRegistering(t *testing.T) {
 	dupeController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 	otherDupeController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 
@@ -501,7 +501,7 @@ func TestNewApp_ZeroControllers_BootstrapsNormally(t *testing.T) {
 func TestNewApp_EmptyPathPrefix_RegistersRouteWithBarePath(t *testing.T) {
 	noPrefixController := controller.New(func(c *controller.Controller) {
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 
@@ -534,7 +534,7 @@ func (f *recordingFakeAdapter) Init(opts Options) {
 	lastRecordingAdapter = f
 }
 
-func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
+func (f *recordingFakeAdapter) RegisterRoute(method route.HttpMethod, path string, h func(c *execution.HttpContext)) error {
 	f.registered = append(f.registered, fakeRegisteredRoute{method: method, path: path})
 	return nil
 }
@@ -560,7 +560,7 @@ func TestNewApp_ZeroValueAppOptions_BootstrapsIdenticallyToPreT2Behavior(t *test
 	userController := controller.New(func(c *controller.Controller) {
 		c.Path("/user")
 		c.Route(route.HttpGet, "/:id", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 
@@ -649,7 +649,7 @@ type listenSpyAdapter struct {
 
 func (f *listenSpyAdapter) Init(opts Options) {}
 
-func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
+func (f *listenSpyAdapter) RegisterRoute(method route.HttpMethod, path string, h func(c *execution.HttpContext)) error {
 	return nil
 }
 
@@ -868,7 +868,7 @@ func TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes(t *testing.T) 
 	subController := controller.New(func(c *controller.Controller) {
 		c.Path("/sub")
 		c.Route(route.HttpGet, "/thing", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 	subModule := module.New(func(m *module.Module) {
@@ -878,7 +878,7 @@ func TestNewApp_Root_WalksWholeTree_ReachesRootAndSubModuleRoutes(t *testing.T) 
 	rootController := controller.New(func(c *controller.Controller) {
 		c.Path("/root")
 		c.Route(route.HttpPost, "/own", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 	root := module.New(func(m *module.Module) {

@@ -40,7 +40,8 @@ func attachAndDrainToken(t *testing.T, reg *graphql.ReservationRegistry, token s
 	t.Helper()
 	connResponder := newFakeSSEResponder("", map[string]string{"token": token})
 	connReq, connRes := execution.New(connResponder)
-	graphql.SSESingleConnectHandler(reg)(connReq, connRes)
+	connC := execution.NewHttpContext(connReq, connRes)
+	graphql.SSESingleConnectHandler(reg)(connC)
 
 	deadline := time.After(2 * time.Second)
 	for {
@@ -73,7 +74,7 @@ func TestSSESingleOperationHandler_QueryOperation_RoutesNextCompleteToToken(t *t
 	postResponder := newFakeSSEResponder("", map[string]string{"token": token})
 	postResponder.body = []byte(body)
 	postReq, postRes := execution.New(postResponder)
-
+	postC := execution.NewHttpContext(postReq, postRes)
 	// The handler's own write of the `next`/`complete` frames blocks on the
 	// unbuffered io.Pipe until this test's own readLine calls below read the
 	// other end -- so the handler must run concurrently with those reads,
@@ -83,7 +84,7 @@ func TestSSESingleOperationHandler_QueryOperation_RoutesNextCompleteToToken(t *t
 	postDone := make(chan struct{})
 	go func() {
 		defer close(postDone)
-		graphql.SSESingleOperationHandler(sch, map[string]*graphql.Subscription{}, reg)(postReq, postRes)
+		graphql.SSESingleOperationHandler(sch, map[string]*graphql.Subscription{}, reg)(postC)
 	}()
 
 	eventLine := readLine(t, r, time.Second)
@@ -166,8 +167,8 @@ func TestSSESingleOperationHandler_SubscriptionOperation_RoutesMultipleNextToTok
 	postResponder := newFakeSSEResponder("", map[string]string{"token": token})
 	postResponder.body = []byte(body)
 	postReq, postRes := execution.New(postResponder)
-
-	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq, postRes)
+	postC := execution.NewHttpContext(postReq, postRes)
+	graphql.SSESingleOperationHandler(nil, subs, reg)(postC)
 
 	if postResponder.GetStatus() != 202 {
 		t.Fatalf("GetStatus() = %d, want 202", postResponder.GetStatus())
@@ -210,8 +211,8 @@ func TestSSESingleOperationHandler_UnknownToken_RespondsError(t *testing.T) {
 		postResponder := newFakeSSEResponder("", map[string]string{"token": "does-not-exist"})
 		postResponder.body = []byte(body)
 		postReq, postRes := execution.New(postResponder)
-
-		graphql.SSESingleOperationHandler(nil, map[string]*graphql.Subscription{}, reg)(postReq, postRes)
+		postC := execution.NewHttpContext(postReq, postRes)
+		graphql.SSESingleOperationHandler(nil, map[string]*graphql.Subscription{}, reg)(postC)
 
 		if postResponder.GetStatus() != 409 {
 			t.Fatalf("GetStatus() = %d, want 409", postResponder.GetStatus())
@@ -225,8 +226,8 @@ func TestSSESingleOperationHandler_UnknownToken_RespondsError(t *testing.T) {
 		postResponder := newFakeSSEResponder("", map[string]string{"token": token})
 		postResponder.body = []byte(body)
 		postReq, postRes := execution.New(postResponder)
-
-		graphql.SSESingleOperationHandler(nil, map[string]*graphql.Subscription{}, reg)(postReq, postRes)
+		postC := execution.NewHttpContext(postReq, postRes)
+		graphql.SSESingleOperationHandler(nil, map[string]*graphql.Subscription{}, reg)(postC)
 
 		if postResponder.GetStatus() != 409 {
 			t.Fatalf("GetStatus() = %d, want 409", postResponder.GetStatus())
@@ -292,7 +293,8 @@ func TestSSESingleOperationHandler_ConcurrentOperations_NoRace(t *testing.T) {
 			postResponder := newFakeSSEResponder("", map[string]string{"token": token})
 			postResponder.body = []byte(body)
 			postReq, postRes := execution.New(postResponder)
-			graphql.SSESingleOperationHandler(sch, map[string]*graphql.Subscription{}, reg)(postReq, postRes)
+			postC := execution.NewHttpContext(postReq, postRes)
+			graphql.SSESingleOperationHandler(sch, map[string]*graphql.Subscription{}, reg)(postC)
 		}(i)
 	}
 
@@ -300,7 +302,8 @@ func TestSSESingleOperationHandler_ConcurrentOperations_NoRace(t *testing.T) {
 	subResponder := newFakeSSEResponder("", map[string]string{"token": token})
 	subResponder.body = []byte(subBody)
 	subReq, subRes := execution.New(subResponder)
-	graphql.SSESingleOperationHandler(sch, subs, reg)(subReq, subRes)
+	subC := execution.NewHttpContext(subReq, subRes)
+	graphql.SSESingleOperationHandler(sch, subs, reg)(subC)
 
 	wg.Wait()
 	time.Sleep(50 * time.Millisecond)
@@ -312,8 +315,8 @@ func TestSSESingleReserveHandler_Put_Responds201WithToken(t *testing.T) {
 
 	responder := newFakeSSEResponder("", nil)
 	req, res := execution.New(responder)
-
-	graphql.SSESingleReserveHandler(reg)(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSESingleReserveHandler(reg)(reqC)
 
 	if responder.GetStatus() != 201 {
 		t.Fatalf("GetStatus() = %d, want 201", responder.GetStatus())
@@ -350,8 +353,8 @@ func TestSSESingleConnectHandler_ValidToken_AttachesConnection(t *testing.T) {
 
 	responder := newFakeSSEResponder("", map[string]string{"token": token})
 	req, res := execution.New(responder)
-
-	graphql.SSESingleConnectHandler(reg)(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSESingleConnectHandler(reg)(reqC)
 
 	// io.Pipe (fakeSSEResponder's transport) is unbuffered: a write only
 	// returns once something reads the other end, so the retry-until-ready
@@ -391,8 +394,8 @@ func TestSSESingleConnectHandler_UnknownToken_RespondsError(t *testing.T) {
 	t.Run("token never reserved", func(t *testing.T) {
 		responder := newFakeSSEResponder("", map[string]string{"token": "does-not-exist"})
 		req, res := execution.New(responder)
-
-		graphql.SSESingleConnectHandler(reg)(req, res)
+		reqC := execution.NewHttpContext(req, res)
+		graphql.SSESingleConnectHandler(reg)(reqC)
 
 		if responder.GetStatus() != 404 {
 			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
@@ -402,8 +405,8 @@ func TestSSESingleConnectHandler_UnknownToken_RespondsError(t *testing.T) {
 	t.Run("token missing entirely", func(t *testing.T) {
 		responder := newFakeSSEResponder("", nil)
 		req, res := execution.New(responder)
-
-		graphql.SSESingleConnectHandler(reg)(req, res)
+		reqC := execution.NewHttpContext(req, res)
+		graphql.SSESingleConnectHandler(reg)(reqC)
 
 		if responder.GetStatus() != 404 {
 			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
@@ -476,13 +479,15 @@ func TestSSESingleCancelHandler_ActiveOperationId_StopsThatSubscriptionOnly(t *t
 	postResponder1 := newFakeSSEResponder("", map[string]string{"token": token})
 	postResponder1.body = []byte(body1)
 	postReq1, postRes1 := execution.New(postResponder1)
-	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq1, postRes1)
+	postReq1C := execution.NewHttpContext(postReq1, postRes1)
+	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq1C)
 
 	body2 := `{"query":"{ onOther }","extensions":{"operationId":"op-other"}}`
 	postResponder2 := newFakeSSEResponder("", map[string]string{"token": token})
 	postResponder2.body = []byte(body2)
 	postReq2, postRes2 := execution.New(postResponder2)
-	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq2, postRes2)
+	postReq2C := execution.NewHttpContext(postReq2, postRes2)
+	graphql.SSESingleOperationHandler(nil, subs, reg)(postReq2C)
 
 	// Wait for op-other to actually be registered before op-cancel is
 	// DELETEd, so StopOperation(token, "op-cancel") below can never race
@@ -501,7 +506,8 @@ func TestSSESingleCancelHandler_ActiveOperationId_StopsThatSubscriptionOnly(t *t
 
 	delResponder := newFakeSSEResponder("", map[string]string{"token": token, "operationId": "op-cancel"})
 	delReq, delRes := execution.New(delResponder)
-	graphql.SSESingleCancelHandler(reg)(delReq, delRes)
+	delC := execution.NewHttpContext(delReq, delRes)
+	graphql.SSESingleCancelHandler(reg)(delC)
 
 	if delResponder.GetStatus() != 200 {
 		t.Fatalf("GetStatus() = %d, want 200", delResponder.GetStatus())
@@ -529,8 +535,8 @@ func TestSSESingleCancelHandler_UnknownOperationId_RespondsError(t *testing.T) {
 	t.Run("token never reserved", func(t *testing.T) {
 		responder := newFakeSSEResponder("", map[string]string{"token": "does-not-exist", "operationId": "op-1"})
 		req, res := execution.New(responder)
-
-		graphql.SSESingleCancelHandler(reg)(req, res)
+		reqC := execution.NewHttpContext(req, res)
+		graphql.SSESingleCancelHandler(reg)(reqC)
 
 		if responder.GetStatus() != 404 {
 			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
@@ -541,8 +547,8 @@ func TestSSESingleCancelHandler_UnknownOperationId_RespondsError(t *testing.T) {
 		token := reg.Reserve()
 		responder := newFakeSSEResponder("", map[string]string{"token": token, "operationId": "does-not-exist"})
 		req, res := execution.New(responder)
-
-		graphql.SSESingleCancelHandler(reg)(req, res)
+		reqC := execution.NewHttpContext(req, res)
+		graphql.SSESingleCancelHandler(reg)(reqC)
 
 		if responder.GetStatus() != 404 {
 			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
@@ -553,8 +559,8 @@ func TestSSESingleCancelHandler_UnknownOperationId_RespondsError(t *testing.T) {
 		token := reg.Reserve()
 		responder := newFakeSSEResponder("", map[string]string{"token": token})
 		req, res := execution.New(responder)
-
-		graphql.SSESingleCancelHandler(reg)(req, res)
+		reqC := execution.NewHttpContext(req, res)
+		graphql.SSESingleCancelHandler(reg)(reqC)
 
 		if responder.GetStatus() != 404 {
 			t.Fatalf("GetStatus() = %d, want 404", responder.GetStatus())
@@ -568,8 +574,8 @@ func TestSSESingleConnectHandler_ClientDisconnects_ReleasesReservation(t *testin
 
 	responder := newFakeSSEResponder("", map[string]string{"token": token})
 	req, res := execution.New(responder)
-
-	graphql.SSESingleConnectHandler(reg)(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSESingleConnectHandler(reg)(reqC)
 
 	// Wait for the connection to actually attach.
 	deadline := time.After(2 * time.Second)

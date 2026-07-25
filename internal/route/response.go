@@ -6,16 +6,17 @@ import (
 	"gonest.dev/gonest/internal/schema"
 )
 
-// RouteResponse is the per-status response builder passed to Route.Response's
+// Response is the per-status response builder passed to Route.Response's
 // optional callback -- lets a route configure that status's documented
 // body schema and/or description in one place (INSIGHT.md's
-// `route.Response(201, func(response *gonest.RouteResponse) { response.Schema(...) })`
-// shape), instead of two unrelated method calls per status. Named
-// RouteResponse (not plain Response) since request-response-split feature
-// claimed gonest.Response for the write-side of the (req, res) HTTP pair --
-// this type is unrelated to that one, purely an OpenAPI documentation
-// builder.
-type RouteResponse struct {
+// `route.Response(201, func(response *gonest.Response) { response.Schema(...) })`
+// shape), instead of two unrelated method calls per status. Named Response
+// (matching OpenAPI 3.x's own vocabulary -- "responses" is the spec's
+// literal term for this) now that the write side of an actual HTTP
+// request/response cycle is named Reply instead (see
+// internal/execution.Reply's own doc comment) -- this type is unrelated to
+// that one, purely an OpenAPI documentation builder.
+type Response struct {
 	schemaValue *schema.Schema
 
 	description    string
@@ -24,7 +25,7 @@ type RouteResponse struct {
 
 // Schema sets this response's documented body schema and returns r so
 // calls can chain.
-func (r *RouteResponse) Schema(m *schema.Schema) *RouteResponse {
+func (r *Response) Schema(m *schema.Schema) *Response {
 	r.schemaValue = m
 	return r
 }
@@ -32,7 +33,7 @@ func (r *RouteResponse) Schema(m *schema.Schema) *RouteResponse {
 // SchemaValue returns the schema set via Schema, and whether Schema was
 // ever called -- the bool distinguishes "documented, no body" from
 // "documented with a body".
-func (r *RouteResponse) SchemaValue() (*schema.Schema, bool) {
+func (r *Response) SchemaValue() (*schema.Schema, bool) {
 	return r.schemaValue, r.schemaValue != nil
 }
 
@@ -45,7 +46,7 @@ func (r *RouteResponse) SchemaValue() (*schema.Schema, bool) {
 // reasoning as route.Route.Summary's own doc comment -- joined with a
 // single space so a long description can be split across multiple Go
 // string literals without manual concatenation.
-func (r *RouteResponse) Description(word string, words ...string) *RouteResponse {
+func (r *Response) Description(word string, words ...string) *Response {
 	r.description = strings.Join(append([]string{word}, words...), " ")
 	r.descriptionSet = true
 	return r
@@ -53,6 +54,6 @@ func (r *RouteResponse) Description(word string, words ...string) *RouteResponse
 
 // DescriptionText returns the description set via Description, and
 // whether Description was ever called.
-func (r *RouteResponse) DescriptionText() (string, bool) {
+func (r *Response) DescriptionText() (string, bool) {
 	return r.description, r.descriptionSet
 }

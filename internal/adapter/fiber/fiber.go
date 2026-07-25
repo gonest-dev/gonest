@@ -140,16 +140,16 @@ func fiberMethod(method route.HttpMethod) string {
 
 // RegisterRoute registers a real route on the internal *fiber.App. The
 // handler Fiber invokes is a thin wrapper: it builds a *execution.Request/
-// *execution.Response pair around a fiberResponder for this specific
-// request/response pair, then runs the gonest Handler inside the wrapper's
-// OWN recover() -- per design.md's Tech Decisions, this deliberately does
-// NOT use Fiber's error-return contract (func(fiber.Ctx) error) as the
-// panic-propagation path, and does NOT install Fiber's `recover` middleware.
-// gonest's Handler signature is func(req *execution.Request, res
-// *execution.Response) with no return value -- panic is the only way a
-// Handler signals failure, consistent with how Constructor/MustInject
-// already work elsewhere in this framework (see internal/provider,
-// param.go).
+// *execution.Reply pair around a fiberResponder for this specific
+// request/response pair, wraps both in a single *execution.HttpContext,
+// then runs the gonest Handler inside the wrapper's OWN recover() -- per
+// design.md's Tech Decisions, this deliberately does NOT use Fiber's
+// error-return contract (func(fiber.Ctx) error) as the panic-propagation
+// path, and does NOT install Fiber's `recover` middleware. gonest's
+// Handler signature is func(c *execution.HttpContext) with no return
+// value -- panic is the only way a Handler signals failure, consistent
+// with how Constructor/MustInject already work elsewhere in this
+// framework (see internal/provider, param.go).
 //
 // The recover branch first type-asserts the recovered value against
 // exception.Exception -- an interface satisfied structurally by anything
@@ -160,7 +160,7 @@ func fiberMethod(method route.HttpMethod) string {
 // pattern) must be recognized identically to a built-in, with zero
 // awareness on this package's part of what concrete types exist. When the
 // assertion succeeds, the response is built via res.Json -- the SAME
-// *execution.Response already constructed above for the Handler call -- so
+// *execution.Reply already constructed above for the Handler call -- so
 // the Exception branch goes through the one Fiber-agnostic path every other
 // gonest response does, rather than reaching for raw fiber.Ctx calls. A
 // panic value that does NOT satisfy Exception (including panic(nil), which
@@ -171,9 +171,10 @@ func fiberMethod(method route.HttpMethod) string {
 // last-resort, best-effort write for a case where we deliberately know
 // nothing about the panic value and must not risk it leaking into the
 // response -- it never crashes the process and leaks no internal detail.
-func (f *App) RegisterRoute(method route.HttpMethod, path string, h func(req *execution.Request, res *execution.Response)) error {
-	wrapped := func(c fiber.Ctx) error {
-		req, res := execution.New(&fiberResponder{c: c})
+func (f *App) RegisterRoute(method route.HttpMethod, path string, h func(c *execution.HttpContext)) error {
+	wrapped := func(fc fiber.Ctx) error {
+		req, res := execution.New(&fiberResponder{c: fc})
+		ctx := execution.NewHttpContext(req, res)
 
 		defer func() {
 			if r := recover(); r != nil {
@@ -185,11 +186,11 @@ func (f *App) RegisterRoute(method route.HttpMethod, path string, h func(req *ex
 					})
 					return
 				}
-				c.Status(fiber.StatusInternalServerError).SendString("Internal Server Error") //nolint:errcheck // best-effort write on an already-failed request
+				fc.Status(fiber.StatusInternalServerError).SendString("Internal Server Error") //nolint:errcheck // best-effort write on an already-failed request
 			}
 		}()
 
-		h(req, res)
+		h(ctx)
 		return nil
 	}
 

@@ -2,7 +2,7 @@ package execution
 
 import "testing"
 
-func TestResponse_Json_DelegatesToResponder(t *testing.T) {
+func TestReply_Json_DelegatesToResponder(t *testing.T) {
 	fake := newFakeResponder()
 	_, res := New(fake)
 
@@ -18,21 +18,21 @@ func TestResponse_Json_DelegatesToResponder(t *testing.T) {
 	}
 }
 
-func TestResponse_Status_IsChainableAndSetsCode(t *testing.T) {
+func TestReply_Status_IsChainableAndSetsCode(t *testing.T) {
 	fake := newFakeResponder()
 	_, res := New(fake)
 
 	returned := res.Status(201)
 
 	if returned != res {
-		t.Fatalf("expected Status() to return the same *Response for chaining")
+		t.Fatalf("expected Status() to return the same *Reply for chaining")
 	}
 	if fake.statusCode != 201 {
 		t.Fatalf("expected responder.SetStatus(201), got %d", fake.statusCode)
 	}
 }
 
-func TestResponse_Status_Json_Chained(t *testing.T) {
+func TestReply_Status_Json_Chained(t *testing.T) {
 	fake := newFakeResponder()
 	_, res := New(fake)
 
@@ -48,7 +48,7 @@ func TestResponse_Status_Json_Chained(t *testing.T) {
 	}
 }
 
-func TestResponse_StatusCode_ReadsCurrentStatus(t *testing.T) {
+func TestReply_StatusCode_ReadsCurrentStatus(t *testing.T) {
 	fake := newFakeResponder()
 	fake.statusCode = 404
 	_, res := New(fake)
@@ -58,7 +58,7 @@ func TestResponse_StatusCode_ReadsCurrentStatus(t *testing.T) {
 	}
 }
 
-func TestResponse_SetHeader_WritesToResponder(t *testing.T) {
+func TestReply_SetHeader_WritesToResponder(t *testing.T) {
 	fake := newFakeResponder()
 	_, res := New(fake)
 
@@ -69,10 +69,10 @@ func TestResponse_SetHeader_WritesToResponder(t *testing.T) {
 	}
 }
 
-// TestResponse_Html_DelegatesToResponder proves Html(s) is a one-line
+// TestReply_Html_DelegatesToResponder proves Html(s) is a one-line
 // delegation to the underlying Responder's own HTML method -- request-
 // response-split feature, renamed from HTML (all-caps).
-func TestResponse_Html_DelegatesToResponder(t *testing.T) {
+func TestReply_Html_DelegatesToResponder(t *testing.T) {
 	fake := newFakeResponder()
 	_, res := New(fake)
 
@@ -85,10 +85,10 @@ func TestResponse_Html_DelegatesToResponder(t *testing.T) {
 	}
 }
 
-// TestResponse_Text_SetsPlainTextContentType proves Text(s) forces
+// TestReply_Text_SetsPlainTextContentType proves Text(s) forces
 // Content-Type: text/plain before writing -- request-response-split
 // feature, replaces SendString (which set no Content-Type).
-func TestResponse_Text_SetsPlainTextContentType(t *testing.T) {
+func TestReply_Text_SetsPlainTextContentType(t *testing.T) {
 	fake := newFakeResponder()
 	_, res := New(fake)
 
@@ -101,10 +101,10 @@ func TestResponse_Text_SetsPlainTextContentType(t *testing.T) {
 	}
 }
 
-// TestResponse_Request_ReturnsOriginatingRequest proves Response holds a
+// TestReply_Request_ReturnsOriginatingRequest proves Reply holds a
 // reference back to the *Request that originated it (context.md's Decision
 // D2).
-func TestResponse_Request_ReturnsOriginatingRequest(t *testing.T) {
+func TestReply_Request_ReturnsOriginatingRequest(t *testing.T) {
 	req, res := New(newFakeResponder())
 
 	if got := res.Request(); got != req {

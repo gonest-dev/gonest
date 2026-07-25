@@ -94,13 +94,11 @@ func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
 // with req/res reaching the handler body and the handler's own `true`
 // decision coming back out unchanged.
 func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
-	var gotReq *execution.Request
-	var gotRes *execution.Response
+	var gotCtx *execution.HttpContext
 
 	g := New(func(g *Guard) {
-		g.Handler(func(req *execution.Request, res *execution.Response) bool {
-			gotReq = req
-			gotRes = res
+		g.Handler(func(c *execution.HttpContext) bool {
+			gotCtx = c
 			return true
 		})
 	})
@@ -112,13 +110,11 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 	}
 
 	req, res := execution.New(newFakeResponder())
-	got := fn(req, res)
+	ctx := execution.NewHttpContext(req, res)
+	got := fn(ctx)
 
-	if gotReq != req {
-		t.Fatal("expected req passed to the returned handler to reach the handler body unchanged")
-	}
-	if gotRes != res {
-		t.Fatal("expected res passed to the returned handler to reach the handler body unchanged")
+	if gotCtx != ctx {
+		t.Fatal("expected c passed to the returned handler to reach the handler body unchanged")
 	}
 	if got != true {
 		t.Fatal("expected the returned bool to genuinely reflect the handler's own true decision")
@@ -129,13 +125,11 @@ func TestHandler_HandlerFunc_RoundTrip_True(t *testing.T) {
 // above but for a handler whose own logic decides false, confirming the
 // returned bool is not hardcoded/always-true.
 func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
-	var gotReq *execution.Request
-	var gotRes *execution.Response
+	var gotCtx *execution.HttpContext
 
 	g := New(func(g *Guard) {
-		g.Handler(func(req *execution.Request, res *execution.Response) bool {
-			gotReq = req
-			gotRes = res
+		g.Handler(func(c *execution.HttpContext) bool {
+			gotCtx = c
 			return false
 		})
 	})
@@ -147,13 +141,11 @@ func TestHandler_HandlerFunc_RoundTrip_False(t *testing.T) {
 	}
 
 	req, res := execution.New(newFakeResponder())
-	got := fn(req, res)
+	ctx := execution.NewHttpContext(req, res)
+	got := fn(ctx)
 
-	if gotReq != req {
-		t.Fatal("expected req passed to the returned handler to reach the handler body unchanged")
-	}
-	if gotRes != res {
-		t.Fatal("expected res passed to the returned handler to reach the handler body unchanged")
+	if gotCtx != ctx {
+		t.Fatal("expected c passed to the returned handler to reach the handler body unchanged")
 	}
 	if got != false {
 		t.Fatal("expected the returned bool to genuinely reflect the handler's own false decision")

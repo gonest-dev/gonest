@@ -20,8 +20,9 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List users")
-		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(Schema) })
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
+		r.Handler(func(c *gonest.HttpContext) {
+			res := c.Response()
 			res.Json(service.List())
 		})
 	})
@@ -29,9 +30,10 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpGet, "/:user_id", func(r *gonest.Route) {
 		r.Summary("Get a user by id")
 		r.Params(paramsDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(Schema) })
+		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusNotFound)
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
 			u := service.Get(p.UserID)
 			if u == nil {
@@ -45,9 +47,10 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Create a user")
 		r.HttpCode(http.StatusCreated)
 		r.RequestBody(createBodyDTOSchema)
-		r.Response(http.StatusCreated, func(response *gonest.RouteResponse) { response.Schema(Schema) })
+		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Response(http.StatusConflict)
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			body := gonest.MustParse[CreateBodyDTO](req.Body().Json(), createBodyDTOSchema)
 			res.Status(http.StatusCreated).Json(service.Create(body.Name, body.Email))
 		})

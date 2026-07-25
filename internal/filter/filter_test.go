@@ -106,7 +106,7 @@ func TestDeclare_NilFn_DoesNotPanic(t *testing.T) {
 // recoverable via HandlerFor using reflect.TypeOf(exemplar), ok=true.
 func TestCatch_HandlerFor_RoundTrip(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {})
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext, exc *fooExampleError) {})
 	})
 	f.Declare(nil)
 
@@ -123,7 +123,7 @@ func TestCatch_HandlerFor_RoundTrip(t *testing.T) {
 // type that was never registered via Catch on this Filter.
 func TestHandlerFor_MissReturnsFalse(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {})
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext, exc *fooExampleError) {})
 	})
 	f.Declare(nil)
 
@@ -137,8 +137,8 @@ func TestHandlerFor_MissReturnsFalse(t *testing.T) {
 // distinct exemplar types, each independently recoverable via HandlerFor.
 func TestCatch_MultipleDistinctTypes(t *testing.T) {
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {})
-		f.Catch(&barExampleError{}, func(req *execution.Request, res *execution.Response, exc *barExampleError) {})
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext, exc *fooExampleError) {})
+		f.Catch(&barExampleError{}, func(c *execution.HttpContext, exc *barExampleError) {})
 	})
 	f.Declare(nil)
 
@@ -158,14 +158,12 @@ func TestCatch_MultipleDistinctTypes(t *testing.T) {
 // original handler body with req, res, and the typed exception value intact,
 // not just "returned something non-nil".
 func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
-	var gotReq *execution.Request
-	var gotRes *execution.Response
+	var gotCtx *execution.HttpContext
 	var gotExc *fooExampleError
 
 	f := filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) {
-			gotReq = req
-			gotRes = res
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext, exc *fooExampleError) {
+			gotCtx = c
 			gotExc = exc
 		})
 	})
@@ -177,15 +175,13 @@ func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
 	}
 
 	req, res := execution.New(newFakeResponder())
+	ctx := execution.NewHttpContext(req, res)
 	exc := &fooExampleError{Code: "boom"}
 
-	fn.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
+	fn.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(exc)})
 
-	if gotReq != req {
-		t.Fatal("expected req passed via reflect.Call to reach the handler body unchanged")
-	}
-	if gotRes != res {
-		t.Fatal("expected res passed via reflect.Call to reach the handler body unchanged")
+	if gotCtx != ctx {
+		t.Fatal("expected c passed via reflect.Call to reach the handler body unchanged")
 	}
 	if gotExc != exc {
 		t.Fatal("expected the typed exception value passed via reflect.Call to reach the handler body unchanged")
@@ -196,7 +192,7 @@ func TestCatch_HandlerFor_GenuineCallRoundTrip(t *testing.T) {
 }
 
 // TestCatch_PanicsOnWrongParamCount proves Catch panics at registration time
-// (clear message) when handler doesn't take exactly (req, res, exc).
+// (clear message) when handler doesn't take exactly (c, exc).
 func TestCatch_PanicsOnWrongParamCount(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -206,12 +202,12 @@ func TestCatch_PanicsOnWrongParamCount(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request) {})
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext) {})
 	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongFirstParamType proves Catch panics when the first
-// parameter isn't *execution.Request.
+// parameter isn't *execution.HttpContext.
 func TestCatch_PanicsOnWrongFirstParamType(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -221,12 +217,12 @@ func TestCatch_PanicsOnWrongFirstParamType(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(exc *fooExampleError, req *execution.Request, res *execution.Response) {})
+		f.Catch(&fooExampleError{}, func(exc *fooExampleError, c *execution.HttpContext) {})
 	}).Declare(nil)
 }
 
 // TestCatch_PanicsOnWrongSecondParamType proves Catch panics when the second
-// parameter isn't *execution.Response.
+// parameter's type doesn't exactly match reflect.TypeOf(exemplar).
 func TestCatch_PanicsOnWrongSecondParamType(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -236,22 +232,7 @@ func TestCatch_PanicsOnWrongSecondParamType(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, exc *fooExampleError, res *execution.Response) {})
-	}).Declare(nil)
-}
-
-// TestCatch_PanicsOnWrongThirdParamType proves Catch panics when the third
-// parameter's type doesn't exactly match reflect.TypeOf(exemplar).
-func TestCatch_PanicsOnWrongThirdParamType(t *testing.T) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expected panic for invalid Catch handler signature (wrong third param type), got none")
-		}
-	}()
-
-	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *barExampleError) {})
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext, exc *barExampleError) {})
 	}).Declare(nil)
 }
 
@@ -267,9 +248,35 @@ func TestCatch_PanicsOnWrongReturnCount(t *testing.T) {
 	}()
 
 	filter.New(func(f *filter.Filter) {
-		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Response, exc *fooExampleError) error {
+		f.Catch(&fooExampleError{}, func(c *execution.HttpContext, exc *fooExampleError) error {
 			return nil
 		})
+	}).Declare(nil)
+}
+
+// TestCatch_PanicsOnOldThreeArgShape proves the pre-HttpContext-unification
+// 3-arg func(req *execution.Request, res *execution.Reply, exc T) shape is
+// now rejected (it used to be the ONLY accepted shape) -- and that the panic
+// message reflects the new 2-arg func(c *execution.HttpContext, exc T)
+// contract, not the old one.
+func TestCatch_PanicsOnOldThreeArgShape(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for the old 3-arg func(req, res, exc) Catch handler shape, got none")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("expected panic value to be a string, got %T", r)
+		}
+		wantSubstr := "gonest: invalid Filter.Catch handler signature, expected func(c *execution.HttpContext, exc *filter_test.fooExampleError)"
+		if msg != wantSubstr {
+			t.Fatalf("expected panic message %q, got %q", wantSubstr, msg)
+		}
+	}()
+
+	filter.New(func(f *filter.Filter) {
+		f.Catch(&fooExampleError{}, func(req *execution.Request, res *execution.Reply, exc *fooExampleError) {})
 	}).Declare(nil)
 }
 

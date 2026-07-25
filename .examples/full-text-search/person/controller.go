@@ -39,8 +39,9 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			"gonest.Schema nested Object()/Array() refs, Enum-constrained Fields.Select/Remove",
 			"and Sort.Field, and Accessor dirty-tracking on both write DTOs and the Where filter.")
 		r.RequestBody(QueryDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(resultSchema) })
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(resultSchema) })
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			q := gonest.MustParse[QueryDTO](req.Body().Json(), QueryDTOSchema)
 			res.Json(service.Search(q))
 		})
@@ -49,11 +50,12 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.RouteGet("/:person_id", func(r *gonest.Route) {
 		r.Summary("Get a person by id")
 		r.Params(ParamsDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(entity.PersonSchema) })
-		r.Response(http.StatusNotFound, func(response *gonest.RouteResponse) {
+		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(entity.PersonSchema) })
+		r.Response(http.StatusNotFound, func(response *gonest.Response) {
 			response.Description("Cannot find a person using person_id")
 		})
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
 			person := service.Get(p.PersonID)
 			if person == nil {
@@ -67,11 +69,12 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Update a person (only fields present in the body are applied)")
 		r.Params(ParamsDTOSchema)
 		r.RequestBody(BodyUpdateDTOSchema)
-		r.Response(http.StatusOK, func(response *gonest.RouteResponse) { response.Schema(entity.PersonSchema) })
-		r.Response(http.StatusNotFound, func(response *gonest.RouteResponse) {
+		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(entity.PersonSchema) })
+		r.Response(http.StatusNotFound, func(response *gonest.Response) {
 			response.Description("Cannot find a person using person_id")
 		})
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
 			body := gonest.MustParse[BodyUpdateDTO](req.Body().Json(), BodyUpdateDTOSchema)
 			person := service.Update(p.PersonID, body)
@@ -86,13 +89,14 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Delete a person")
 		r.Params(ParamsDTOSchema)
 		r.HttpCode(http.StatusNoContent)
-		r.Response(http.StatusNoContent, func(response *gonest.RouteResponse) {
+		r.Response(http.StatusNoContent, func(response *gonest.Response) {
 			response.Description("Person deleted")
 		})
-		r.Response(http.StatusNotFound, func(response *gonest.RouteResponse) {
+		r.Response(http.StatusNotFound, func(response *gonest.Response) {
 			response.Description("Cannot find a person using person_id")
 		})
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
 			if !service.Delete(p.PersonID) {
 				panic(gonest.NewNotFoundException(nil))
@@ -105,8 +109,9 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Summary("Create a person")
 		r.HttpCode(http.StatusCreated)
 		r.RequestBody(BodyCreateDTOSchema)
-		r.Response(http.StatusCreated, func(response *gonest.RouteResponse) { response.Schema(entity.PersonSchema) })
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(entity.PersonSchema) })
+		r.Handler(func(c *gonest.HttpContext) {
+			req, res := c.Request(), c.Response()
 			body := gonest.MustParse[BodyCreateDTO](req.Body().Json(), BodyCreateDTOSchema)
 			res.Status(http.StatusCreated).Json(service.Create(body))
 		})

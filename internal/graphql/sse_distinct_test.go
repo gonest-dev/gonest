@@ -37,8 +37,8 @@ func TestSSEDistinctHandler_ValidQuery_RespondsNextThenComplete(t *testing.T) {
 
 	responder := newFakeSSEResponder("", map[string]string{"query": `{ ping }`})
 	req, res := execution.New(responder)
-
-	graphql.SSEDistinctHandler(sch, map[string]*graphql.Subscription{})(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSEDistinctHandler(sch, map[string]*graphql.Subscription{})(reqC)
 
 	r := bufio.NewReader(responder.pr)
 
@@ -92,8 +92,8 @@ func TestSSEDistinctHandler_InvalidQuery_RespondsNextWithErrorNot400(t *testing.
 
 	responder := newFakeSSEResponder("", map[string]string{"query": `{ doesNotExist`})
 	req, res := execution.New(responder)
-
-	graphql.SSEDistinctHandler(sch, map[string]*graphql.Subscription{})(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSEDistinctHandler(sch, map[string]*graphql.Subscription{})(reqC)
 
 	if responder.GetStatus() != 200 {
 		t.Fatalf("GetStatus() = %d, want 200 (error must arrive as a next event, never a bare HTTP status)", responder.GetStatus())
@@ -137,8 +137,8 @@ func TestSSEDistinctHandler_Subscription_EmitsNextPerEmittedValue(t *testing.T) 
 
 	responder := newFakeSSEResponder("", map[string]string{"query": `subscription { onCreated }`})
 	req, res := execution.New(responder)
-
-	graphql.SSEDistinctHandler(nil, subs)(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSEDistinctHandler(nil, subs)(reqC)
 
 	r := bufio.NewReader(responder.pr)
 
@@ -204,8 +204,8 @@ func TestSSEDistinctHandler_ClientDisconnects_HandlerGoroutineEnds(t *testing.T)
 
 	responder := newFakeSSEResponder("", map[string]string{"query": `subscription { onCreated }`})
 	req, res := execution.New(responder)
-
-	graphql.SSEDistinctHandler(nil, subs)(req, res)
+	reqC := execution.NewHttpContext(req, res)
+	graphql.SSEDistinctHandler(nil, subs)(reqC)
 
 	r := bufio.NewReader(responder.pr)
 	line := readLine(t, r, time.Second)

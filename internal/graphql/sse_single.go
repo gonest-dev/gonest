@@ -38,8 +38,9 @@ const sseSingleTokenHeader = "X-GraphQL-Event-Stream-Token"
 // "token... in the body of the response") -- {"token": "<token>"} is used
 // here, the same bare single-field JSON convention this package's own
 // error responses already use (e.g. sse.go's {"message": "..."}).
-func SSESingleReserveHandler(reg *ReservationRegistry) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func SSESingleReserveHandler(reg *ReservationRegistry) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
+		res := c.Response()
 		token := reg.Reserve()
 		res.Status(201)
 		_ = res.Json(map[string]any{"token": token})
@@ -69,8 +70,9 @@ func SSESingleReserveHandler(reg *ReservationRegistry) func(req *execution.Reque
 // reservation, so there is no SSE stream to carry a `next` frame over in the
 // first place, and this handler never even calls res.Stream in that case.
 // Plain HTTP status is the only channel left, and is the correct one here.
-func SSESingleConnectHandler(reg *ReservationRegistry) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func SSESingleConnectHandler(reg *ReservationRegistry) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
+		req, res := c.Request(), c.Response()
 		token := req.Header(sseSingleTokenHeader)
 		if token == "" {
 			token = req.Queries()["token"]
@@ -239,8 +241,9 @@ func writeSSESingleFrame(write func(string) error, event string, frame sseSingle
 // cancellation responds 200 with an empty JSON body; PROTOCOL.md does not
 // specify a response shape for DELETE, so the convention is picked to match
 // this file's own PUT/POST bare-JSON responses.
-func SSESingleCancelHandler(reg *ReservationRegistry) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func SSESingleCancelHandler(reg *ReservationRegistry) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
+		req, res := c.Request(), c.Response()
 		token := req.Header(sseSingleTokenHeader)
 		if token == "" {
 			token = req.Queries()["token"]
@@ -297,8 +300,9 @@ func SSESingleCancelHandler(reg *ReservationRegistry) func(req *execution.Reques
 // known -- PROTOCOL.md's own contract ("get accepted with a 202... and are
 // then streamed through the single SSE connection"), never through this
 // POST response's own body.
-func SSESingleOperationHandler(sch *gql.Schema, subs map[string]*Subscription, reg *ReservationRegistry) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func SSESingleOperationHandler(sch *gql.Schema, subs map[string]*Subscription, reg *ReservationRegistry) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
+		req, res := c.Request(), c.Response()
 		// Same BodySource wiring graphqlHandler (internal/app/graphql.go)
 		// does for the plain GraphQL-over-HTTP POST /graphql -- this route
 		// is (or, once T15 lands, will be) dispatched directly rather than

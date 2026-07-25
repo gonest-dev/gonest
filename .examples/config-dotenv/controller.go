@@ -13,7 +13,8 @@ var ConfigController = gonest.NewController(func(controller *gonest.Controller) 
 	config := gonest.MustInject[*DatabaseConfig](controller)
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
-		r.Handler(func(req *gonest.Request, res *gonest.Response) {
+		r.Handler(func(c *gonest.HttpContext) {
+			res := c.Response()
 			res.Json(config)
 		})
 	})

@@ -117,7 +117,7 @@ func TestThreePhaseBootstrap_GuardReferencedByTwoModules_DeclaresOnceWithUnionSc
 		declareCount++
 		sawX = inject.Must[*tpProviderX](g) != nil
 		sawY = inject.Must[*tpProviderY](g) != nil
-		g.Handler(func(req *execution.Request, res *execution.Response) bool { return true })
+		g.Handler(func(c *execution.HttpContext) bool { return true })
 	})
 
 	providerX := provider.New(func(p *provider.Provider) {
@@ -130,13 +130,13 @@ func TestThreePhaseBootstrap_GuardReferencedByTwoModules_DeclaresOnceWithUnionSc
 	ctrlA := controller.New(func(c *controller.Controller) {
 		c.Guards(sharedGuard)
 		c.Route(route.HttpGet, "/a", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 	ctrlB := controller.New(func(c *controller.Controller) {
 		c.Guards(sharedGuard)
 		c.Route(route.HttpGet, "/b", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 
@@ -175,19 +175,19 @@ func TestThreePhaseBootstrap_DeclareIdempotent_AcrossAllFourPipelineStageTypes(t
 	guardRuns := 0
 	g := guard.New(func(g *guard.Guard) {
 		guardRuns++
-		g.Handler(func(req *execution.Request, res *execution.Response) bool { return true })
+		g.Handler(func(c *execution.HttpContext) bool { return true })
 	})
 
 	ctrlA := controller.New(func(c *controller.Controller) {
 		c.Guards(g)
 		c.Route(route.HttpGet, "/a", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 	ctrlB := controller.New(func(c *controller.Controller) {
 		c.Guards(g) // SAME guard, second controller, SAME module
 		c.Route(route.HttpGet, "/b", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {})
+			r.Handler(func(c *execution.HttpContext) {})
 		})
 	})
 

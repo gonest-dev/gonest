@@ -20,7 +20,7 @@ type Route struct {
 	path   string
 
 	httpCode int
-	handler  func(req *execution.Request, res *execution.Response)
+	handler  func(c *execution.HttpContext)
 
 	// Documentation-builder state (schema-generation feature, P1) -- every
 	// field here is purely declarative, read back only by the OpenAPI
@@ -51,11 +51,11 @@ type Route struct {
 	// doc comment.
 	formBody           *schema.Schema
 	formBodyFileFields []string
-	// responses maps status code -> the *RouteResponse built for it. The KEY's
+	// responses maps status code -> the *Response built for it. The KEY's
 	// mere presence distinguishes "documented" from "never documented at
-	// all" (spec.md AC3) -- a *RouteResponse with no Schema() call still means
+	// all" (spec.md AC3) -- a *Response with no Schema() call still means
 	// "documented, no body".
-	responses map[int]*RouteResponse
+	responses map[int]*Response
 
 	params *schema.Schema
 	query  *schema.Schema
@@ -111,13 +111,13 @@ func (r *Route) Code() int {
 }
 
 // Handler stores fn as this Route's request handler.
-func (r *Route) Handler(fn func(req *execution.Request, res *execution.Response)) {
+func (r *Route) Handler(fn func(c *execution.HttpContext)) {
 	r.handler = fn
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called.
-func (r *Route) HandlerFunc() func(req *execution.Request, res *execution.Response) {
+func (r *Route) HandlerFunc() func(c *execution.HttpContext) {
 	return r.handler
 }
 
@@ -259,18 +259,18 @@ func (r *Route) FormBodySchema() (*schema.Schema, []string, bool) {
 
 // Response documents status as one of this Route's possible responses. With
 // zero callback args, status is documented as having no body (the map key
-// still exists, pointing at an empty *RouteResponse, distinguishing "documented,
+// still exists, pointing at an empty *Response, distinguishing "documented,
 // no body" from "never documented" -- spec.md AC3). With one callback arg,
-// it runs against a fresh *RouteResponse so the route can set that status's
+// it runs against a fresh *Response so the route can set that status's
 // Schema/Description in one place. Calling Response again for the SAME
 // status overwrites that status's entry entirely; calling it for a
 // DIFFERENT status accumulates alongside any previously documented
 // statuses. Returns r so calls can chain.
-func (r *Route) Response(status int, fn ...func(response *RouteResponse)) *Route {
+func (r *Route) Response(status int, fn ...func(response *Response)) *Route {
 	if r.responses == nil {
-		r.responses = map[int]*RouteResponse{}
+		r.responses = map[int]*Response{}
 	}
-	resp := &RouteResponse{}
+	resp := &Response{}
 	if len(fn) > 0 && fn[0] != nil {
 		fn[0](resp)
 	}
@@ -278,12 +278,12 @@ func (r *Route) Response(status int, fn ...func(response *RouteResponse)) *Route
 	return r
 }
 
-// Responses returns a copy of the status -> *RouteResponse map built via
+// Responses returns a copy of the status -> *Response map built via
 // Response. Read-only: mutating the returned map does not affect this
 // Route's internal state (same defensive-copy pattern as
 // Controller.OwnMiddleware/OwnTags).
-func (r *Route) Responses() map[int]*RouteResponse {
-	out := make(map[int]*RouteResponse, len(r.responses))
+func (r *Route) Responses() map[int]*Response {
+	out := make(map[int]*Response, len(r.responses))
 	for status, resp := range r.responses {
 		out[status] = resp
 	}

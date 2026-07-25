@@ -50,8 +50,9 @@ import (
 // `event: next` frame carrying the error in `data.errors`, never as a bare
 // HTTP 4xx/5xx status. This function never calls res.Status at all,
 // including for its own ?variables= JSON-decode failure.
-func SSEDistinctHandler(sch *gql.Schema, subs map[string]*Subscription) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func SSEDistinctHandler(sch *gql.Schema, subs map[string]*Subscription) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
+		req, res := c.Request(), c.Response()
 		queries := req.Queries()
 		query := queries["query"]
 		operationName := queries["operationName"]
@@ -99,7 +100,7 @@ func SSEDistinctHandler(sch *gql.Schema, subs map[string]*Subscription) func(req
 // here vs SSEHandler's own bare `data: <value>\n\n`, plus the terminating
 // `event: complete\ndata: \n\n` frame Distinct connections require that
 // SSEHandler's own long-lived-per-Subscription endpoint never needed).
-func streamSSEDistinctSubscription(res *execution.Response, sub *Subscription, rootField string, variables map[string]any) {
+func streamSSEDistinctSubscription(res *execution.Reply, sub *Subscription, rootField string, variables map[string]any) {
 	res.SetHeader("Content-Type", "text/event-stream")
 	res.SetHeader("Cache-Control", "no-cache")
 	res.SetHeader("Connection", "keep-alive")
@@ -199,7 +200,7 @@ func streamSSEDistinctSubscription(res *execution.Response, sub *Subscription, r
 // this function did) is a real bug, not a neutral choice: browser
 // EventSource never fires its listener for an event with no `data:` line at
 // all.
-func writeSSEDistinctResult(res *execution.Response, data any, errs []map[string]any) {
+func writeSSEDistinctResult(res *execution.Reply, data any, errs []map[string]any) {
 	res.SetHeader("Content-Type", "text/event-stream")
 	res.SetHeader("Cache-Control", "no-cache")
 	res.SetHeader("Connection", "keep-alive")

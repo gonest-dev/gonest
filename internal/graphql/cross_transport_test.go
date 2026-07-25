@@ -65,7 +65,8 @@ func TestWSProtocolAndSSEDistinct_SameSubscription_BothReceiveSameEmittedEvent(t
 	// --- SSE Distinct client: real graphql-sse Distinct connections mode. ---
 	sseResponder := newFakeSSEResponder("", map[string]string{"query": `subscription { onOrderCreated }`})
 	sseReq, sseRes := execution.New(sseResponder)
-	graphql.SSEDistinctHandler(nil, subs)(sseReq, sseRes)
+	sseC := execution.NewHttpContext(sseReq, sseRes)
+	graphql.SSEDistinctHandler(nil, subs)(sseC)
 
 	// A single dedicated goroutine reads lines off the SSE pipe --
 	// bufio.Reader is not safe for concurrent reads, so the polling loop

@@ -141,11 +141,12 @@ type graphqlPostBodyPeek struct {
 // wire their own BodySource via req.WithSources and read req.Body().Raw()
 // independently), so this peek does not consume or share any parsing
 // state with either.
-func graphqlPostDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscription, reg *graphql.ReservationRegistry) func(req *execution.Request, res *execution.Response) {
+func graphqlPostDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscription, reg *graphql.ReservationRegistry) func(c *execution.HttpContext) {
 	plainHandler := graphqlHandler(sch)
 	singleOperationHandler := graphql.SSESingleOperationHandler(sch, subsByName, reg)
 
-	return func(req *execution.Request, res *execution.Response) {
+	return func(c *execution.HttpContext) {
+		req := c.Request()
 		if requestCarriesEventStreamToken(req) {
 			// Body().Raw() needs a BodySource wired first (req.res.RawBody()
 			// is only reachable through it -- see BodySource.Raw()'s own doc
@@ -171,11 +172,11 @@ func graphqlPostDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subsc
 
 			var peek graphqlPostBodyPeek
 			if err := json.Unmarshal(req.Body().Raw(), &peek); err == nil && peek.Extensions.OperationId != "" {
-				singleOperationHandler(req, res)
+				singleOperationHandler(c)
 				return
 			}
 		}
-		plainHandler(req, res)
+		plainHandler(c)
 	}
 }
 
@@ -186,21 +187,22 @@ func graphqlPostDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subsc
 // graphql.SSESingleConnectHandler; otherwise (GraphQL-over-HTTP GET with
 // Accept: text/event-stream, or any other GET) falls through to
 // graphql.SSEDistinctHandler.
-func graphqlGetDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscription, reg *graphql.ReservationRegistry) func(req *execution.Request, res *execution.Response) {
+func graphqlGetDispatcher(sch *gql.Schema, subsByName map[string]*graphql.Subscription, reg *graphql.ReservationRegistry) func(c *execution.HttpContext) {
 	wsHandler := graphql.WSProtocolHandler(sch, subsByName)
 	connectHandler := graphql.SSESingleConnectHandler(reg)
 	distinctHandler := graphql.SSEDistinctHandler(sch, subsByName)
 
-	return func(req *execution.Request, res *execution.Response) {
+	return func(c *execution.HttpContext) {
+		req, res := c.Request(), c.Response()
 		if req.IsWebSocketUpgrade() {
 			res.UpgradeWebSocket(wsHandler, "graphql-transport-ws")
 			return
 		}
 		if requestCarriesEventStreamToken(req) {
-			connectHandler(req, res)
+			connectHandler(c)
 			return
 		}
-		distinctHandler(req, res)
+		distinctHandler(c)
 	}
 }
 
@@ -229,8 +231,9 @@ type graphqlResponseBody struct {
 // Subscription requests are never dispatched here -- they connect via
 // WS/SSE (graphql-support and graphql-realtime-protocols features), a
 // genuinely different transport, not this JSON-over-HTTP endpoint.
-func graphqlHandler(sch *gql.Schema) func(req *execution.Request, res *execution.Response) {
-	return func(req *execution.Request, res *execution.Response) {
+func graphqlHandler(sch *gql.Schema) func(c *execution.HttpContext) {
+	return func(c *execution.HttpContext) {
+		req, res := c.Request(), c.Response()
 		// Same BodySource wiring registerRoutes' own withRoute closure does
 		// for every REST route -- req.Body().Raw() (and, transitively,
 		// GraphqlContext.Args()' MustParse[T] calls) need it, and this

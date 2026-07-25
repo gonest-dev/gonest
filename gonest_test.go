@@ -347,7 +347,8 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
+				req, res := c.Request(), c.Response()
 				p := MustParse[idParams](req.Params(), idParamsSchema)
 				gotID = p.ID
 				handlerRan = true
@@ -449,7 +450,8 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpGet, "/users/:user_id/orders", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
+				req, res := c.Request(), c.Response()
 				params := MustParse[insightUserIdParams](req.Params(), insightUserIdParamsSchema)
 				query := MustParse[insightListUsersQuery](req.Query(), insightListUsersQuerySchema)
 				gotUserId = params.UserId
@@ -602,14 +604,14 @@ func TestHttpException_RootAlias_SatisfiesException(t *testing.T) {
 // body.
 func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 	var gotReq *Request
-	var gotRes *Response
+	var gotRes *Reply
 	nextCalled := false
 
 	m := NewMiddleware(func(m *Middleware) {
-		m.Handler(func(req *Request, res *Response, next Next) {
-			gotReq = req
-			gotRes = res
-			next(req, res)
+		m.Handler(func(c *HttpContext, next Next) {
+			gotReq = c.Request()
+			gotRes = c.Response()
+			next(c)
 		})
 	})
 	if m == nil {
@@ -623,7 +625,8 @@ func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	req, res := execution.New(nil)
-	fn(req, res, func(req *Request, res *Response) {
+	c := execution.NewHttpContext(req, res)
+	fn(c, func(c *HttpContext) {
 		nextCalled = true
 	})
 
@@ -643,10 +646,10 @@ func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 // UUID and sets it as the X-Request-Id response header before calling
 // next(ctx).
 var RequestIdMiddleware = NewMiddleware(func(middleware *Middleware) {
-	middleware.Handler(func(req *Request, res *Response, next Next) {
+	middleware.Handler(func(c *HttpContext, next Next) {
 		requestId, _ := uuid.NewV7()
-		res.SetHeader("X-Request-Id", requestId.String())
-		next(req, res)
+		c.Response().SetHeader("X-Request-Id", requestId.String())
+		next(c)
 	})
 })
 
@@ -660,8 +663,8 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Use(RequestIdMiddleware)
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
-				res.Json(map[string]string{"ok": "true"})
+			r.Handler(func(c *HttpContext) {
+				c.Response().Json(map[string]string{"ok": "true"})
 			})
 		})
 	})
@@ -716,7 +719,8 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration(t *te
 	controller := NewController(func(c *Controller) {
 		c.Use(NewLoggerMiddleware())
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
+				res := c.Response()
 				res.Status(http.StatusTeapot)
 				res.Json(map[string]string{"ok": "true"})
 			})
@@ -771,7 +775,7 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *
 	t.Cleanup(func() { logger.SetOutput(os.Stdout) })
 
 	rejectingGuard := NewGuard(func(g *Guard) {
-		g.Handler(func(req *Request, res *Response) bool {
+		g.Handler(func(c *HttpContext) bool {
 			return false
 		})
 	})
@@ -780,8 +784,8 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *
 		c.Use(NewLoggerMiddleware())
 		c.Guards(rejectingGuard)
 		c.Route(route.HttpGet, "/ping", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
-				res.Json(map[string]string{"ok": "true"})
+			r.Handler(func(c *HttpContext) {
+				c.Response().Json(map[string]string{"ok": "true"})
 			})
 		})
 	})
@@ -830,12 +834,12 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *
 // ctx through to the handler body and returns its own decision.
 func TestNewGuard_RootAlias_TypeCheck(t *testing.T) {
 	var gotReq *Request
-	var gotRes *Response
+	var gotRes *Reply
 
 	g := NewGuard(func(g *Guard) {
-		g.Handler(func(req *Request, res *Response) bool {
-			gotReq = req
-			gotRes = res
+		g.Handler(func(c *HttpContext) bool {
+			gotReq = c.Request()
+			gotRes = c.Response()
 			return true
 		})
 	})
@@ -850,7 +854,8 @@ func TestNewGuard_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	req, res := execution.New(nil)
-	result := fn(req, res)
+	c := execution.NewHttpContext(req, res)
+	result := fn(c)
 
 	if gotReq != req {
 		t.Fatal("req passed to the stored handler did not reach the handler body unchanged")
@@ -888,7 +893,8 @@ var stubAuthService = &authService{}
 // plain bool (proving the false->automatic 403 path and the true->Handler-
 // runs path).
 var AuthGuard = NewGuard(func(guard *Guard) {
-	guard.Handler(func(req *Request, res *Response) bool {
+	guard.Handler(func(c *HttpContext) bool {
+		req := c.Request()
 		token := req.Header("Authorization")
 		if token == "" {
 			panic(NewUnauthorizedException(nil))
@@ -909,9 +915,9 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Guards(AuthGuard)
 		c.Route(route.HttpGet, "/secure", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
 				handlerRan = true
-				res.Json(map[string]string{"ok": "true"})
+				c.Response().Json(map[string]string{"ok": "true"})
 			})
 		})
 	})
@@ -1002,14 +1008,14 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 // is imported directly here for the Next parameter type.
 func TestNewInterceptor_RootAlias_TypeCheck(t *testing.T) {
 	var gotReq *Request
-	var gotRes *Response
+	var gotRes *Reply
 	nextCalled := false
 
 	i := NewInterceptor(func(i *Interceptor) {
-		i.Handler(func(req *Request, res *Response, next interceptorpkg.Next) {
-			gotReq = req
-			gotRes = res
-			next(req, res)
+		i.Handler(func(c *HttpContext, next interceptorpkg.Next) {
+			gotReq = c.Request()
+			gotRes = c.Response()
+			next(c)
 		})
 	})
 	if i == nil {
@@ -1023,7 +1029,8 @@ func TestNewInterceptor_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	req, res := execution.New(nil)
-	fn(req, res, func(req *Request, res *Response) {
+	c := execution.NewHttpContext(req, res)
+	fn(c, func(c *HttpContext) {
 		nextCalled = true
 	})
 
@@ -1055,10 +1062,10 @@ var timingLog []string
 // next(ctx) returns via observable ordering (timingLog's contents), not by
 // measuring real elapsed time precisely.
 var TimingInterceptor = NewInterceptor(func(interceptor *Interceptor) {
-	interceptor.Handler(func(req *Request, res *Response, next interceptorpkg.Next) {
+	interceptor.Handler(func(c *HttpContext, next interceptorpkg.Next) {
 		start := time.Now()
 		timingLog = append(timingLog, "before")
-		next(req, res)
+		next(c)
 		timingLog = append(timingLog, "request took "+time.Since(start).String())
 	})
 })
@@ -1078,10 +1085,10 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Interceptors(TimingInterceptor)
 		c.Route(route.HttpGet, "/timed", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
 				handlerRan = true
 				timingLog = append(timingLog, "handler")
-				res.Json(map[string]string{"ok": "true"})
+				c.Response().Json(map[string]string{"ok": "true"})
 			})
 		})
 	})
@@ -1141,13 +1148,13 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 // findable via HandlerFor keyed by the exemplar's exact reflect.Type.
 func TestNewFilter_RootAlias_TypeCheck(t *testing.T) {
 	var gotReq *Request
-	var gotRes *Response
+	var gotRes *Reply
 	var gotExc *FooExampleError
 
 	f := NewFilter(func(f *Filter) {
-		f.Catch(&FooExampleError{}, func(req *Request, res *Response, exc *FooExampleError) {
-			gotReq = req
-			gotRes = res
+		f.Catch(&FooExampleError{}, func(c *HttpContext, exc *FooExampleError) {
+			gotReq = c.Request()
+			gotRes = c.Response()
 			gotExc = exc
 		})
 	})
@@ -1163,8 +1170,9 @@ func TestNewFilter_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	req, res := execution.New(nil)
+	c := execution.NewHttpContext(req, res)
 	exc := NewFooExampleError(nil)
-	fn.Call([]reflect.Value{reflect.ValueOf(req), reflect.ValueOf(res), reflect.ValueOf(exc)})
+	fn.Call([]reflect.Value{reflect.ValueOf(c), reflect.ValueOf(exc)})
 
 	if gotReq != req {
 		t.Fatal("req passed to the stored handler did not reach the handler body unchanged")
@@ -1185,8 +1193,8 @@ func TestNewFilter_RootAlias_TypeCheck(t *testing.T) {
 // 418 instead. It reuses FooExampleError (declared above in the Exceptions
 // section) rather than redeclaring a new exception type.
 var FooExampleFilter = NewFilter(func(filter *Filter) {
-	filter.Catch(&FooExampleError{}, func(req *Request, res *Response, exc *FooExampleError) {
-		res.Status(418).Json(map[string]any{
+	filter.Catch(&FooExampleError{}, func(c *HttpContext, exc *FooExampleError) {
+		c.Response().Status(418).Json(map[string]any{
 			"custom": true,
 			"name":   exc.Name(),
 		})
@@ -1208,12 +1216,12 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Filters(FooExampleFilter)
 		c.Route(route.HttpGet, "/caught", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
 				panic(NewFooExampleError(nil))
 			})
 		})
 		c.Route(route.HttpGet, "/uncaught", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
 				panic(NewNotFoundException(nil))
 			})
 		})
@@ -2478,7 +2486,8 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	controller := NewController(func(c *Controller) {
 		c.Route(route.HttpPost, "/users", func(r *route.Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
+				req, res := c.Request(), c.Response()
 				v := MustParse[jsonBodyUserEntity](req.Body().Json(), jsonBodyUserSchema)
 				gotUser = &v
 				res.Json(gotUser)
@@ -2758,19 +2767,19 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		c.Route(route.HttpGet, "/:user_id", func(r *Route) {
 			r.Summary("Busca um usuario por ID")
 			r.Params(userIdParamsSchema)
-			r.Response(http.StatusOK, func(response *RouteResponse) { response.Schema(userEntitySchema) })
+			r.Response(http.StatusOK, func(response *Response) { response.Schema(userEntitySchema) })
 			r.Response(http.StatusNotFound)
 			r.HttpCode(http.StatusOK)
-			r.Handler(func(req *Request, res *Response) {
-				res.Json(map[string]any{"ok": true})
+			r.Handler(func(c *HttpContext) {
+				c.Response().Json(map[string]any{"ok": true})
 			})
 		})
 
 		c.Route(route.HttpGet, "/_internal/debug", func(r *Route) {
 			r.ExcludeFromDocs()
 			r.HttpCode(http.StatusOK)
-			r.Handler(func(req *Request, res *Response) {
-				res.Json(map[string]any{"ok": true})
+			r.Handler(func(c *HttpContext) {
+				c.Response().Json(map[string]any{"ok": true})
 			})
 		})
 	})
@@ -3075,8 +3084,8 @@ func TestMustInjectAll_RootAlias_InsightConnectableExample(t *testing.T) {
 
 		controller.Route(route.HttpGet, "/ping", func(r *Route) {
 			r.HttpCode(http.StatusOK)
-			r.Handler(func(req *Request, res *Response) {
-				res.Json(service.PingAll())
+			r.Handler(func(c *HttpContext) {
+				c.Response().Json(service.PingAll())
 			})
 		})
 	})
@@ -3241,7 +3250,8 @@ func newInsightTestUserModule() *Module {
 
 		controller.Route(route.HttpGet, "/:id", func(r *route.Route) {
 			r.HttpCode(http.StatusOK)
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
+				req, res := c.Request(), c.Response()
 				p := MustParse[insightTestUserIDParam](req.Params(), insightTestUserIDParamSchema)
 				res.Json(userService.Get(p.ID))
 			})
@@ -3590,7 +3600,7 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 		pingables := MustInjectAll[insightPingable](controller)
 
 		controller.Route(HttpGet, "/readyz", func(r *Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(ctx *HttpContext) {
 				results, status := make(map[string]string), HttpStatusOk
 
 				for _, c := range pingables {
@@ -3602,14 +3612,14 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 					}
 				}
 
-				res.Status(status).Json(map[string]any{"status": "ok", "checks": results})
+				ctx.Response().Status(status).Json(map[string]any{"status": "ok", "checks": results})
 			})
 		})
 
 		controller.Route(HttpGet, "/livez", func(r *Route) {
 			r.HttpCode(HttpStatusOk)
-			r.Handler(func(req *Request, res *Response) {
-				res.Status(HttpStatusOk).Text("OK")
+			r.Handler(func(c *HttpContext) {
+				c.Response().Status(HttpStatusOk).Text("OK")
 			})
 		})
 	})
@@ -3786,7 +3796,8 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 	uploadController := NewController(func(controller *Controller) {
 		controller.Path("/upload")
 		controller.Route(HttpPost, "/", func(r *Route) {
-			r.Handler(func(req *Request, res *Response) {
+			r.Handler(func(c *HttpContext) {
+				req, res := c.Request(), c.Response()
 				result := MustParse[uploadForm](req.Body().Form(func(f *FormFile) error {
 					close(onFileReached)
 					gotFilename = f.Filename()

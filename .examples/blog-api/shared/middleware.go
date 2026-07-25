@@ -15,10 +15,11 @@ var requestCounter atomic.Int64
 // the rest of the chain (Guard/Interceptor/Handler) runs.
 var RequestIDMiddleware = func() *gonest.Middleware {
 	return gonest.NewMiddleware(func(middleware *gonest.Middleware) {
-		middleware.Handler(func(req *gonest.Request, res *gonest.Response, next gonest.Next) {
+		middleware.Handler(func(c *gonest.HttpContext, next gonest.Next) {
+			res := c.Response()
 			id := requestCounter.Add(1)
 			res.SetHeader("X-Request-Id", fmt.Sprintf("req-%d", id))
-			next(req, res)
+			next(c)
 		})
 	})
 }

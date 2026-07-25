@@ -584,11 +584,12 @@ func NewMiddleware(fn func(*Middleware)) *Middleware {
 // startup logging.
 func NewLoggerMiddleware() *Middleware {
 	return middleware.New(func(m *Middleware) {
-		m.Handler(func(req *Request, res *Response, next Next) {
+		m.Handler(func(c *HttpContext, next Next) {
 			start := time.Now()
+			req := c.Request()
 			// A rejecting Guard/an exception.Exception thrown by the Handler
-			// unwinds via panic straight past next(req, res) below, without
-			// ever coming back here -- it is only turned into a status code
+			// unwinds via panic straight past next(c) below, without ever
+			// coming back here -- it is only turned into a status code
 			// FURTHER UP the stack, by filteredHandler/the adapter's own
 			// recover (internal/app/app.go, internal/adapter/fiber/fiber.go).
 			// This defer/recover mirrors that mapping (exception.Exception's
@@ -596,7 +597,7 @@ func NewLoggerMiddleware() *Middleware {
 			// reports the real status the caller will see, then re-panics
 			// unchanged so the existing Filter/default-formatting behavior
 			// is untouched.
-			r := recoverAfter(req, res, next)
+			r := recoverAfter(c, next)
 			status := r.status
 			duration := time.Since(start)
 
@@ -610,16 +611,16 @@ func NewLoggerMiddleware() *Middleware {
 }
 
 // loggerOutcome is NewLoggerMiddleware's own internal record of what
-// happened after calling next(req, res): the status to log, and (if next
+// happened after calling next(c): the status to log, and (if next
 // panicked) the original panic value to re-panic once logging is done.
 type loggerOutcome struct {
 	status     int
 	panicValue any
 }
 
-// recoverAfter calls next(req, res), catching any panic so
-// NewLoggerMiddleware can log a line before re-propagating it unchanged.
-func recoverAfter(req *Request, res *Response, next Next) (outcome loggerOutcome) {
+// recoverAfter calls next(c), catching any panic so NewLoggerMiddleware can
+// log a line before re-propagating it unchanged.
+func recoverAfter(c *HttpContext, next Next) (outcome loggerOutcome) {
 	defer func() {
 		if r := recover(); r != nil {
 			outcome.panicValue = r
@@ -630,8 +631,8 @@ func recoverAfter(req *Request, res *Response, next Next) (outcome loggerOutcome
 			}
 		}
 	}()
-	next(req, res)
-	outcome.status = res.StatusCode()
+	next(c)
+	outcome.status = c.Response().StatusCode()
 	return outcome
 }
 
@@ -899,12 +900,30 @@ type ObjectSchema = schema.ObjectSchema
 // is automatically visible on gonest.Request with zero extra wrapper code.
 type Request = execution.Request
 
-// Response encapsulates the WRITE side of a single REST route Handler's
-// request/response cycle -- request-response-split feature. Because this is
-// a true Go type alias, every method on execution.Response (Status/
-// StatusCode/SetHeader/Json/Html/Text/Request) is automatically visible on
-// gonest.Response with zero extra wrapper code.
-type Response = execution.Response
+// Reply is the WRITE side of an HTTP request/response cycle -- Status/
+// StatusCode/SetHeader/Json/Html/Text/Stream/UpgradeWebSocket, plus
+// Request() to reach back to the Request that originated it. Reached via
+// HttpContext.Response() in every Handler/Guard/Middleware/Interceptor/
+// Filter.Catch -- named Reply (not Response) to avoid colliding with the
+// OpenAPI documentation builder of the same conceptual area (see Response
+// below). Same (request, reply) naming Fastify uses for this exact role, a
+// real precedent in the Node ecosystem this framework targets, not a
+// neologism. Because this is a true Go type alias, every method on
+// execution.Reply is automatically visible on gonest.Reply with zero extra
+// wrapper code.
+type Reply = execution.Reply
+
+// HttpContext is the single parameter every Handler/Guard/Middleware/
+// Interceptor/Filter.Catch receives -- exactly 2 methods, Request() (read
+// side) and Response() (write side, *Reply) -- everything else is reached
+// through one of those two. Replaces the separate (req, res) 2-parameter
+// shape request-response-split (AD-030) introduced; unlike that split,
+// still keeps Request/Reply as real, separate, independently testable
+// types underneath -- HttpContext is a thin wrapper, not a re-merge of
+// their fields. Because this is a true Go type alias, both methods are
+// automatically visible on gonest.HttpContext with zero extra wrapper
+// code.
+type HttpContext = execution.HttpContext
 
 // ---------------------------------------------------------------------------
 // Accessor (dirty-tracking field wrapper)
@@ -1069,17 +1088,18 @@ func NewOpenAPI(specVersion string, fn func(*OpenAPI)) *OpenAPI {
 // the full contract.
 type Route = route.Route
 
-// RouteResponse is the per-status response builder passed to Route.Response's
-// optional callback (`route.Response(201, func(response *gonest.RouteResponse) {
-// response.Schema(userEntitySchema) })`) -- lets a route configure that
-// status's documented body schema (Schema) and/or description
-// (Description) in one place. It is a true Go type alias, so both methods
-// are automatically visible on gonest.RouteResponse with zero extra wrapper
-// code, same as Route/Schema/etc above. See internal/route.RouteResponse's
-// doc comment for the full contract. Named RouteResponse (not plain
-// Response) since request-response-split feature claimed gonest.Response
-// for the write-side of the (req, res) HTTP pair.
-type RouteResponse = route.RouteResponse
+// Response is the per-status documentation builder passed to
+// Route.Response's optional callback (`route.Response(201, func(response
+// *gonest.Response) { response.Schema(userEntitySchema) })`) -- lets a
+// route configure that status's documented body schema (Schema) and/or
+// description (Description) in one place. It is a true Go type alias, so
+// both methods are automatically visible on gonest.Response with zero
+// extra wrapper code, same as Route/Schema/etc above. See
+// internal/route.Response's doc comment for the full contract. Named
+// Response (matching OpenAPI 3.x's own vocabulary -- "responses" is the
+// spec's literal term for this) now that the write side of an actual HTTP
+// request/response cycle is named Reply instead (see Reply above).
+type Response = route.Response
 
 // OpenapiGenerate walks app's assembled module tree (via app.Root(),
 // recursing into every imported module -- see internal/app.App.Root's doc

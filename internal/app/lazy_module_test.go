@@ -60,8 +60,8 @@ func buildLazyDrivenApp(t *testing.T, driver string, constructorCalls *int) *fib
 
 	controllerA := controller.New(func(c *controller.Controller) {
 		c.Route(route.HttpGet, "/which", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {
-				res.Json(map[string]string{"which": "a"})
+			r.Handler(func(c *execution.HttpContext) {
+				c.Response().Json(map[string]string{"which": "a"})
 			})
 		})
 	})
@@ -71,8 +71,8 @@ func buildLazyDrivenApp(t *testing.T, driver string, constructorCalls *int) *fib
 
 	controllerB := controller.New(func(c *controller.Controller) {
 		c.Route(route.HttpGet, "/which", func(r *route.Route) {
-			r.Handler(func(req *execution.Request, res *execution.Response) {
-				res.Json(map[string]string{"which": "b"})
+			r.Handler(func(c *execution.HttpContext) {
+				c.Response().Json(map[string]string{"which": "b"})
 			})
 		})
 	})

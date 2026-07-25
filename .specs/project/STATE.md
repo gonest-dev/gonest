@@ -63,6 +63,45 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 
 ## Recent Decisions (Last 60 days)
 
+### AD-061: `HttpContext` unifica `(req, res)` de volta num parâmetro só; `Response`→`Reply` (write-side), `RouteResponse`→`Response` (builder OpenAPI) -- Milestone 26 (2026-07-25)
+
+**Decision:** `internal/execution.Response` (write-side HTTP real) renomeado pra `internal/execution.Reply`
+(arquivo `response.go`→`reply.go`); `internal/route.RouteResponse` (builder de documentação
+OpenAPI por status) renomeado pra `internal/route.Response` -- nome do MÉTODO `Route.Response(status,
+fn)` inalterado, só o tipo do parâmetro muda. `internal/execution.HttpContext` novo -- exatamente 2
+métodos, `Request() *Request` e `Response() *Reply` -- nenhum outro promovido. Toda assinatura
+pública (`Route.Handler`, `Guard.Handler`, `Middleware`/`Interceptor.Handler`+`Next`,
+`Filter.Catch`, `HttpAdapter.RegisterRoute`, GraphQL realtime SSE/WS, `SetupSwagger`) migra de
+`(req *Request, res *Reply)` (2 parâmetros) pra `(c *HttpContext)` (1 parâmetro). `gonest.go`:
+`Reply`/`Response`/`HttpContext` alias novos/realocados.
+**Reason:** achado real do usuário -- `gonest.Response` (write-side, AD-030) e `gonest.RouteResponse`
+(builder OpenAPI) liam como quase-duplicatas, confundindo justamente onde documentação Swagger e
+handler real aparecem lado a lado no mesmo controller. Resolvido em 2 camadas: renomear pra tirar a
+colisão (`Reply`/`Response`), E (decisão adicional do usuário, ampliando o escopo original) unificar
+`(req, res)` de volta num parâmetro único `HttpContext`, com precedente parcial em `GraphqlContext`
+(objeto único, mas sem write-side real) e a convenção `(request, reply)` do Fastify pro nome do tipo
+write-side. Verificado via Context7 que o padrão Nest REAL pra "múltiplos providers" (`inject:
+[A,B,C]`) já resolvia uma dúvida lateral do usuário sobre `MustInjectAll` em Provider sem precisar
+de feature nova -- mas essa investigação levou à descoberta real do naming problem que motivou esta AD.
+**Trade-off:** breaking change real -- reverte a forma de 2 parâmetros que AD-028/AD-030 (Milestone
+14) introduziu deliberadamente pra paridade Express/NestJS. Ainda assim, `Request`/`Reply` continuam
+tipos concretos separados e independentemente testáveis por baixo -- `HttpContext` é wrapper fino
+(2 getters), não uma re-fusão de campos. `GraphqlContext` (resolvers Query/Mutation/Subscription)
+NÃO muda -- convenção diferente, sem write-side real, fora de escopo.
+**Impact:** `internal/execution/{reply.go(novo, era response.go),reply_test.go,httpcontext.go(novo)}`,
+`internal/route/{response.go,route.go,route_test.go}`, `internal/adapter/fiber/{fiber.go,fiber_test.go}`,
+`internal/app/{app.go,graphql.go}` + todo `_test.go` de `internal/app`, `internal/{guard,middleware,
+interceptor,filter}/*.go`+testes, `internal/openapi/{swagger.go,generate_test.go}`,
+`internal/graphql/{sse_distinct.go,sse_single.go}`+testes, `internal/controller/controller_test.go`,
+`gonest.go`, `gonest_test.go`, todo `.examples/*` (6 dos 7 exemplos tocados -- `blog-graphql` usa só
+`GraphqlContext`, inalterado), `README.md` (14 blocos de código recompilados de verdade via scratch
+module, não só revisão visual). Executado via 3 personas + subagentes (T1 fundação feita direto,
+T2/T3 paralelos via `Agent`, T1-cleanup+T4 sequenciais) -- achado real durante execução: worktrees
+dos subagentes nascem do HEAD commitado, sem mudanças uncommitted da sessão -- T1 (não commitado
+ainda quando T2/T3 foram lançados) precisou ser copiado manualmente pros 2 worktrees antes dos
+Implementers conseguirem compilar contra ele. `go build ./...`/`go vet ./...`/`go test ./...
+-race -count=1` verdes, 24 pacotes, todo `.examples/*` buildando.
+
 ### AD-060: `gonest.MustSetupSwagger` -- panic-on-error convenience wrapper (2026-07-24)
 
 **Decision:** `gonest.MustSetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions)`

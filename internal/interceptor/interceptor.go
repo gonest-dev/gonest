@@ -17,22 +17,22 @@ import (
 // whatever comes after the current interceptor (the next interceptor, or
 // eventually the already-guard-gated route Handler). This is a package-own
 // type -- NOT reused from internal/middleware.Next -- even though both share
-// the identical underlying shape (func(req *execution.Request, res
-// *execution.Response)). See design.md's Tech Decisions: internal/interceptor
-// and internal/middleware are parallel, conceptually independent
-// pipeline-stage packages (different composition position, different
-// semantic framing) that only coincide in shape today; coupling one to the
-// other just to reuse a one-liner type declaration would be an artificial
-// dependency for no runtime benefit (Go's structural function-type
-// compatibility already makes both Next types freely interchangeable at the
-// underlying-function level for composition purposes).
-type Next func(req *execution.Request, res *execution.Response)
+// the identical underlying shape (func(c *execution.HttpContext)). See
+// design.md's Tech Decisions: internal/interceptor and internal/middleware
+// are parallel, conceptually independent pipeline-stage packages (different
+// composition position, different semantic framing) that only coincide in
+// shape today; coupling one to the other just to reuse a one-liner type
+// declaration would be an artificial dependency for no runtime benefit (Go's
+// structural function-type compatibility already makes both Next types
+// freely interchangeable at the underlying-function level for composition
+// purposes).
+type Next func(c *execution.HttpContext)
 
-// Interceptor represents a single interceptor unit: it holds the (req, res,
+// Interceptor represents a single interceptor unit: it holds the (context,
 // next) handler function registered via Handler.
 type Interceptor struct {
 	fn      func(*Interceptor)
-	handler func(req *execution.Request, res *execution.Response, next Next)
+	handler func(c *execution.HttpContext, next Next)
 
 	scope    []*module.Module
 	declared bool
@@ -81,14 +81,14 @@ func (i *Interceptor) ResolveDirectAll(t reflect.Type) []reflect.Value {
 	return resolver.FindDirectAll(i.scope, t)
 }
 
-// Handler stores h as this Interceptor's (req, res, next) handler function.
-func (i *Interceptor) Handler(h func(req *execution.Request, res *execution.Response, next Next)) {
+// Handler stores h as this Interceptor's (context, next) handler function.
+func (i *Interceptor) Handler(h func(c *execution.HttpContext, next Next)) {
 	i.handler = h
 }
 
 // HandlerFunc returns the handler stored via Handler, or nil if Handler was
 // never called (mirrors middleware.Middleware.HandlerFunc()'s zero-value
 // contract).
-func (i *Interceptor) HandlerFunc() func(req *execution.Request, res *execution.Response, next Next) {
+func (i *Interceptor) HandlerFunc() func(c *execution.HttpContext, next Next) {
 	return i.handler
 }
