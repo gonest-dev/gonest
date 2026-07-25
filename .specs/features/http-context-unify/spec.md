@@ -77,4 +77,4 @@ com o builder de documentação OpenAPI usado em `Route.Response(status, func(*g
 | HTTPCTX-04 | Toda assinatura pública migrada pra `(c *HttpContext)` | Verified |
 | HTTPCTX-05 | `gonest.go` alias novo/realocado (`Reply`, `Response`, `HttpContext`) | Verified |
 | HTTPCTX-06 | Callsites (`.examples`, README, testes) migrados | Verified |
-| HTTPCTX-07 | Site atualizado | Implementing |
+| HTTPCTX-07 | Site atualizado | Verified |
