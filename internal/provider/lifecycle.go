@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/scope"
 )
 
@@ -326,6 +327,7 @@ func (p *Provider) runSignalHook(ctx context.Context, hook reflect.Value, phaseN
 func invokeHook(ctx context.Context, fn reflect.Value, resolved reflect.Value, phaseName string, typ reflect.Type, signal *string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			logger.Error(fmt.Sprintf("provider for type %s panicked during %s: %v", typ, phaseName, r))
 			err = fmt.Errorf("gonest: provider for type %s panicked during %s: %v", typ, phaseName, r)
 		}
 	}()

@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
@@ -102,6 +103,7 @@ func MustNewTestApp(root *module.Module, configure func(*TestBuilder)) *Test {
 		configure(b)
 	}
 
+	logger.SetActive(nil) // MustNewTestApp takes no Options -- always resets to the built-in console Logger, never leaks a custom one from an earlier bootstrap in the same process
 	inject.Reset()
 	registerFrameworkSingletons()
 

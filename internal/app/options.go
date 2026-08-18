@@ -58,6 +58,18 @@ type Options struct {
 	// graphql-sse's Distinct and Single connection modes, Milestone 18)
 	// share this SAME path -- overriding it moves all of them consistently.
 	GraphqlPath string
+
+	// Logger, when non-nil, replaces internal/logger's built-in console
+	// implementation for the lifetime of this bootstrap -- passed once at
+	// construction (NewApp/MustNewApp), matching Nest's
+	// NestFactory.create(AppModule, {logger: instance}) factory-time swap
+	// (no separate app.UseLogger() call). nil (the zero value) keeps the
+	// built-in timestamp+tag+stdout logger. Every gonest.GetLogger/
+	// GetLoggerFor call, plus every internal diagnostic line the framework
+	// itself prints (banner, module/controller/route counts, "Listening
+	// on"), resolves through this same instance -- see internal/logger's
+	// own doc comment.
+	Logger logger.Logger
 }
 
 // OnListen is the "bind succeeded" callback shape passed to App.MustListen.

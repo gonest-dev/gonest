@@ -88,12 +88,12 @@ func (e *Emitter) Emit(event any) {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logger.Error(fmt.Sprintf("listener for event %s panicked: %v", t, r))
+					logger.GetLogger(t.String()).Error(fmt.Sprintf("listener panicked: %v", r))
 				}
 			}()
 			out := h.Call([]reflect.Value{reflect.ValueOf(context.Background()), eventValue})
 			if len(out) == 1 && !out[0].IsNil() {
-				logger.Error(fmt.Sprintf("listener for event %s returned error: %v", t, out[0].Interface().(error)))
+				logger.GetLogger(t.String()).Error(fmt.Sprintf("listener returned error: %v", out[0].Interface().(error)))
 			}
 		}()
 	}

@@ -1,13 +1,17 @@
 package graphql_test
 
 import (
+	"bytes"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"unsafe"
 
 	gql "github.com/graphql-go/graphql"
 
 	"gonest.dev/gonest/internal/graphql"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/schema"
 )
 
@@ -61,6 +65,51 @@ func TestBuild_SimpleQuery_ProducesValidSchema(t *testing.T) {
 	})
 	if result.HasErrors() {
 		t.Fatalf("introspection query failed: %v", result.Errors)
+	}
+}
+
+// TestBuild_HandlerPanicsNonException_LogsServerSideAndReturnsGenericError
+// proves a Query Handler's panic with a plain (non-exception.Exception)
+// value now logs server-side before converting to resolveErr -- previously
+// 100% silent (logger.features's Ecosystem Trace, site #2). The GraphQL
+// response contract is unchanged (still a generic "panic in resolver"
+// error), logging is additive.
+func TestBuild_HandlerPanicsNonException_LogsServerSideAndReturnsGenericError(t *testing.T) {
+	buf := &bytes.Buffer{}
+	logger.SetOutput(buf)
+	t.Cleanup(func() { logger.SetOutput(os.Stdout) })
+
+	zero, userSchema := newGenTestSchema(t)
+	userSchema.Property(&zero.Id).Integer().Required()
+	userSchema.Property(&zero.Email).Email().Required()
+
+	res := graphql.New(func(r *graphql.Resolver) {
+		r.Query("boom", func(qb *graphql.Query) {
+			qb.Returns(userSchema)
+			qb.Handler(func(ctx *graphql.Context) any { panic("something went wrong") })
+		})
+	})
+	res.Declare()
+
+	sch, err := graphql.Build(res.OwnQueries(), nil, nil)
+	if err != nil {
+		t.Fatalf("Build() error: %v", err)
+	}
+
+	result := gql.Do(gql.Params{
+		Schema:        *sch,
+		RequestString: `{ boom { id email } }`,
+	})
+	if !result.HasErrors() {
+		t.Fatal("expected the panicking resolver to produce a GraphQL error")
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "[ERROR]") || !strings.Contains(out, "something went wrong") {
+		t.Fatalf("expected server-side log to contain [ERROR] and the panic message, got: %q", out)
+	}
+	if !strings.Contains(out, `"boom"`) {
+		t.Fatalf("expected server-side log to contain the resolver field name, got: %q", out)
 	}
 }
 

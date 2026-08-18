@@ -146,7 +146,7 @@ func (s *Scheduler) Stop(name string) {
 func runIsolated(name string, fn func(ctx context.Context)) {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error(fmt.Sprintf("scheduled job %q panicked: %v", name, r))
+			logger.GetLogger(name).Error(fmt.Sprintf("scheduled job panicked: %v", r))
 		}
 	}()
 	fn(context.Background())

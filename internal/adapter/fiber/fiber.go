@@ -10,6 +10,7 @@ package fiber
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	coreapp "gonest.dev/gonest/internal/app"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/route"
 )
 
@@ -186,6 +188,10 @@ func (f *App) RegisterRoute(method route.HttpMethod, path string, h func(c *exec
 					})
 					return
 				}
+				logger.Error(fmt.Sprintf("unhandled panic in handler: %v", r), map[string]any{
+					"method": fc.Method(),
+					"path":   fc.Path(),
+				})
 				fc.Status(fiber.StatusInternalServerError).SendString("Internal Server Error") //nolint:errcheck // best-effort write on an already-failed request
 			}
 		}()

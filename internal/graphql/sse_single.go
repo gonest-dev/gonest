@@ -17,6 +17,7 @@ import (
 	gql "github.com/graphql-go/graphql"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/validate"
 )
 
@@ -138,8 +139,13 @@ func SSESingleConnectHandler(reg *ReservationRegistry) func(c *execution.HttpCon
 		res.Stream(func(bw *bufio.Writer) {
 			// A panic here must not crash the process -- same recover
 			// contract sse.go's own SSEHandler and ssedistinct.go document
-			// for the same reason.
-			defer func() { _ = recover() }()
+			// for the same reason. Previously fully silent server-side
+			// (logger.features's Ecosystem Trace, site #5).
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(fmt.Sprintf("unhandled panic in SSE single stream: %v", r))
+				}
+			}()
 
 			// The client disconnecting (naturally, or a write failure
 			// noticed elsewhere) always ends with the reservation removed

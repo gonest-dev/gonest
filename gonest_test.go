@@ -63,6 +63,83 @@ func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	}
 }
 
+// gonestTestSpyLogger is a minimal Logger recording every call it receives,
+// used to prove AppOptions.Logger actually replaces gonest's own console
+// output rather than merely being stored inertly.
+type gonestTestSpyLogger struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (s *gonestTestSpyLogger) record(tag, message string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lines = append(s.lines, tag+" "+message)
+}
+func (s *gonestTestSpyLogger) Error(message string, meta ...map[string]any)   { s.record("ERROR", message) }
+func (s *gonestTestSpyLogger) Warn(message string, meta ...map[string]any)    { s.record("WARN", message) }
+func (s *gonestTestSpyLogger) Info(message string, meta ...map[string]any)    { s.record("INFO", message) }
+func (s *gonestTestSpyLogger) Debug(message string, meta ...map[string]any)   { s.record("DEBUG", message) }
+func (s *gonestTestSpyLogger) Verbose(message string, meta ...map[string]any) { s.record("VERBOSE", message) }
+
+func (s *gonestTestSpyLogger) snapshot() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.lines...)
+}
+
+// TestMustNewApp_AppOptionsLogger_BecomesTheActiveFrameworkLogger proves
+// AppOptions.Logger (factory-time swap, no separate app.UseLogger() call)
+// actually installs the caller's instance as internal/logger's active
+// Logger -- the same value every framework diagnostic line (banner counts,
+// "Listening on") and every GetLogger/GetLoggerFor call resolves through.
+// Asserted via internal/logger.Active() directly rather than triggering a
+// real Listen (which would need a bound port) -- SetActive's wiring is what
+// this test targets, not the banner's own print timing.
+func TestMustNewApp_AppOptionsLogger_BecomesTheActiveFrameworkLogger(t *testing.T) {
+	root := NewModule(func(s *Module) {})
+
+	spy := &gonestTestSpyLogger{}
+	app := MustNewApp[fiber.App](root, AppOptions{Logger: spy})
+	if app == nil {
+		t.Fatalf("MustNewApp() returned nil *App")
+	}
+
+	if logger.Active() != Logger(spy) {
+		t.Fatalf("logger.Active() = %v, want the AppOptions.Logger instance passed to MustNewApp", logger.Active())
+	}
+}
+
+// TestGetLoggerFor_InsideProviderConstructor_ResolvesWithoutMustInject
+// proves GetLoggerFor[T] is usable from exactly the place that motivated
+// this feature -- inside a Provider's own Constructor, where
+// MustInject[SomeInterface](p) would panic ("requires T to be a pointer
+// type", Provider-to-Provider dependencies only support pointer T).
+// GetLoggerFor bypasses MustInject/the DI graph entirely, so it works here
+// with zero special-casing.
+func TestGetLoggerFor_InsideProviderConstructor_ResolvesWithoutMustInject(t *testing.T) {
+	spy := &gonestTestSpyLogger{}
+
+	type widget struct{}
+	widgetProvider := NewProvider(func(p *Provider) {
+		p.Constructor(func() *widget {
+			GetLoggerFor[widget]().Info("constructing widget")
+			return &widget{}
+		})
+	})
+	root := NewModule(func(s *Module) { s.Providers(widgetProvider) })
+
+	MustNewApp[fiber.App](root, AppOptions{Logger: spy})
+
+	want := "INFO [widget] constructing widget"
+	for _, line := range spy.snapshot() {
+		if line == want {
+			return
+		}
+	}
+	t.Fatalf("spy logger lines = %v, want to contain %q", spy.snapshot(), want)
+}
+
 // TestApp_MustListen_PromotedThroughRootAlias proves App.MustListen (added
 // on internal/app.App) is automatically visible on the root gonest.App
 // alias with zero extra wrapper code, and that both

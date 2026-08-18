@@ -11,6 +11,7 @@ import (
 	"github.com/graphql-go/graphql/language/parser"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/validate"
 )
 
@@ -123,7 +124,13 @@ func wsRootFieldName(query, operationName string) (string, error) {
 // so every write on conn goes through the single writeMu below.
 func WSProtocolHandler(sch *gql.Schema, subs map[string]*Subscription) func(conn WSConn) {
 	return func(conn WSConn) {
-		defer func() { _ = recover() }()
+		// A panic here must not crash the process. Previously fully silent
+		// server-side (logger.features's Ecosystem Trace, site #6).
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(fmt.Sprintf("unhandled panic in WS protocol handler: %v", r))
+			}
+		}()
 
 		// writeMu serializes every write onto conn: the handshake replies
 		// (Ack/Pong) below, the single-result Next/Complete pair T6 already

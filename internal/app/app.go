@@ -384,6 +384,7 @@ func New[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (*Ap
 		opt = opts[0]
 	}
 	logger.Configure(opt.LogLevels)
+	logger.SetActive(opt.Logger)
 	inject.Reset()
 	registerFrameworkSingletons()
 

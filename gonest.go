@@ -351,6 +351,36 @@ type AppOptions = app.Options
 // const block plus a debug-friendly String()).
 type LoggerLevel = logger.Level
 
+// Logger is gonest's structured logging contract -- 5 severities
+// (Error/Warn/Info/Debug/Verbose), each accepting an optional structured
+// meta map. Implement this and pass an instance via AppOptions.Logger to
+// replace gonest's own built-in console output (banner, module/controller/
+// route counts, "Listening on", plus any GetLogger/GetLoggerFor caller
+// anywhere in application code) -- see internal/logger's own doc comment.
+type Logger = logger.Logger
+
+// GetLogger returns the currently active Logger (the built-in console
+// implementation, unless AppOptions.Logger set a custom one), optionally
+// wrapped to prefix every line with a caller-chosen context name -- e.g.
+// GetLogger("cron:invoice-sync") for a context that isn't a Go type. Panics
+// if given more than one name. Reads directly from internal/logger's
+// package-level active value -- no MustInject, no owner argument, callable
+// from literally anywhere (including inside a Provider's own Constructor,
+// where MustInject[T] would reject an interface T).
+func GetLogger(optionalNamedContext ...string) Logger {
+	return logger.GetLogger(optionalNamedContext...)
+}
+
+// GetLoggerFor returns the currently active Logger wrapped to prefix every
+// line with T's own type name (derived via reflect -- T's pointee name for
+// a pointer type, so GetLoggerFor[*Service]() prefixes "[Service]"). Go
+// cannot re-export a generic function via var, so this is a real wrapper
+// calling the internal one (same reason MustInject's own doc comment
+// gives).
+func GetLoggerFor[T any]() Logger {
+	return logger.GetLoggerFor[T]()
+}
+
 const (
 	// LoggerLevelError is the most severe level -- unrecoverable failures.
 	LoggerLevelError = logger.LevelError

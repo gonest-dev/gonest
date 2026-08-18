@@ -10,6 +10,7 @@ import (
 	gql "github.com/graphql-go/graphql"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/validate"
 )
 
@@ -125,8 +126,13 @@ func streamSSEDistinctSubscription(res *execution.Reply, sub *Subscription, root
 		// A panic inside Handler (or this function) must not crash the
 		// process -- same recover contract sse.go's own SSEHandler and
 		// this file's own writeSSEDistinctResult document for the same
-		// reason.
-		defer func() { _ = recover() }()
+		// reason. Previously fully silent server-side (logger.features's
+		// Ecosystem Trace, site #3) -- now logged before being swallowed.
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(fmt.Sprintf("unhandled panic in SSE distinct stream: %v", r))
+			}
+		}()
 
 		// w is shared between the Handler's own goroutine (via emit) and
 		// this function's heartbeat loop -- bufio.Writer is not safe for
@@ -208,8 +214,13 @@ func writeSSEDistinctResult(res *execution.Reply, data any, errs []map[string]an
 	res.Stream(func(w *bufio.Writer) {
 		// A panic here (e.g. an unexpected marshal failure) must not crash
 		// the process -- same recover contract sse.go's own SSEHandler
-		// documents for the same reason.
-		defer func() { _ = recover() }()
+		// documents for the same reason. Previously fully silent
+		// server-side (logger.features's Ecosystem Trace, site #4).
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(fmt.Sprintf("unhandled panic writing SSE distinct result: %v", r))
+			}
+		}()
 
 		payload, err := json.Marshal(map[string]any{"data": data, "errors": errs})
 		if err != nil {

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	coreapp "gonest.dev/gonest/internal/app"
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/route"
 )
 
@@ -200,6 +202,45 @@ func TestRegisterRoute_HandlerPanics_Responds500(t *testing.T) {
 
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", resp.StatusCode)
+	}
+}
+
+// TestRegisterRoute_HandlerPanicsNonException_LogsServerSide proves the
+// generic-500 branch of RegisterRoute's recover now calls logger.Error
+// before writing the response -- previously this branch was 100% silent
+// server-side (logger.features's Ecosystem Trace, site #1), leaving an
+// operator with no server-side trace of an unhandled panic. The response
+// contract is unchanged (still the same generic 500 text) -- logging is
+// additive.
+func TestRegisterRoute_HandlerPanicsNonException_LogsServerSide(t *testing.T) {
+	buf := &bytes.Buffer{}
+	logger.SetOutput(buf)
+	t.Cleanup(func() { logger.SetOutput(os.Stdout) })
+
+	app := New()
+	if err := app.RegisterRoute(route.HttpGet, "/boom-logged", func(c *execution.HttpContext) {
+		panic("something went wrong")
+	}); err != nil {
+		t.Fatalf("RegisterRoute returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/boom-logged", nil)
+	resp, err := app.FiberApp().Test(req)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", resp.StatusCode)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "[ERROR]") || !strings.Contains(out, "something went wrong") {
+		t.Fatalf("expected server-side log to contain [ERROR] and the panic message, got: %q", out)
+	}
+	if !strings.Contains(out, "/boom-logged") {
+		t.Fatalf("expected server-side log to contain the request path, got: %q", out)
 	}
 }
 

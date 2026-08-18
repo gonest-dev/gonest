@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"gonest.dev/gonest/internal/inject"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/scope"
 )
@@ -400,6 +401,7 @@ func invokeAndCopyEdge(ctx context.Context, node module.ProviderRef, edge inject
 func callConstructor(ctx context.Context, node module.ProviderRef) (real reflect.Value, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			logger.Error(fmt.Sprintf("provider for type %s panicked during resolution: %v", node.ResolvedType(), r))
 			err = fmt.Errorf("gonest: provider for type %s panicked during resolution: %v", node.ResolvedType(), r)
 		}
 	}()

@@ -9,6 +9,7 @@ import (
 
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/schema"
 	"gonest.dev/gonest/internal/validate"
 )
@@ -155,6 +156,7 @@ func (b *builder) buildField(name string, args, returns *schema.Schema, returnsL
 					resolveErr = fmt.Errorf("%s", exc.Message())
 					return
 				}
+				logger.Error(fmt.Sprintf("unhandled panic in resolver %q: %v", name, r))
 				resolveErr = fmt.Errorf("gonest: panic in resolver %q: %v", name, r)
 			}()
 

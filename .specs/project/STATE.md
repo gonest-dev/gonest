@@ -1,7 +1,34 @@
 # State
 
-**Last Updated:** 2026-08-17
-**Current Work:** Duration Branch feature (`.specs/features/duration-branch/`) **COMPLETE**. `PropertyBuilder.Duration()` novo (`internal/schema/duration.go`) -- retorna `*DurationSchema` (embeda `*PropertyBuilder`, mesmo padrão de `NumericSchema`: `Min`/`Max`/`Enum` reusam os MESMOS campos `p.min`/`p.max`/`p.enumInt` já usados pela família numérica, só convertendo de/pra `time.Duration` nanossegundos; `Required`/`Nullable`/`Description`/`Examples` redeclarados pra manter o chain tipado). `format`/`kind` = `"duration"` -- kind NOVO, não reusa `"string"`, porque `internal/validate`'s `validatePrimitive` trata `Min`/`Max` de kind `"string"` como tamanho de string, semântica errada pra bound de duração. `validatePrimitive` ganhou `case "duration"`: parseia a string (`"5s"`, `"1h30m"`, formato Go nativo via `time.ParseDuration` -- NÃO ISO-8601) e compara o VALOR parseado contra Min/Max/Enum; string malformada agora vira `violation` por campo na validação (melhor que `Date()`/`DateTime()`, cujo formato inválido só falha depois, no populate, com erro genérico). `setField` ganhou um caso pra `fieldType == durationType` (`time.Duration`, kind `Int64`, não struct como `time.Time` -- não cai de graça no fallback json round-trip que `Date`/`DateTime` já usam): raw string -> `time.ParseDuration` -> `SetInt`; raw já-tipado (JSON number ou `Default`/`Custom` retornando `time.Duration` direto) continua passando pelos caminhos existentes sem mudança. `coerceParamString` (params/query/header/form/env) ganhou `case "duration"` (pass-through, igual `"string"` -- o parse real fica em `validatePrimitive`/`setField`). `internal/graphql/scalar.go` mapeia `"duration"` -> scalar GraphQL `Duration`. `gonest.go` reexporta `type DurationSchema = schema.DurationSchema`. Testado via TDD: `internal/schema/duration_test.go` (identity/chain/Min-Max-Enum round-trip/last-call-wins, mesmo padrão de `numeric_test.go`/`datetime_test.go`) + `internal/validate/duration_test.go` (JSON body happy-path/malformado/fora-de-Min/fora-de-Max/Enum-violation, params happy-path, env com valor presente E com `Default(5*time.Second)` ausente). `go test ./... -count=1` verde, 25 pacotes.
+**Last Updated:** 2026-08-18
+**Current Work:** Logger feature (`.specs/features/logger/`) **COMPLETE**. Motivada por dogfooding
+fora deste repo (`erc/ctrl/api`) -- consumidor tentou `gonest.MustInject[port.Logger](p)` dentro do
+`Constructor` de outro Provider e panicou (`MustInject[T]` Provider-a-Provider só aceita `T` pointer,
+nunca interface -- regra pré-existente, não bug novo). `internal/logger` deixou de ser só funções de
+pacote com formato fixo: `Logger` (interface pública, 5 severidades, `meta ...map[string]any`
+opcional) + `active Logger` trocável (`consoleLogger` default = formato de sempre) +
+`contextLogger` (prefixa `[name]`). `AppOptions.Logger` novo -- troca no FACTORY (`NewApp(root,
+AppOptions{Logger: instance})`, sem `app.UseLogger()` separado -- decisão do usuário, gonest não tem
+a janela assíncrona que motiva o 2-passos do Nest), `nil` mantém o console default; `MustNewTestApp`
+(sem `Options`) sempre reseta pro default, nunca vaza logger customizado entre bootstraps do mesmo
+processo. `gonest.GetLogger(optionalNamedContext ...string)`/`gonest.GetLoggerFor[T any]()` novos --
+acesso DIRETO ao `active` (função de pacote, não `MustInject`), funciona de QUALQUER lugar incluindo
+dentro de `Constructor` de Provider, onde `MustInject[interface]` sempre foi (e continua sendo)
+inválido -- resolve o caso motivador sem tocar a regra pointer-only do DI. Ecosystem trace completo
+(`spec.md`): rastreados TODOS os 10 `recover()` do codebase; 8 estavam 100% silenciosos
+server-side (T1 `fiber.go` RegisterRoute -- todo panic de request HTTP; T2 `graphql/generate.go`
+Field.Resolve -- todo panic de Query/Mutation; T3, 4 sites de streaming SSE/WS que faziam `_ =
+recover()` puro; T4 `resolver/stage3.go`+`provider/lifecycle.go`, já propagavam erro mas sem log
+estruturado), agora todos chamam `logger.Error`/`logger.GetLogger(ctx)` antes de converter em
+resposta/erro -- só o branch de `exception.Exception` (erro de negócio esperado) fica de fora de
+propósito, pra não virar ruído. T5: `emitter`/`scheduler` (já logavam) upgradados pra
+`logger.GetLogger(nomeRuntime)` -- usa string, não `GetLoggerFor[T]` genérico, porque o contexto ali
+é um `reflect.Type`/`name string` só conhecido em runtime, não um type param compile-time (achado
+durante a execução, corrigido no spec.md). `.specs/insight/LOGGER.md` tem o rascunho completo
+(de/para Nest, decisões de design, exemplos). `go build`/`go vet`/`go test ./... -race -count=1`
+verdes, 25 pacotes, zero assertion pré-existente mudada. Ver AD-062.
+
+**Current Work (histórico, superado acima):** Duration Branch feature (`.specs/features/duration-branch/`) **COMPLETE**. `PropertyBuilder.Duration()` novo (`internal/schema/duration.go`) -- retorna `*DurationSchema` (embeda `*PropertyBuilder`, mesmo padrão de `NumericSchema`: `Min`/`Max`/`Enum` reusam os MESMOS campos `p.min`/`p.max`/`p.enumInt` já usados pela família numérica, só convertendo de/pra `time.Duration` nanossegundos; `Required`/`Nullable`/`Description`/`Examples` redeclarados pra manter o chain tipado). `format`/`kind` = `"duration"` -- kind NOVO, não reusa `"string"`, porque `internal/validate`'s `validatePrimitive` trata `Min`/`Max` de kind `"string"` como tamanho de string, semântica errada pra bound de duração. `validatePrimitive` ganhou `case "duration"`: parseia a string (`"5s"`, `"1h30m"`, formato Go nativo via `time.ParseDuration` -- NÃO ISO-8601) e compara o VALOR parseado contra Min/Max/Enum; string malformada agora vira `violation` por campo na validação (melhor que `Date()`/`DateTime()`, cujo formato inválido só falha depois, no populate, com erro genérico). `setField` ganhou um caso pra `fieldType == durationType` (`time.Duration`, kind `Int64`, não struct como `time.Time` -- não cai de graça no fallback json round-trip que `Date`/`DateTime` já usam): raw string -> `time.ParseDuration` -> `SetInt`; raw já-tipado (JSON number ou `Default`/`Custom` retornando `time.Duration` direto) continua passando pelos caminhos existentes sem mudança. `coerceParamString` (params/query/header/form/env) ganhou `case "duration"` (pass-through, igual `"string"` -- o parse real fica em `validatePrimitive`/`setField`). `internal/graphql/scalar.go` mapeia `"duration"` -> scalar GraphQL `Duration`. `gonest.go` reexporta `type DurationSchema = schema.DurationSchema`. Testado via TDD: `internal/schema/duration_test.go` (identity/chain/Min-Max-Enum round-trip/last-call-wins, mesmo padrão de `numeric_test.go`/`datetime_test.go`) + `internal/validate/duration_test.go` (JSON body happy-path/malformado/fora-de-Min/fora-de-Max/Enum-violation, params happy-path, env com valor presente E com `Default(5*time.Second)` ausente). `go test ./... -count=1` verde, 25 pacotes.
 
 **Current Work (histórico, superado acima):** Milestone 24 (Module Lazy Loading) **COMPLETE** (T1-T8). `Module.Lazy(fn func(l *LazyModule))` novo (`internal/module/lazy.go`) -- roda `fn(l)` IMEDIATAMENTE (não deferido, seguro porque `Lazy` só é chamado de DENTRO do `fn` já-deferido de um módulo, mesma janela de tempo de `Imports`/`Providers`/`Exports`). `inject.Must[T]` ganha um 3º branch de dispatch (`mustLazy`, `internal/inject/inject.go`) pra `owner` sendo `*module.LazyModule`: `Declare()`-a todo provider próprio pra achar por `ResolvedType()`, invoca o `Constructor` diretamente via reflect (mesma lógica de 4 assinaturas de `stage3.go`'s `callConstructor`, duplicada -- ciclo de import impede reuso), panica se não achar (LAZY-05), se o provider tiver dependência própria (LAZY-06, `PendingEdges()` cresceu durante a invocação eager) ou se não for `ScopeSingleton` (LAZY-07); chamada repetida reusa o valor já resolvido (LAZY-08). `internal/resolver/stage3.go`'s `invokeAndCopy` (path Singleton) ganha 1 check novo antes de `callConstructor` -- garante LAZY-03 (Constructor eager-resolvido via Lazy nunca roda 2x). `gonest.LazyModule` alias novo em `gonest.go`. `.examples/notification-driver` migrado: `notifier.Config_` (Provider+Schema real, `env:"NOTIFICATION_DRIVER"`) substitui a antiga `ModuleForRoot(driver)` chamada de `main.go`; `main.go` só carrega `.env` e importa `AppModule_`, não escolhe módulo mais. Verificado ao vivo via `curl` pros 2 valores de driver (sms e email/default). `go test ./... -race -count=1` verde, 24 pacotes.
 
@@ -64,6 +91,39 @@ Pós-v1, refinamento contínuo de OpenAPI a partir de dogfooding real em `.examp
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-062: `gonest.Logger` pluggable + `GetLogger`/`GetLoggerFor` -- acesso direto, não via `MustInject` -- ecosystem-wide panic logging (2026-08-18)
+
+**Decision:** `internal/logger` vira instância trocável (`Logger` interface, `active` package var,
+`consoleLogger` default) em vez de funções fixas; `AppOptions.Logger` troca no factory
+(`NewApp`/`MustNewApp`), `MustNewTestApp` sempre reseta pro default. `gonest.GetLogger(optionalName
+...string)`/`GetLoggerFor[T]()` são funções de pacote lendo `active` DIRETO -- não passam por
+`internal/inject.Must[T]`, então funcionam de qualquer lugar (Provider Constructor incluso) sem
+esbarrar na regra "Provider-a-Provider só aceita T pointer". Todos os 10 `recover()` do codebase
+auditados; os 8 que eram 100% silenciosos ganharam `logger.Error`/`logger.GetLogger(ctx)` antes de
+converter panic em resposta/erro (só o branch `exception.Exception`, erro de negócio esperado, fica
+de fora -- logar isso seria ruído, não sinal).
+**Reason:** achado real dogfooding fora deste repo (`erc/ctrl/api`) -- consumidor tentou
+`gonest.MustInject[port.Logger](p)` dentro do `Constructor` de outro Provider e panicou. Investigação
+mostrou 2 problemas empilhados: (1) gonest não tinha jeito de trocar seu PRÓPRIO logger de
+diagnóstico (banner/contadores), só `internal/logger` hardcoded; (2) mesmo se tivesse, injetar uma
+INTERFACE via `MustInject` Provider-a-Provider nunca funcionaria (regra pointer-only pré-existente,
+não bug) -- `GetLogger`/`GetLoggerFor` contornam isso de propósito, sendo accessor direto em vez de
+resolução DI. Rastrear o ecossistema revelou que a maioria dos `recover()` do framework (HTTP
+dispatch, GraphQL resolver, SSE/WS transports) não logava NADA server-side, só convertia panic em
+resposta -- gap real, não hipotético (achado lendo código, confirmado com `grep`, não assumido).
+**Trade-off:** nenhum técnico -- puramente aditivo, toda função/assinatura pré-existente de
+`internal/logger` continua funcionando idêntico (mesmo formato default). `GetLoggerFor[T]` só serve
+pra contexto conhecido em compile-time -- onde o contexto só existe em runtime (evento
+`reflect.Type`, nome de job), usa-se `GetLogger(string)` em vez (achado durante T5, documentado no
+spec.md).
+**Impact:** `internal/logger/{logger.go,logger_test.go}` (reescrito), `internal/app/{options.go,
+app.go,test_app.go}`, `gonest.go` (`Logger`/`GetLogger`/`GetLoggerFor` novos), `gonest_test.go` (2
+testes e2e), `internal/adapter/fiber/{fiber.go,fiber_test.go}`, `internal/graphql/{generate.go,
+generate_test.go,sse_distinct.go,sse_single.go,ws_protocol.go}`, `internal/resolver/stage3.go`,
+`internal/provider/lifecycle.go`, `internal/emitter/emitter.go`, `internal/scheduler/scheduler.go`.
+`.specs/features/logger/{spec,tasks}.md` novos, `.specs/insight/LOGGER.md` (rascunho completo).
+`go build ./...`/`go vet ./...`/`go test ./... -race -count=1` verdes, 25 pacotes.
 
 ### AD-061: `HttpContext` unifica `(req, res)` de volta num parâmetro só; `Response`→`Reply` (write-side), `RouteResponse`→`Response` (builder OpenAPI) -- Milestone 26 (2026-07-25)
 
