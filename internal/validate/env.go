@@ -56,14 +56,14 @@ import (
 //  8. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="env", REUSED unchanged).
 func ParseEnvInto(dst any, schemaArg any) error {
-	m := schemaArg.(*schema.Schema)
+	s := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
-	resolveSchema(m, dstVal.Type())
+	resolveSchema(s, dstVal.Type())
 
 	var violations []violation
 	presence := map[string]any{}
 
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		key, visible := tagKeyVisible(p.Field(), "env")
 		if !visible {
 			continue
@@ -101,7 +101,7 @@ func ParseEnvInto(dst any, schemaArg any) error {
 		return exception.NewBadRequestException(violations)
 	}
 
-	if err := populate(dstVal, presence, m, "env"); err != nil {
+	if err := populate(dstVal, presence, s, "env"); err != nil {
 		// Should be unreachable in practice, same rationale as
 		// paramsSource/jsonBodySource's own equivalent case: the validate
 		// pass above already proved every present field's shape matches

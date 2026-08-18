@@ -51,21 +51,21 @@ func NewHeadersSource(req *execution.Request) execution.Parseable {
 //     exception.NewBadRequestException(violations).
 //  6. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="header").
-func (s *headersSource) ParseInto(dst any, schemaArg any) error {
-	m := schemaArg.(*schema.Schema)
+func (src *headersSource) ParseInto(dst any, schemaArg any) error {
+	s := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
-	resolveSchema(m, dstVal.Type())
+	resolveSchema(s, dstVal.Type())
 
 	var violations []violation
 	presence := map[string]any{}
 
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		key, visible := tagKeyVisible(p.Field(), "header")
 		if !visible {
 			continue
 		}
 
-		raw := s.req.Header(key)
+		raw := src.req.Header(key)
 		if raw == "" {
 			if p.IsRequired() {
 				violations = append(violations, violation{Field: key, Message: "required"})
@@ -93,7 +93,7 @@ func (s *headersSource) ParseInto(dst any, schemaArg any) error {
 		return exception.NewBadRequestException(violations)
 	}
 
-	if err := populate(dstVal, presence, m, "header"); err != nil {
+	if err := populate(dstVal, presence, s, "header"); err != nil {
 		// Should be unreachable in practice, same rationale as
 		// jsonBodySource's own equivalent case.
 		return exception.NewBadRequestException([]violation{

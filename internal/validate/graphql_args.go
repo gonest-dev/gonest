@@ -32,11 +32,11 @@ func NewGraphqlArgsSource(parsed any) execution.Parseable {
 }
 
 // ParseInto implements execution.Parseable.
-func (s *mapArgsSource) ParseInto(dst any, schemaArg any) error {
-	m := schemaArg.(*schema.Schema)
+func (src *mapArgsSource) ParseInto(dst any, schemaArg any) error {
+	s := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
-	resolveSchema(m, dstVal.Type())
-	return parseDecoded(dst, dstVal, m, normalizeGraphqlValue(s.parsed))
+	resolveSchema(s, dstVal.Type())
+	return parseDecoded(dst, dstVal, s, normalizeGraphqlValue(src.parsed))
 }
 
 // normalizeGraphqlValue converts graphql-go's own decoded arg shapes into

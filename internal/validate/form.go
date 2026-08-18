@@ -66,17 +66,17 @@ func NewFormBodySource(req *execution.Request, onFile func(*execution.FormFile) 
 //  6. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="form"), using the SAME raw/coerced value already produced
 //     during the walk as the presence map's value.
-func (s *formBodySource) ParseInto(dst any, schemaArg any) error {
-	m := schemaArg.(*schema.Schema)
+func (src *formBodySource) ParseInto(dst any, schemaArg any) error {
+	s := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
-	resolveSchema(m, dstVal.Type())
+	resolveSchema(s, dstVal.Type())
 
-	stream, boundary, ok := s.req.FormStream()
+	stream, boundary, ok := src.req.FormStream()
 	if !ok {
 		panic("gonest: form stream unavailable -- enable AppOptions.EnableFormStreaming when building the app, and ensure the request's Content-Type is multipart/form-data with a boundary")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	byKey := make(map[string]*schema.PropertyBuilder, len(props))
 	for _, p := range props {
 		key, visible := tagKeyVisible(p.Field(), "form")
@@ -103,9 +103,9 @@ func (s *formBodySource) ParseInto(dst any, schemaArg any) error {
 		}
 
 		if part.FileName() != "" {
-			if s.onFile != nil {
+			if src.onFile != nil {
 				file := execution.NewFormFile(part)
-				if err := s.onFile(file); err != nil {
+				if err := src.onFile(file); err != nil {
 					return exception.NewBadRequestException([]violation{
 						{Field: part.FormName(), Message: err.Error()},
 					})
@@ -159,7 +159,7 @@ func (s *formBodySource) ParseInto(dst any, schemaArg any) error {
 		return exception.NewBadRequestException(violations)
 	}
 
-	if err := populate(dstVal, presence, m, "form"); err != nil {
+	if err := populate(dstVal, presence, s, "form"); err != nil {
 		// Should be unreachable in practice, same rationale as
 		// paramsSource's/jsonBodySource's own equivalent case: the validate
 		// pass above already proved every present field's shape matches

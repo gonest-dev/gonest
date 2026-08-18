@@ -54,17 +54,17 @@ func NewQuerySource(req *execution.Request) execution.Parseable {
 //  7. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="query"), using the SAME raw/coerced value already produced
 //     during validation as the presence map's value.
-func (s *querySource) ParseInto(dst any, schemaArg any) error {
-	m := schemaArg.(*schema.Schema)
+func (src *querySource) ParseInto(dst any, schemaArg any) error {
+	s := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
-	resolveSchema(m, dstVal.Type())
+	resolveSchema(s, dstVal.Type())
 
-	queries := s.req.Queries()
+	queries := src.req.Queries()
 
 	var violations []violation
 	presence := map[string]any{}
 
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		key, visible := tagKeyVisible(p.Field(), "query")
 		if !visible {
 			continue
@@ -98,7 +98,7 @@ func (s *querySource) ParseInto(dst any, schemaArg any) error {
 		return exception.NewBadRequestException(violations)
 	}
 
-	if err := populate(dstVal, presence, m, "query"); err != nil {
+	if err := populate(dstVal, presence, s, "query"); err != nil {
 		// Should be unreachable in practice, same rationale as
 		// paramsSource's/jsonBodySource's own equivalent case: the validate
 		// pass above already proved every present field's shape matches
