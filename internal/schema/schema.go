@@ -558,6 +558,22 @@ func (p *PropertyBuilder) Date() *PropertyBuilder {
 	return p
 }
 
+// Duration selects a "duration" kind/format -- a time.Duration-typed field
+// whose external representation is a Go-formatted duration STRING ("5s",
+// "1h30m", parsed via time.ParseDuration -- NOT ISO-8601), for which
+// Min/Max/Enum need to compare the PARSED duration VALUE, not the string's
+// length. That numeric-comparison need is why this branch gets its OWN kind
+// ("duration", not "string"): internal/validate's validatePrimitive treats
+// kind=="string" Min/Max as string length, the wrong semantic here. Returns
+// a brand new *DurationSchema (duration.go) -- same reasoning as Array/
+// Object: extra state (Min/Max/Enum) that a bare *PropertyBuilder can't
+// carry on its own.
+func (p *PropertyBuilder) Duration() *DurationSchema {
+	p.format = "duration"
+	p.kind = "duration"
+	return &DurationSchema{PropertyBuilder: p}
+}
+
 // Array selects OpenAPI's "array" type and returns a brand new
 // *ArraySchema (array.go, array-builder feature) -- the first branch
 // method whose extra state can't be captured by simply wrapping p itself

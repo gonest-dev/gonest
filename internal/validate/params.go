@@ -131,7 +131,11 @@ func (src *paramsSource) ParseInto(dst any, schemaArg any) error {
 // Custom BEFORE ever calling this function.
 func coerceParamString(raw string, kind string) (any, error) {
 	switch kind {
-	case "string":
+	case "string", "duration":
+		// "duration" is a string-shaped raw value too (e.g. "5s") -- the
+		// real time.ParseDuration parse happens later, in validateValue/
+		// setField (see validate.go's "duration" case and durationType
+		// check), same division of labor "string" already has.
 		return raw, nil
 	case "integer", "number":
 		f, err := strconv.ParseFloat(raw, 64)

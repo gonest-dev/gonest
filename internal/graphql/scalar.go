@@ -27,6 +27,7 @@ var nativeFormatScalarNames = map[string]string{
 	"binary":    "Binary",
 	"date-time": "DateTime",
 	"date":      "Date",
+	"duration":  "Duration",
 }
 
 // NativeScalarName returns the GraphQL custom scalar name generated for a

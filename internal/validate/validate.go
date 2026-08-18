@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"time"
 
 	"gonest.dev/gonest/internal/exception"
 	"gonest.dev/gonest/internal/execution"
@@ -402,6 +403,27 @@ func validatePrimitive(raw any, p *schema.PropertyBuilder, path string) []violat
 		}
 		return nil
 
+	case "duration":
+		s, ok := raw.(string)
+		if !ok {
+			return []violation{{Field: path, Message: "expected string"}}
+		}
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return []violation{{Field: path, Message: "invalid duration format"}}
+		}
+		var violations []violation
+		if min, ok := p.MinValue(); ok && d < time.Duration(min) {
+			violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must be >= %s", time.Duration(min))})
+		}
+		if max, ok := p.MaxValue(); ok && d > time.Duration(max) {
+			violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must be <= %s", time.Duration(max))})
+		}
+		if allowed, ok := p.EnumIntValues(); ok && !int64SliceContains(allowed, int64(d)) {
+			violations = append(violations, violation{Field: path, Message: fmt.Sprintf("must be one of %v", allowed)})
+		}
+		return violations
+
 	default:
 		// No branch method was ever called on this PropertyBuilder (kind ==
 		// ""), or an unrecognized kind -- nothing to check against, treat
@@ -640,6 +662,12 @@ func populateValue(dest reflect.Value, raw any, p *schema.PropertyBuilder) error
 // AddressEntity -- fall back to a JSON round-trip (marshal raw back to
 // bytes, unmarshal into fieldVal's address), reusing encoding/json's own
 // well-tested conversion rules rather than reimplementing them by hand.
+// durationType is time.Duration's own reflect.Type, compared against
+// fieldVal's type in setField to special-case string->time.Duration
+// conversion (see that check's own comment for why time.Duration, unlike
+// time.Time, needs one).
+var durationType = reflect.TypeOf(time.Duration(0))
+
 func setField(fieldVal reflect.Value, raw any) error {
 	if !fieldVal.CanSet() {
 		return fmt.Errorf("field is not settable")
@@ -676,10 +704,33 @@ func setField(fieldVal reflect.Value, raw any) error {
 	}
 
 	// Directly assignable (identical types, e.g. Custom returning exactly
-	// the field's own type, or an interface{}/any-typed field).
+	// the field's own type, or an interface{}/any-typed field, or a Default
+	// value that's already a genuine time.Duration -- env.go's own doc
+	// comment: "a Default value is a Go literal... already the correct Go
+	// type, not a string needing coercion").
 	if rawVal.Type().AssignableTo(fieldType) {
 		fieldVal.Set(rawVal)
 		return nil
+	}
+
+	// time.Duration: unlike time.Time (a struct, handled by the json
+	// round-trip fallback below), time.Duration is int64-kind, so it would
+	// otherwise fall into the plain numeric branch just below -- which only
+	// accepts a JSON NUMBER. A Duration()-branch field's external shape is a
+	// Go-formatted duration STRING ("5s", "1h30m"), so that string needs its
+	// own time.ParseDuration step here. A raw JSON number (nanoseconds) or
+	// an already-time.Duration-typed Custom/Default return value never
+	// reaches this branch -- both are handled above, by AssignableTo or the
+	// numeric branch just below.
+	if fieldType == durationType {
+		if s, ok := raw.(string); ok {
+			d, err := time.ParseDuration(s)
+			if err != nil {
+				return fmt.Errorf("cannot convert %q to time.Duration: %w", s, err)
+			}
+			fieldVal.SetInt(int64(d))
+			return nil
+		}
 	}
 
 	// Numeric family: JSON numbers decode to float64; Custom(fn) may also

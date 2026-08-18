@@ -849,6 +849,22 @@ func NewValue[T any](fn func(v *Value)) *Schema {
 type NumericSchema = schema.NumericSchema
 
 // ---------------------------------------------------------------------------
+// DurationSchema (Duration Branch feature)
+// ---------------------------------------------------------------------------
+
+// DurationSchema is the branch-specific builder returned by
+// PropertyBuilder.Duration. Numeric under the hood (Min/Max/Enum reuse the
+// same nanoseconds storage NumericSchema's own Min/Max/Enum use), but
+// spelled in time.Duration for callers, since a Duration()-branch field's
+// external representation is a Go-formatted duration STRING ("5s", "1h30m"),
+// not a JSON number. It is a true Go type alias, so its own methods plus the
+// manually re-declared chain methods (Required/Nullable/Description/
+// Examples) are automatically visible on gonest.DurationSchema with zero
+// extra wrapper code, same as gonest.NumericSchema above. See
+// internal/schema.DurationSchema's doc comment for the full contract.
+type DurationSchema = schema.DurationSchema
+
+// ---------------------------------------------------------------------------
 // ArraySchema (Array Builder feature)
 // ---------------------------------------------------------------------------
 
