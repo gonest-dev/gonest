@@ -43,21 +43,21 @@ type violation struct {
 	Message string `json:"message"`
 }
 
-// resolveSchema verifies m was built for structType (m.StructType() ==
+// resolveSchema verifies s was built for structType (s.StructType() ==
 // structType) before any of Must*'s reflect-heavy work runs, panicking with
-// a clear message otherwise -- m's field offsets are measured against ITS
+// a clear message otherwise -- s's field offsets are measured against ITS
 // OWN struct's memory layout (internal/schema.New's own doc comment), so
 // populating/reading against a mismatched T would silently misinterpret
 // memory instead of failing loudly. Shared by MustJsonBody/MustParams/
-// MustQuery, all 3 of which now take m explicitly (AD-019) instead of
+// MustQuery, all 3 of which now take s explicitly (AD-019) instead of
 // looking it up in a global registry keyed by T -- this is the one
 // remaining safety net for "the schema I passed doesn't actually describe
 // the T I asked for".
-func resolveSchema(m *schema.Schema, structType reflect.Type) *schema.Schema {
-	if m.StructType() != structType {
-		panic(fmt.Sprintf("gonest: schema mismatch -- schema built for %s, but T is %s", m.StructType(), structType))
+func resolveSchema(s *schema.Schema, structType reflect.Type) *schema.Schema {
+	if s.StructType() != structType {
+		panic(fmt.Sprintf("gonest: schema mismatch -- schema built for %s, but T is %s", s.StructType(), structType))
 	}
-	return m
+	return s
 }
 
 // jsonBodySource is the Parseable implementation behind ctx.Body().Json()
@@ -99,12 +99,12 @@ func NewJSONBodySource(req *execution.Request) execution.Parseable {
 //     (param-query-validation feature's P0) instead of a second opaque
 //     json.Unmarshal call, so Custom(fn)'s transformed value can actually
 //     reach the final result.
-func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
-	m := schemaArg.(*schema.Schema)
+func (src *jsonBodySource) ParseInto(dst any, schemaArg any) error {
+	s := schemaArg.(*schema.Schema)
 	dstVal := reflect.ValueOf(dst).Elem()
-	resolveSchema(m, dstVal.Type())
+	resolveSchema(s, dstVal.Type())
 
-	bodyRaw := s.req.Body().Raw()
+	bodyRaw := src.req.Body().Raw()
 
 	var parsed any
 	if err := json.Unmarshal(bodyRaw, &parsed); err != nil {
@@ -113,7 +113,7 @@ func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 		})
 	}
 
-	return parseDecoded(dst, dstVal, m, parsed)
+	return parseDecoded(dst, dstVal, s, parsed)
 }
 
 // parseDecoded is jsonBodySource.ParseInto's shared core, factored out
@@ -122,10 +122,10 @@ func (s *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 // can reuse the EXACT same validate/populate/Refine pipeline without
 // re-running json.Unmarshal (GraphQL's own args arrive pre-decoded, there
 // is no raw JSON body to unmarshal for them). parsed is either a
-// map[string]any (struct-shaped m) or a bare value (m.IsValue()) -- same
+// map[string]any (struct-shaped s) or a bare value (s.IsValue()) -- same
 // shape jsonBodySource.ParseInto already produced via json.Unmarshal.
-func parseDecoded(dst any, dstVal reflect.Value, m *schema.Schema, parsed any) error {
-	// SPEC_DEVIATION (schema-value-support feature, T5): a Value-schema (m
+func parseDecoded(dst any, dstVal reflect.Value, s *schema.Schema, parsed any) error {
+	// SPEC_DEVIATION (schema-value-support feature, T5): a Value-schema (s
 	// built via schema.NewValue, no struct around it) has no JSON object
 	// wrapping it, no struct tag, no reflect.StructField to key off of --
 	// the top-level decoded JSON value IS the value itself. validateStruct/
@@ -136,8 +136,8 @@ func parseDecoded(dst any, dstVal reflect.Value, m *schema.Schema, parsed any) e
 	// SAME per-value primitives validateStruct/populate already call
 	// per-field, just applied directly to the whole body/dst instead of one
 	// field within it.
-	if m.IsValue() {
-		return populateValue(dstVal, parsed, m.ValueProperty())
+	if s.IsValue() {
+		return populateValue(dstVal, parsed, s.ValueProperty())
 	}
 
 	// presence may be nil if the top-level JSON value isn't an object (e.g.
@@ -146,12 +146,12 @@ func parseDecoded(dst any, dstVal reflect.Value, m *schema.Schema, parsed any) e
 	// design.md's Error Handling Strategy describes.
 	presence, _ := parsed.(map[string]any)
 
-	violations := validateStruct(presence, m, "")
+	violations := validateStruct(presence, s, "")
 	if len(violations) > 0 {
 		return exception.NewBadRequestException(violations)
 	}
 
-	if err := populate(dstVal, presence, m, "json"); err != nil {
+	if err := populate(dstVal, presence, s, "json"); err != nil {
 		// Should be unreachable in practice: pass 1 already proved body is
 		// valid JSON, and validation already proved every field's shape
 		// matches what T expects. Returning an error here (rather than
@@ -169,7 +169,7 @@ func parseDecoded(dst any, dstVal reflect.Value, m *schema.Schema, parsed any) e
 	// meaningless. Every registered Refine runs (collect-all, same
 	// convention validateStruct already follows), not just the first one
 	// that fails.
-	if refines := m.OwnRefines(); len(refines) > 0 {
+	if refines := s.OwnRefines(); len(refines) > 0 {
 		var refineViolations []violation
 		for _, refine := range refines {
 			field, err := refine(dst)
@@ -235,17 +235,17 @@ func tagKeyVisible(field reflect.StructField, tag string) (string, bool) {
 	return name, true
 }
 
-// validateStruct iterates m's own registered properties, checking each
+// validateStruct iterates s's own registered properties, checking each
 // one's presence in presence (a decoded JSON object, or nil if the parent
 // value wasn't an object at all -- see MustJsonBody's step 2 doc comment)
 // and recursing into validateValue for whichever ones ARE present.
 // pathPrefix is prepended to every violation's Field (e.g. "address." for
 // a nested Object, so a violation reads "address.zip" -- spec.md's P5,
 // AC3).
-func validateStruct(presence map[string]any, m *schema.Schema, pathPrefix string) []violation {
+func validateStruct(presence map[string]any, s *schema.Schema, pathPrefix string) []violation {
 	var violations []violation
 
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		key, visible := tagKeyVisible(p.Field(), "json")
 		if !visible {
 			continue
@@ -510,7 +510,7 @@ func validateObject(raw any, p *schema.PropertyBuilder, path string) []violation
 // populate is the shared reflect-based "build T" core used by ALL public
 // entry points (MustJsonBody today; MustParams/MustQuery in later tasks of
 // this feature -- param-query-validation's context.md Decision 5). It walks
-// m's own registered properties, resolves each field's key via tagKey(...,
+// s's own registered properties, resolves each field's key via tagKey(...,
 // tag), and writes that field's final value into dest via setField.
 //
 // Called ONLY after the caller's own validate pass already confirmed zero
@@ -534,8 +534,8 @@ func validateObject(raw any, p *schema.PropertyBuilder, path string) []violation
 // with a violation earlier, and MustJsonBody/MustParams/MustQuery all check
 // violations BEFORE calling populate, fn is guaranteed to succeed here too
 // (same raw input, same idempotent fn).
-func populate(dest reflect.Value, presence map[string]any, m *schema.Schema, tag string) error {
-	for _, p := range m.OwnProperties() {
+func populate(dest reflect.Value, presence map[string]any, s *schema.Schema, tag string) error {
+	for _, p := range s.OwnProperties() {
 		key, visible := tagKeyVisible(p.Field(), tag)
 		if !visible {
 			continue

@@ -37,7 +37,7 @@ import (
 // not exist as a root alias yet (a pre-existing gap from an earlier
 // feature) -- fiber.FiberApp is used directly here via import instead.
 func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
-	root := NewModule(func(m *Module) {})
+	root := NewModule(func(s *Module) {})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
@@ -52,7 +52,7 @@ func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 // gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{...})
 // compiles and works through the root gonest package.
 func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
-	root := NewModule(func(m *Module) {})
+	root := NewModule(func(s *Module) {})
 
 	app := MustNewApp[fiber.App](root, AppOptions{
 		BufferLogs: true,
@@ -69,7 +69,7 @@ func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 // app.MustListen(addr, gonest.OnListen(fn)) and
 // app.MustListen(addr, nil) compile and work through the root alias.
 func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
-	root := NewModule(func(m *Module) {})
+	root := NewModule(func(s *Module) {})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
@@ -120,7 +120,7 @@ func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 // TestApp_MustListen_NilOnListen_ThroughRootAlias proves
 // app.MustListen(addr, nil) compiles and works through the root alias.
 func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
-	root := NewModule(func(m *Module) {})
+	root := NewModule(func(s *Module) {})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
@@ -194,8 +194,8 @@ type idParams struct {
 	ID int `param:"id"`
 }
 
-var idParamsSchema = NewSchema(func(t *idParams, m *Schema) {
-	m.Property(&t.ID).Integer().Required()
+var idParamsSchema = NewSchema(func(t *idParams, s *Schema) {
+	s.Property(&t.ID).Integer().Required()
 })
 
 // TestMustParams_RootPackage_HappyPath proves the replacement for the old
@@ -357,8 +357,8 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -418,8 +418,8 @@ type insightUserIdParams struct {
 	UserId int64 `param:"user_id"`
 }
 
-var insightUserIdParamsSchema = NewSchema(func(t *insightUserIdParams, m *Schema) {
-	m.Property(&t.UserId).Integer().Min(1).Required()
+var insightUserIdParamsSchema = NewSchema(func(t *insightUserIdParams, s *Schema) {
+	s.Property(&t.UserId).Integer().Min(1).Required()
 })
 
 // insightListUsersQuery mirrors INSIGHT.md's settled ListUsersQuery: two
@@ -429,9 +429,9 @@ type insightListUsersQuery struct {
 	Limit int `query:"limit"`
 }
 
-var insightListUsersQuerySchema = NewSchema(func(t *insightListUsersQuery, m *Schema) {
-	m.Property(&t.Page).Integer().Min(1).Required()
-	m.Property(&t.Limit).Integer().Min(1).Max(100).Required()
+var insightListUsersQuerySchema = NewSchema(func(t *insightListUsersQuery, s *Schema) {
+	s.Property(&t.Page).Integer().Min(1).Required()
+	s.Property(&t.Limit).Integer().Min(1).Max(100).Required()
 })
 
 // TestMustParamsAndMustQuery_RootAlias_InsightCallShape reproduces INSIGHT.md's
@@ -467,8 +467,8 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -607,19 +607,19 @@ func TestNewMiddleware_RootAlias_TypeCheck(t *testing.T) {
 	var gotRes *Reply
 	nextCalled := false
 
-	m := NewMiddleware(func(m *Middleware) {
-		m.Handler(func(c *HttpContext, next Next) {
+	s := NewMiddleware(func(s *Middleware) {
+		s.Handler(func(c *HttpContext, next Next) {
 			gotReq = c.Request()
 			gotRes = c.Response()
 			next(c)
 		})
 	})
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewMiddleware() returned nil *Middleware")
 	}
-	m.Declare(nil)
+	s.Declare(nil)
 
-	fn := m.HandlerFunc()
+	fn := s.HandlerFunc()
 	if fn == nil {
 		t.Fatal("HandlerFunc() returned nil after Handler was called")
 	}
@@ -669,8 +669,8 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -727,8 +727,8 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration(t *te
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -790,8 +790,8 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -922,8 +922,8 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -1093,8 +1093,8 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -1227,8 +1227,8 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -1294,7 +1294,7 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 
 // TestNewSchema_RootAlias_TypeCheck proves NewSchema/Schema/
 // PropertyBuilder resolve and type-check at the root gonest package:
-// NewSchema[T] builds a *Schema, m.Property(&t.Field) returns a
+// NewSchema[T] builds a *Schema, s.Property(&t.Field) returns a
 // *PropertyBuilder, and the whole call shape compiles and runs without
 // panicking for a minimal one-field struct.
 func TestNewSchema_RootAlias_TypeCheck(t *testing.T) {
@@ -1302,10 +1302,10 @@ func TestNewSchema_RootAlias_TypeCheck(t *testing.T) {
 		Id int64
 	}
 
-	m := NewSchema(func(t *minimalEntity, m *Schema) {
-		var _ *PropertyBuilder = m.Property(&t.Id)
+	s := NewSchema(func(t *minimalEntity, s *Schema) {
+		var _ *PropertyBuilder = s.Property(&t.Id)
 	})
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewSchema() returned nil *Schema")
 	}
 }
@@ -1331,27 +1331,27 @@ func TestNewSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	now := time.Now()
 
-	m := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Description("Entidade de usuário")
-		m.Property(&t.Id).Required().Description("ID do usuário").Examples(int64(1))
-		m.Property(&t.Name).Required().Description("Nome do usuário").Examples("John Doe")
-		m.Property(&t.Email).Required().Description("Email do usuário").Examples("john@example.com")
-		m.Property(&t.IsActive).Required().Description("Status do usuário").Examples(true)
-		m.Property(&t.CreatedAt).Required().Description("Data de criação do usuário").Examples(now)
-		m.Property(&t.UpdatedAt).Required().Description("Data de atualização do usuário").Examples(now)
-		m.Property(&t.DeletedAt).Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
+	s := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Description("Entidade de usuário")
+		s.Property(&t.Id).Required().Description("ID do usuário").Examples(int64(1))
+		s.Property(&t.Name).Required().Description("Nome do usuário").Examples("John Doe")
+		s.Property(&t.Email).Required().Description("Email do usuário").Examples("john@example.com")
+		s.Property(&t.IsActive).Required().Description("Status do usuário").Examples(true)
+		s.Property(&t.CreatedAt).Required().Description("Data de criação do usuário").Examples(now)
+		s.Property(&t.UpdatedAt).Required().Description("Data de atualização do usuário").Examples(now)
+		s.Property(&t.DeletedAt).Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
 	})
 
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewSchema() returned nil *Schema")
 	}
-	if m.DescriptionText() != "Entidade de usuário" {
-		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
+	if s.DescriptionText() != "Entidade de usuário" {
+		t.Fatalf("s.DescriptionText() = %q, want %q", s.DescriptionText(), "Entidade de usuário")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 7 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 7", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 7", len(props))
 	}
 
 	byName := map[string]*PropertyBuilder{}
@@ -1422,8 +1422,8 @@ func TestSchemaFor_ReturnsSameSchemaRegisteredByNewSchema(t *testing.T) {
 		Name string
 	}
 
-	want := NewSchema(func(e *schemaForEntity, m *Schema) {
-		m.Title("schemaForEntity")
+	want := NewSchema(func(e *schemaForEntity, s *Schema) {
+		s.Title("schemaForEntity")
 	})
 
 	got := SchemaFor[schemaForEntity]()
@@ -1454,17 +1454,17 @@ func TestSchemaFor_UnregisteredType_Panics(t *testing.T) {
 // value schema, no struct wrapping it, built via NewValue instead of
 // NewSchema.
 func TestNewValue_RootAlias_CpfExample(t *testing.T) {
-	m := NewValue[string](func(m *Value) {
-		m.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+	s := NewValue[string](func(s *Value) {
+		s.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
 	})
 
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewValue() returned nil *Schema")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 1 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 1", len(props))
 	}
 
 	p := props[0]
@@ -1499,9 +1499,9 @@ func TestNewGraphqlResolver_RootAlias_RealHTTPDispatch(t *testing.T) {
 		Email string `json:"email"`
 	}
 
-	userSchema := NewSchema(func(t *userEntity, m *Schema) {
-		m.Property(&t.Id).Integer().Required()
-		m.Property(&t.Email).Email().Required()
+	userSchema := NewSchema(func(t *userEntity, s *Schema) {
+		s.Property(&t.Id).Integer().Required()
+		s.Property(&t.Email).Email().Required()
 	})
 
 	userResolver := NewGraphqlResolver(func(r *GraphqlResolver) {
@@ -1513,8 +1513,8 @@ func TestNewGraphqlResolver_RootAlias_RealHTTPDispatch(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Resolvers(userResolver)
+	root := NewModule(func(s *Module) {
+		s.Resolvers(userResolver)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -1578,20 +1578,20 @@ func TestStringSchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var sm *StringSchema
-	m := NewSchema(func(t *minimalEntity, m *Schema) {
-		sm = m.Property(&t.Name).String().Required().Min(1).Max(50).Pattern(`^\w+$`).
+	s := NewSchema(func(t *minimalEntity, s *Schema) {
+		sm = s.Property(&t.Name).String().Required().Min(1).Max(50).Pattern(`^\w+$`).
 			Description("a name").Examples("John")
 	})
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if sm == nil {
 		t.Fatal("expected *StringSchema, got nil")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 1 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 1", len(props))
 	}
 	p := props[0]
 
@@ -1634,20 +1634,20 @@ func TestStringSchema_RootAlias_AddressEntityInsightCallShape(t *testing.T) {
 		Zip    string `json:"zip"`
 	}
 
-	m := NewSchema(func(t *AddressEntity, m *Schema) {
-		m.Description("Endereço")
-		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
-		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
-		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+	s := NewSchema(func(t *AddressEntity, s *Schema) {
+		s.Description("Endereço")
+		s.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+		s.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+		s.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	if m.DescriptionText() != "Endereço" {
-		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Endereço")
+	if s.DescriptionText() != "Endereço" {
+		t.Fatalf("s.DescriptionText() = %q, want %q", s.DescriptionText(), "Endereço")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 3 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 3", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 3", len(props))
 	}
 	byName := map[string]*PropertyBuilder{}
 	for _, p := range props {
@@ -1716,13 +1716,13 @@ func TestPropertyBuilder_RootAlias_EmailInsightCallShape(t *testing.T) {
 		Email string `json:"email"`
 	}
 
-	m := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("john@example.com")
+	s := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("john@example.com")
 	})
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 1 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 1", len(props))
 	}
 	p := props[0]
 	if p.FormatValue() != "email" {
@@ -1751,20 +1751,20 @@ func TestStringSchema_RootAlias_RemainingSevenBranches(t *testing.T) {
 		Binary   string
 	}
 
-	var m *Schema
-	m = NewSchema(func(t *entity, m *Schema) {
-		m.Property(&t.Uuid).Uuid()
-		m.Property(&t.Uri).Uri()
-		m.Property(&t.Hostname).Hostname()
-		m.Property(&t.Ipv4).Ipv4()
-		m.Property(&t.Ipv6).Ipv6()
-		m.Property(&t.Password).Password()
-		m.Property(&t.Byte).Byte()
-		m.Property(&t.Binary).Binary()
+	var s *Schema
+	s = NewSchema(func(t *entity, s *Schema) {
+		s.Property(&t.Uuid).Uuid()
+		s.Property(&t.Uri).Uri()
+		s.Property(&t.Hostname).Hostname()
+		s.Property(&t.Ipv4).Ipv4()
+		s.Property(&t.Ipv6).Ipv6()
+		s.Property(&t.Password).Password()
+		s.Property(&t.Byte).Byte()
+		s.Property(&t.Binary).Binary()
 	})
 
 	byName := map[string]*PropertyBuilder{}
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		byName[p.Field().Name] = p
 	}
 
@@ -1806,20 +1806,20 @@ func TestNumericSchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var nm *NumericSchema
-	m := NewSchema(func(t *minimalEntity, m *Schema) {
-		nm = m.Property(&t.Age).Integer().Required().Min(0).Max(150).
+	s := NewSchema(func(t *minimalEntity, s *Schema) {
+		nm = s.Property(&t.Age).Integer().Required().Min(0).Max(150).
 			Description("an age").Examples(int64(30))
 	})
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if nm == nil {
 		t.Fatal("expected *NumericSchema, got nil")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 1 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 1", len(props))
 	}
 	p := props[0]
 
@@ -1855,19 +1855,19 @@ func TestNumericSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		IsActive bool  `json:"isActive"`
 	}
 
-	m := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Description("Entidade de usuário")
-		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
-		m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
+	s := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Description("Entidade de usuário")
+		s.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+		s.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
 	})
 
-	if m.DescriptionText() != "Entidade de usuário" {
-		t.Fatalf("m.DescriptionText() = %q, want %q", m.DescriptionText(), "Entidade de usuário")
+	if s.DescriptionText() != "Entidade de usuário" {
+		t.Fatalf("s.DescriptionText() = %q, want %q", s.DescriptionText(), "Entidade de usuário")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 2 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 2", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 2", len(props))
 	}
 	byName := map[string]*PropertyBuilder{}
 	for _, p := range props {
@@ -1921,14 +1921,14 @@ func TestNumericSchema_RootAlias_RemainingThreeBranches(t *testing.T) {
 		DoubleField float64
 	}
 
-	m := NewSchema(func(t *entity, m *Schema) {
-		m.Property(&t.Int32Field).Int32()
-		m.Property(&t.FloatField).Float()
-		m.Property(&t.DoubleField).Double()
+	s := NewSchema(func(t *entity, s *Schema) {
+		s.Property(&t.Int32Field).Int32()
+		s.Property(&t.FloatField).Float()
+		s.Property(&t.DoubleField).Double()
 	})
 
 	byName := map[string]*PropertyBuilder{}
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		byName[p.Field().Name] = p
 	}
 
@@ -1968,14 +1968,14 @@ func TestDateTime_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 	now := time.Now()
 
-	m := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(now)
-		m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(now)
-		m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
+	s := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(now)
+		s.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(now)
+		s.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, now)
 	})
 
 	byName := map[string]*PropertyBuilder{}
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		byName[p.Field().Name] = p
 	}
 
@@ -2015,13 +2015,13 @@ func TestDate_RootAlias_TypeCheck(t *testing.T) {
 		BirthDate time.Time
 	}
 
-	m := NewSchema(func(t *entity, m *Schema) {
-		m.Property(&t.BirthDate).Date().Required()
+	s := NewSchema(func(t *entity, s *Schema) {
+		s.Property(&t.BirthDate).Date().Required()
 	})
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 1 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 1", len(props))
 	}
 	if got := props[0].FormatValue(); got != "date" {
 		t.Fatalf("FormatValue() = %q, want %q", got, "date")
@@ -2049,27 +2049,27 @@ func TestArraySchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var identity *ArraySchema
-	m := NewSchema(func(t *entity, m *Schema) {
-		am := m.Property(&t.Tags).Array()
+	s := NewSchema(func(t *entity, s *Schema) {
+		am := s.Property(&t.Tags).Array()
 		var _ *ArraySchema = am
-		am.Items(func(m *ArraySchema) {
-			identity = m
-			m.String().Min(1).Max(50)
-			m.Required()
-			m.Description("Tags")
-			m.Examples("admin", "beta")
+		am.Items(func(s *ArraySchema) {
+			identity = s
+			s.String().Min(1).Max(50)
+			s.Required()
+			s.Description("Tags")
+			s.Examples("admin", "beta")
 		}).Min(1).Max(10)
 	})
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if identity == nil {
 		t.Fatal("Items(fn) callback never invoked")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 1 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 1", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 1", len(props))
 	}
 	p := props[0]
 	if p.FormatValue() != "array" {
@@ -2120,43 +2120,43 @@ func TestArraySchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		Addresses []AddressEntity `json:"addresses"`
 	}
 
-	addressSchema := NewSchema(func(t *AddressEntity, m *Schema) {
-		m.Description("Endereço")
-		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
-		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
-		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+	addressSchema := NewSchema(func(t *AddressEntity, s *Schema) {
+		s.Description("Endereço")
+		s.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+		s.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+		s.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	m := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Description("Entidade de usuário com campos aninhados")
-		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+	s := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Description("Entidade de usuário com campos aninhados")
+		s.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
-		m.Property(&t.Tags).Array().Items(func(m *ArraySchema) {
-			m.String().Min(1).Max(50)
-			m.Required()
-			m.Description("Tags do usuário")
-			m.Examples("admin", "beta")
+		s.Property(&t.Tags).Array().Items(func(s *ArraySchema) {
+			s.String().Min(1).Max(50)
+			s.Required()
+			s.Description("Tags do usuário")
+			s.Examples("admin", "beta")
 		})
 
-		m.Property(&t.Scores).Array().Items(func(m *ArraySchema) {
-			m.Integer().Min(0).Max(100)
-			m.Required()
-			m.Description("Notas do usuário")
-			m.Examples(80, 95)
+		s.Property(&t.Scores).Array().Items(func(s *ArraySchema) {
+			s.Integer().Min(0).Max(100)
+			s.Required()
+			s.Description("Notas do usuário")
+			s.Examples(80, 95)
 		})
 
-		m.Property(&t.Addresses).Array().Items(func(m *ArraySchema) {
-			m.Object(addressSchema)
-			m.Required()
-			m.Min(1)
-			m.Description("Endereços do usuário")
-			m.Examples("admin", "beta")
+		s.Property(&t.Addresses).Array().Items(func(s *ArraySchema) {
+			s.Object(addressSchema)
+			s.Required()
+			s.Min(1)
+			s.Description("Endereços do usuário")
+			s.Examples("admin", "beta")
 		})
 	})
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 4 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 4", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 4", len(props))
 	}
 	byName := map[string]*PropertyBuilder{}
 	for _, p := range props {
@@ -2226,21 +2226,21 @@ func TestObjectSchema_RootAlias_TypeCheck(t *testing.T) {
 	}
 
 	var insideIdentity *ObjectSchema
-	m := NewSchema(func(t *entity, m *Schema) {
-		om := m.Property(&t.Inside).Object(func(m *ObjectSchema) {
-			insideIdentity = m
-			m.AdditionalProperties()
-			m.Required()
-			m.Description("Inside")
-			m.Examples("a", "b")
+	s := NewSchema(func(t *entity, s *Schema) {
+		om := s.Property(&t.Inside).Object(func(s *ObjectSchema) {
+			insideIdentity = s
+			s.AdditionalProperties()
+			s.Required()
+			s.Description("Inside")
+			s.Examples("a", "b")
 		})
 		var _ *ObjectSchema = om
 
-		m.Property(&t.Outside).Object(func(m *ObjectSchema) {
-			m.AdditionalProperties()
+		s.Property(&t.Outside).Object(func(s *ObjectSchema) {
+			s.AdditionalProperties()
 		}).Required().Description("Outside").Examples("c", "d")
 	})
-	if m == nil {
+	if s == nil {
 		t.Fatal("NewSchema() returned nil *Schema")
 	}
 	if insideIdentity == nil {
@@ -2250,9 +2250,9 @@ func TestObjectSchema_RootAlias_TypeCheck(t *testing.T) {
 		t.Fatal("insideIdentity.IsAdditionalProperties() = false, want true")
 	}
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 2 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 2", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 2", len(props))
 	}
 	byName := map[string]*PropertyBuilder{}
 	for _, p := range props {
@@ -2318,19 +2318,19 @@ func TestObjectSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		Schema  map[string]any `json:"schema"`
 	}
 
-	addressSchema := NewSchema(func(t *AddressEntity, m *Schema) {
-		m.Description("Endereço")
-		m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
-		m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
-		m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+	addressSchema := NewSchema(func(t *AddressEntity, s *Schema) {
+		s.Description("Endereço")
+		s.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+		s.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+		s.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 	})
 
-	m := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Description("Entidade de usuário com campos aninhados")
-		m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+	s := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Description("Entidade de usuário com campos aninhados")
+		s.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
 
 		// Object() direto (não-array) -- mesma reutilização via valor, sem reflect.
-		m.Property(&t.Address).Object(func(om *ObjectSchema) {
+		s.Property(&t.Address).Object(func(om *ObjectSchema) {
 			om.Schema(addressSchema)
 			om.Required()
 			om.Description("Endereço principal")
@@ -2338,14 +2338,14 @@ func TestObjectSchema_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 
 		// Object() livre (schema aberto, tipo map[string]any) -- sem struct Go aninhada
 		// pra reusar, por isso recebe callback em vez de schema já registrada.
-		m.Property(&t.Schema).Object(func(om *ObjectSchema) {
+		s.Property(&t.Schema).Object(func(om *ObjectSchema) {
 			om.AdditionalProperties()
 		}).Nullable().Description("Metadados abertos do usuário")
 	})
 
-	props := m.OwnProperties()
+	props := s.OwnProperties()
 	if len(props) != 3 {
-		t.Fatalf("len(m.OwnProperties()) = %d, want 3", len(props))
+		t.Fatalf("len(s.OwnProperties()) = %d, want 3", len(props))
 	}
 	byName := map[string]*PropertyBuilder{}
 	for _, p := range props {
@@ -2423,51 +2423,51 @@ type jsonBodyUserEntity struct {
 // registration for the same reflect.Type -- T1), via a package-level init
 // mirroring INSIGHT.md's own top-level `var _ = gonest.NewSchema[...]`
 // call shape.
-var jsonBodyAddressSchema = NewSchema(func(t *jsonBodyAddressEntity, m *Schema) {
-	m.Description("Endereço")
-	m.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
-	m.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
-	m.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
+var jsonBodyAddressSchema = NewSchema(func(t *jsonBodyAddressEntity, s *Schema) {
+	s.Description("Endereço")
+	s.Property(&t.Street).String().Required().Description("Logradouro").Examples("Rua A, 123")
+	s.Property(&t.City).String().Required().Description("Cidade").Examples("São Paulo")
+	s.Property(&t.Zip).String().Required().Pattern(`^\d{5}-?\d{3}$`).Description("CEP").Examples("01310-100")
 })
 
-var jsonBodyUserSchema = NewSchema(func(t *jsonBodyUserEntity, m *Schema) {
-	m.Description("Entidade de usuário com campos aninhados")
-	m.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
-	m.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
-	m.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("user@example.com")
-	m.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
-	m.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(time.Now())
-	m.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
-	m.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
+var jsonBodyUserSchema = NewSchema(func(t *jsonBodyUserEntity, s *Schema) {
+	s.Description("Entidade de usuário com campos aninhados")
+	s.Property(&t.Id).Integer().Required().Description("ID do usuário").Examples(int64(1))
+	s.Property(&t.Name).String().Required().Description("Nome do usuário").Examples("John Doe")
+	s.Property(&t.Email).Email().Required().Description("Email do usuário").Examples("user@example.com")
+	s.Property(&t.IsActive).Boolean().Required().Description("Status do usuário").Examples(true)
+	s.Property(&t.CreatedAt).DateTime().Required().Description("Data de criação do usuário").Examples(time.Now())
+	s.Property(&t.UpdatedAt).DateTime().Required().Description("Data de atualização do usuário").Examples(time.Now())
+	s.Property(&t.DeletedAt).DateTime().Nullable().Description("Data de exclusão do usuário").Examples(nil, time.Now())
 
-	m.Property(&t.Tags).Array().Items(func(m *ArraySchema) {
-		m.String().Min(1).Max(50)
-		m.Required()
-		m.Description("Tags do usuário")
-		m.Examples("admin", "beta")
+	s.Property(&t.Tags).Array().Items(func(s *ArraySchema) {
+		s.String().Min(1).Max(50)
+		s.Required()
+		s.Description("Tags do usuário")
+		s.Examples("admin", "beta")
 	})
 
-	m.Property(&t.Scores).Array().Items(func(m *ArraySchema) {
-		m.Integer().Min(0).Max(100)
-		m.Required()
-		m.Description("Notas do usuário")
-		m.Examples(80, 95)
+	s.Property(&t.Scores).Array().Items(func(s *ArraySchema) {
+		s.Integer().Min(0).Max(100)
+		s.Required()
+		s.Description("Notas do usuário")
+		s.Examples(80, 95)
 	})
 
-	m.Property(&t.Addresses).Array().Items(func(m *ArraySchema) {
-		m.Object(jsonBodyAddressSchema)
-		m.Required()
-		m.Min(1)
-		m.Description("Endereços do usuário")
+	s.Property(&t.Addresses).Array().Items(func(s *ArraySchema) {
+		s.Object(jsonBodyAddressSchema)
+		s.Required()
+		s.Min(1)
+		s.Description("Endereços do usuário")
 	})
 
-	m.Property(&t.Address).Object(func(om *ObjectSchema) {
+	s.Property(&t.Address).Object(func(om *ObjectSchema) {
 		om.Schema(jsonBodyAddressSchema)
 		om.Required()
 		om.Description("Endereço principal")
 	})
 
-	m.Property(&t.Schema).Object(func(om *ObjectSchema) {
+	s.Property(&t.Schema).Object(func(om *ObjectSchema) {
 		om.AdditionalProperties()
 	}).Nullable().Description("Metadados abertos do usuário")
 })
@@ -2495,8 +2495,8 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -2738,23 +2738,23 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		Addresses []AddressEntity
 	}
 
-	addressSchema := NewSchema(func(t *AddressEntity, m *Schema) {
-		m.Property(&t.City).String().Required()
-		m.Property(&t.Zip).String().Required()
+	addressSchema := NewSchema(func(t *AddressEntity, s *Schema) {
+		s.Property(&t.City).String().Required()
+		s.Property(&t.Zip).String().Required()
 	})
 
-	userIdParamsSchema := NewSchema(func(t *UserIdParams, m *Schema) {
-		m.Property(&t.UserId).String().Required()
+	userIdParamsSchema := NewSchema(func(t *UserIdParams, s *Schema) {
+		s.Property(&t.UserId).String().Required()
 	})
 
-	userEntitySchema := NewSchema(func(t *UserEntity, m *Schema) {
-		m.Title("UserEntity")
-		m.Property(&t.Id).String().Required()
-		m.Property(&t.Name).String().Required()
-		m.Property(&t.Address).Object(func(om *ObjectSchema) {
+	userEntitySchema := NewSchema(func(t *UserEntity, s *Schema) {
+		s.Title("UserEntity")
+		s.Property(&t.Id).String().Required()
+		s.Property(&t.Name).String().Required()
+		s.Property(&t.Address).Object(func(om *ObjectSchema) {
 			om.Schema(addressSchema)
 		}).Required()
-		m.Property(&t.Addresses).Array().Items(func(am *ArraySchema) {
+		s.Property(&t.Addresses).Array().Items(func(am *ArraySchema) {
 			am.Object(addressSchema)
 		})
 	})
@@ -2784,8 +2784,8 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		})
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(userController)
+	root := NewModule(func(s *Module) {
+		s.Controllers(userController)
 	})
 
 	app, err := NewApp[fiber.App](root, AppOptions{})
@@ -2857,9 +2857,9 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 	}
 }
 
-func mapKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
+func mapKeys(s map[string]any) []string {
+	keys := make([]string, 0, len(s))
+	for k := range s {
 		keys = append(keys, k)
 	}
 	return keys
@@ -2876,7 +2876,7 @@ func mapKeys(m map[string]any) []string {
 // shape) through the root gonest package, dispatched via REAL app.Test HTTP
 // requests to both routes it registers.
 func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
-	root := NewModule(func(m *Module) {})
+	root := NewModule(func(s *Module) {})
 
 	appInstance, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
@@ -2963,7 +2963,7 @@ func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 // MustSetupSwagger behaves exactly like a successful SetupSwagger call --
 // same 2 routes registered, no panic -- for the common (no error) path.
 func TestMustSetupSwagger_Success_DoesNotPanic_RegistersRoutes(t *testing.T) {
-	root := NewModule(func(m *Module) {})
+	root := NewModule(func(s *Module) {})
 
 	appInstance, err := NewApp[fiber.App](root, AppOptions{})
 	if err != nil {
@@ -3138,8 +3138,8 @@ func TestMustInjectAll_ZeroMatches_ReturnsEmptySlice(t *testing.T) {
 		got = MustInjectAll[insightConnectable](controller)
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(c)
+	root := NewModule(func(s *Module) {
+		s.Controllers(c)
 	})
 
 	if _, err := NewApp[fiber.App](root, AppOptions{}); err != nil {
@@ -3164,9 +3164,9 @@ func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
 		MustInjectAll[*insightPostgres](controller)
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Providers(insightPostgresProvider)
-		m.Controllers(c)
+	root := NewModule(func(s *Module) {
+		s.Providers(insightPostgresProvider)
+		s.Controllers(c)
 	})
 
 	MustNewApp[fiber.App](root, AppOptions{})
@@ -3209,16 +3209,16 @@ type insightTestUserServiceMock struct {
 	GetFn func(userID int64) *insightTestUserEntity
 }
 
-func (m *insightTestUserServiceMock) Get(userID int64) *insightTestUserEntity {
-	return m.GetFn(userID)
+func (s *insightTestUserServiceMock) Get(userID int64) *insightTestUserEntity {
+	return s.GetFn(userID)
 }
 
 type insightTestUserIDParam struct {
 	ID int64 `param:"id"`
 }
 
-var insightTestUserIDParamSchema = NewSchema(func(t *insightTestUserIDParam, m *Schema) {
-	m.Property(&t.ID).Integer().Required()
+var insightTestUserIDParamSchema = NewSchema(func(t *insightTestUserIDParam, s *Schema) {
+	s.Property(&t.ID).Integer().Required()
 })
 
 // newInsightTestUserModule builds a FRESH *Module (+ Provider + Controller)
@@ -3344,13 +3344,13 @@ func TestMustNewTestApp_RealProviderConstructor_NeverRunsWhenOverridden(t *testi
 	c := NewController(func(controller *Controller) {
 		MustInject[insightTestIUserService](controller)
 	})
-	m := NewModule(func(module *Module) {
+	s := NewModule(func(module *Module) {
 		module.Providers(p, ProviderAs[insightTestIUserService](p))
 		module.Controllers(c)
 	})
 
 	mock := &insightTestUserServiceMock{GetFn: func(int64) *insightTestUserEntity { return nil }}
-	tester := MustNewTestApp(m, func(b *TestBuilder) {
+	tester := MustNewTestApp(s, func(b *TestBuilder) {
 		MustOverride[insightTestIUserService](b, mock)
 	})
 	defer tester.Close()
@@ -3416,9 +3416,9 @@ func TestMustInject_RouteCallback_ResolvesFromOwningControllerScope(t *testing.T
 		})
 	})
 
-	module := NewModule(func(m *Module) {
-		m.Providers(provider)
-		m.Controllers(controller)
+	module := NewModule(func(s *Module) {
+		s.Providers(provider)
+		s.Controllers(controller)
 	})
 
 	tester := MustNewTestApp(module, nil)
@@ -3476,8 +3476,8 @@ func TestMustInject_RouteCallback_PanicsWhenNoProviderRegistered(t *testing.T) {
 		})
 	})
 
-	module := NewModule(func(m *Module) {
-		m.Controllers(controller)
+	module := NewModule(func(s *Module) {
+		s.Controllers(controller)
 	})
 
 	defer func() {
@@ -3640,8 +3640,8 @@ func TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration(t *testing.T) {
 		resolved = MustInject[*Emitter](controller)
 	})
 
-	root := NewModule(func(m *Module) {
-		m.Controllers(c)
+	root := NewModule(func(s *Module) {
+		s.Controllers(c)
 	})
 
 	if _, err := NewApp[fiber.App](root, AppOptions{}); err != nil {
@@ -3894,8 +3894,8 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 	type uploadForm struct {
 		Title string `form:"title"`
 	}
-	uploadSchema := NewSchema(func(t *uploadForm, m *Schema) {
-		m.Property(&t.Title).String().Required()
+	uploadSchema := NewSchema(func(t *uploadForm, s *Schema) {
+		s.Property(&t.Title).String().Required()
 	})
 
 	onFileReached := make(chan struct{})
@@ -3922,8 +3922,8 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 		})
 	})
 
-	uploadModule := NewModule(func(m *Module) {
-		m.Controllers(uploadController)
+	uploadModule := NewModule(func(s *Module) {
+		s.Controllers(uploadController)
 	})
 
 	app := MustNewApp[FiberApp](uploadModule, AppOptions{EnableFormStreaming: true})
@@ -4105,9 +4105,9 @@ type rootDotenvE2EConfig struct {
 	Port int64  `env:"GONEST_ROOT_DOTENV_T11_PORT"`
 }
 
-var rootDotenvE2ESchema = NewSchema(func(c *rootDotenvE2EConfig, m *Schema) {
-	m.Property(&c.Host).String().Required()
-	m.Property(&c.Port).Integer().Default(int64(5432))
+var rootDotenvE2ESchema = NewSchema(func(c *rootDotenvE2EConfig, s *Schema) {
+	s.Property(&c.Host).String().Required()
+	s.Property(&c.Port).Integer().Default(int64(5432))
 })
 
 // TestMustParse_DotenvEndToEnd_LoadThenBind proves the full env-schema-

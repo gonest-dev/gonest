@@ -20,7 +20,7 @@ princípio de toda feature anterior deste framework (`GraphQL Support`, `OpenAPI
 
 Rascunho original de `INSIGHT-CONFIG.md` (antes desta sessão de brainstorming) tinha
 `databaseConfigSchema.Validate(instance)` -- validar uma struct Go JÁ CONSTRUÍDA. Pesquisa confirmou
-que isso não existe hoje: `*Schema` só é consumido via `Parse[T](src Parseable, m *Schema) (T, error)`/
+que isso não existe hoje: `*Schema` só é consumido via `Parse[T](src Parseable, s *Schema) (T, error)`/
 `MustParse[T]`, que decodifica uma FONTE CRUA (não uma instância já populada) via `validateStruct`+
 `populate` (`internal/validate/validate.go`). Criar `Validate(instance)` abriria um SEGUNDO caminho de
 validação inteiro em `internal/schema`, com semântica diferente (valida instância populada vs. valida

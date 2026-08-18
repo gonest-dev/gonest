@@ -71,7 +71,7 @@ graph TD
 - **Purpose**: The single contract every HTTP data source must satisfy. Carries its own parse logic alongside the state needed to execute it (ctx, onFile, etc.).
 - **Location**: `internal/validate/validate.go`
 - **Interfaces**:
-  - `parse(dst any, m *Schema) error` — unexported; only types in `internal/validate` can implement it
+  - `parse(dst any, s *Schema) error` — unexported; only types in `internal/validate` can implement it
 - **Dependencies**: `*Schema` (already imported)
 - **Reuses**: nothing — this is the new leaf type
 
@@ -80,7 +80,7 @@ graph TD
 - **Purpose**: `Parseable` implementation for route path params. Delegates to the existing internal params-parse logic extracted from `ParseRestParams[T]`.
 - **Location**: `internal/validate/params.go`
 - **Interfaces**:
-  - `parse(dst any, m *Schema) error` — reads path params via `param:` struct tag
+  - `parse(dst any, s *Schema) error` — reads path params via `param:` struct tag
 - **Dependencies**: `*execution.Context` (already imported in this file)
 - **Reuses**: extracted helper from current `ParseRestParams[T]` body
 
@@ -89,7 +89,7 @@ graph TD
 - **Purpose**: `Parseable` implementation for URL query string.
 - **Location**: `internal/validate/query.go`
 - **Interfaces**:
-  - `parse(dst any, m *Schema) error` — reads query params via `query:` struct tag
+  - `parse(dst any, s *Schema) error` — reads query params via `query:` struct tag
 - **Dependencies**: `*execution.Context`
 - **Reuses**: extracted helper from current `ParseRestQuery[T]` body
 
@@ -98,7 +98,7 @@ graph TD
 - **Purpose**: `Parseable` implementation for JSON request body.
 - **Location**: `internal/validate/validate.go`
 - **Interfaces**:
-  - `parse(dst any, m *Schema) error` — reads raw body via `json:` struct tag
+  - `parse(dst any, s *Schema) error` — reads raw body via `json:` struct tag
 - **Dependencies**: `*execution.Context`
 - **Reuses**: extracted helper from current `ParseRestJsonBody[T]` body
 
@@ -107,7 +107,7 @@ graph TD
 - **Purpose**: `Parseable` implementation for `multipart/form-data` body. Holds the `onFile` callback alongside the context.
 - **Location**: `internal/validate/form.go`
 - **Interfaces**:
-  - `parse(dst any, m *Schema) error` — streams multipart parts; invokes `onFile` on file parts; collects field violations
+  - `parse(dst any, s *Schema) error` — streams multipart parts; invokes `onFile` on file parts; collects field violations
 - **Dependencies**: `*execution.Context`, `onFile func(*FormFile) error`
 - **Reuses**: extracted helper from current `ParseRestFormBody[T]` body
 - **Special**: `onFile == nil` → file parts are silently ignored (no panic)
@@ -117,7 +117,7 @@ graph TD
 - **Purpose**: `Parseable` implementation for HTTP request headers. Net-new capability.
 - **Location**: `internal/validate/validate.go` (or extracted to `headers.go` if file grows too large)
 - **Interfaces**:
-  - `parse(dst any, m *Schema) error` — reads headers via `header:` struct tag using `ctx.Header(name)`
+  - `parse(dst any, s *Schema) error` — reads headers via `header:` struct tag using `ctx.Header(name)`
 - **Dependencies**: `*execution.Context`
 - **Reuses**: `tagKeyVisible`, `validateValue`, `violation`, `exception.NewBadRequestException` — same pattern as `querySource`
 
@@ -146,8 +146,8 @@ graph TD
 - **Purpose**: The two public generic entry points. Source-agnostic. Declare `var zero T`, call `src.parse(&zero, schema)`, return.
 - **Location**: `gonest.go` — new section replacing the legacy `// Validation` section
 - **Interfaces**:
-  - `Parse[T any](src Parseable, m *Schema) (T, error)`
-  - `MustParse[T any](src Parseable, m *Schema) T`
+  - `Parse[T any](src Parseable, s *Schema) (T, error)`
+  - `MustParse[T any](src Parseable, s *Schema) T`
 - **Dependencies**: `Parseable` type (re-exported), `*Schema`
 - **Reuses**: AD-004 wrapper pattern; `resolveSchema` check (inside each source's `parse`)
 

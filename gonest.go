@@ -758,7 +758,7 @@ type StringSchema = schema.StringSchema
 
 // NewSchema builds a *Schema for T, identifying fields purely by their
 // own pointer address within a zero value of T (INSIGHT.md's
-// `m.Property(&t.Id)` call shape) -- no struct tags required. Go cannot
+// `s.Property(&t.Id)` call shape) -- no struct tags required. Go cannot
 // re-export a generic function via var, so this is a real wrapper calling
 // the internal one (same pattern as MustInject/NewApp, see AD-004
 // in STATE.md; see also AD-009 in STATE.md for why this section lives in
@@ -770,11 +770,11 @@ type StringSchema = schema.StringSchema
 // and the freshly built *Schema (see internal/schema.Schema's doc
 // comment for the full field-identification algorithm, empirically
 // confirmed working by T1's own test suite).
-func NewSchema[T any](fn func(t *T, m *Schema)) *Schema {
+func NewSchema[T any](fn func(t *T, s *Schema)) *Schema {
 	var zero T
-	m := schema.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
-	fn(&zero, m)
-	return m
+	s := schema.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
+	fn(&zero, s)
+	return s
 }
 
 // SchemaFor returns the *Schema already registered for T via an earlier
@@ -795,11 +795,11 @@ func NewSchema[T any](fn func(t *T, m *Schema)) *Schema {
 // NewSchema itself, see AD-004 in STATE.md).
 func SchemaFor[T any]() *Schema {
 	t := reflect.TypeFor[T]()
-	m, ok := schema.Lookup(t)
+	s, ok := schema.Lookup(t)
 	if !ok {
 		panic("gonest: no schema registered for type " + t.String() + " (call NewSchema[" + t.String() + "] first)")
 	}
-	return m
+	return s
 }
 
 // Value is the builder handed to NewValue's callback -- a true Go type
@@ -815,17 +815,17 @@ type Value = schema.Value
 // function via var, so this is a real wrapper (same AD-004 precedent as
 // NewSchema itself).
 //
-//	cpfSchema := gonest.NewValue[string](func(m *gonest.Value) {
-//	    m.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
+//	cpfSchema := gonest.NewValue[string](func(v *gonest.Value) {
+//	    v.String().Min(11).Max(11).Pattern(`^\d{11}$`).Required()
 //	})
 //	cpf := gonest.MustParse[string](req.Body(), cpfSchema)
-func NewValue[T any](fn func(m *Value)) *Schema {
+func NewValue[T any](fn func(v *Value)) *Schema {
 	var zero T
-	m, pb := schema.NewValue(reflect.TypeOf(zero))
+	s, pb := schema.NewValue(reflect.TypeOf(zero))
 	if fn != nil {
 		fn(pb)
 	}
-	return m
+	return s
 }
 
 // ---------------------------------------------------------------------------
@@ -1001,18 +1001,18 @@ type Parseable = execution.Parseable
 type FormFile = execution.FormFile
 
 // Parse reads and validates src (one of ctx.Params(), ctx.Query(),
-// ctx.Headers(), ctx.Body().Json(), ctx.Body().Form(onFile)) against m (the
+// ctx.Headers(), ctx.Body().Json(), ctx.Body().Form(onFile)) against s (the
 // *Schema built via NewSchema[T] for that same T -- passed explicitly,
 // AD-019) and returns a populated T. Returns a non-nil *BadRequestException
 // (collecting EVERY violation found, not just the first) as the error on
 // any validation failure -- AD-021's non-panicking half of the family (see
-// MustParse for the panicking twin). Still panics with a plain string if m
+// MustParse for the panicking twin). Still panics with a plain string if s
 // was not built for T (a coding-error class of failure, not a
 // request-validation one) -- src.ParseInto itself calls resolveSchema
 // before touching anything else.
 //
 // Parse/MustParse contain NO source-specific logic: they declare `var zero
-// T`, call src.ParseInto(&zero, m), and return -- every ctx method
+// T`, call src.ParseInto(&zero, s), and return -- every ctx method
 // (unified-parse-api feature) hands back a Parseable that already knows how
 // to read and validate its own source, so adding a new source later (e.g.
 // ctx.Body().Xml()) never touches these two functions.
@@ -1026,16 +1026,16 @@ type FormFile = execution.FormFile
 // when T is itself a pointer type, that dst IS the T being returned, just
 // allocated fresh via reflect.New instead of zero-valued via `var zero T`
 // (a nil *T has nowhere for ParseInto to write into).
-func Parse[T any](src Parseable, m *Schema) (T, error) {
+func Parse[T any](src Parseable, s *Schema) (T, error) {
 	var zero T
 	if t := reflect.TypeFor[T](); t.Kind() == reflect.Pointer {
 		ptr := reflect.New(t.Elem())
-		if err := src.ParseInto(ptr.Interface(), m); err != nil {
+		if err := src.ParseInto(ptr.Interface(), s); err != nil {
 			return zero, err
 		}
 		return ptr.Interface().(T), nil
 	}
-	if err := src.ParseInto(&zero, m); err != nil {
+	if err := src.ParseInto(&zero, s); err != nil {
 		return zero, err
 	}
 	return zero, nil
@@ -1044,8 +1044,8 @@ func Parse[T any](src Parseable, m *Schema) (T, error) {
 // MustParse is Parse, panicking on any returned error instead of returning
 // it -- AD-021's panicking twin, for call sites that don't want to handle
 // the error themselves.
-func MustParse[T any](src Parseable, m *Schema) T {
-	v, err := Parse[T](src, m)
+func MustParse[T any](src Parseable, s *Schema) T {
+	v, err := Parse[T](src, s)
 	if err != nil {
 		panic(err)
 	}

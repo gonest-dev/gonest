@@ -44,7 +44,7 @@ edits: `validateValue`'s top, `populate`'s per-field loop, `populateValue`,
 | ------ | ------------------- |
 | `internal/schema` (`PropertyBuilder`) | New field `sanitize func(raw any) any`, methods `Sanitize(fn) *PropertyBuilder` / `SanitizeFunc() (func(raw any) any, bool)` |
 | `internal/schema` (`Schema`) | New field `refines []func(dst any) (string, error)`, methods `Refine(fn) *Schema` / `OwnRefines() []func(dst any) (string, error)` |
-| `internal/validate` | `validateValue` (top), `populate` (per-field loop), `populateValue` (top) each gain a 3-line Sanitize-application block; `jsonBodySource.ParseInto` gains a post-`populate` Refine-running block (struct path only, `m.IsValue()` stays untouched) |
+| `internal/validate` | `validateValue` (top), `populate` (per-field loop), `populateValue` (top) each gain a 3-line Sanitize-application block; `jsonBodySource.ParseInto` gains a post-`populate` Refine-running block (struct path only, `s.IsValue()` stays untouched) |
 
 ---
 
@@ -62,7 +62,7 @@ edits: `validateValue`'s top, `populate`'s per-field loop, `populateValue`,
 
 - **Purpose**: Register a cross-field check, run after all individual field validation and population succeed.
 - **Location**: `internal/schema/schema.go`, alongside `Title`/`Description`
-- **Interfaces**: `func (m *Schema) Refine(fn func(dst any) (field string, err error)) *Schema`, `func (m *Schema) OwnRefines() []func(dst any) (string, error)`
+- **Interfaces**: `func (s *Schema) Refine(fn func(dst any) (field string, err error)) *Schema`, `func (s *Schema) OwnRefines() []func(dst any) (string, error)`
 - **Dependencies**: none
 - **Reuses**: `OwnProperties()`'s defensive-copy getter shape
 
@@ -94,7 +94,7 @@ edits: `validateValue`'s top, `populate`'s per-field loop, `populateValue`,
 | `Sanitize(fn)` panics | Not caught specially -- same as any other user-supplied callback in this package (`Custom`, `CustomFunc`) already documents no special recover; a panicking Sanitize propagates like a panicking Custom would | Same failure mode as an existing panicking `Custom(fn)` -- consistent, not a new risk category |
 | `Refine(fn)` returns `err != nil` | Collected into `violation{Field: field, Message: err.Error()}`, same slice individual field violations would use if `validateStruct` had produced any -- but Refine's violations are collected in a SEPARATE pass (after populate), never mixed into the same collection call | `exception.NewBadRequestException(violations)` -- same shape as any other validation failure |
 | Multiple `Refine` calls, more than one fails | ALL failing ones contribute a violation (collect-all, D5) | A single `BadRequestException` with N violations, one per failing `Refine` |
-| `Refine` registered on a `Value`-schema (`m.IsValue() == true`) | Not invoked -- `jsonBodySource.ParseInto`'s Refine-running block is gated the same way the existing `if m.IsValue()` branch already short-circuits before reaching it (Refine block placed only in the struct path, after the early `return populateValue(...)`) | No error, no behavior -- silently a no-op (Out of Scope per spec.md's Edge Cases, not treated as a caller mistake worth a panic in this version) |
+| `Refine` registered on a `Value`-schema (`s.IsValue() == true`) | Not invoked -- `jsonBodySource.ParseInto`'s Refine-running block is gated the same way the existing `if s.IsValue()` branch already short-circuits before reaching it (Refine block placed only in the struct path, after the early `return populateValue(...)`) | No error, no behavior -- silently a no-op (Out of Scope per spec.md's Edge Cases, not treated as a caller mistake worth a panic in this version) |
 
 ---
 

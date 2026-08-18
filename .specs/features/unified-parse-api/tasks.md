@@ -54,7 +54,7 @@ T12 → T13
 
 ### T1: Define `Parseable` interface in `internal/execution`
 
-**What**: Create the `Parseable` interface with a single unexported method `parse(dst any, m *Schema) error` in `internal/execution/context.go`. Placing it here avoids the import cycle: `internal/validate` already imports `internal/execution`, so `validate`'s source structs can implement `execution.Parseable` without any new dependency direction. `gonest.go` re-exports it as `type Parseable = execution.Parseable`.
+**What**: Create the `Parseable` interface with a single unexported method `parse(dst any, s *Schema) error` in `internal/execution/context.go`. Placing it here avoids the import cycle: `internal/validate` already imports `internal/execution`, so `validate`'s source structs can implement `execution.Parseable` without any new dependency direction. `gonest.go` re-exports it as `type Parseable = execution.Parseable`.
 **Where**: `internal/execution/context.go` (new type)
 **Depends on**: None
 **Reuses**: `*schema.Schema` (imported via `internal/validate` chain — check if `execution` needs to add `schema` import or if the method signature uses `any`)
@@ -83,7 +83,7 @@ T12 → T13
 
 **Done when**:
 - [ ] `paramsSource` struct defined with a `ctx` field (type `*execution.Context`)
-- [ ] `parse(dst any, m *Schema) error` delegates to the existing internal params-parse logic (no logic duplication — extract shared helper if needed)
+- [ ] `parse(dst any, s *Schema) error` delegates to the existing internal params-parse logic (no logic duplication — extract shared helper if needed)
 - [ ] Gate: `go build ./...` passes
 
 **Tests**: unit — existing `params_test.go` must still pass (0 regressions)
@@ -103,7 +103,7 @@ T12 → T13
 
 **Done when**:
 - [ ] `querySource` struct defined with a `ctx` field
-- [ ] `parse(dst any, m *Schema) error` delegates to existing internal query-parse logic
+- [ ] `parse(dst any, s *Schema) error` delegates to existing internal query-parse logic
 - [ ] Gate: `go test ./internal/validate/...` passes
 
 **Tests**: unit — existing `query_test.go` must still pass
@@ -123,7 +123,7 @@ T12 → T13
 
 **Done when**:
 - [ ] `jsonBodySource` struct defined with a `ctx` field
-- [ ] `parse(dst any, m *Schema) error` delegates to existing internal json-body-parse logic
+- [ ] `parse(dst any, s *Schema) error` delegates to existing internal json-body-parse logic
 - [ ] Gate: `go test ./internal/validate/...` passes
 
 **Tests**: unit — existing `validate_test.go` must still pass
@@ -143,7 +143,7 @@ T12 → T13
 
 **Done when**:
 - [ ] `formBodySource` struct defined with `ctx` and `onFile func(*FormFile) error` fields
-- [ ] `parse(dst any, m *Schema) error` delegates to existing internal form-parse logic
+- [ ] `parse(dst any, s *Schema) error` delegates to existing internal form-parse logic
 - [ ] `onFile == nil` → file parts are silently skipped (no panic)
 - [ ] Gate: `go test ./internal/validate/...` passes
 
@@ -244,8 +244,8 @@ T12 → T13
 **Requirement**: PARSE-01..06, PARSE-06
 
 **Done when**:
-- [ ] `func Parse[T any](src Parseable, m *Schema) (T, error)` exported and documented
-- [ ] `func MustParse[T any](src Parseable, m *Schema) T` exported and documented
+- [ ] `func Parse[T any](src Parseable, s *Schema) (T, error)` exported and documented
+- [ ] `func MustParse[T any](src Parseable, s *Schema) T` exported and documented
 - [ ] Schema mismatch → panic with clear message (via `resolveSchema`)
 - [ ] Gate: `go build ./...` passes
 

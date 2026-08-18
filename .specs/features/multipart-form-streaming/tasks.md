@@ -7,7 +7,7 @@
 
 ### T7: `Route.FormBody` -- OpenAPI documentation for multipart/form-data (added post-T6)
 
-**What**: `Route.FormBody(m *schema.Schema, fileFields ...string) *Route` + `FormBodySchema()` getter (`internal/route/route.go`); `internal/openapi/generate.go` builds an INLINE (never `$ref`'d into `components.schemas`) object schema when `FormBody` was called -- `m`'s own properties keyed by their `form` tag (`tagName(p, "form")`, not `tagName(p, "")`'s `json`-first resolution, which would fall back to the bare Go field name since a `form:"..."` field typically has no `json` tag at all) plus one `{"type":"string","format":"binary"}` property per `fileFields` entry, all under `content["multipart/form-data"]` instead of `content["application/json"]`.
+**What**: `Route.FormBody(s *schema.Schema, fileFields ...string) *Route` + `FormBodySchema()` getter (`internal/route/route.go`); `internal/openapi/generate.go` builds an INLINE (never `$ref`'d into `components.schemas`) object schema when `FormBody` was called -- `s`'s own properties keyed by their `form` tag (`tagName(p, "form")`, not `tagName(p, "")`'s `json`-first resolution, which would fall back to the bare Go field name since a `form:"..."` field typically has no `json` tag at all) plus one `{"type":"string","format":"binary"}` property per `fileFields` entry, all under `content["multipart/form-data"]` instead of `content["application/json"]`.
 **Where**: `internal/route/route.go`, `internal/openapi/generate.go` (new `formBodySchemaObject` helper), `internal/openapi/generate_test.go`, `.examples/blog-api/module/post/controller.go` (wires `r.FormBody(uploadAttachmentFormDTOSchema, "file")` onto the upload route)
 **Depends on**: T1-T6 (the runtime side, `ParseRestFormBody`/`MustParseRestFormBody`, already existed -- this only adds documentation, no change to validation behavior)
 **Reuses**: `schemaFor`/`tagName` (unchanged, called with a new `"form"` context tag), same inline-vs-registered distinction `paramsToParameters` already established for path/query params (never `$ref`'d, request-specific)
@@ -141,7 +141,7 @@ below it to compile). Not worth forcing artificial parallelism onto a
 
 **Done when**:
 
-- [ ] `gonest.ParseRestFormBody[T](ctx *RestContext, m *Schema, onFile func(*FormFile) error) (T, error)` compiles and delegates
+- [ ] `gonest.ParseRestFormBody[T](ctx *RestContext, s *Schema, onFile func(*FormFile) error) (T, error)` compiles and delegates
 - [ ] `gonest.MustParseRestFormBody[T](...)  T` compiles and delegates
 - [ ] `gonest.FormFile = validate.FormFile` alias exported
 - [ ] Gate check passes: `go test ./... -race`

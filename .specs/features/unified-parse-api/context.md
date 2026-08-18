@@ -30,7 +30,7 @@ call site via context methods: `ctx.Params()`, `ctx.Query()`, `ctx.Headers()`,
 ### `Parseable` interface
 
 - Named `Parseable` (not `ParseSource`, not `Source`) — user's explicit choice.
-- Single unexported method: `parse(dst any, m *Schema) error`.
+- Single unexported method: `parse(dst any, s *Schema) error`.
 - Unexported method → only types defined inside `internal/validate` (or packages that embed them)
   can satisfy it. Devusers never implement `Parseable` directly; they only receive values of it
   from `ctx` methods.

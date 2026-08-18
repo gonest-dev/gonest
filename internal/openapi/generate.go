@@ -49,17 +49,17 @@ func Generate(doc *OpenAPI, root *module.Module) {
 	walkModule(root, visitedModules, doc)
 }
 
-// walkModule visits m exactly once (visitedModules prevents infinite
+// walkModule visits s exactly once (visitedModules prevents infinite
 // recursion on circular/diamond module imports -- design.md's Error Handling
 // Strategy), walking its own controllers before recursing into
-// m.ImportedModules().
-func walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *OpenAPI) {
-	if m == nil || visitedModules[m] {
+// s.ImportedModules().
+func walkModule(s *module.Module, visitedModules map[*module.Module]bool, doc *OpenAPI) {
+	if s == nil || visitedModules[s] {
 		return
 	}
-	visitedModules[m] = true
+	visitedModules[s] = true
 
-	for _, cref := range m.OwnControllers() {
+	for _, cref := range s.OwnControllers() {
 		rc, ok := cref.(routableController)
 		if !ok {
 			continue
@@ -67,7 +67,7 @@ func walkModule(m *module.Module, visitedModules map[*module.Module]bool, doc *O
 		walkController(rc, doc)
 	}
 
-	for _, imported := range m.ImportedModules() {
+	for _, imported := range s.ImportedModules() {
 		walkModule(imported, visitedModules, doc)
 	}
 }
@@ -205,7 +205,7 @@ func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bo
 
 	for status, resp := range responses {
 		key := strconv.Itoa(status)
-		m, hasSchema := resp.SchemaValue()
+		s, hasSchema := resp.SchemaValue()
 
 		var entry map[string]any
 		if !hasSchema && status >= http.StatusBadRequest {
@@ -215,7 +215,7 @@ func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bo
 			if hasSchema {
 				entry["content"] = map[string]any{
 					"application/json": map[string]any{
-						"schema": refSchema(m, doc, visiting),
+						"schema": refSchema(s, doc, visiting),
 					},
 				}
 			}
@@ -284,7 +284,7 @@ func pascalCase(s string) string {
 	return strings.Join(fields, "")
 }
 
-// paramsToParameters converts every OwnProperties() entry of m into one
+// paramsToParameters converts every OwnProperties() entry of s into one
 // OpenAPI Parameter Object, keyed by tagName's resolution (design.md's
 // Components: "each property in that Schema becomes one parameter object").
 // contextTag is "param" for path params, "query" for query params -- a
@@ -293,9 +293,9 @@ func pascalCase(s string) string {
 // falling back straight to the bare Go field name (e.g. "UserID" instead of
 // "user_id") would document a name that doesn't match what actually binds
 // the request.
-func paramsToParameters(m *schema.Schema, in string, contextTag string, doc *OpenAPI, visiting map[*schema.Schema]bool) []any {
+func paramsToParameters(s *schema.Schema, in string, contextTag string, doc *OpenAPI, visiting map[*schema.Schema]bool) []any {
 	var out []any
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		name := tagName(p, contextTag)
 		out = append(out, map[string]any{
 			"name":     name,
@@ -357,8 +357,8 @@ func tagValue(field reflect.StructField, tag string) (string, bool) {
 // $ref (a request/response body is always the FULL registered shape, never
 // inlined, matching how ItemRef()/SchemaRef() are handled by schemaFor for
 // nested fields).
-func refSchema(m *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
-	name := registerSchema(m, doc, visiting)
+func refSchema(s *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
+	name := registerSchema(s, doc, visiting)
 	return map[string]any{"$ref": "#/components/schemas/" + name}
 }
 
@@ -511,21 +511,21 @@ func addDescriptionAndExamples(schema map[string]any, p *schema.PropertyBuilder)
 
 // formBodySchemaObject builds an INLINE (never $ref/registered into
 // components.schemas -- unlike refSchema/registerSchema) OpenAPI object
-// schema for a multipart/form-data requestBody: m's own properties (keyed
+// schema for a multipart/form-data requestBody: s's own properties (keyed
 // by their "form" tag, NOT "json" -- unlike registerSchema's own
 // tagName(p, ""), a form:"..." field typically has no json tag at all, so
 // falling back through registerSchema's resolution would emit the bare Go
 // field name instead) plus one `{"type":"string","format":"binary"}`
 // property per name in fileFields -- OpenAPI 3.1's own convention for "this
 // property is an uploaded file" (there is no dedicated JSON Schema "file"
-// type). Inline rather than registered: combining m's validated fields with
+// type). Inline rather than registered: combining s's validated fields with
 // synthetic file properties isn't a reusable named shape the way a JSON
 // body's whole schema is, it's specific to this one requestBody.
-func formBodySchemaObject(m *schema.Schema, fileFields []string, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
+func formBodySchemaObject(s *schema.Schema, fileFields []string, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	properties := map[string]any{}
 	var required []string
 
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		key := tagName(p, "form")
 		properties[key] = schemaFor(p, doc, visiting)
 		if p.IsRequired() {
@@ -544,7 +544,7 @@ func formBodySchemaObject(m *schema.Schema, fileFields []string, doc *OpenAPI, v
 		"type":       "object",
 		"properties": properties,
 	}
-	if desc := m.DescriptionText(); desc != "" {
+	if desc := s.DescriptionText(); desc != "" {
 		out["description"] = desc
 	}
 	if len(required) > 0 {
@@ -553,17 +553,17 @@ func formBodySchemaObject(m *schema.Schema, fileFields []string, doc *OpenAPI, v
 	return out
 }
 
-// registerSchema ensures m has EXACTLY ONE entry in doc.schemas (dedup via
+// registerSchema ensures s has EXACTLY ONE entry in doc.schemas (dedup via
 // doc.schemaNames, pointer-keyed -- design.md's Data Models: "the SOLE dedup
 // mechanism"), returning the schema's name for building a $ref string.
-// doc.schemaNames is checked FIRST, before ever walking m's own properties,
-// and the name is RESERVED in doc.schemaNames BEFORE recursing into m's
+// doc.schemaNames is checked FIRST, before ever walking s's own properties,
+// and the name is RESERVED in doc.schemaNames BEFORE recursing into s's
 // properties -- both orderings are critical: checking first is what makes a
 // diamond-shaped reference graph (two different routes both referencing the
 // same *Schema) resolve to a single walk, and reserving before recursing
-// is what prevents infinite recursion if m indirectly references itself
+// is what prevents infinite recursion if s indirectly references itself
 // (e.g. a self-referential tree-shaped struct).
-func registerSchema(m *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]bool) string {
+func registerSchema(s *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]bool) string {
 	if doc.schemas == nil {
 		doc.schemas = map[string]any{}
 	}
@@ -571,21 +571,21 @@ func registerSchema(m *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]
 		doc.schemaNames = map[*schema.Schema]string{}
 	}
 
-	if name, ok := doc.schemaNames[m]; ok {
+	if name, ok := doc.schemaNames[s]; ok {
 		return name
 	}
 
-	name := m.TitleText()
+	name := s.TitleText()
 	if name == "" {
-		name = m.StructType().Name()
+		name = s.StructType().Name()
 	}
 
-	doc.schemaNames[m] = name
+	doc.schemaNames[s] = name
 
 	properties := map[string]any{}
 	var required []string
 
-	for _, p := range m.OwnProperties() {
+	for _, p := range s.OwnProperties() {
 		key := tagName(p, "")
 		properties[key] = schemaFor(p, doc, visiting)
 		if p.IsRequired() {
@@ -598,7 +598,7 @@ func registerSchema(m *schema.Schema, doc *OpenAPI, visiting map[*schema.Schema]
 		"title":      name,
 		"properties": properties,
 	}
-	if desc := m.DescriptionText(); desc != "" {
+	if desc := s.DescriptionText(); desc != "" {
 		schema["description"] = desc
 	}
 	if len(required) > 0 {

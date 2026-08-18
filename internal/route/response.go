@@ -25,8 +25,8 @@ type Response struct {
 
 // Schema sets this response's documented body schema and returns r so
 // calls can chain.
-func (r *Response) Schema(m *schema.Schema) *Response {
-	r.schemaValue = m
+func (r *Response) Schema(s *schema.Schema) *Response {
+	r.schemaValue = s
 	return r
 }
 

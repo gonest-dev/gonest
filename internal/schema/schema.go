@@ -6,7 +6,7 @@
 // Integer(), Boolean(), DateTime(), etc. -- see ROADMAP.md) will build on
 // top of: a way to declare, per struct field, a set of OpenAPI-3.1-shaped
 // constraints WITHOUT struct tags, identified purely by the field's own
-// pointer address (INSIGHT.md's `m.Property(&t.Id)` call shape).
+// pointer address (INSIGHT.md's `s.Property(&t.Id)` call shape).
 //
 // This package only builds the REGISTRATION side (a *Schema value that
 // HOLDS what was declared, inspectable via accessors) -- it does nothing
@@ -53,34 +53,34 @@ func New(structType reflect.Type, baseAddr uintptr) *Schema {
 	if structType.Kind() != reflect.Struct {
 		panic("gonest: NewSchema requires a struct type, got " + structType.Kind().String())
 	}
-	m := &Schema{
+	s := &Schema{
 		structType: structType,
 		baseAddr:   baseAddr,
 		properties: map[uintptr]*PropertyBuilder{},
 	}
-	Register(structType, m)
-	return m
+	Register(structType, s)
+	return s
 }
 
 // Title sets the whole-type title (the struct itself, not any individual
-// field -- same tier as Description) and returns m so calls can chain. Used
+// field -- same tier as Description) and returns s so calls can chain. Used
 // as the components.schemas key + schema "title" field by the OpenAPI
 // generator; when never called, TitleText returns "" and the generator falls
 // back to the Go type's own name (spec.md AC1 -- that fallback is the
 // generator's job, not Schema's).
-func (m *Schema) Title(s string) *Schema {
-	m.title = s
-	return m
+func (s *Schema) Title(title string) *Schema {
+	s.title = title
+	return s
 }
 
 // TitleText returns the whole-type title set via Title, or "" if it was
 // never called. Named differently from the setter for the same reason as
 // Description/DescriptionText -- Go has no method overloading.
-func (m *Schema) TitleText() string {
-	return m.title
+func (s *Schema) TitleText() string {
+	return s.title
 }
 
-// StructType returns the reflect.Type m was constructed for (New's
+// StructType returns the reflect.Type s was constructed for (New's
 // structType argument). SPEC_DEVIATION (schema-generation feature, T2):
 // design.md's registerSchema component needs a default components.schemas
 // name (the Go type's own name) when TitleText() is "" -- Schema had no
@@ -89,63 +89,63 @@ func (m *Schema) TitleText() string {
 // (same defensive shape as every other Schema accessor) is the smallest
 // change that unblocks that requirement, rather than deriving the type name
 // indirectly through a PropertyBuilder's Field().
-func (m *Schema) StructType() reflect.Type {
-	return m.structType
+func (s *Schema) StructType() reflect.Type {
+	return s.structType
 }
 
 // Description sets the whole-type description (the struct itself, not any
 // individual field -- see PropertyBuilder.Description for the field-level
-// equivalent) and returns m so calls can chain. Takes at least one word
+// equivalent) and returns s so calls can chain. Takes at least one word
 // (word, words...) rather than a bare `...string` -- a zero-arg call would
 // compile silently and set an empty description, indistinguishable from a
 // caller mistake; requiring one argument makes that state unreachable
 // instead of guessing at it. Multiple words are joined with a single space,
 // letting a long description split across several Go string literals --
 // one per call-site line -- without manual "..." + "..." concatenation.
-func (m *Schema) Description(word string, words ...string) *Schema {
-	m.description = strings.Join(append([]string{word}, words...), " ")
-	return m
+func (s *Schema) Description(word string, words ...string) *Schema {
+	s.description = strings.Join(append([]string{word}, words...), " ")
+	return s
 }
 
 // DescriptionText returns the whole-type description set via Description,
 // or "" if it was never called. Named differently from the setter because
 // Go has no method overloading -- same setter/getter split already
 // established by internal/route/route.go's HttpCode(status)/Code().
-func (m *Schema) DescriptionText() string {
-	return m.description
+func (s *Schema) DescriptionText() string {
+	return s.description
 }
 
-// Property identifies WHICH field of the type m was built for is being
+// Property identifies WHICH field of the type s was built for is being
 // referenced by fieldPtr, using the offset between fieldPtr's own address
-// and m.baseAddr (design.md's "Field identification algorithm" -- the core,
+// and s.baseAddr (design.md's "Field identification algorithm" -- the core,
 // non-obvious mechanism this whole feature depends on, empirically
 // confirmed by this package's own test suite per design.md's Tech
 // Decisions table: "not independently re-verified via external docs this
 // session ... T1's own test suite is what proves it actually works").
 //
 // Panics if fieldPtr's offset does not match any field of the type (a
-// pointer that does not belong to the value m was built for -- spec.md
+// pointer that does not belong to the value s was built for -- spec.md
 // AC3), or if that offset was already registered by an earlier Property
 // call (spec.md's Edge Cases: panic chosen over silent merge, since merge
 // semantics -- does a second Required() call OVERRIDE or ADD to the
 // first's -- are genuinely ambiguous and INSIGHT.md never demonstrates
 // this case).
-func (m *Schema) Property(fieldPtr any) *PropertyBuilder {
+func (s *Schema) Property(fieldPtr any) *PropertyBuilder {
 	ptrVal := reflect.ValueOf(fieldPtr)
 	fieldAddr := ptrVal.Pointer()
-	offset := fieldAddr - m.baseAddr
+	offset := fieldAddr - s.baseAddr
 
-	if _, exists := m.properties[offset]; exists {
+	if _, exists := s.properties[offset]; exists {
 		panic("gonest: field already registered via Property")
 	}
 
-	field, ok := findFieldByOffset(m.structType, offset, ptrVal.Type().Elem())
+	field, ok := findFieldByOffset(s.structType, offset, ptrVal.Type().Elem())
 	if !ok {
 		panic("gonest: Property(...) pointer does not belong to the type passed to NewSchema")
 	}
 
 	pb := &PropertyBuilder{field: field}
-	m.properties[offset] = pb
+	s.properties[offset] = pb
 	return pb
 }
 
@@ -219,16 +219,16 @@ func cumulativeOffset(t reflect.Type, index []int) uintptr {
 // via Property. Read-only: mutating the returned slice does not affect this
 // Schema's internal state (same defensive-copy pattern as
 // Controller.OwnMiddleware/Module.OwnProviders).
-func (m *Schema) OwnProperties() []*PropertyBuilder {
-	out := make([]*PropertyBuilder, 0, len(m.properties))
-	for _, pb := range m.properties {
+func (s *Schema) OwnProperties() []*PropertyBuilder {
+	out := make([]*PropertyBuilder, 0, len(s.properties))
+	for _, pb := range s.properties {
 		out = append(out, pb)
 	}
 	return out
 }
 
 // Refine registers fn as a cross-field check (schema-sanitize-refine
-// feature) and returns m so calls can chain. Unlike Property/Custom/
+// feature) and returns s so calls can chain. Unlike Property/Custom/
 // Sanitize (all field-scoped), fn receives dst -- a pointer to the WHOLE
 // value this Schema describes, already populated -- since a cross-field
 // comparison (e.g. password == confirmPassword) has no meaning at the
@@ -240,17 +240,17 @@ func (m *Schema) OwnProperties() []*PropertyBuilder {
 // runs (internal/validate never stops at the first failing Refine, same
 // collect-all convention validateStruct already follows for individual
 // fields), each contributing at most one violation.
-func (m *Schema) Refine(fn func(dst any) (field string, err error)) *Schema {
-	m.refines = append(m.refines, fn)
-	return m
+func (s *Schema) Refine(fn func(dst any) (field string, err error)) *Schema {
+	s.refines = append(s.refines, fn)
+	return s
 }
 
 // OwnRefines returns a copy of every function registered via Refine, in
 // registration order. Read-only: mutating the returned slice does not
 // affect this Schema's internal state (same defensive-copy pattern as
 // OwnProperties).
-func (m *Schema) OwnRefines() []func(dst any) (string, error) {
-	return append([]func(dst any) (string, error)(nil), m.refines...)
+func (s *Schema) OwnRefines() []func(dst any) (string, error) {
+	return append([]func(dst any) (string, error)(nil), s.refines...)
 }
 
 // PropertyBuilder holds one field's own constraints -- Required/Nullable/

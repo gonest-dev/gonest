@@ -60,7 +60,7 @@ existente vence vs. merge de todos) também não decidido ainda.
 O rascunho original desta doc tinha `databaseConfigSchema.Validate(instance)`/`MustValidate(instance)`
 — validar uma struct **já construída na mão**. Pesquisa confirmou: isso **não existe** hoje e seria um
 caminho de API genuinamente NOVO em `internal/schema` — `*Schema` hoje só é consumido de UM jeito,
-`Parse[T](src Parseable, m *Schema) (T, error)`/`MustParse[T]`, que decodifica uma fonte crua
+`Parse[T](src Parseable, s *Schema) (T, error)`/`MustParse[T]`, que decodifica uma fonte crua
 (`map[string]any`-ish) via `validateStruct`+`populate` (`internal/validate/validate.go`). Validar uma
 INSTÂNCIA já populada exigiria reescrever a entrada desses dois (aceitar `reflect.Value` de uma
 instância em vez de um mapa), ou converter a instância pra mapa primeiro — dois caminhos de validação

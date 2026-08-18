@@ -24,11 +24,11 @@ type schemaShape struct {
 // built-in and dev-defined exceptions alike -- a route that never calls
 // Response with its own error body schema still documents a real shape,
 // not an empty description.
-var Schema = newSchema(func(t *schemaShape, m *schema.Schema) {
-	m.Title("HttpException")
-	m.Property(&t.Name).String().Required()
-	m.Property(&t.Message).String().Required()
-	m.Property(&t.Details).Object(func(om *schema.ObjectSchema) {
+var Schema = newSchema(func(t *schemaShape, s *schema.Schema) {
+	s.Title("HttpException")
+	s.Property(&t.Name).String().Required()
+	s.Property(&t.Message).String().Required()
+	s.Property(&t.Details).Object(func(om *schema.ObjectSchema) {
 		om.AdditionalProperties()
 		om.Nullable()
 	})
@@ -39,9 +39,9 @@ var Schema = newSchema(func(t *schemaShape, m *schema.Schema) {
 // gonest package from here would be an import cycle (gonest.go already
 // imports internal/exception for its exported exception types/
 // constructors).
-func newSchema[T any](fn func(t *T, m *schema.Schema)) *schema.Schema {
+func newSchema[T any](fn func(t *T, s *schema.Schema)) *schema.Schema {
 	var zero T
-	m := schema.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
-	fn(&zero, m)
-	return m
+	s := schema.New(reflect.TypeOf(zero), uintptr(unsafe.Pointer(&zero)))
+	fn(&zero, s)
+	return s
 }

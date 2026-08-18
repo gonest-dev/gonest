@@ -919,7 +919,7 @@ e `paramsDTOSchema`, por exemplo). Isso:
 - Empurra a declaração do Schema pra perto do Controller/Route que o usa
   (mesmo padrão de arquivo-por-concern já em `.examples/blog-api`).
 - Não exige `Schema` virar genérico nem mexe em nenhum outro pacote --
-  `resolveSchema` (novo, `internal/validate`) confere `m.StructType() ==
+  `resolveSchema` (novo, `internal/validate`) confere `s.StructType() ==
   T` antes de qualquer trabalho, panicando com mensagem clara se o Schema
   passado foi construído pra um tipo DIFERENTE (proteção contra passar o
   Schema errado por engano).

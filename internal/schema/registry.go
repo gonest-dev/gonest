@@ -22,19 +22,19 @@ import (
 var registryMu sync.RWMutex
 var registry = map[reflect.Type]*Schema{}
 
-// Register stores m under t, the struct type NewSchema[T] was built for.
+// Register stores s under t, the struct type NewSchema[T] was built for.
 // Panics if t was already registered -- one schema declaration per type,
 // same precedent as Property's own double-registration panic (schema.go):
 // silently overwriting an earlier declaration would let a typo'd duplicate
 // NewSchema[T] call silently corrupt validation behavior instead of
 // failing loudly at startup.
-func Register(t reflect.Type, m *Schema) {
+func Register(t reflect.Type, s *Schema) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
 	if _, ok := registry[t]; ok {
 		panic(fmt.Sprintf("gonest: NewSchema already registered for type %s", t))
 	}
-	registry[t] = m
+	registry[t] = s
 }
 
 // Lookup returns the *Schema registered for t and true, or (nil, false)
@@ -44,8 +44,8 @@ func Register(t reflect.Type, m *Schema) {
 func Lookup(t reflect.Type) (*Schema, bool) {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
-	m, ok := registry[t]
-	return m, ok
+	s, ok := registry[t]
+	return s, ok
 }
 
 // Deregister removes t's entry from the registry, if any. It is a TEST-ONLY

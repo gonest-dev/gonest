@@ -123,8 +123,8 @@ is fully done (`io.EOF`), reusing the exact same violation-collection shape
 - **Purpose**: The real implementation behind `gonest.ParseRestFormBody`/`MustParseRestFormBody` -- walks the multipart stream once, dispatching each part to either the presence map (field) or `onFile` (file), then validates/populates `T` exactly like `ParseParams`/`ParseQuery` do.
 - **Location**: `internal/validate/form.go`
 - **Interfaces**:
-  - `ParseFormBody[T any](ctx *execution.Context, m *schema.Schema, onFile func(*FormFile) error) (T, error)`
-  - `MustFormBody[T any](ctx *execution.Context, m *schema.Schema, onFile func(*FormFile) error) T` -- thin panic wrapper, same shape as `MustParams`/`MustQuery`/`MustJsonBody`.
+  - `ParseFormBody[T any](ctx *execution.Context, s *schema.Schema, onFile func(*FormFile) error) (T, error)`
+  - `MustFormBody[T any](ctx *execution.Context, s *schema.Schema, onFile func(*FormFile) error) T` -- thin panic wrapper, same shape as `MustParams`/`MustQuery`/`MustJsonBody`.
 - **Dependencies**: `ctx.FormStream()`, `mime/multipart.NewReader`, `resolveSchema`, `tagKeyVisible(..., "form")`, `coerceParamString`, `validateValue`, `populate(..., "form")`.
 - **Reuses**: everything listed in Code Reuse Analysis above -- this function is almost entirely composition of EXISTING internal machinery, plus the multipart walk itself (genuinely new logic, but small: a loop calling `mr.NextPart()` until `io.EOF`).
 
@@ -133,8 +133,8 @@ is fully done (`io.EOF`), reusing the exact same violation-collection shape
 - **Purpose**: Public API, matching AD-021's Parse/Must pair shape.
 - **Location**: `gonest.go`
 - **Interfaces**:
-  - `func ParseRestFormBody[T any](ctx *RestContext, m *Schema, onFile func(*FormFile) error) (T, error)`
-  - `func MustParseRestFormBody[T any](ctx *RestContext, m *Schema, onFile func(*FormFile) error) T`
+  - `func ParseRestFormBody[T any](ctx *RestContext, s *Schema, onFile func(*FormFile) error) (T, error)`
+  - `func MustParseRestFormBody[T any](ctx *RestContext, s *Schema, onFile func(*FormFile) error) T`
   - `type FormFile = validate.FormFile`
 - **Reuses**: thin wrappers calling `validate.ParseFormBody`/`validate.MustFormBody`, exactly like every other `ParseRestXxx`/`MustParseRestXxx` pair.
 

@@ -65,9 +65,9 @@ import (
 
 // mustParse mirrors gonest.MustParse[T] for this file's own tests -- same
 // duplicate-by-necessity reasoning as the package doc comment above.
-func mustParse[T any](src execution.Parseable, m *schema.Schema) T {
+func mustParse[T any](src execution.Parseable, s *schema.Schema) T {
 	var zero T
-	if err := src.ParseInto(&zero, m); err != nil {
+	if err := src.ParseInto(&zero, s); err != nil {
 		panic(err)
 	}
 	return zero
@@ -126,9 +126,9 @@ type userIDParams struct {
 
 var userIDParamsSchema = func() *schema.Schema {
 	f := &userIDParams{}
-	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
-	m.Property(&f.UserID).Integer().Required()
-	return m
+	s := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	s.Property(&f.UserID).Integer().Required()
+	return s
 }()
 
 type nameParams struct {
@@ -137,9 +137,9 @@ type nameParams struct {
 
 var nameParamsSchema = func() *schema.Schema {
 	f := &nameParams{}
-	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
-	m.Property(&f.Name).String().Required()
-	return m
+	s := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	s.Property(&f.Name).String().Required()
+	return s
 }()
 
 type userIDNameParams struct {
@@ -149,10 +149,10 @@ type userIDNameParams struct {
 
 var userIDNameParamsSchema = func() *schema.Schema {
 	f := &userIDNameParams{}
-	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
-	m.Property(&f.UserID).Integer().Required()
-	m.Property(&f.Name).String().Required()
-	return m
+	s := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	s.Property(&f.UserID).Integer().Required()
+	s.Property(&f.Name).String().Required()
+	return s
 }()
 
 var UserProvider = provider.New(func(p *provider.Provider) {
@@ -187,15 +187,15 @@ type pipelineIDParams struct {
 
 var pipelineIDParamsSchema = func() *schema.Schema {
 	f := &pipelineIDParams{}
-	m := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
-	m.Property(&f.ID).Custom(func(raw any) (any, error) {
-		s, _ := raw.(string)
-		if s == "bad" {
+	s := schema.New(reflect.TypeOf(*f), uintptr(unsafe.Pointer(f)))
+	s.Property(&f.ID).Custom(func(raw any) (any, error) {
+		str, _ := raw.(string)
+		if str == "bad" {
 			panic(exception.NewBadRequestException(map[string]string{"reason": "invalid id"}))
 		}
 		return 42, nil
 	})
-	return m
+	return s
 }()
 
 // buildPipelineOrderingApp wires one controller with global+controller

@@ -38,8 +38,8 @@ ficava estranho para "o valor inteiro é ele mesmo".
   nova, mas descartado: "Property" carrega a ideia de "parte de um todo"
   (natural pro campo de struct, caso mais comum e já estabelecido); usar
   o MESMO nome pro valor raiz (que não é parte de nada) criaria
-  ambiguidade de leitura ("por que às vezes é `m.Property(&t.X)` e às
-  vezes só `m.String()` direto?"). Decisão final: `Property` fica
+  ambiguidade de leitura ("por que às vezes é `s.Property(&t.X)` e às
+  vezes só `s.String()` direto?"). Decisão final: `Property` fica
   RESERVADO só para dentro de `NewSchema[T]` (struct) -- D1 no spec.md.
 - **`Scalar`** -- cogitado por já ser vocabulário reconhecível de
   GraphQL/JSON Schema, descartado porque engessaria a leitura da API pro
@@ -74,8 +74,8 @@ algo que tem get/set"):
 
 ### `NewValue[T]` não recebe `t *T`
 
-Diferente de `NewSchema[T](func(t *T, m *Schema))`, `NewValue[T]` recebe
-só `func(m *Value)` -- o parâmetro `t` em `NewSchema` existe unicamente
+Diferente de `NewSchema[T](func(t *T, s *Schema))`, `NewValue[T]` recebe
+só `func(v *Value)` -- o parâmetro `t` em `NewSchema` existe unicamente
 para permitir `&t.Field` dentro do callback; um valor primitivo solto não
 tem campo nenhum pra apontar (é ele mesmo o valor), então não precisa
 desse parâmetro.

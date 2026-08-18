@@ -296,11 +296,11 @@ func (r *Route) HasBearerAuth() (bool, bool) {
 	return r.bearerAuthValue, r.bearerAuthSet
 }
 
-// RequestBody stores m as this Route's documented request body schema and
+// RequestBody stores s as this Route's documented request body schema and
 // returns r so calls can chain. Calling RequestBody more than once
 // overwrites the previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) RequestBody(m *schema.Schema) *Route {
-	r.requestBody = m
+func (r *Route) RequestBody(s *schema.Schema) *Route {
+	r.requestBody = s
 	return r
 }
 
@@ -311,16 +311,16 @@ func (r *Route) RequestBodySchema() (*schema.Schema, bool) {
 	return r.requestBody, r.requestBody != nil
 }
 
-// FormBody stores m as this Route's documented multipart/form-data request
+// FormBody stores s as this Route's documented multipart/form-data request
 // body schema (for MustParseRestFormBody routes, Multipart Form Streaming
 // feature), plus fileFields -- the form field names that are FILES, not
-// covered by m's own Property declarations (a file part has no primitive
+// covered by s's own Property declarations (a file part has no primitive
 // value to validate via Schema, only name/size/content-type -- see
 // FormFile/MustParseRestFormBody's own onFile callback). Returns r so
 // calls can chain. Calling FormBody more than once overwrites the previous
 // value (last-write-wins, same convention as RequestBody).
-func (r *Route) FormBody(m *schema.Schema, fileFields ...string) *Route {
-	r.formBody = m
+func (r *Route) FormBody(s *schema.Schema, fileFields ...string) *Route {
+	r.formBody = s
 	r.formBodyFileFields = fileFields
 	return r
 }
@@ -365,13 +365,13 @@ func (r *Route) Responses() map[int]*Response {
 	return out
 }
 
-// Params stores m as this Route's documented path-parameters schema and
+// Params stores s as this Route's documented path-parameters schema and
 // returns r so calls can chain (named after NestJS's `@Param()`, not
 // `@PathParam()` -- matches MustParams' own naming, which reads path
 // params at runtime). Calling Params more than once overwrites the
 // previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) Params(m *schema.Schema) *Route {
-	r.params = m
+func (r *Route) Params(s *schema.Schema) *Route {
+	r.params = s
 	return r
 }
 
@@ -382,12 +382,12 @@ func (r *Route) ParamsSchema() (*schema.Schema, bool) {
 	return r.params, r.params != nil
 }
 
-// Query stores m as this Route's documented query-parameters schema and
+// Query stores s as this Route's documented query-parameters schema and
 // returns r so calls can chain (matches MustQuery's own naming, which reads
 // query params at runtime). Calling Query more than once overwrites the
 // previous value (last-write-wins, spec.md's Edge Cases).
-func (r *Route) Query(m *schema.Schema) *Route {
-	r.query = m
+func (r *Route) Query(s *schema.Schema) *Route {
+	r.query = s
 	return r
 }
 
