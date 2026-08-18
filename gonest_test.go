@@ -76,11 +76,17 @@ func (s *gonestTestSpyLogger) record(tag, message string) {
 	defer s.mu.Unlock()
 	s.lines = append(s.lines, tag+" "+message)
 }
-func (s *gonestTestSpyLogger) Error(message string, meta ...map[string]any)   { s.record("ERROR", message) }
-func (s *gonestTestSpyLogger) Warn(message string, meta ...map[string]any)    { s.record("WARN", message) }
-func (s *gonestTestSpyLogger) Info(message string, meta ...map[string]any)    { s.record("INFO", message) }
-func (s *gonestTestSpyLogger) Debug(message string, meta ...map[string]any)   { s.record("DEBUG", message) }
-func (s *gonestTestSpyLogger) Verbose(message string, meta ...map[string]any) { s.record("VERBOSE", message) }
+func (s *gonestTestSpyLogger) Error(message string, meta ...map[string]any) {
+	s.record("ERROR", message)
+}
+func (s *gonestTestSpyLogger) Warn(message string, meta ...map[string]any) { s.record("WARN", message) }
+func (s *gonestTestSpyLogger) Info(message string, meta ...map[string]any) { s.record("INFO", message) }
+func (s *gonestTestSpyLogger) Debug(message string, meta ...map[string]any) {
+	s.record("DEBUG", message)
+}
+func (s *gonestTestSpyLogger) Verbose(message string, meta ...map[string]any) {
+	s.record("VERBOSE", message)
+}
 
 func (s *gonestTestSpyLogger) snapshot() []string {
 	s.mu.Lock()

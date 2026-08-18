@@ -104,10 +104,16 @@ type Logger interface {
 // through the Logger interface instead of being the only option.
 type consoleLogger struct{}
 
-func (consoleLogger) Error(message string, meta ...map[string]any) { write(LevelError, "", message, meta) }
-func (consoleLogger) Warn(message string, meta ...map[string]any)  { write(LevelWarn, "", message, meta) }
-func (consoleLogger) Info(message string, meta ...map[string]any)  { write(LevelLog, "", message, meta) }
-func (consoleLogger) Debug(message string, meta ...map[string]any) { write(LevelDebug, "", message, meta) }
+func (consoleLogger) Error(message string, meta ...map[string]any) {
+	write(LevelError, "", message, meta)
+}
+func (consoleLogger) Warn(message string, meta ...map[string]any) {
+	write(LevelWarn, "", message, meta)
+}
+func (consoleLogger) Info(message string, meta ...map[string]any) { write(LevelLog, "", message, meta) }
+func (consoleLogger) Debug(message string, meta ...map[string]any) {
+	write(LevelDebug, "", message, meta)
+}
 func (consoleLogger) Verbose(message string, meta ...map[string]any) {
 	write(LevelVerbose, "", message, meta)
 }
