@@ -11,10 +11,41 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/scope"
 )
+
+// resolving is set by internal/resolver's Resolve/ResolveWithOverrides for
+// the exact duration of Stage 3 (every Provider's Constructor already
+// Declare()'d in Stage 2, now actually being invoked, concurrently across
+// goroutines via errgroup) -- see MarkResolving's own doc comment. Must[T]/
+// MustAll[T] check it FIRST, before any dispatch branch, to catch the one
+// mistake this package cannot otherwise distinguish from a legitimate call:
+// MustInject/MustInjectAll invoked from INSIDE a Constructor closure itself,
+// instead of the builder fn that declares it (before Constructor(...) is
+// even called). Doing so is not merely discouraged -- it is broken: Stage 3
+// already built its dependency graph and dispatched every goroutine before
+// any Constructor runs, so a pending edge recorded this late is never
+// consulted by anything, and the placeholder/slice MustInject/MustInjectAll
+// returns here sits permanently unfilled (a zero-value pointer, or an
+// all-nil-element slice) with no error ever raised -- exactly the silent
+// failure a real user hit in production before this guard existed (see
+// AD-0XX). A plain atomic (not a mutex) is enough: it is written exactly
+// once before Stage 3's errgroup.Go loop starts and once again when Stage 3
+// returns (see resolveGraph in internal/resolver/stage3.go), read
+// concurrently by every goroutine's own Must/MustAll calls in between.
+var resolving atomic.Bool
+
+// MarkResolving sets whether Stage 3 (resolver.Resolve/ResolveWithOverrides)
+// is currently running. Exported so internal/resolver can toggle it around
+// its own resolveGraph call without this package needing to import
+// internal/resolver (which already imports this package -- see this file's
+// other cross-package duplication comments for the same cycle constraint).
+func MarkResolving(v bool) {
+	resolving.Store(v)
+}
 
 // PendingEdge records that Owner requested resolution of TargetType via
 // MustInject. internal/resolver walks this bookkeeping (via PendingEdges)
@@ -203,6 +234,8 @@ func PendingEdges() []PendingEdge {
 // suite) are safe -- see TestReset_ClearsAllPendingEdges and
 // TestNewApp_TwoSequentialUnrelatedCalls_DoNotLeakPendingEdges.
 func Reset() {
+	resolving.Store(false)
+
 	pendingEdgesMu.Lock()
 	pendingEdges = nil
 	pendingEdgesMu.Unlock()
@@ -524,6 +557,10 @@ func Must[T any](owner any) T {
 		return v.Interface().(T)
 	}
 
+	if resolving.Load() {
+		panic(fmt.Sprintf("gonest: MustInject[%s] called from inside a Constructor -- Stage 3 is already running, so a dependency requested this late is never resolved (the placeholder returned here would stay a permanent zero value). Call MustInject in the builder fn, BEFORE Constructor(...), and close over the result instead of calling MustInject inside the Constructor closure itself", t.String()))
+	}
+
 	if lm, ok := owner.(*module.LazyModule); ok {
 		return mustLazy[T](lm, t)
 	}
@@ -599,6 +636,10 @@ func MustAll[T any](owner any) []T {
 
 	if t.Kind() != reflect.Interface {
 		panic(fmt.Sprintf("gonest: MustInjectAll[T] requires T to be an interface type, got %s", t.String()))
+	}
+
+	if resolving.Load() {
+		panic(fmt.Sprintf("gonest: MustInjectAll[%s] called from inside a Constructor -- Stage 3 is already running, so a dependency requested this late is never resolved (the slice returned here would stay permanently empty/unfilled). Call MustInjectAll in the builder fn, BEFORE Constructor(...), and close over the result instead of calling MustInjectAll inside the Constructor closure itself", t.String()))
 	}
 
 	if dr, ok := owner.(directResolver); ok {

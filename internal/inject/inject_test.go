@@ -524,3 +524,91 @@ func TestMustAllProvider_TransientMatch_PanicsBeforeRecordingEdge(t *testing.T) 
 
 	mustAllProvider[pingable](owner, pingerType)
 }
+
+// TestMust_CalledDuringResolvingPhase_Panics and
+// TestMustAll_CalledDuringResolvingPhase_Panics prove the guard added
+// against calling MustInject/MustInjectAll from inside a Constructor
+// closure (Stage 3, after internal/resolver's resolveGraph has already
+// built its dependency graph and dispatched every goroutine) -- a call
+// arriving this late used to silently return a placeholder/slice that is
+// never filled in, with no error raised anywhere. See resolving's own doc
+// comment.
+func TestMust_CalledDuringResolvingPhase_Panics(t *testing.T) {
+	owner := newOwner()
+
+	MarkResolving(true)
+	defer MarkResolving(false)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("Must[*fakeService] during resolving phase did not panic")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("panic value = %v (%T), want string", r, r)
+		}
+		if !strings.Contains(msg, "MustInject[*inject.fakeService]") || !strings.Contains(msg, "inside a Constructor") {
+			t.Fatalf("panic message = %q, missing expected substrings", msg)
+		}
+	}()
+
+	Must[*fakeService](owner)
+}
+
+func TestMustAll_CalledDuringResolvingPhase_Panics(t *testing.T) {
+	owner := newOwner()
+
+	MarkResolving(true)
+	defer MarkResolving(false)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("MustAll[pingable] during resolving phase did not panic")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("panic value = %v (%T), want string", r, r)
+		}
+		if !strings.Contains(msg, "MustInjectAll[inject.pingable]") || !strings.Contains(msg, "inside a Constructor") {
+			t.Fatalf("panic message = %q, missing expected substrings", msg)
+		}
+	}()
+
+	MustAll[pingable](owner)
+}
+
+// TestMust_NotResolvingPhase_StillWorks and
+// TestMustAll_NotResolvingPhase_StillWorks are the negative counterpart --
+// prove the new guard does not false-positive on ordinary builder-fn-time
+// calls (the overwhelmingly common case, exercised by every other test in
+// this file too, but explicit here alongside the guard's own tests for
+// readability).
+func TestMust_NotResolvingPhase_StillWorks(t *testing.T) {
+	if resolving.Load() {
+		t.Fatalf("resolving flag leaked true from a previous test")
+	}
+	owner := newOwner()
+
+	if got := Must[*fakeService](owner); got == nil {
+		t.Fatalf("Must[*fakeService] outside resolving phase returned nil")
+	}
+}
+
+func TestMustAll_NotResolvingPhase_StillWorks(t *testing.T) {
+	if resolving.Load() {
+		t.Fatalf("resolving flag leaked true from a previous test")
+	}
+	owner := provider.New(func(p *provider.Provider) {})
+	m := module.New(func(m *module.Module) {
+		m.Providers(owner)
+	})
+	if _, err := m.Assemble(); err != nil {
+		t.Fatalf("Assemble() error = %v", err)
+	}
+
+	if got := MustAll[pingable](owner); got == nil {
+		t.Fatalf("MustAll[pingable] outside resolving phase returned nil slice")
+	}
+}

@@ -1,11 +1,29 @@
 # State
 
-Last synced commit: 4b2245e
-**Last Updated:** 2026-08-18
+Last synced commit: c8e05a8
+**Last Updated:** 2026-08-20
 
 ## Current Work
 
-**Current Work:** Provider-side `MustInjectAll` feature (`.specs/features/provider-must-inject-all/`)
+**Current Work:** guard novo contra `MustInject`/`MustInjectAll` chamado de DENTRO de um
+`Constructor` (em vez do builder fn que o antecede) -- achado real do usuário ("eu mesmo já fiz
+isso"). Antes desta mudança, esse engano nunca dava erro: o `PendingEdge`/`PendingAllEdge`
+registrado durante a execução do `Constructor` (Stage 3, quando o grafo de dependência já foi
+montado e todo goroutine já foi despachado) nunca era consultado por nada -- o placeholder/slice
+retornado ficava permanentemente zerado/vazio, sem panic, sem erro, silêncio total. Fix:
+`internal/inject.resolving` (atomic.Bool) marcado `true` por `internal/resolver/stage3.go`'s
+`resolveGraph` durante toda a janela de Stage 3 (`defer` desmarca ao sair), checado no topo de
+`Must[T]`/`MustAll[T]` (depois do short-circuit de `GlobalSingletonFor`, que é imediato e sempre
+seguro) -- panic imediato e explícito nomeando o tipo e explicando a causa/fix, em vez de falha
+silenciosa. Testado: unit (`internal/inject`, seta a flag manualmente, prova panic com a flag
+ligada e comportamento normal desligada) + integração real (`internal/app`, `Constructor` chamando
+`inject.Must` de dentro de si mesmo, prova que `New()` retorna `error` contendo a mensagem --
+`callConstructor` já converte panic em erro via `recover()`, então não é um panic cru saindo de
+`New()` -- e que `MustNewApp()` panica). `go test ./... -race -count=1` verde, 25 pacotes. Site
+(`site` repo) ainda precisa de nota explícita sobre esse erro na doc de dependency-injection.
+Ver AD-064.
+
+**Current Work (histórico, superado acima):** Provider-side `MustInjectAll` feature (`.specs/features/provider-must-inject-all/`)
 **COMPLETE** (Milestone 27, T1-T10 executados via pipeline PO→DEV→QA em subagentes, T1-T4
 sequenciais no mesmo arquivo `internal/inject/inject.go`, T5/T6 em paralelo genuíno (arquivos
 diferentes, `graph.go`/`stage3.go`), T7-T10 sequenciais no mesmo arquivo novo de teste de
@@ -102,6 +120,31 @@ verdes, 25 pacotes, zero assertion pré-existente mudada. Ver AD-062.
 **Resolution:** definitivo seria reiniciar a sessão do harness pra ver se `CC=clang` some do processo — até lá, o prefixo inline no Gate command é a solução permanente-o-suficiente. Revisar quando/se reiniciar a sessão.
 
 ## Recent Decisions (Last 15)
+
+### AD-064: guard fail-fast contra `MustInject`/`MustInjectAll` chamado dentro de `Constructor` (2026-08-20)
+
+**Decision:** `internal/inject.resolving` (novo `atomic.Bool`, package-level) marcado `true` por
+`internal/resolver/stage3.go`'s `resolveGraph` durante toda a janela síncrona+concorrente de
+Stage 3 (`inject.MarkResolving(true)` antes do loop `errgroup.Go`, `defer
+inject.MarkResolving(false)`), limpo também em `Reset()` por simetria com todo outro estado
+process-global do pacote. `Must[T]`/`MustAll[T]` checam a flag logo no topo (depois do
+short-circuit de `GlobalSingletonFor`, que resolve IMEDIATO sem depender do grafo de Stage 3, então
+é seguro chamar de qualquer lugar) -- panic imediato, nomeando o tipo genérico exato e explicando
+causa + fix, se a flag estiver ligada.
+**Reason:** achado REAL do próprio usuário fora desta sessão ("eu mesmo já fiz isso") -- chamar
+`MustInject`/`MustInjectAll` de DENTRO do `Constructor` (em vez do builder fn que roda ANTES de
+`p.Constructor(...)` ser registrado) sempre foi um erro silencioso: o `PendingEdge`/`PendingAllEdge`
+registrado nesse momento tarde demais nunca é consultado por Stage 3 (que já montou o grafo de
+dependência e já despachou todo goroutine antes de qualquer `Constructor` rodar) -- o
+placeholder/slice retornado fica permanentemente zerado/vazio, sem NENHUM sinal de erro em lugar
+nenhum. `declareControllers` (fase 2, Controller/Middleware/Guard/Interceptor/Filter) só roda
+DEPOIS que `resolver.Resolve` retorna (confirmado lendo `internal/app/app.go`), então a flag nunca
+falso-positiva pro caminho `directResolver` -- só pega exatamente o caso do `Provider`.
+**Trade-off:** nenhum técnico -- aditivo, 1 leitura atomic por chamada (custo desprezível),
+zero mudança de comportamento pra qualquer chamada legítima (builder-fn-time). `callConstructor`
+já tinha `recover()` convertendo panic em `error` -- então o efeito observável pro chamador de
+`NewApp`/`New` é um `error` com mensagem clara (não um panic cru), e `MustNewApp`/`MustNewApp`
+continuam panicando via seu próprio wrapper de sempre, sem mudança de contrato de erro.
 
 ### AD-063: Provider-side `MustInjectAll` -- slice pré-alocado + escrita in-place via reflect (2026-08-20)
 

@@ -114,6 +114,18 @@ func overrideFor(overrides map[reflect.Type]reflect.Value, node module.ProviderR
 }
 
 func resolveGraph(ctx context.Context, modules []*module.Module, overrides map[reflect.Type]reflect.Value) error {
+	// inject.MarkResolving(true) flags the exact window in which any
+	// MustInject/MustInjectAll call is illegitimate -- one already recorded
+	// via a builder fn during Stage 2 is fine (the graph below already
+	// accounts for it), but a NEW call reaching internal/inject from inside
+	// a Constructor closure running THIS Stage means it arrived too late:
+	// this function's dependency graph/goroutine dispatch is already built,
+	// so nothing would ever consult a pending edge recorded now. See
+	// inject.resolving's own doc comment for the full rationale (this
+	// codebase's real production incident that motivated the guard).
+	inject.MarkResolving(true)
+	defer inject.MarkResolving(false)
+
 	nodes := allProviders(modules)
 	if len(nodes) == 0 {
 		return nil
