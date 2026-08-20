@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
 )
 
 // fakeDirectOwner is a minimal module.Owner + directResolver test double,
@@ -144,13 +145,67 @@ func TestMustInjectAll_PointerType_Panics(t *testing.T) {
 	MustAll[*fakeService](owner)
 }
 
-func TestMustInjectAll_FromProviderOwner_Panics(t *testing.T) {
-	owner := newOwner() // *provider.Provider, does not satisfy directResolver
+// TestMustInjectAll_FromProviderOwner_DispatchesToMustAllProvider replaces
+// the OLD "*provider.Provider is unsupported" panic test -- this feature
+// (provider-must-inject-all) explicitly makes *provider.Provider a
+// supported MustInjectAll owner (REQ-001), dispatching to mustAllProvider
+// instead of panicking. See T4's "Done when": a *provider.Provider-owned
+// MustAll[T] call must reach mustAllProvider (correctly-sized slice +
+// recorded PendingAllEdge), proven here end-to-end via a real Assemble()'d
+// module tree, not the fakeDirectOwner double used by every other test in
+// this file (a real *provider.Provider is required: mustAllProvider calls
+// owner.OwnerModule(), which fakeDirectOwner only fakes for the
+// directResolver path).
+func TestMustInjectAll_FromProviderOwner_DispatchesToMustAllProvider(t *testing.T) {
+	resetPendingEdges()
+
+	owner := provider.New(func(p *provider.Provider) {})
+	match1 := newDeclaredProvider(func() directIface { return directImpl{name: "a"} })
+	match2 := newDeclaredProvider(func() directIface { return directImpl{name: "b"} })
+
+	m := module.New(func(m *module.Module) {
+		m.Providers(owner, match1, match2)
+	})
+	if _, err := m.Assemble(); err != nil {
+		t.Fatalf("Assemble() error = %v", err)
+	}
+
+	got := MustAll[directIface](owner)
+	if len(got) != 2 {
+		t.Fatalf("MustInjectAll() len = %d, want 2", len(got))
+	}
+
+	edges := pendingAllEdgesFor(owner)
+	if len(edges) != 1 {
+		t.Fatalf("pending all edges for owner = %d, want 1", len(edges))
+	}
+	if len(edges[0].Matches) != 2 {
+		t.Fatalf("edge.Matches len = %d, want 2", len(edges[0].Matches))
+	}
+}
+
+func TestMustInjectAll_LazyModuleOwner_Panics(t *testing.T) {
+	owner := &module.LazyModule{}
 
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Fatalf("MustInjectAll() did not panic, want panic (Provider unsupported)")
+			t.Fatalf("MustInjectAll() did not panic, want panic (Lazy owner unsupported)")
+		}
+		if !strings.Contains(r.(string), "not supported from a Lazy owner") {
+			t.Fatalf("panic message = %q, missing expected substring", r)
+		}
+	}()
+	MustAll[directIface](owner)
+}
+
+func TestMustInjectAll_UnsupportedOwner_Panics(t *testing.T) {
+	owner := "not a supported owner kind"
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("MustInjectAll() did not panic, want panic (owner unsupported)")
 		}
 		if !strings.Contains(r.(string), "not supported from this owner") {
 			t.Fatalf("panic message = %q, missing expected substring", r)

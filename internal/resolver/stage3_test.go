@@ -342,6 +342,113 @@ func TestResolve_DoesNotCrossContaminateWithUnrelatedPendingEdges(t *testing.T) 
 	}
 }
 
+// --- PendingAllEdge slot-write (T6) ----------------------------------------
+
+// stage3Pingable/stage3FakePinger are placeholder target/implementation
+// types for the PendingAllEdge slot-write tests below -- same
+// "content does not matter, only identity/type" role stage3AService/
+// stage3BService play for the PendingEdge (single-valor) tests above.
+type stage3Pingable interface {
+	Ping() string
+}
+
+type stage3FakePinger struct {
+	name string
+}
+
+func (f *stage3FakePinger) Ping() string { return f.name }
+
+// TestInvokeAndCopy_PendingAllEdge_WritesMatchedNodeIntoItsSlot proves a
+// node listed as Matches[i] in a recorded PendingAllEdge has its resolved
+// value written into edge.Slice.Index(i) once invokeAndCopy(node) runs, and
+// that a node NOT listed in any edge's Matches (invokeAndCopy called for it
+// too) leaves every OTHER slot in that same Slice untouched.
+func TestInvokeAndCopy_PendingAllEdge_WritesMatchedNodeIntoItsSlot(t *testing.T) {
+	inject.Reset()
+	defer inject.Reset()
+
+	matchA := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() stage3Pingable { return &stage3FakePinger{name: "a"} })
+	})
+	matchB := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() stage3Pingable { return &stage3FakePinger{name: "b"} })
+	})
+	unrelated := provider.New(func(p *provider.Provider) {
+		p.Constructor(func() *stage3AService { return &stage3AService{Value: "unrelated"} })
+	})
+	// matchA/matchB/unrelated must already be Declare()'d (ResolvedType()
+	// populated) before owner's own Declare() runs findAllRefs against them
+	// -- see internal/inject's findAllRefs/mustAllProvider, which reads
+	// ResolvedType() directly without Declare()'ing candidates itself.
+	matchA.Declare()
+	matchB.Declare()
+	unrelated.Declare()
+
+	var owner *provider.Provider
+	owner = provider.New(func(p *provider.Provider) {
+		inject.MustAll[stage3Pingable](owner)
+		p.Constructor(func() *stage3BService { return &stage3BService{Value: "owner"} })
+	})
+
+	m := module.New(func(m *module.Module) {
+		m.Providers(owner, matchA, matchB, unrelated)
+	})
+	if _, err := m.Assemble(); err != nil {
+		t.Fatalf("Assemble() error = %v", err)
+	}
+	owner.Declare()
+
+	edges := inject.PendingAllEdges()
+	if len(edges) != 1 {
+		t.Fatalf("PendingAllEdges() len = %d, want 1", len(edges))
+	}
+	edge := edges[0]
+	if len(edge.Matches) != 2 {
+		t.Fatalf("edge.Matches len = %d, want 2", len(edge.Matches))
+	}
+
+	idxA, idxB := -1, -1
+	for i, m := range edge.Matches {
+		switch m {
+		case module.ProviderRef(matchA):
+			idxA = i
+		case module.ProviderRef(matchB):
+			idxB = i
+		}
+	}
+	if idxA == -1 || idxB == -1 {
+		t.Fatalf("edge.Matches did not contain both matchA and matchB: %+v", edge.Matches)
+	}
+
+	if err := invokeAndCopy(context.Background(), matchA, nil); err != nil {
+		t.Fatalf("invokeAndCopy(matchA) error = %v", err)
+	}
+
+	gotA, ok := edge.Slice.Index(idxA).Interface().(stage3Pingable)
+	if !ok || gotA == nil || gotA.Ping() != "a" {
+		t.Fatalf("edge.Slice.Index(idxA) = %#v, want resolved matchA value (Ping() == %q)", edge.Slice.Index(idxA).Interface(), "a")
+	}
+	if !edge.Slice.Index(idxB).IsNil() {
+		t.Fatalf("edge.Slice.Index(idxB) was written by invokeAndCopy(matchA), want untouched (nil)")
+	}
+
+	// unrelated is not listed in edge.Matches at all -- running
+	// invokeAndCopy for it must leave every slot in edge.Slice exactly as
+	// it was (idxA still "a", idxB still nil), proving the m == node guard
+	// in invokeAndCopy's PendingAllEdge loop actually filters.
+	if err := invokeAndCopy(context.Background(), unrelated, nil); err != nil {
+		t.Fatalf("invokeAndCopy(unrelated) error = %v", err)
+	}
+
+	gotA2, ok := edge.Slice.Index(idxA).Interface().(stage3Pingable)
+	if !ok || gotA2 == nil || gotA2.Ping() != "a" {
+		t.Fatalf("edge.Slice.Index(idxA) changed after invokeAndCopy(unrelated), got %#v", edge.Slice.Index(idxA).Interface())
+	}
+	if !edge.Slice.Index(idxB).IsNil() {
+		t.Fatalf("edge.Slice.Index(idxB) was written by invokeAndCopy(unrelated), want untouched (nil)")
+	}
+}
+
 // TestResolve_ResolvesProvidersWithNoPendingEdgesToo proves Stage 3 resolves
 // EVERY registered provider, not only ones reachable via a MustInject
 // chain -- a provider nobody depends on (never a pending-edge target) must

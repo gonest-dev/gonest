@@ -40,6 +40,52 @@ var (
 	pendingEdges   []PendingEdge
 )
 
+// PendingAllEdge records that Owner (a *provider.Provider) requested
+// resolution of every provider implementing InterfaceType via
+// MustInjectAll, called from a Provider's own builder fn (see
+// mustAllProvider below) -- the multi-valor counterpart of PendingEdge.
+// internal/resolver walks this bookkeeping (via PendingAllEdges) to expand
+// N owner->matched dependency edges into the DI graph (BuildGraph) and to
+// write each matched provider's resolved value into its slot in Slice, in
+// place, once that provider's Constructor has run (Stage 3's
+// invokeAndCopy).
+//
+// Matches holds the exact, already-unwrapped concrete ProviderRef for each
+// candidate (never a providerAsRef view -- see findAllRefs's own doc
+// comment for why the unwrap happens there, before this struct is ever
+// populated), in the same order as Slice's elements: Matches[i] resolves
+// into Slice.Index(i).
+//
+// Slice is the reflect.Value of the slice MustInjectAll already allocated
+// and returned to the caller (via reflect.MakeSlice) -- a slice's elements
+// are always addressable/settable via Index(i) regardless of how the slice
+// itself was obtained, so Stage 3 can write into it in place, visible to
+// every copy of the slice header already handed out (e.g. captured by a
+// Constructor closure), with no "commit" step required from the caller.
+type PendingAllEdge struct {
+	Owner         module.Owner
+	InterfaceType reflect.Type
+	Matches       []module.ProviderRef
+	Slice         reflect.Value
+}
+
+var (
+	pendingAllEdgesMu sync.Mutex
+	pendingAllEdges   []PendingAllEdge
+)
+
+// PendingAllEdges returns a copy of all pending multi-valor edges recorded
+// so far, in registration order. Read-only: mutating the returned slice
+// does not affect this package's internal state. Mirrors PendingEdges's own
+// defensive-copy contract. Used by internal/resolver to expand each edge
+// into N owner->matched dependency edges (BuildGraph) and to write resolved
+// values into the right slot (Stage 3's invokeAndCopy).
+func PendingAllEdges() []PendingAllEdge {
+	pendingAllEdgesMu.Lock()
+	defer pendingAllEdgesMu.Unlock()
+	return append([]PendingAllEdge(nil), pendingAllEdges...)
+}
+
 // lazyResolved records, for the CURRENT bootstrap only, every
 // module.ProviderRef that mustLazy already eagerly constructed via
 // Module.Lazy's MustInject[T](l) dispatch branch (see mustLazy below),
@@ -160,6 +206,10 @@ func Reset() {
 	pendingEdgesMu.Lock()
 	pendingEdges = nil
 	pendingEdgesMu.Unlock()
+
+	pendingAllEdgesMu.Lock()
+	pendingAllEdges = nil
+	pendingAllEdgesMu.Unlock()
 
 	globalSingletonsMu.Lock()
 	globalSingletons = nil
@@ -334,6 +384,99 @@ func mustLazy[T any](lm *module.LazyModule, t reflect.Type) T {
 	return real.Interface().(T)
 }
 
+// mustAllProvider implements MustAll[T]'s *provider.Provider-owner dispatch
+// branch (design.md's 5-step algorithm): T is an interface type, owner is a
+// *provider.Provider calling MustInjectAll[T] from its own builder fn
+// (Stage 2, Declare) -- see this feature's (provider-must-inject-all)
+// design.md Architecture Overview for the full rationale.
+//
+// The returned slice's element ORDER IS NOT GUARANTEED -- see REQ-004:
+// Matches is collected by walking owner's own module then its imports (see
+// findAllRefs), not by any stable dependency-resolution order, and Stage
+// 3's errgroup-based resolution may finish matched providers in any order.
+// Callers that need every matching value (e.g. to aggregate health-check
+// adapters) must not rely on a particular position within the slice.
+func mustAllProvider[T any](owner module.Owner, t reflect.Type) []T {
+	matches := findAllRefs(owner.OwnerModule(), t)
+
+	for _, m := range matches {
+		if sc, ok := m.(lazyScoped); ok && sc.ResolvedScope() != scope.Singleton {
+			panic(fmt.Sprintf("gonest: MustInjectAll[T](p) matched provider for type %s is scoped %v, only ScopeSingleton providers can be members of a Provider-owned MustInjectAll slice", t.String(), sc.ResolvedScope()))
+		}
+	}
+
+	slice := reflect.MakeSlice(reflect.SliceOf(t), len(matches), len(matches))
+
+	pendingAllEdgesMu.Lock()
+	pendingAllEdges = append(pendingAllEdges, PendingAllEdge{Owner: owner, InterfaceType: t, Matches: matches, Slice: slice})
+	pendingAllEdgesMu.Unlock()
+
+	return slice.Interface().([]T)
+}
+
+// allAsView is the local duck-typed interface findAllRefs checks a matched
+// module.ProviderRef against to decide whether it is a view (produced by
+// gonest.ProviderAs[T], internal/module's providerAsRef) that needs
+// unwrapping before being recorded as a PendingAllEdge match. Mirrors
+// module.providerAsRef.InnerRef(), already exported for exactly this kind
+// of cross-package duck-typing (see its own doc comment) -- declared here,
+// not imported, for the same reason every other duck-typed marker in this
+// file is local: internal/inject only needs the one method, not the whole
+// providerAsRef type.
+type allAsView interface {
+	InnerRef() module.ProviderRef
+}
+
+// findAllRefs collects every module.ProviderRef visible from ownerModule --
+// its own OwnProviders() plus, for each of its ImportedModules(), that
+// module's own EffectiveExports() -- whose ResolvedType() EXACTLY matches
+// t (no structural reflect.Type.Implements() fallback, same convention as
+// internal/resolver's findDirectMatches/Find, per AD-053: interface
+// resolution is exclusively explicit, via gonest.ProviderAs[T]).
+// Deduplicated by ProviderRef identity (a provider reachable via two import
+// paths -- e.g. a diamond import -- is returned once).
+//
+// Any matched ref satisfying allAsView (a providerAsRef -- see its own doc
+// comment) is unwrapped to the CONCRETE ref it wraps (InnerRef()) before
+// being appended to the result: callers (mustAllProvider, and everything
+// downstream that reads PendingAllEdge.Matches) must never see a
+// providerAsRef, only the real ref Stage 3 actually constructs.
+//
+// Mirrors internal/resolver's Find/candidateProviders -- see this file's
+// own duplicated constructable/scoped/etc interfaces (used by mustLazy) for
+// why this is a SEPARATE implementation, not a reuse: internal/resolver
+// already imports internal/inject (graph.go/stage3.go), so the inverse
+// import here would create a cycle.
+func findAllRefs(ownerModule *module.Module, t reflect.Type) []module.ProviderRef {
+	seen := make(map[module.ProviderRef]bool)
+	var out []module.ProviderRef
+
+	add := func(p module.ProviderRef) {
+		if p.ResolvedType() != t {
+			return
+		}
+		if av, ok := p.(allAsView); ok {
+			p = av.InnerRef()
+		}
+		if seen[p] {
+			return
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+
+	for _, p := range ownerModule.OwnProviders() {
+		add(p)
+	}
+	for _, imported := range ownerModule.ImportedModules() {
+		for _, p := range imported.EffectiveExports() {
+			add(p)
+		}
+	}
+
+	return out
+}
+
 // directResolver is satisfied by *controller.Controller (once Provider
 // phase/phase 1 has completed) and by *middleware.Middleware/*guard.Guard/
 // *interceptor.Interceptor/*filter.Filter (once Controller phase/phase 2 has
@@ -427,12 +570,30 @@ func Must[T any](owner any) T {
 // value satisfies interface T, as []T. T must be an interface kind (panics
 // otherwise -- multi-binding only makes sense for interfaces, a pointer
 // type has no "multiple implementations" concept, see MustInject's
-// single-match contract for that case). owner must satisfy directResolver
-// (panics otherwise -- Provider never supports multi-binding, matching
-// Provider-to-Provider dependencies staying single-value only). Returns an
-// empty slice, never panics, if zero providers match -- "give me all of
-// them" reasonably tolerates "there are none", unlike MustInject[T]'s
-// single-match contract.
+// single-match contract for that case).
+//
+// If owner satisfies directResolver (a Controller, Middleware, Guard,
+// Interceptor, or Filter), resolution happens DIRECTLY, right now, exactly
+// as before this feature (REQ-008: no behavior change to this path).
+//
+// If owner is a *module.LazyModule, MustInjectAll is explicitly
+// unsupported (out of scope, see this feature's (provider-must-inject-all)
+// spec.md Out of Scope) -- panics, rather than silently mis-dispatching if
+// LazyModule ever comes to structurally satisfy module.Owner.
+//
+// Otherwise, if owner satisfies module.Owner (a *provider.Provider calling
+// MustInjectAll from its own builder fn, Stage 2), resolution is DEFERRED
+// via the same placeholder+edge mechanism MustInject[T] already uses for
+// Provider-to-Provider dependencies -- generalized to a fixed-length slice,
+// see mustAllProvider's own doc comment for the full algorithm. The
+// returned slice's element ORDER IS NOT GUARANTEED (REQ-004) in this path.
+//
+// Otherwise, panics: owner is not supported.
+//
+// Returns an empty slice, never panics, if zero providers match -- "give me
+// all of them" reasonably tolerates "there are none", unlike MustInject[T]'s
+// single-match contract. This holds for both the directResolver path and
+// the Provider-owned deferred path.
 func MustAll[T any](owner any) []T {
 	t := reflect.TypeFor[T]()
 
@@ -440,15 +601,22 @@ func MustAll[T any](owner any) []T {
 		panic(fmt.Sprintf("gonest: MustInjectAll[T] requires T to be an interface type, got %s", t.String()))
 	}
 
-	dr, ok := owner.(directResolver)
-	if !ok {
-		panic("gonest: MustInjectAll[T] is not supported from this owner (Provider-to-Provider dependencies stay single-value via MustInject)")
+	if dr, ok := owner.(directResolver); ok {
+		matches := dr.ResolveDirectAll(t)
+		out := make([]T, len(matches))
+		for i, v := range matches {
+			out[i] = v.Interface().(T)
+		}
+		return out
 	}
 
-	matches := dr.ResolveDirectAll(t)
-	out := make([]T, len(matches))
-	for i, v := range matches {
-		out[i] = v.Interface().(T)
+	if _, ok := owner.(*module.LazyModule); ok {
+		panic("gonest: MustInjectAll[T](l) is not supported from a Lazy owner")
 	}
-	return out
+
+	if moOwner, ok := owner.(module.Owner); ok {
+		return mustAllProvider[T](moOwner, t)
+	}
+
+	panic("gonest: MustInjectAll[T] is not supported from this owner (Provider-to-Provider dependencies stay single-value via MustInject)")
 }

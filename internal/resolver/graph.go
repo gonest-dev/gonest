@@ -31,5 +31,19 @@ func BuildGraph() map[module.ProviderRef][]module.ProviderRef {
 		graph[ownerRef] = append(graph[ownerRef], target)
 	}
 
+	// PendingAllEdge (MustInjectAll[T] from a *provider.Provider owner)
+	// expands into N owner->match edges, one per Matches entry -- no Find()
+	// call needed, findAllRefs (internal/inject) already recorded the exact,
+	// already-unwrapped concrete refs Stage 3 will construct (design.md:
+	// "BuildGraph() expande cada PendingAllEdge em N arestas owner->match[i]").
+	for _, edge := range inject.PendingAllEdges() {
+		ownerRef, ok := edge.Owner.(module.ProviderRef)
+		if !ok {
+			continue
+		}
+
+		graph[ownerRef] = append(graph[ownerRef], edge.Matches...)
+	}
+
 	return graph
 }

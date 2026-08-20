@@ -364,6 +364,25 @@ func invokeAndCopy(ctx context.Context, node module.ProviderRef, overrides map[r
 		placeholder.Elem().Set(real.Elem())
 	}
 
+	// Multi-valor counterpart of the placeholder-copy loop above: every
+	// PendingAllEdge (recorded by MustInjectAll's Provider-owner dispatch,
+	// see internal/inject's mustAllProvider) whose Matches slice lists node
+	// gets node's resolved value written into the matching slot(s) of its
+	// pre-allocated Slice. Unlike the placeholder loop (exact pointer type
+	// match), edge.Slice's element type is an interface (T in
+	// MustInjectAll[T]), so the guard here is AssignableTo, not equality.
+	for _, edge := range inject.PendingAllEdges() {
+		for i, m := range edge.Matches {
+			if m != node {
+				continue
+			}
+			if !real.Type().AssignableTo(edge.InterfaceType) {
+				continue
+			}
+			edge.Slice.Index(i).Set(real)
+		}
+	}
+
 	return nil
 }
 

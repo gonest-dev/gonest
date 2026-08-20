@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** 26 (HttpContext Unification) -- COMPLETE
-**Status:** Milestones 1-26 COMPLETE
+**Current Milestone:** 27 (Provider-side MustInjectAll) -- COMPLETE
+**Status:** Milestones 1-27 COMPLETE
 
 ---
 
@@ -644,6 +644,43 @@ buildando, README recompilado via scratch real)
 - `gonest.go`: `Reply`/`Response`/`HttpContext` alias novos/realocados
 - `.examples/*` (6 de 7, `blog-graphql` inalterado) + README.md (14 blocos recompilados)
   migrados
+
+---
+
+## Milestone 27: Provider-side MustInjectAll
+
+**Goal:** `gonest.MustInjectAll[T](p)` (T interface) funcionando DENTRO do builder fn de um
+`gonest.NewProvider`, não só a partir de Controller/Middleware/Guard/Interceptor/Filter. Motivado
+por `INSIGHT-MUST-INJECT-ALL.md`: um `HealthUsecase` quer injetar TODOS os `port.Pingable` do
+grafo (vários adapters de infra, cada um exportado via `gonest.ProviderAs[T]`) sem precisar montar
+manualmente `[]port.Pingable` fora do DI.
+**Status:** COMPLETE (T1-T10, `go test ./... -race -count=1` verde 24 pacotes/932 subtests, zero
+flake sob `-race -count=10`, `.examples/*` -- 7 módulos -- buildando)
+
+### Features
+
+**`internal/inject.MustAll[T]` -- branch novo pra owner Provider** - COMPLETE
+- `PendingAllEdge` (contraparte multi-valor de `PendingEdge`) + bookkeeping process-global
+  (`pendingAllEdges`, limpo em `Reset()`)
+- `findAllRefs` (own module + imports `EffectiveExports()`, match EXATO via `ResolvedType()`,
+  desembrulha `providerAsRef` via `InnerRef()` antes de gravar) -- duplicado em `internal/inject`
+  (não reusado de `internal/resolver`) por ciclo de import, mesmo precedente de `mustLazy`
+- `mustAllProvider[T]`: pré-aloca `reflect.MakeSlice(SliceOf(T), N, N)` (N = candidatos já
+  contados na hora, árvore de módulos já montada em Stage 2), devolve JÁ, registra o
+  `PendingAllEdge`; panic fail-fast se algum candidato for `scope.Transient` (só Singleton pode
+  ser membro -- sem caso de uso real pra Transient hoje)
+- `MustAll[T]` ganha o branch de dispatch; `*module.LazyModule` explicitamente fora de escopo
+  (panic próprio); `directResolver` (Controller/etc) path inalterado
+
+**Stage 3 -- escrita in-place + ordenação** - COMPLETE
+- `internal/resolver/graph.go`'s `BuildGraph`: expande cada `PendingAllEdge` em N arestas
+  owner→matched no mesmo grafo (`waitDeps` bloqueia o owner até todos terminarem, sem mudança de
+  algoritmo em `DetectCycle`)
+- `internal/resolver/stage3.go`'s `invokeAndCopy` (Singleton path): loop novo escreve
+  `edge.Slice.Index(i).Set(real)` pro slot certo -- elemento de slice é sempre endereçável mesmo
+  sem o slice ter vindo de um ponteiro, cópias do header (inclusive a capturada por uma closure de
+  `Constructor`) compartilham o mesmo array, sem exigir passo de "commit" do chamador
+- Ordem do slice NÃO garantida (documentado via GoDoc, não testado)
 
 ---
 

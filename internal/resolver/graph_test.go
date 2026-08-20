@@ -42,7 +42,6 @@ func resetForGraphTest(t *testing.T) {
 // MustInject calls recorded as pending edges.
 type graphAService struct{}
 type graphBService struct{}
-type graphCService struct{}
 
 func TestBuildGraph_SingleDependencyEdge(t *testing.T) {
 	resetForGraphTest(t)
@@ -96,6 +95,63 @@ func TestBuildGraph_ExcludesControllerOwnedEdges(t *testing.T) {
 	// depends on it).
 	if deps, ok := graph[module.ProviderRef(p)]; ok && len(deps) != 0 {
 		t.Fatalf("graph[p] = %v, want empty (p has no MustInject calls of its own; only ctrl, a non-ProviderRef, resolved it)", deps)
+	}
+}
+
+// graphIfaceService is the interface type used by
+// TestBuildGraph_IncludesPendingAllEdges_AlongsidePendingEdges to exercise
+// inject.MustAll's Provider-owned dispatch (mustAllProvider/findAllRefs),
+// which requires T to be an interface kind and matches candidates by EXACT
+// ResolvedType() equality (AD-053) -- so the fake matching providers below
+// set resolved directly to this interface's reflect.Type, no ProviderAs
+// wrapping needed for this unit test's purposes.
+type graphIfaceService interface {
+	DoStuff()
+}
+
+func TestBuildGraph_IncludesPendingAllEdges_AlongsidePendingEdges(t *testing.T) {
+	resetForGraphTest(t)
+
+	ifaceType := reflect.TypeOf((*graphIfaceService)(nil)).Elem()
+
+	a := &fakeProvider{resolved: reflect.TypeOf(&graphAService{})}
+	b := &fakeProvider{resolved: reflect.TypeOf(&graphBService{})}
+	m1 := &fakeProvider{resolved: ifaceType}
+	m2 := &fakeProvider{resolved: ifaceType}
+
+	m := module.New(func(m *module.Module) {
+		m.Providers(a, b, m1, m2)
+	})
+	m.Assemble()
+
+	// Simulate Stage 2: A's builder fn calls both MustInject[*graphBService]
+	// (a PendingEdge, single pointer target) and
+	// MustInjectAll[graphIfaceService] (a PendingAllEdge, matching m1 and
+	// m2) -- BuildGraph must expand BOTH kinds of pending bookkeeping into
+	// edges from the SAME owner (a), coexisting in the same graph[a] entry.
+	inject.Must[*graphBService](a)
+	inject.MustAll[graphIfaceService](a)
+
+	graph := BuildGraph()
+
+	deps := graph[module.ProviderRef(a)]
+	if len(deps) != 3 {
+		t.Fatalf("graph[a] = %v, want 3 entries (1 PendingEdge target + 2 PendingAllEdge matches)", deps)
+	}
+
+	want := map[module.ProviderRef]bool{
+		module.ProviderRef(b):  true,
+		module.ProviderRef(m1): true,
+		module.ProviderRef(m2): true,
+	}
+	for _, dep := range deps {
+		if !want[dep] {
+			t.Fatalf("graph[a] contains unexpected dep %v, want only b/m1/m2", dep)
+		}
+		delete(want, dep)
+	}
+	if len(want) != 0 {
+		t.Fatalf("graph[a] = %v, missing expected deps %v", deps, want)
 	}
 }
 
