@@ -107,6 +107,95 @@ func TestBuiltinException_ConstructorAcceptsNilDetails(t *testing.T) {
 	}
 }
 
+// TestBuiltinException_ConstructorWithoutDetails verifies calling New*Exception
+// with only a message (0 variadic details) does NOT panic and correctly sets
+// the message and leaves details as nil.
+func TestBuiltinException_ConstructorWithoutDetails(t *testing.T) {
+	t.Run("CustomMessageOnly", func(t *testing.T) {
+		exc := exception.NewNotFoundException("User not found")
+		if exc.Message() != "User not found" {
+			t.Errorf("Message() = %q, want %q", exc.Message(), "User not found")
+		}
+		if exc.Details() != nil {
+			t.Errorf("Details() = %v, want nil", exc.Details())
+		}
+	})
+
+	t.Run("EmptyMessageDefaults", func(t *testing.T) {
+		exc := exception.NewBadRequestException("")
+		if exc.Message() != "Bad request" {
+			t.Errorf("Message() = %q, want %q", exc.Message(), "Bad request")
+		}
+		if exc.Details() != nil {
+			t.Errorf("Details() = %v, want nil", exc.Details())
+		}
+	})
+
+	t.Run("AllBuiltinsNoPanicWithSingleMessage", func(t *testing.T) {
+		allConstructors := []func(string, ...any) exception.Exception{
+			func(m string, d ...any) exception.Exception { return exception.NewBadRequestException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewUnauthorizedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewPaymentRequiredException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewForbiddenException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewNotFoundException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewMethodNotAllowedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewNotAcceptableException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewProxyAuthRequiredException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewRequestTimeoutException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewConflictException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewGoneException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewLengthRequiredException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewPreconditionFailedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewRequestEntityTooLargeException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewRequestURITooLongException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewUnsupportedMediaTypeException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewRequestedRangeNotSatisfiableException(m, d...)
+			},
+			func(m string, d ...any) exception.Exception { return exception.NewExpectationFailedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewTeapotException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewMisdirectedRequestException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewUnprocessableEntityException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewLockedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewFailedDependencyException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewTooEarlyException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewUpgradeRequiredException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewPreconditionRequiredException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewTooManyRequestsException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewRequestHeaderFieldsTooLargeException(m, d...)
+			},
+			func(m string, d ...any) exception.Exception {
+				return exception.NewUnavailableForLegalReasonsException(m, d...)
+			},
+			func(m string, d ...any) exception.Exception { return exception.NewInternalServerErrorException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewNotImplementedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewBadGatewayException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewServiceUnavailableException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewGatewayTimeoutException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewHTTPVersionNotSupportedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewVariantAlsoNegotiatesException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewInsufficientStorageException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewLoopDetectedException(m, d...) },
+			func(m string, d ...any) exception.Exception { return exception.NewNotExtendedException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewNetworkAuthenticationRequiredException(m, d...)
+			},
+		}
+
+		for _, fn := range allConstructors {
+			// Call with single arg (no details)
+			exc := fn("custom error")
+			if exc.Message() != "custom error" {
+				t.Errorf("expected 'custom error', got %q", exc.Message())
+			}
+			if exc.Details() != nil {
+				t.Errorf("expected nil details, got %v", exc.Details())
+			}
+		}
+	})
+}
+
 // TestBuiltinException_SatisfiesException verifies all five built-in types
 // satisfy the Exception interface structurally, via HttpException embedding
 // -- mirrors T1's own assertion pattern.

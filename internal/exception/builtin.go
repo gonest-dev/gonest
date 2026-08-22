@@ -2,25 +2,25 @@ package exception
 
 import "net/http"
 
-func cond[T any](cond bool, when T, then T) T {
-	if cond {
-		return when
-	}
-	return then
-}
 
 func newBuiltin[T any](
 	wrap func(HttpException) T,
 	status int, name, defaultMessage string,
 	message string, details []any,
 ) *T {
-	msg := cond(message != "", message, defaultMessage)
-	det := cond(details != nil, details, make([]any, 0))
+	msg := message
+	if msg == "" {
+		msg = defaultMessage
+	}
+	var det any
+	if len(details) > 0 {
+		det = details[0]
+	}
 	exc := wrap(NewHttpException().
 		SetStatus(status).
 		SetName(name).
 		SetMessage(msg).
-		SetDetails(det[0]))
+		SetDetails(det))
 	return &exc
 }
 

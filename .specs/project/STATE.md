@@ -5,14 +5,14 @@ Last synced commit: e904dc9
 
 ## Current Work
 
-**Feature:** built-in HTTP exceptions — padronização e expansão de `SetMessage` + cobertura completa de status 4xx/5xx.
+**Feature:** built-in HTTP exceptions (v0.35.1 fix).
 
 Concluído nesta sessão:
-1. `NewNotFoundException` já tinha o padrão `(message string, details ...any)` + `SetMessage` com default. Aplicado nos outros 4 construtores existentes (`BadRequestException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`), atualizando todos os call-sites internos (`internal/validate/*.go`, `internal/app/app.go`) e testes.
-2. Adicionados **35 novos tipos** built-in cobrindo todos os status HTTP 4xx e 5xx (`PaymentRequiredException` 402 … `NetworkAuthenticationRequiredException` 511). `builtin.go` refatorado com helper genérico `newBuiltin[T]` eliminando repetição. Aliases e wrappers públicos adicionados em `gonest.go`.
-3. `go build ./...` e `go test ./...` verdes (todos os 25 pacotes).
-
-Pendente: commit + site sync obrigatório (ver Preferences).
+1. `New*Exception(message)` sem `details` causava index out of range (`det[0]` em slice vazia) no helper `newBuiltin` em `internal/exception/builtin.go`.
+2. Corrigido para checar `len(details) > 0` antes de atribuir `details[0]`, caso contrário `det = nil`.
+3. Removido helper `cond` não utilizado.
+4. Adicionados testes unitários e de integração em `internal/exception/builtin_test.go` e `gonest_test.go` cobrindo todas as 40 exceções chamadas com apenas 1 argumento de mensagem.
+5. Versão lançada: `v0.35.1`.
 
 ## Todos
 
@@ -75,7 +75,8 @@ _(Ver `STATE_ARCHIVE.md` para AD-061 até AD-001 completos.)_
 
 ## Recent Progress (Last 10)
 
-- [2026-08-22] Built-in HTTP exceptions: SetMessage padrão + 35 novos tipos 4xx/5xx. Gate: `go test ./...` verde, 25 pacotes.
+- [2026-08-22] Fix builtin exception panic on missing details (v0.35.1). Gate: `go test ./...` verde, 25 pacotes.
+- [2026-08-22] Built-in HTTP exceptions: SetMessage padrão + 35 novos tipos 4xx/5xx (v0.35.0). Gate: `go test ./...` verde, 25 pacotes.
 - [2026-08-20] MustInject/MustInjectAll guard fail-fast dentro de Constructor. Gate: `go test ./... -race -count=1` verde, 25 pacotes. Ver AD-064.
 - [2026-08-20] Provider-side MustInjectAll (Milestone 27, T1-T10). Gate: `go test ./... -race -count=1` verde, 25 pacotes. Ver AD-063.
 - [2026-08-18] Duration Branch feature complete. Gate: `go test ./... -count=1` verde, 25 pacotes.

@@ -664,6 +664,34 @@ func TestNewNotFoundException_RootAlias_PanicRecoverRoundTrip(t *testing.T) {
 	panic(NewNotFoundException("", map[string]any{"userId": "abc123"}))
 }
 
+// TestBuiltinExceptions_RootAlias_WithoutDetails proves root-aliased built-in
+// exceptions can be instantiated with only a message, without variadic details.
+func TestBuiltinExceptions_RootAlias_WithoutDetails(t *testing.T) {
+	exc1 := NewNotFoundException("User not found")
+	if exc1.Message() != "User not found" {
+		t.Fatalf("Message() = %q, want 'User not found'", exc1.Message())
+	}
+	if exc1.Details() != nil {
+		t.Fatalf("Details() = %v, want nil", exc1.Details())
+	}
+
+	exc2 := NewUnauthorizedException("Invalid credentials")
+	if exc2.Message() != "Invalid credentials" {
+		t.Fatalf("Message() = %q, want 'Invalid credentials'", exc2.Message())
+	}
+	if exc2.Details() != nil {
+		t.Fatalf("Details() = %v, want nil", exc2.Details())
+	}
+
+	exc3 := NewForbiddenException("Access token expired or invalid")
+	if exc3.Message() != "Access token expired or invalid" {
+		t.Fatalf("Message() = %q, want 'Access token expired or invalid'", exc3.Message())
+	}
+	if exc3.Details() != nil {
+		t.Fatalf("Details() = %v, want nil", exc3.Details())
+	}
+}
+
 // TestHttpException_RootAlias_SatisfiesException proves the root-aliased
 // HttpException/Exception types keep their structural-satisfaction
 // relationship: a type embedding gonest.HttpException satisfies
