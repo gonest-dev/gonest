@@ -291,4 +291,14 @@ _Nenhuma ainda._
 - **Evaluator** -- roda DEPOIS de cada Implementer. Recebe a definição da task + o diff real (nunca confia só na alegação): confere `Done when`, `Gate` (roda o comando), SPEC_DEVIATION silencioso. Aprova ou devolve com motivo específico -- NUNCA corrige o código ele mesmo.
 Motivo: cada papel roda com contexto MÍNIMO -- evita que um mesmo agente "marque a própria lição de casa".
 
+**Site sync convention (2026-08-22, OBRIGATÓRIO, ver PROJECT.md):** toda mudança de API
+pública/assinatura/exemplo dispara atualização do repo irmão
+`C:\dev\github.com\gonest-dev\site` no MESMO milestone (nunca débito posterior) — mínimo
+`content/docs/api-reference/*.mdx` + `content/docs/core-concepts/*.mdx` relevantes, nos 3
+idiomas (en=`.mdx`, pt=`.pt.mdx`, es=`.es.mdx`). Motivado por drift real achado 2026-08-22:
+`api-reference/controller.*.mdx` (3 idiomas) ainda mostrava a API pré-refatoração
+(`RouteGet(path, func(c *HttpContext))`, sem `r.Handler`, `MustInject[T](req)` em vez de
+`MustInject[T](r)`) — 2+ milestones sem sync porque a regra anterior citava o path errado do
+site (`C:\dev\gonest-dev\site`, faltando `github.com`).
+
 **Versioning convention (2026-07-15/16):** `{major}.{minor}.{release}` sob `v0` fixo PRA SEMPRE (nunca incrementa pra `v1`) -- `major` em BREAKING change, `minor` em FEATURE nova, `release` em FIX/patch. Tag real é semver 3-segmentos com pontos (`v0.6.0`, não `v0.6-0.0` -- confirmado inválido via `golang.org/x/mod/semver.IsValid`). Primeira tag começou em `0.6.0` (não `0.1.0`), refletindo os 6 commits breaking (`!`) já em git log antes da tag existir.

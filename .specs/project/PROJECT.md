@@ -80,8 +80,15 @@ escreveu.
   (não puramente interna) ganha um exemplo runnable em `.examples/` demonstrando o fluxo
   ponta a ponta, verificado ao vivo (curl/dispatch real) antes do milestone ser considerado
   fechado — mesmo padrão já seguido por toda feature anterior deste projeto.
-- **Mudança documental → atualizar o site.** Qualquer mudança em `.specs/`, README.md, ou
-  comportamento de API pública que afete a documentação pública dispara atualização do repo
-  irmão `C:\dev\gonest-dev\site` (Next.js/fumadocs, `gonest.dev`) — commit + push separado
-  desse repo, nos 3 idiomas mantidos (en/pt/es), seguindo o padrão de commit `docs: ...` já
-  em uso lá.
+- **Mudança documental → atualizar o site — OBRIGATÓRIO, bloqueia o milestone.** Qualquer
+  mudança de API pública, assinatura, exemplo de uso ou comportamento observável dispara
+  atualização do repo irmão `C:\dev\github.com\gonest-dev\site` (Next.js/fumadocs, `gonest.dev`)
+  como parte do MESMO milestone — nunca débito posterior, nunca "próxima sessão". Cobre pelo
+  menos: `content/docs/api-reference/*.mdx`, `content/docs/core-concepts/*.mdx` e qualquer
+  outra página que exemplifique a API tocada, nos 3 idiomas mantidos (en/pt/es — `.mdx` =
+  inglês, `.pt.mdx`/`.es.mdx` = overrides). Commit + push separado desse repo, padrão `docs:
+  ...` já em uso lá. Gate do milestone só fecha depois de `grep`/leitura confirmando que nenhum
+  exemplo do site ainda mostra a assinatura/padrão ANTIGO da API mudada (histórico real:
+  AD-064/AD-063/route-must-inject ficaram sem refletir no site por 2 sessões — path errado
+  nesta mesma regra, corrigido em 2026-08-22, era `C:\dev\gonest-dev\site`, sem o
+  segmento `github.com`).
