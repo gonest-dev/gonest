@@ -146,21 +146,29 @@ func TestBuiltinException_ConstructorWithoutDetails(t *testing.T) {
 			func(m string, d ...any) exception.Exception { return exception.NewGoneException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewLengthRequiredException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewPreconditionFailedException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewRequestEntityTooLargeException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewRequestEntityTooLargeException(m, d...)
+			},
 			func(m string, d ...any) exception.Exception { return exception.NewRequestURITooLongException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewUnsupportedMediaTypeException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewUnsupportedMediaTypeException(m, d...)
+			},
 			func(m string, d ...any) exception.Exception {
 				return exception.NewRequestedRangeNotSatisfiableException(m, d...)
 			},
 			func(m string, d ...any) exception.Exception { return exception.NewExpectationFailedException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewTeapotException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewMisdirectedRequestException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewUnprocessableEntityException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewUnprocessableEntityException(m, d...)
+			},
 			func(m string, d ...any) exception.Exception { return exception.NewLockedException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewFailedDependencyException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewTooEarlyException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewUpgradeRequiredException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewPreconditionRequiredException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewPreconditionRequiredException(m, d...)
+			},
 			func(m string, d ...any) exception.Exception { return exception.NewTooManyRequestsException(m, d...) },
 			func(m string, d ...any) exception.Exception {
 				return exception.NewRequestHeaderFieldsTooLargeException(m, d...)
@@ -168,14 +176,22 @@ func TestBuiltinException_ConstructorWithoutDetails(t *testing.T) {
 			func(m string, d ...any) exception.Exception {
 				return exception.NewUnavailableForLegalReasonsException(m, d...)
 			},
-			func(m string, d ...any) exception.Exception { return exception.NewInternalServerErrorException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewInternalServerErrorException(m, d...)
+			},
 			func(m string, d ...any) exception.Exception { return exception.NewNotImplementedException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewBadGatewayException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewServiceUnavailableException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewGatewayTimeoutException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewHTTPVersionNotSupportedException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewVariantAlsoNegotiatesException(m, d...) },
-			func(m string, d ...any) exception.Exception { return exception.NewInsufficientStorageException(m, d...) },
+			func(m string, d ...any) exception.Exception {
+				return exception.NewHTTPVersionNotSupportedException(m, d...)
+			},
+			func(m string, d ...any) exception.Exception {
+				return exception.NewVariantAlsoNegotiatesException(m, d...)
+			},
+			func(m string, d ...any) exception.Exception {
+				return exception.NewInsufficientStorageException(m, d...)
+			},
 			func(m string, d ...any) exception.Exception { return exception.NewLoopDetectedException(m, d...) },
 			func(m string, d ...any) exception.Exception { return exception.NewNotExtendedException(m, d...) },
 			func(m string, d ...any) exception.Exception {

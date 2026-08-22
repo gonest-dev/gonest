@@ -2,7 +2,6 @@ package exception
 
 import "net/http"
 
-
 func newBuiltin[T any](
 	wrap func(HttpException) T,
 	status int, name, defaultMessage string,
