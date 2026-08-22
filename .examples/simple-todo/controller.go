@@ -63,7 +63,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
 			todo := service.Get(p.ID)
 			if todo == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Json(todo)
 		})
@@ -85,7 +85,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 			body := gonest.MustParse[updateTodoBody](req.Body().Json(), updateTodoBodySchema)
 			todo := service.Update(p.ID, body.Title, body.Done)
 			if todo == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Json(todo)
 		})
@@ -97,7 +97,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
 			if !service.Delete(p.ID) {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Status(http.StatusNoContent).Json(nil)
 		})
