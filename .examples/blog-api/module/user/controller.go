@@ -37,7 +37,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
 			u := service.Get(p.UserID)
 			if u == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Json(u)
 		})

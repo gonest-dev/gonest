@@ -27,7 +27,7 @@ var PostResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 			args := gonest.MustParse[PostIDArgs](ctx.Args(), postIDArgsSchema)
 			p := service.Get(args.ID)
 			if p == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			return p
 		})

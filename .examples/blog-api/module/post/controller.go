@@ -50,7 +50,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
 			post := service.Get(p.PostID)
 			if post == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Json(post)
 		})
@@ -86,7 +86,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
 			if service.Get(p.PostID) == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 
 			var savedFilename string

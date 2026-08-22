@@ -53,7 +53,7 @@ func (s *Service) Get(id int64) *Entity {
 
 func (s *Service) Create(userID int64, title, body string) *Entity {
 	if s.userService.Get(userID) == nil {
-		panic(gonest.NewNotFoundException(map[string]any{"user_id": userID}))
+		panic(gonest.NewNotFoundException("", map[string]any{"user_id": userID}))
 	}
 
 	res, err := s.db.Exec(`INSERT INTO posts (user_id, title, body) VALUES (?, ?, ?)`, userID, title, body)

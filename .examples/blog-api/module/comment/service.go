@@ -47,10 +47,10 @@ func (s *Service) List(postID, userID int64) []*Entity {
 
 func (s *Service) Create(postID, userID int64, body string) *Entity {
 	if s.postService.Get(postID) == nil {
-		panic(gonest.NewNotFoundException(map[string]any{"post_id": postID}))
+		panic(gonest.NewNotFoundException("", map[string]any{"post_id": postID}))
 	}
 	if s.userService.Get(userID) == nil {
-		panic(gonest.NewNotFoundException(map[string]any{"user_id": userID}))
+		panic(gonest.NewNotFoundException("", map[string]any{"user_id": userID}))
 	}
 
 	res, err := s.db.Exec(`INSERT INTO comments (post_id, user_id, body) VALUES (?, ?, ?)`, postID, userID, body)

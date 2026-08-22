@@ -59,7 +59,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
 			person := service.Get(p.PersonID)
 			if person == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Json(person)
 		})
@@ -79,7 +79,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			body := gonest.MustParse[BodyUpdateDTO](req.Body().Json(), BodyUpdateDTOSchema)
 			person := service.Update(p.PersonID, body)
 			if person == nil {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Json(person)
 		})
@@ -99,7 +99,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 			req, res := c.Request(), c.Response()
 			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
 			if !service.Delete(p.PersonID) {
-				panic(gonest.NewNotFoundException(nil))
+				panic(gonest.NewNotFoundException("", nil))
 			}
 			res.Status(http.StatusNoContent)
 		})

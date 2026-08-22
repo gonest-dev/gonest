@@ -16,7 +16,7 @@ type DuplicateEmailException struct {
 
 func NewDuplicateEmailException(email string) *DuplicateEmailException {
 	return &DuplicateEmailException{
-		HttpException: gonest.NewHttpException().
+		HttpException: gonest.NewHttpException("", ).
 			SetStatus(http.StatusConflict).
 			SetName("DuplicateEmailException").
 			SetMessage("email already in use").
