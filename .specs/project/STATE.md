@@ -17,7 +17,7 @@ Pendente: commit + site sync obrigatório (ver Preferences).
 ## Todos
 
 - [x] Fazer commit das mudanças desta sessão (`feat(exception): add SetMessage to all builtin constructors and add all HTTP 4xx/5xx exceptions`) — commit e904dc9
-- [ ] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `content/docs/api-reference/exceptions.*.mdx` nos 3 idiomas
+- [x] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — 6 arquivos `.mdx` (EN/PT/ES) — commit 802299c
 - [ ] Nenhum outro pendente (ver Deferred Ideas para trabalho futuro não priorizado)
 
 ## Active Blockers
