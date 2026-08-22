@@ -5,20 +5,21 @@ Last synced commit: 3645ab9 (tag v0.36.0)
 
 ## Current Work
 
-**Feature:** Redirect nativo (`Reply.Redirect` + `Route.Redirect`).
+**Feature:** Default response description no OpenAPI (`http.StatusText(status)`).
 
 Concluído nesta sessão:
-1. Brainstorm (`.specs/insight/REDIRECT.md`) motivado por `erc/ctrl/api/.../sso/controller.go` reimplementando manualmente `SetHeader("Location")+Status+Text("")` rota a rota.
-2. `.specs/features/redirect/{spec,design,tasks}.md` — pipeline Specify→Design→Tasks completo, papéis PO/DEV/QA (pedido explícito do usuário, substitui Planner/Implementer/Evaluator só nesta feature).
-3. `Reply.Redirect(url string, status ...int) error` (`internal/execution/reply.go`) — default `http.StatusFound` (302, paridade com NestJS `@Redirect()`, não 308 como o `erc` usava).
-4. `Route.Redirect(url string, status ...int) *Route` (`internal/route/route.go`) — sugar estático, chama `Reply.Redirect` internamente, documenta status via `Response(code)`.
-5. `gonest.Reply`/`gonest.Route` (aliases) expõem os dois métodos automaticamente — zero código novo na raiz, provado por smoke test end-to-end (`TestRedirect_RootAlias_DynamicAndStatic`, `gonest_test.go`).
-6. Testes: `reply_test.go` (T1), `route_test.go` (T2), smoke root — todos QA PASS. Gate: `go test ./...` verde, 25 pacotes.
+1. Bug real achado pelo usuário via screenshot do Swagger UI (`POST /auth/register`, resposta `201` sem NENHUMA description).
+2. Causa raiz: `internal/openapi/generate.go`'s `buildResponses` só usava `http.StatusText(status)` no caminho de ERRO (`defaultErrorResponse`, ≥400 sem schema) — sucesso e o caminho sintetizado (rota sem `Response()`) caíam em `"description": ""` literal.
+3. Fix: os 2 pontos que hardcodeavam `""` agora usam `http.StatusText(status)`/`http.StatusText(r.Code())` — `response.Description(...)` explícito continua sobrescrevendo (comportamento inalterado).
+4. `.specs/features/response-default-description/{spec,design,tasks}.md` — mesmo pipeline PO/DEV/QA da feature `redirect`.
+5. Teste novo `TestGenerate_ResponseDescription_DefaultsToStatusText` (`internal/openapi/generate_test.go`) — 5 casos (sucesso sem schema, sucesso com schema, rota sem `Response()`, erro sem schema, override explícito). Gate: `go test ./...` verde, 25 pacotes.
+
+**Feature anterior (v0.36.0):** Redirect nativo (`Reply.Redirect`/`Route.Redirect`) — ver AD-066.
 
 ## Todos
 
-- [x] Bump de versão + tag (`minor`, feature nova) — `v0.36.0`, commit e904dc9..3645ab9 + push no gonest
-- [x] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `controller.{mdx,pt.mdx,es.mdx}` documentando Redirect — commit 4e2cf24, push
+- [ ] Bump de versão + tag `v0.37.0` (pedido explícito do usuário) + commit+push no gonest
+- [ ] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — checar `content/docs/openapi/*.mdx` pra nota sobre description default
 - [ ] Nenhum outro pendente (ver Deferred Ideas para trabalho futuro não priorizado)
 
 ## Active Blockers
@@ -32,6 +33,12 @@ Concluído nesta sessão:
 **Resolution:** definitivo seria reiniciar a sessão do harness.
 
 ## Recent Decisions (Last 15)
+
+### AD-067: OpenAPI — default response description = `http.StatusText(status)` pra todo status (2026-08-22)
+
+**Decision:** `internal/openapi/generate.go`'s `buildResponses` — os 2 pontos que hardcodeavam `"description": ""` (rota sem `Response()` e status sem `Description()` explícito) passam a usar `http.StatusText(status)`/`http.StatusText(r.Code())`. `defaultErrorResponse` (≥400 sem schema) já fazia isso, ficou como referência.
+**Reason:** achado real do usuário (screenshot Swagger UI) — resposta `201` sem NENHUMA description. `response.Description(...)` explícito continua sobrescrevendo, sem mudança nesse contrato.
+**Trade-off:** nenhum técnico — muda só o VALOR default, não introduz tipo/campo novo.
 
 ### AD-066: Redirect nativo — `Reply.Redirect`/`Route.Redirect`, default 302 (2026-08-22)
 
@@ -82,6 +89,7 @@ _(Ver `STATE_ARCHIVE.md` para AD-061 até AD-001 completos.)_
 
 ## Recent Progress (Last 10)
 
+- [2026-08-22] OpenAPI default response description = http.StatusText(status). Gate: `go test ./...` verde, 25 pacotes. Ver AD-067.
 - [2026-08-22] Redirect nativo (Reply.Redirect + Route.Redirect, default 302). Gate: `go test ./...` verde, 25 pacotes. Ver AD-066.
 - [2026-08-22] Fix builtin exception panic on missing details (v0.35.1). Gate: `go test ./...` verde, 25 pacotes.
 - [2026-08-22] Built-in HTTP exceptions: SetMessage padrão + 35 novos tipos 4xx/5xx (v0.35.0). Gate: `go test ./...` verde, 25 pacotes.
@@ -91,7 +99,7 @@ _(Ver `STATE_ARCHIVE.md` para AD-061 até AD-001 completos.)_
 - [2026-07-23] Milestone 24 (Module Lazy Loading) T1-T8 complete. Gate: `go test ./... -race -count=1` verde, 24 pacotes. Ver AD-054.
 - [2026-07-23] Milestone 22 (Provider Interface Export) + Milestone 23 (Thing_ Naming) complete. Gate: `go test ./... -race -count=1` verde. Ver AD-053.
 - [2026-07-21] Pós-Milestone 21: `.examples/full-text-search` + Swagger + 2 bugs fix. Gate: verde, 24 pacotes. Ver AD-048.
-- [2026-07-21] Milestone 21 (Enum Branches) T1-T4 complete. Gate: verde, 24 pacotes. Ver AD-047.
+
 ## Lessons Learned (Last 5)
 
 ### L-008: `Context.route any` + assertion — deveria ter sido interface tipada (2026-07-13)

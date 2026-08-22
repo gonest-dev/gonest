@@ -991,6 +991,74 @@ func TestGenerate_ResponseDescription_OverridesDefault(t *testing.T) {
 	}
 }
 
+// TestGenerate_ResponseDescription_DefaultsToStatusText proves every
+// response without an explicit .Description() gets http.StatusText(status)
+// as its description -- success or error, schema-carrying or not, and even
+// the synthesized default for a route that never calls Response() at all
+// (spec.md's REQ-001..REQ-004, response-default-description feature). Fixes
+// a real bug: a 201 response used to render with a blank description in
+// generated Swagger UI.
+func TestGenerate_ResponseDescription_DefaultsToStatusText(t *testing.T) {
+	type createdEntity struct {
+		Id int64 `json:"id"`
+	}
+	okSchema := schema.New(reflect.TypeOf(createdEntity{}), 0)
+
+	c := controller.New(func(c *controller.Controller) {
+		c.Path("/things")
+		c.Route(route.HttpGet, "/plain", func(r *route.Route) {})
+		c.Route(route.HttpGet, "/ok", func(r *route.Route) {
+			r.Response(200, func(response *route.Response) {})
+		})
+		c.Route(route.HttpPost, "/created", func(r *route.Route) {
+			r.Response(201, func(response *route.Response) {
+				response.Schema(okSchema)
+			})
+		})
+		c.Route(route.HttpGet, "/not-found", func(r *route.Route) {
+			r.Response(404, func(response *route.Response) {})
+		})
+		c.Route(route.HttpGet, "/custom", func(r *route.Route) {
+			r.Response(200, func(response *route.Response) {
+				response.Description("custom")
+			})
+		})
+	})
+	c.Declare()
+
+	root := module.New(func(m *module.Module) {
+		m.Controllers(c)
+	})
+	if _, err := root.Assemble(); err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+
+	doc := New("3.1.0", nil)
+	Generate(doc, root)
+
+	get := func(path, method, status string) map[string]any {
+		op := doc.paths[path][method].(map[string]any)
+		responses := op["responses"].(map[string]any)
+		return responses[status].(map[string]any)
+	}
+
+	if got := get("/things/plain", "get", "200")["description"]; got != "OK" {
+		t.Fatalf("undocumented route 200 description = %v, want %q", got, "OK")
+	}
+	if got := get("/things/ok", "get", "200")["description"]; got != "OK" {
+		t.Fatalf("Response(200) no schema description = %v, want %q", got, "OK")
+	}
+	if got := get("/things/created", "post", "201")["description"]; got != "Created" {
+		t.Fatalf("Response(201) with schema description = %v, want %q", got, "Created")
+	}
+	if got := get("/things/not-found", "get", "404")["description"]; got != "Not Found" {
+		t.Fatalf("Response(404) error path description = %v, want %q", got, "Not Found")
+	}
+	if got := get("/things/custom", "get", "200")["description"]; got != "custom" {
+		t.Fatalf("explicit Description() override = %v, want %q", got, "custom")
+	}
+}
+
 // TestGenerate_FormBody_MultipartFormDataWithFileField proves Route.FormBody
 // documents the requestBody as multipart/form-data (not application/json,
 // unlike RequestBody) -- an object schema combining m's own properties

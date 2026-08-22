@@ -37,11 +37,10 @@ func (r *Response) SchemaValue() (*schema.Schema, bool) {
 	return r.schemaValue, r.schemaValue != nil
 }
 
-// Description sets a custom description for this response, overriding
-// whatever description generation would otherwise pick (empty string for
-// a schema-carrying response, or the auto-derived http.StatusText default
-// for an undocumented 4xx/5xx response -- see internal/openapi's
-// buildResponses/defaultErrorResponse). Returns r so calls can chain. Takes
+// Description sets a custom description for this response, overriding the
+// auto-derived http.StatusText(status) default every other status gets
+// (see internal/openapi's buildResponses/defaultErrorResponse). Returns r
+// so calls can chain. Takes
 // at least one word (word, words...) rather than a bare `...string`, same
 // reasoning as route.Route.Summary's own doc comment -- joined with a
 // single space so a long description can be split across multiple Go

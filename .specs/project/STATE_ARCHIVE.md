@@ -2,6 +2,10 @@
 
 <!-- Auto-generated. Never edit manually. Read with: "show state history" -->
 
+## Archive — 2026-08-22 (Recent Progress trim, response-default-description session)
+
+- [2026-07-21] Milestone 21 (Enum Branches) T1-T4 complete. Gate: verde, 24 pacotes. Ver AD-047.
+
 ## Archive — 2026-08-22 (Recent Progress trim, redirect feature session)
 
 - [2026-07-20] Housekeeping pós-Milestone 20: renames públicos, `internal/value`→`internal/accessor`. Gate: verde. Ver AD-046.

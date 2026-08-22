@@ -189,17 +189,21 @@ func resolveBearerAuth(c routableController, r *route.Route) bool {
 // at all (spec.md's Decision 4 -- undocumented routes still appear, using
 // whatever is inferable). A 4xx/5xx status documented with no explicit
 // schema (e.g. `r.Response(http.StatusNotFound)`) defaults to
-// exception.Schema instead of a bare empty description -- HttpException is
-// the framework's single default carrier for every built-in and dev-defined
+// exception.Schema instead of a bare description -- HttpException is the
+// framework's single default carrier for every built-in and dev-defined
 // exception, so it is always a truthful (if generic) description of what
-// that status actually returns. response.Description(...) always wins over
-// both of those defaults, for any status.
+// that status actually returns. Every OTHER status (success, or error WITH
+// a schema, or the synthesized zero-Response() default) gets
+// http.StatusText(status) as its default description (e.g. 201 ->
+// "Created") instead of an empty string -- an undocumented response should
+// never render blank in generated Swagger UI. response.Description(...)
+// always wins over every one of these defaults, for any status.
 func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bool) map[string]any {
 	responses := r.Responses()
 	out := map[string]any{}
 
 	if len(responses) == 0 {
-		out[strconv.Itoa(r.Code())] = map[string]any{"description": ""}
+		out[strconv.Itoa(r.Code())] = map[string]any{"description": http.StatusText(r.Code())}
 		return out
 	}
 
@@ -211,7 +215,7 @@ func buildResponses(r *route.Route, doc *OpenAPI, visiting map[*schema.Schema]bo
 		if !hasSchema && status >= http.StatusBadRequest {
 			entry = defaultErrorResponse(status, doc, visiting)
 		} else {
-			entry = map[string]any{"description": ""}
+			entry = map[string]any{"description": http.StatusText(status)}
 			if hasSchema {
 				entry["content"] = map[string]any{
 					"application/json": map[string]any{
