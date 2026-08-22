@@ -1,6 +1,6 @@
 # State
 
-Last synced commit: 3645ab9 (tag v0.36.0)
+Last synced commit: 419e73f (tag v0.37.0)
 **Last Updated:** 2026-08-22
 
 ## Current Work
@@ -18,8 +18,8 @@ Concluído nesta sessão:
 
 ## Todos
 
-- [ ] Bump de versão + tag `v0.37.0` (pedido explícito do usuário) + commit+push no gonest
-- [ ] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — checar `content/docs/openapi/*.mdx` pra nota sobre description default
+- [x] Bump de versão + tag `v0.37.0` — commit 419e73f, push no gonest
+- [x] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `openapi/index.{mdx,pt.mdx,es.mdx}` documentando default description — commit a244787, push
 - [ ] Nenhum outro pendente (ver Deferred Ideas para trabalho futuro não priorizado)
 
 ## Active Blockers
