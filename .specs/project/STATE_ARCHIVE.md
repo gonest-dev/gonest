@@ -2,6 +2,11 @@
 
 <!-- Auto-generated. Never edit manually. Read with: "show state history" -->
 
+## Archive — 2026-08-22 (Recent Progress trim, redirect feature session)
+
+- [2026-07-20] Housekeeping pós-Milestone 20: renames públicos, `internal/value`→`internal/accessor`. Gate: verde. Ver AD-046.
+- [2026-07-19] Milestone 20 (Lifecycle Hooks) T1-T7 complete. Gate: `go test ./... -race` verde, 25 pacotes. Ver AD-044.
+
 ## Archive — 2026-08-20 (compaction 1)
 
 ### Progress (Current Work — historical paragraphs, verbatim, superseded by top of STATE.md)

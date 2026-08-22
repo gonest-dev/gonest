@@ -1,6 +1,9 @@
 package execution
 
-import "bufio"
+import (
+	"bufio"
+	"net/http"
+)
 
 // Reply encapsulates the WRITE side of an HTTP request/response cycle for
 // a single route Handler -- request-response-split feature (replaces the
@@ -79,6 +82,23 @@ func (res *Reply) Html(s string) error {
 func (res *Reply) Text(s string) error {
 	res.res.SetHeaderValue("Content-Type", "text/plain")
 	return res.res.SendString(s)
+}
+
+// Redirect writes a redirect response -- sets the Location header to url,
+// the status code (http.StatusFound, 302, by default -- matching NestJS's
+// own @Redirect() default, the reference this framework mirrors), and an
+// empty body. status, when given, overrides the default -- same optional-
+// trailing-arg shape Route.Redirect uses for its own static counterpart.
+// Replaces the SetHeader("Location", ...) + Status(...) + Text("") pattern
+// call sites otherwise repeat by hand for every redirecting route.
+func (res *Reply) Redirect(url string, status ...int) error {
+	code := http.StatusFound
+	if len(status) > 0 {
+		code = status[0]
+	}
+	res.res.SetHeaderValue("Location", url)
+	res.res.SetStatus(code)
+	return res.res.SendString("")
 }
 
 // Stream registers fn as this response's own body-streaming writer

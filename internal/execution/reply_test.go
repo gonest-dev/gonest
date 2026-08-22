@@ -101,6 +101,45 @@ func TestReply_Text_SetsPlainTextContentType(t *testing.T) {
 	}
 }
 
+// TestReply_Redirect_DefaultsTo302 proves Redirect(url) with no status
+// argument uses http.StatusFound (302) -- NestJS's own @Redirect() default,
+// the reference this framework mirrors (see .specs/insight/REDIRECT.md).
+func TestReply_Redirect_DefaultsTo302(t *testing.T) {
+	fake := newFakeResponder()
+	_, res := New(fake)
+
+	if err := res.Redirect("https://example.com/target"); err != nil {
+		t.Fatalf("Redirect() returned error: %v", err)
+	}
+
+	if got := fake.headers["Location"]; got != "https://example.com/target" {
+		t.Fatalf("expected Location header %q, got %q", "https://example.com/target", got)
+	}
+	if fake.statusCode != 302 {
+		t.Fatalf("expected default status 302, got %d", fake.statusCode)
+	}
+	if fake.sentString != "" {
+		t.Fatalf("expected empty body, got %q", fake.sentString)
+	}
+}
+
+// TestReply_Redirect_StatusOverridesDefault proves a passed status
+// overrides the 302 default.
+func TestReply_Redirect_StatusOverridesDefault(t *testing.T) {
+	tests := []int{301, 307, 308}
+	for _, status := range tests {
+		fake := newFakeResponder()
+		_, res := New(fake)
+
+		if err := res.Redirect("/other", status); err != nil {
+			t.Fatalf("Redirect() returned error: %v", err)
+		}
+		if fake.statusCode != status {
+			t.Fatalf("expected status %d, got %d", status, fake.statusCode)
+		}
+	}
+}
+
 // TestReply_Request_ReturnsOriginatingRequest proves Reply holds a
 // reference back to the *Request that originated it (context.md's Decision
 // D2).

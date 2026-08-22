@@ -86,88 +86,87 @@
       "scope_scope_string"
     ],
     "1": [
-      "inject_allasview",
-      "inject_constructable",
-      "inject_declarable",
-      "inject_directresolver",
-      "inject_fakepinger",
-      "inject_fakepinger_ping",
-      "inject_fakeservice",
-      "inject_lazyconfig",
-      "inject_lazyresolvedsetter",
-      "inject_lazyscoped",
-      "inject_otherlazyconfig",
-      "inject_otherservice",
-      "inject_pendingalledge",
-      "inject_pendingedge",
-      "inject_pingable",
-      "internal_inject_direct_dispatch_test_testmustinjectall_fromproviderowner_dispatchestomustallprovider",
-      "internal_inject_inject",
-      "internal_inject_inject_findallrefs",
-      "internal_inject_inject_globalsingletonfor",
-      "internal_inject_inject_go_module",
-      "internal_inject_inject_go_t",
-      "internal_inject_inject_go_type",
-      "internal_inject_inject_go_value",
-      "internal_inject_inject_lazyresolvedvalue",
-      "internal_inject_inject_markresolving",
-      "internal_inject_inject_must",
-      "internal_inject_inject_mustall",
-      "internal_inject_inject_mustallprovider",
-      "internal_inject_inject_mustlazy",
-      "internal_inject_inject_pendingalledges",
-      "internal_inject_inject_pendingedges",
-      "internal_inject_inject_pendingedgesfor",
-      "internal_inject_inject_registerglobalsingleton",
-      "internal_inject_inject_reset",
-      "internal_inject_inject_resetpendingedges",
-      "internal_inject_inject_test",
-      "internal_inject_inject_test_go_provider",
-      "internal_inject_inject_test_go_t",
-      "internal_inject_inject_test_newdeclaredprovider",
-      "internal_inject_inject_test_newowner",
-      "internal_inject_inject_test_pendingalledgesfor",
-      "internal_inject_inject_test_testfindallrefs_diamondimport_dedups",
-      "internal_inject_inject_test_testfindallrefs_importexportedmatch",
-      "internal_inject_inject_test_testfindallrefs_ownmodulematch",
-      "internal_inject_inject_test_testfindallrefs_providerasref_unwrappedtoconcreteref",
-      "internal_inject_inject_test_testfindallrefs_unexportedimportprovider_notmatched",
-      "internal_inject_inject_test_testmust_calledduringresolvingphase_panics",
-      "internal_inject_inject_test_testmust_notresolvingphase_stillworks",
-      "internal_inject_inject_test_testmustall_calledduringresolvingphase_panics",
-      "internal_inject_inject_test_testmustall_notresolvingphase_stillworks",
-      "internal_inject_inject_test_testmustallprovider_singletonmatches_returnssliceandrecordsedge",
-      "internal_inject_inject_test_testmustallprovider_transientmatch_panicsbeforerecordingedge",
-      "internal_inject_inject_test_testmustallprovider_zeromatches_returnsemptynonnilslice_nopanic",
-      "internal_inject_inject_test_testmustinject_multiplecallsdonotcollide",
-      "internal_inject_inject_test_testmustinject_nonpointerbuiltintype_panicswithdynamictypename",
-      "internal_inject_inject_test_testmustinject_nonpointertype_messageisdynamicnothardcoded",
-      "internal_inject_inject_test_testmustinject_nonpointertype_panicswithdynamictypename",
-      "internal_inject_inject_test_testmustinject_placeholderisusable",
-      "internal_inject_inject_test_testmustinject_registersexactlyonependingedge",
-      "internal_inject_inject_test_testmustinject_returnsnonnilplaceholderforpointertype",
-      "internal_inject_inject_test_testpendingalledges_returnscopynotaliasinginternalstate",
-      "internal_inject_inject_test_testpendingedge_retainsplaceholderusableforcopyinplace",
-      "internal_inject_inject_test_testpendingedges_returnscopynotaliasinginternalstate",
-      "internal_inject_inject_test_testreset_clearsallpendingedges",
-      "internal_inject_inject_test_testreset_clearspendingalledges",
-      "internal_inject_lazy_test",
-      "internal_inject_lazy_test_go_t",
-      "internal_inject_lazy_test_testmustlazy_nestedmustinject_panics",
-      "internal_inject_lazy_test_testmustlazy_nomatchingprovider_panics",
-      "internal_inject_lazy_test_testmustlazy_nonpointertype_panics",
-      "internal_inject_lazy_test_testmustlazy_nonsingletonprovider_panics",
-      "internal_inject_lazy_test_testmustlazy_repeatedcall_reusescachedvalue",
-      "internal_inject_lazy_test_testmustlazy_successfuleagerresolve",
-      "internal_module_lazy",
-      "internal_module_lazy_go_module",
-      "internal_module_lazy_go_module_module",
-      "module_lazymodule",
-      "module_lazymodule_exports",
-      "module_lazymodule_imports",
-      "module_lazymodule_ownproviders",
-      "module_module_lazy",
-      "module_owner"
+      "graphql_resolver_resolvedirect",
+      "graphql_resolver_resolvedirectall",
+      "internal_graphql_resolver_go_type",
+      "internal_graphql_resolver_go_value",
+      "internal_resolver_direct",
+      "internal_resolver_direct_candidateproviders",
+      "internal_resolver_direct_finddirect",
+      "internal_resolver_direct_finddirectall",
+      "internal_resolver_direct_finddirectmatches",
+      "internal_resolver_direct_go_module",
+      "internal_resolver_direct_go_type",
+      "internal_resolver_direct_go_value",
+      "internal_resolver_direct_resolvedvalueof",
+      "internal_resolver_direct_test",
+      "internal_resolver_direct_test_animalifacetype",
+      "internal_resolver_direct_test_go_fakeprovider",
+      "internal_resolver_direct_test_go_t",
+      "internal_resolver_direct_test_go_type",
+      "internal_resolver_direct_test_go_value",
+      "internal_resolver_direct_test_newresolved",
+      "internal_resolver_direct_test_testfinddirect_importednotreexported_stillinvisible",
+      "internal_resolver_direct_test_testfinddirect_interface_exactmatchtakesprecedenceoverimplements",
+      "internal_resolver_direct_test_testfinddirect_interface_singleimplementor_resolves",
+      "internal_resolver_direct_test_testfinddirect_interface_twoimplementors_ambiguousnotfoundhere",
+      "internal_resolver_direct_test_testfinddirect_pointer_exactmatch",
+      "internal_resolver_direct_test_testfinddirect_pointer_nomatch",
+      "internal_resolver_direct_test_testfinddirect_reexportedmodule_resolvestransitivelythrougheffectiveexports",
+      "internal_resolver_direct_test_testfinddirect_unexportedimports_notvisible",
+      "internal_resolver_direct_test_testfinddirect_unionscope_findsproviderfromeithermodule",
+      "internal_resolver_direct_test_testfinddirectall_interface_returnseveryimplementor",
+      "internal_resolver_direct_test_testfinddirectall_interface_zeroimplementors_returnsempty",
+      "internal_resolver_direct_test_testfinddirectall_reexportedmodule_resolvestransitivelythrougheffectiveexports",
+      "internal_resolver_direct_test_testresolvewithoverrides_interfaceoverride_skipsrealconstructor",
+      "internal_resolver_direct_test_testresolvewithoverrides_matchingpointeroverride_skipsrealconstructor",
+      "internal_resolver_direct_test_testresolvewithoverrides_nomatch_runsrealconstructor",
+      "internal_resolver_resolver",
+      "internal_resolver_resolver_find",
+      "internal_resolver_resolver_findexported",
+      "internal_resolver_resolver_findown",
+      "internal_resolver_resolver_go_module",
+      "internal_resolver_resolver_go_type",
+      "internal_resolver_resolver_hasownunexported",
+      "internal_resolver_resolver_test",
+      "internal_resolver_resolver_test_bartype",
+      "internal_resolver_resolver_test_baztype",
+      "internal_resolver_resolver_test_footype",
+      "internal_resolver_resolver_test_go_module",
+      "internal_resolver_resolver_test_go_t",
+      "internal_resolver_resolver_test_go_type",
+      "internal_resolver_resolver_test_testfind_diamondimport_directimporterresolvessharedprovider",
+      "internal_resolver_resolver_test_testfind_diamondimport_resolvesdirectimportonly",
+      "internal_resolver_resolver_test_testfind_importedbutnotexported_panics",
+      "internal_resolver_resolver_test_testfind_importedexportedprovider_resolvescorrectly",
+      "internal_resolver_resolver_test_testfind_importednotreexported_stillpanics_noproviderregistered",
+      "internal_resolver_resolver_test_testfind_ownmodulehaspriorityoverimports",
+      "internal_resolver_resolver_test_testfind_ownmoduleprovider_resolvesdirectly",
+      "internal_resolver_resolver_test_testfind_plainnotexported_stillpanicsexistsbutnotexported",
+      "internal_resolver_resolver_test_testfind_reexportedmodule_resolvestransitivelythrougheffectiveexports",
+      "internal_resolver_resolver_test_testfind_typenowhere_panics",
+      "resolver_animaliface",
+      "resolver_barservice",
+      "resolver_bazservice",
+      "resolver_catanimal",
+      "resolver_catanimal_talk",
+      "resolver_doganimal",
+      "resolver_doganimal_talk",
+      "resolver_fakeprovider",
+      "resolver_fakeprovider_isprovider",
+      "resolver_fakeprovider_istoken",
+      "resolver_fakeprovider_ownermodule",
+      "resolver_fakeprovider_resolvedtype",
+      "resolver_fakeprovider_setownermodule",
+      "resolver_fakeresolvedprovider",
+      "resolver_fakeresolvedprovider_resolvedvalue",
+      "resolver_fooservice",
+      "resolver_overridefooiface",
+      "resolver_overridefooservice",
+      "resolver_overridefooservice_isoverridefoo",
+      "resolver_overridefooservicemock",
+      "resolver_overridefooservicemock_isoverridefoo",
+      "resolver_resolvedgetter"
     ],
     "2": [
       "app",
@@ -386,67 +385,60 @@
       "route_fakeresponder_writestream"
     ],
     "5": [
-      "internal_validate_env",
-      "internal_validate_env_parseenvinto",
-      "internal_validate_env_test",
-      "internal_validate_env_test_go_t",
-      "internal_validate_env_test_testparseenvinto_allfieldsset_populatescorrectly",
-      "internal_validate_env_test_testparseenvinto_defaultusedwhenabsent_realvalueusedwhenpresent",
-      "internal_validate_env_test_testparseenvinto_emptybutsetenvvar_treatedaspresent",
-      "internal_validate_env_test_testparseenvinto_fieldwithoutenvtag_ignored",
-      "internal_validate_graphql_args",
-      "internal_validate_graphql_args_newgraphqlargssource",
-      "internal_validate_graphql_args_normalizegraphqlvalue",
-      "internal_validate_graphql_args_test",
-      "internal_validate_graphql_args_test_go_schema",
-      "internal_validate_graphql_args_test_go_t",
-      "internal_validate_graphql_args_test_newgraphqlargstestschema",
-      "internal_validate_graphql_args_test_testnewgraphqlargssource_normalizesnativeintarg",
-      "internal_validate_graphql_args_test_testnewgraphqlargssource_normalizesnestedintargs",
-      "internal_validate_headers",
-      "internal_validate_params",
-      "internal_validate_params_coerceparamstring",
-      "internal_validate_params_go_request",
-      "internal_validate_validate",
-      "internal_validate_validate_go_request",
-      "internal_validate_validate_go_schema",
-      "internal_validate_validate_int64slicecontains",
-      "internal_validate_validate_isnumerickind",
-      "internal_validate_validate_parsedecoded",
-      "internal_validate_validate_populate",
-      "internal_validate_validate_populatevalue",
-      "internal_validate_validate_resolveschema",
-      "internal_validate_validate_setfield",
-      "internal_validate_validate_stringslicecontains",
-      "internal_validate_validate_tagkey",
-      "internal_validate_validate_tagkeyvisible",
-      "internal_validate_validate_tofloat64",
-      "internal_validate_validate_validatearray",
-      "internal_validate_validate_validateobject",
-      "internal_validate_validate_validateprimitive",
-      "internal_validate_validate_validatestruct",
-      "internal_validate_validate_validatevalue",
-      "kind",
-      "propertybuilder",
-      "structfield",
-      "type",
-      "validate_envallfieldsfixture",
-      "validate_envdefaultfixture",
-      "validate_envemptybutsetfixture",
-      "validate_envtworequiredfixture",
-      "validate_formbodysource_parseinto",
-      "validate_graphqlargsentity",
-      "validate_headerssource",
-      "validate_headerssource_parseinto",
-      "validate_jsonbodysource",
-      "validate_jsonbodysource_parseinto",
-      "validate_mapargssource",
-      "validate_mapargssource_parseinto",
-      "validate_paramssource",
-      "validate_paramssource_parseinto",
-      "validate_querysource_parseinto",
-      "validate_violation",
-      "value"
+      "controller_controller_ownfilters",
+      "filter_barexampleerror",
+      "filter_fakeresponder",
+      "filter_fakeresponder_bodystream",
+      "filter_fakeresponder_getheader",
+      "filter_fakeresponder_getmethod",
+      "filter_fakeresponder_getparam",
+      "filter_fakeresponder_getpath",
+      "filter_fakeresponder_getstatus",
+      "filter_fakeresponder_html",
+      "filter_fakeresponder_isupgraderequest",
+      "filter_fakeresponder_json",
+      "filter_fakeresponder_queries",
+      "filter_fakeresponder_rawbody",
+      "filter_fakeresponder_sendstring",
+      "filter_fakeresponder_setheadervalue",
+      "filter_fakeresponder_setstatus",
+      "filter_fakeresponder_upgrade",
+      "filter_fakeresponder_writestream",
+      "filter_filter",
+      "filter_filter_catch",
+      "filter_filter_declare",
+      "filter_filter_handlerfor",
+      "filter_filter_isfilter",
+      "filter_filter_istoken",
+      "filter_filter_resolvedirect",
+      "filter_filter_resolvedirectall",
+      "filter_fooexampleerror",
+      "gonest_newfilter",
+      "internal_filter_filter",
+      "internal_filter_filter_go_module",
+      "internal_filter_filter_go_type",
+      "internal_filter_filter_go_value",
+      "internal_filter_filter_isvalidcatchsignature",
+      "internal_filter_filter_new",
+      "internal_filter_filter_test",
+      "internal_filter_filter_test_go_reader",
+      "internal_filter_filter_test_go_t",
+      "internal_filter_filter_test_go_writer",
+      "internal_filter_filter_test_newfakeresponder",
+      "internal_filter_filter_test_testcatch_handlerfor_genuinecallroundtrip",
+      "internal_filter_filter_test_testcatch_handlerfor_roundtrip",
+      "internal_filter_filter_test_testcatch_multipledistincttypes",
+      "internal_filter_filter_test_testcatch_panicsonnonfunc",
+      "internal_filter_filter_test_testcatch_panicsonoldthreeargshape",
+      "internal_filter_filter_test_testcatch_panicsonwrongfirstparamtype",
+      "internal_filter_filter_test_testcatch_panicsonwrongparamcount",
+      "internal_filter_filter_test_testcatch_panicsonwrongreturncount",
+      "internal_filter_filter_test_testcatch_panicsonwrongsecondparamtype",
+      "internal_filter_filter_test_testdeclare_doesnotrunfntwiceonrepeatedcalls",
+      "internal_filter_filter_test_testdeclare_executesfn",
+      "internal_filter_filter_test_testdeclare_nilfn_doesnotpanic",
+      "internal_filter_filter_test_testhandlerfor_missreturnsfalse",
+      "internal_filter_filter_test_testnew_doesnotexecutefnoncall"
     ],
     "6": [
       "emitter_barevent",
@@ -505,62 +497,6 @@
       "internal_emitter_subscribe_test_testsubscribe_receivesfutureemit"
     ],
     "7": [
-      "exception_badgatewayexception",
-      "exception_expectationfailedexception",
-      "exception_faileddependencyexception",
-      "exception_gatewaytimeoutexception",
-      "exception_goneexception",
-      "exception_httpversionnotsupportedexception",
-      "exception_internalservererrorexception",
-      "exception_methodnotallowedexception",
-      "exception_networkauthenticationrequiredexception",
-      "exception_notimplementedexception",
-      "exception_paymentrequiredexception",
-      "exception_preconditionfailedexception",
-      "exception_requestentitytoolargeexception",
-      "exception_requesturitoolongexception",
-      "exception_teapotexception",
-      "exception_tooearlyexception",
-      "exception_variantalsonegotiatesexception",
-      "gonest_newexpectationfailedexception",
-      "gonest_newfaileddependencyexception",
-      "gonest_newgatewaytimeoutexception",
-      "gonest_newgoneexception",
-      "gonest_newhttpversionnotsupportedexception",
-      "gonest_newinternalservererrorexception",
-      "gonest_newmethodnotallowedexception",
-      "gonest_newnetworkauthenticationrequiredexception",
-      "gonest_newnotimplementedexception",
-      "gonest_newpaymentrequiredexception",
-      "gonest_newpreconditionfailedexception",
-      "gonest_newrequestentitytoolargeexception",
-      "gonest_newrequesturitoolongexception",
-      "gonest_newteapotexception",
-      "gonest_newtooearlyexception",
-      "gonest_newvariantalsonegotiatesexception",
-      "internal_exception_builtin",
-      "internal_exception_builtin_cond",
-      "internal_exception_builtin_go_t",
-      "internal_exception_builtin_newbadgatewayexception",
-      "internal_exception_builtin_newbuiltin",
-      "internal_exception_builtin_newexpectationfailedexception",
-      "internal_exception_builtin_newfaileddependencyexception",
-      "internal_exception_builtin_newgatewaytimeoutexception",
-      "internal_exception_builtin_newgoneexception",
-      "internal_exception_builtin_newhttpversionnotsupportedexception",
-      "internal_exception_builtin_newinternalservererrorexception",
-      "internal_exception_builtin_newmethodnotallowedexception",
-      "internal_exception_builtin_newnetworkauthenticationrequiredexception",
-      "internal_exception_builtin_newnotimplementedexception",
-      "internal_exception_builtin_newpaymentrequiredexception",
-      "internal_exception_builtin_newpreconditionfailedexception",
-      "internal_exception_builtin_newrequestentitytoolargeexception",
-      "internal_exception_builtin_newrequesturitoolongexception",
-      "internal_exception_builtin_newteapotexception",
-      "internal_exception_builtin_newtooearlyexception",
-      "internal_exception_builtin_newvariantalsonegotiatesexception"
-    ],
-    "8": [
       "gonest_getlogger",
       "gonest_getloggerfor",
       "gonest_test_testmustnewapp_appoptionslogger_becomestheactiveframeworklogger",
@@ -616,62 +552,7 @@
       "logger_spylogger_verbose",
       "logger_spylogger_warn"
     ],
-    "9": [
-      "controller_controller_ownfilters",
-      "filter_barexampleerror",
-      "filter_fakeresponder",
-      "filter_fakeresponder_bodystream",
-      "filter_fakeresponder_getheader",
-      "filter_fakeresponder_getmethod",
-      "filter_fakeresponder_getparam",
-      "filter_fakeresponder_getpath",
-      "filter_fakeresponder_getstatus",
-      "filter_fakeresponder_html",
-      "filter_fakeresponder_isupgraderequest",
-      "filter_fakeresponder_json",
-      "filter_fakeresponder_queries",
-      "filter_fakeresponder_rawbody",
-      "filter_fakeresponder_sendstring",
-      "filter_fakeresponder_setheadervalue",
-      "filter_fakeresponder_setstatus",
-      "filter_fakeresponder_writestream",
-      "filter_filter",
-      "filter_filter_catch",
-      "filter_filter_declare",
-      "filter_filter_handlerfor",
-      "filter_filter_isfilter",
-      "filter_filter_istoken",
-      "filter_filter_resolvedirect",
-      "filter_filter_resolvedirectall",
-      "filter_fooexampleerror",
-      "gonest_newfilter",
-      "internal_filter_filter",
-      "internal_filter_filter_go_module",
-      "internal_filter_filter_go_type",
-      "internal_filter_filter_go_value",
-      "internal_filter_filter_isvalidcatchsignature",
-      "internal_filter_filter_new",
-      "internal_filter_filter_test",
-      "internal_filter_filter_test_go_reader",
-      "internal_filter_filter_test_go_t",
-      "internal_filter_filter_test_go_writer",
-      "internal_filter_filter_test_newfakeresponder",
-      "internal_filter_filter_test_testcatch_handlerfor_genuinecallroundtrip",
-      "internal_filter_filter_test_testcatch_handlerfor_roundtrip",
-      "internal_filter_filter_test_testcatch_multipledistincttypes",
-      "internal_filter_filter_test_testcatch_panicsonnonfunc",
-      "internal_filter_filter_test_testcatch_panicsonoldthreeargshape",
-      "internal_filter_filter_test_testcatch_panicsonwrongfirstparamtype",
-      "internal_filter_filter_test_testcatch_panicsonwrongparamcount",
-      "internal_filter_filter_test_testcatch_panicsonwrongreturncount",
-      "internal_filter_filter_test_testcatch_panicsonwrongsecondparamtype",
-      "internal_filter_filter_test_testdeclare_doesnotrunfntwiceonrepeatedcalls",
-      "internal_filter_filter_test_testdeclare_executesfn",
-      "internal_filter_filter_test_testdeclare_nilfn_doesnotpanic",
-      "internal_filter_filter_test_testhandlerfor_missreturnsfalse",
-      "internal_filter_filter_test_testnew_doesnotexecutefnoncall"
-    ],
-    "10": [
+    "8": [
       "accessor",
       "gonest_authservice",
       "gonest_authservice_validate",
@@ -686,13 +567,15 @@
       "gonest_insighttestuseridparam",
       "gonest_insightusercreatedevent",
       "gonest_insightuseridparams",
+      "gonest_jsonbodyaddressentity",
+      "gonest_jsonbodyuserentity",
       "gonest_newschema",
       "gonest_rootdotenve2econfig",
       "gonest_rootsyncpersonentity",
       "gonest_rootsyncpersonprops",
       "gonest_test",
       "gonest_test_go_t",
-      "gonest_test_newinsighttestusermodule",
+      "gonest_test_mapkeys",
       "gonest_test_testarrayschema_rootalias_typecheck",
       "gonest_test_testarrayschema_rootalias_userentityinsightcallshape",
       "gonest_test_testdate_rootalias_typecheck",
@@ -700,12 +583,9 @@
       "gonest_test_testdotenv_callablewithoutanyappbootstrap",
       "gonest_test_testhttpstatusconstants_matchnethttp",
       "gonest_test_testmustnewapp_rootalias_insightcallshape",
-      "gonest_test_testmustnewtestapp_nilconfigure_behaveslikenewappminuslisten",
-      "gonest_test_testmustnewtestapp_overridebyinterface_realhttpdispatch",
       "gonest_test_testmustparse_dotenvendtoend_loadthenbind",
       "gonest_test_testmustparse_pointert_returnspointertoparsedstruct",
-      "gonest_test_testmustrequest_notfound_statuspropagatesgenericexception",
-      "gonest_test_testmustrequest_rootalias_insighttestusercontrollerexample",
+      "gonest_test_testnewgraphqlresolver_rootalias_realhttpdispatch",
       "gonest_test_testnewguard_rootalias_typecheck",
       "gonest_test_testnewinterceptor_rootalias_typecheck",
       "gonest_test_testnewmiddleware_rootalias_typecheck",
@@ -718,14 +598,16 @@
       "gonest_test_testnumericschema_rootalias_userentityinsightcallshape",
       "gonest_test_testobjectschema_rootalias_typecheck",
       "gonest_test_testobjectschema_rootalias_userentityinsightcallshape",
+      "gonest_test_testparserestformbody_realhttpdispatch_streamsfilewithoutfullbuffering",
       "gonest_test_testpropertybuilder_rootalias_emailinsightcallshape",
       "gonest_test_testschemafor_returnssameschemaregisteredbynewschema",
       "gonest_test_testschemafor_unregisteredtype_panics",
       "gonest_test_teststringschema_rootalias_addressentityinsightcallshape",
       "gonest_test_teststringschema_rootalias_remainingsevenbranches",
-      "gonest_test_teststringschema_rootalias_typecheck"
+      "gonest_test_teststringschema_rootalias_typecheck",
+      "time"
     ],
-    "11": [
+    "9": [
       "internal_openapi_generate_generate",
       "internal_openapi_generate_schemafor",
       "internal_openapi_generate_test",
@@ -775,9 +657,101 @@
       "openapi_stringenumbranchentity",
       "openapi_userentity"
     ],
+    "10": [
+      "examples_blog_api_module_user_service",
+      "examples_blog_api_module_user_service_go_db",
+      "examples_blog_api_module_user_service_go_entity",
+      "examples_blog_api_shared_exception",
+      "examples_blog_api_shared_exception_newduplicateemailexception",
+      "exception_exception",
+      "exception_fooexampleerror",
+      "exception_httpexception",
+      "exception_httpexception_details",
+      "exception_httpexception_error",
+      "exception_httpexception_marshaljson",
+      "exception_httpexception_message",
+      "exception_httpexception_name",
+      "exception_httpexception_setdetails",
+      "exception_httpexception_setmessage",
+      "exception_httpexception_setname",
+      "exception_httpexception_setstatus",
+      "exception_httpexception_status",
+      "gonest_exceptionname",
+      "gonest_newhttpexception",
+      "internal_app_app_test_go_app_barfilterexception",
+      "internal_app_app_test_go_app_foofilterexception",
+      "internal_app_app_test_newbarfilterexception",
+      "internal_app_app_test_newfoofilterexception",
+      "internal_exception_exception",
+      "internal_exception_exception_effectivename",
+      "internal_exception_exception_newhttpexception",
+      "internal_exception_exception_test",
+      "internal_exception_exception_test_go_t",
+      "internal_exception_exception_test_testeffectivename_fallsbacktoconcretetypename_whennameunset",
+      "internal_exception_exception_test_testeffectivename_returnssetnamewhennonempty",
+      "internal_exception_exception_test_testfooexampleerror_satisfiesexception",
+      "internal_exception_exception_test_testhttpexception_error_emptywhennomessageandnodetails",
+      "internal_exception_exception_test_testhttpexception_error_fallsbacktojsondetails_whenmessageunset",
+      "internal_exception_exception_test_testhttpexception_error_returnsmessagewhenset",
+      "internal_exception_exception_test_testhttpexception_marshaljson_omitsstatusincludesrest",
+      "internal_exception_exception_test_testhttpexception_marshaljson_promotedthroughembedding",
+      "internal_exception_exception_test_testhttpexception_setmethods_chainandreturnindependentcopies",
+      "internal_exception_exception_test_testnewhttpexception_accessorsreturnwhatwaspassed",
+      "internal_exception_exception_test_testnewhttpexception_defaultsstatusto500",
+      "internal_exception_exception_test_testnonexceptionvalues_donotsatisfyexception",
+      "shared_duplicateemailexception",
+      "user_service",
+      "user_service_create",
+      "user_service_get",
+      "user_service_list"
+    ],
+    "11": [
+      "controller_controller_ownmiddleware",
+      "gonest_newmiddleware",
+      "internal_middleware_middleware",
+      "internal_middleware_middleware_go_module",
+      "internal_middleware_middleware_go_type",
+      "internal_middleware_middleware_go_value",
+      "internal_middleware_middleware_new",
+      "internal_middleware_middleware_test",
+      "internal_middleware_middleware_test_go_reader",
+      "internal_middleware_middleware_test_go_t",
+      "internal_middleware_middleware_test_go_writer",
+      "internal_middleware_middleware_test_newfakeresponder",
+      "internal_middleware_middleware_test_testdeclare_doesnotrunfntwiceonrepeatedcalls",
+      "internal_middleware_middleware_test_testdeclare_executesfn",
+      "internal_middleware_middleware_test_testdeclare_nilfn_doesnotpanic",
+      "internal_middleware_middleware_test_testhandler_handlerfunc_roundtrip",
+      "internal_middleware_middleware_test_testhandlerfunc_nilwhennevercalled",
+      "internal_middleware_middleware_test_testnew_doesnotexecutefnoncall",
+      "internal_middleware_middleware_test_testnext_typeidentitywithroutehandlersignature",
+      "middleware_fakeresponder",
+      "middleware_fakeresponder_bodystream",
+      "middleware_fakeresponder_getheader",
+      "middleware_fakeresponder_getmethod",
+      "middleware_fakeresponder_getparam",
+      "middleware_fakeresponder_getpath",
+      "middleware_fakeresponder_getstatus",
+      "middleware_fakeresponder_html",
+      "middleware_fakeresponder_isupgraderequest",
+      "middleware_fakeresponder_json",
+      "middleware_fakeresponder_queries",
+      "middleware_fakeresponder_rawbody",
+      "middleware_fakeresponder_sendstring",
+      "middleware_fakeresponder_setheadervalue",
+      "middleware_fakeresponder_setstatus",
+      "middleware_fakeresponder_writestream",
+      "middleware_middleware",
+      "middleware_middleware_declare",
+      "middleware_middleware_handler",
+      "middleware_middleware_handlerfunc",
+      "middleware_middleware_ismiddleware",
+      "middleware_middleware_istoken",
+      "middleware_middleware_resolvedirect",
+      "middleware_middleware_resolvedirectall",
+      "middleware_next"
+    ],
     "12": [
-      "internal_validate_env_test_testparseenvinto_integercoercionfails_recordsviolation",
-      "internal_validate_env_test_testparseenvinto_tworequiredmissing_collectsbothviolations",
       "internal_validate_validate_test",
       "internal_validate_validate_test_expectbadrequest",
       "internal_validate_validate_test_go_t",
@@ -824,53 +798,6 @@
       "validate_userproperties"
     ],
     "13": [
-      "controller_controller_ownmiddleware",
-      "gonest_newmiddleware",
-      "internal_middleware_middleware",
-      "internal_middleware_middleware_go_module",
-      "internal_middleware_middleware_go_type",
-      "internal_middleware_middleware_go_value",
-      "internal_middleware_middleware_new",
-      "internal_middleware_middleware_test",
-      "internal_middleware_middleware_test_go_reader",
-      "internal_middleware_middleware_test_go_t",
-      "internal_middleware_middleware_test_go_writer",
-      "internal_middleware_middleware_test_newfakeresponder",
-      "internal_middleware_middleware_test_testdeclare_doesnotrunfntwiceonrepeatedcalls",
-      "internal_middleware_middleware_test_testdeclare_executesfn",
-      "internal_middleware_middleware_test_testdeclare_nilfn_doesnotpanic",
-      "internal_middleware_middleware_test_testhandler_handlerfunc_roundtrip",
-      "internal_middleware_middleware_test_testhandlerfunc_nilwhennevercalled",
-      "internal_middleware_middleware_test_testnew_doesnotexecutefnoncall",
-      "internal_middleware_middleware_test_testnext_typeidentitywithroutehandlersignature",
-      "middleware_fakeresponder",
-      "middleware_fakeresponder_bodystream",
-      "middleware_fakeresponder_getheader",
-      "middleware_fakeresponder_getmethod",
-      "middleware_fakeresponder_getparam",
-      "middleware_fakeresponder_getpath",
-      "middleware_fakeresponder_getstatus",
-      "middleware_fakeresponder_html",
-      "middleware_fakeresponder_isupgraderequest",
-      "middleware_fakeresponder_json",
-      "middleware_fakeresponder_queries",
-      "middleware_fakeresponder_rawbody",
-      "middleware_fakeresponder_sendstring",
-      "middleware_fakeresponder_setheadervalue",
-      "middleware_fakeresponder_setstatus",
-      "middleware_fakeresponder_upgrade",
-      "middleware_fakeresponder_writestream",
-      "middleware_middleware",
-      "middleware_middleware_declare",
-      "middleware_middleware_handler",
-      "middleware_middleware_handlerfunc",
-      "middleware_middleware_ismiddleware",
-      "middleware_middleware_istoken",
-      "middleware_middleware_resolvedirect",
-      "middleware_middleware_resolvedirectall",
-      "middleware_next"
-    ],
-    "14": [
       "controller_controller_owninterceptors",
       "gonest_newinterceptor",
       "interceptor_fakeresponder",
@@ -915,9 +842,59 @@
       "internal_interceptor_interceptor_test_testnew_doesnotexecutefnoncall",
       "internal_interceptor_interceptor_test_testnext_typeidentitywithroutehandlersignature"
     ],
+    "14": [
+      "exception_badgatewayexception",
+      "exception_gatewaytimeoutexception",
+      "exception_goneexception",
+      "exception_lockedexception",
+      "exception_notextendedexception",
+      "exception_preconditionrequiredexception",
+      "exception_proxyauthrequiredexception",
+      "exception_requestedrangenotsatisfiableexception",
+      "exception_requestheaderfieldstoolargeexception",
+      "exception_requesttimeoutexception",
+      "exception_tooearlyexception",
+      "exception_unavailableforlegalreasonsexception",
+      "exception_variantalsonegotiatesexception",
+      "gonest_newbadgatewayexception",
+      "gonest_newgatewaytimeoutexception",
+      "gonest_newgoneexception",
+      "gonest_newlockedexception",
+      "gonest_newnotextendedexception",
+      "gonest_newpreconditionrequiredexception",
+      "gonest_newproxyauthrequiredexception",
+      "gonest_newrequestedrangenotsatisfiableexception",
+      "gonest_newrequestheaderfieldstoolargeexception",
+      "gonest_newrequesttimeoutexception",
+      "gonest_newtooearlyexception",
+      "gonest_newunavailableforlegalreasonsexception",
+      "gonest_newvariantalsonegotiatesexception",
+      "internal_exception_builtin",
+      "internal_exception_builtin_go_t",
+      "internal_exception_builtin_newbadgatewayexception",
+      "internal_exception_builtin_newbuiltin",
+      "internal_exception_builtin_newgatewaytimeoutexception",
+      "internal_exception_builtin_newgoneexception",
+      "internal_exception_builtin_newlockedexception",
+      "internal_exception_builtin_newnotextendedexception",
+      "internal_exception_builtin_newpreconditionrequiredexception",
+      "internal_exception_builtin_newproxyauthrequiredexception",
+      "internal_exception_builtin_newrequestedrangenotsatisfiableexception",
+      "internal_exception_builtin_newrequestheaderfieldstoolargeexception",
+      "internal_exception_builtin_newrequesttimeoutexception",
+      "internal_exception_builtin_newtooearlyexception",
+      "internal_exception_builtin_newunavailableforlegalreasonsexception",
+      "internal_exception_builtin_newvariantalsonegotiatesexception"
+    ],
     "15": [
+      "app_graphqlpostbodypeek",
+      "app_graphqlrequestbody",
+      "app_graphqlresponsebody",
+      "app_resolvableresolver",
       "execution_httpcontext",
-      "fiber_app_registerroute",
+      "execution_httpcontext_request",
+      "execution_httpcontext_response",
+      "formfile",
       "graphql_reservation",
       "graphql_reservationregistry",
       "graphql_reservationregistry_attach",
@@ -928,37 +905,29 @@
       "graphql_reservationregistry_stopoperation",
       "graphql_ssesingleframe",
       "graphql_ssesingleoperationbody",
+      "internal_app_graphql",
       "internal_app_graphql_go_module",
+      "internal_app_graphql_go_schema",
+      "internal_app_graphql_graphqlgetdispatcher",
+      "internal_app_graphql_graphqlhandler",
+      "internal_app_graphql_graphqlpostdispatcher",
       "internal_app_graphql_registergraphql",
+      "internal_app_graphql_requestcarrieseventstreamtoken",
       "internal_execution_httpcontext",
-      "internal_execution_httpcontext_newhttpcontext",
       "internal_graphql_reservation",
       "internal_graphql_reservation_go_mutex",
-      "internal_graphql_reservation_newreservationregistry",
-      "internal_graphql_sse_fixtures_test_newfakesseresponder",
       "internal_graphql_sse_single",
       "internal_graphql_sse_single_go_rawmessage",
-      "internal_graphql_sse_single_go_schema",
       "internal_graphql_sse_single_ssesinglecancelhandler",
-      "internal_graphql_sse_single_ssesingleconnecthandler",
-      "internal_graphql_sse_single_ssesingleoperationhandler",
       "internal_graphql_sse_single_ssesinglereservehandler",
-      "internal_graphql_sse_single_test",
-      "internal_graphql_sse_single_test_attachanddraintoken",
-      "internal_graphql_sse_single_test_go_reader",
-      "internal_graphql_sse_single_test_go_t",
-      "internal_graphql_sse_single_test_newssesingletestschema",
-      "internal_graphql_sse_single_test_testssesinglecancelhandler_activeoperationid_stopsthatsubscriptiononly",
-      "internal_graphql_sse_single_test_testssesinglecancelhandler_unknownoperationid_respondserror",
-      "internal_graphql_sse_single_test_testssesingleconnecthandler_clientdisconnects_releasesreservation",
-      "internal_graphql_sse_single_test_testssesingleconnecthandler_unknowntoken_respondserror",
-      "internal_graphql_sse_single_test_testssesingleconnecthandler_validtoken_attachesconnection",
-      "internal_graphql_sse_single_test_testssesingleoperationhandler_concurrentoperations_norace",
-      "internal_graphql_sse_single_test_testssesingleoperationhandler_queryoperation_routesnextcompletetotoken",
-      "internal_graphql_sse_single_test_testssesingleoperationhandler_subscriptionoperation_routesmultiplenexttotoken",
-      "internal_graphql_sse_single_test_testssesingleoperationhandler_unknowntoken_respondserror",
-      "internal_graphql_sse_single_test_testssesinglereservehandler_put_responds201withtoken",
-      "internal_graphql_sse_single_writessesingleframe"
+      "internal_graphql_sse_single_writessesingleframe",
+      "internal_validate_form",
+      "internal_validate_form_go_parseable",
+      "internal_validate_form_go_request",
+      "internal_validate_form_newformbodysource",
+      "route_route_handler",
+      "route_route_handlerfunc",
+      "validate_formbodysource"
     ],
     "16": [
       "controller_controller_ownguards",
@@ -1008,7 +977,6 @@
       "controller_ctrlcat",
       "controller_ctrlcat_sound",
       "controller_ctrlfooservice",
-      "internal_controller_controller",
       "internal_controller_controller_new",
       "internal_controller_controller_test",
       "internal_controller_controller_test_go_t",
@@ -1089,44 +1057,46 @@
       "scheduler_scheduler_timeout"
     ],
     "19": [
-      "app_consumermarker",
-      "app_listenspyadapter_listen",
-      "app_onlisten",
-      "internal_app_app_new",
-      "internal_app_app_test",
-      "internal_app_app_test_go_app_barfilterexception",
-      "internal_app_app_test_go_app_foofilterexception",
-      "internal_app_app_test_go_app_nameparams",
-      "internal_app_app_test_go_app_useridnameparams",
-      "internal_app_app_test_go_app_useridparams",
-      "internal_app_app_test_go_t",
-      "internal_app_app_test_newbarfilterexception",
-      "internal_app_app_test_newfoofilterexception",
-      "internal_app_app_test_testdisplayaddr_bareport_printslocalhostnotwildcard",
-      "internal_app_app_test_testdisplayaddr_explicithost_passesthroughunchanged",
-      "internal_app_app_test_testlisten_returnserrorwithoutpanicking",
-      "internal_app_app_test_testlisten_variadicnoonlisten_doesnotpanic",
-      "internal_app_app_test_testmustlisten_disablebanner_skipsbannerstilllogsandfires",
-      "internal_app_app_test_testmustlisten_disableloaded_skipsloadedcountsstilllogsandfires",
-      "internal_app_app_test_testmustlisten_firesonlistenonceandblocks",
-      "internal_app_app_test_testmustlisten_listenerror_panicswithaddranderror",
-      "internal_app_app_test_testmustlisten_nilonlisten_blockswithoutpanicorcall",
-      "internal_app_app_test_testmustnewapp_nooptsargument_doesnotpanic",
-      "internal_app_app_test_testmustnewapp_panicsonassembleerror",
-      "internal_app_app_test_testmustnewapp_returnsapponsuccess",
-      "internal_app_app_test_testnewapp_circulardependency_returnserror",
-      "internal_app_app_test_testnewapp_constructorerror_returnserror",
-      "internal_app_app_test_testnewapp_controllerwithroutes_registerseachonadapter",
-      "internal_app_app_test_testnewapp_duplicateroute_returnserrorbeforeregistering",
-      "internal_app_app_test_testnewapp_emptypathprefix_registersroutewithbarepath",
-      "internal_app_app_test_testnewapp_nonzeroappoptions_storedonapp",
-      "internal_app_app_test_testnewapp_nooptsargument_behaveslikezerovalueappoptions",
-      "internal_app_app_test_testnewapp_root_returnssamemodulepassedtonewapp",
-      "internal_app_app_test_testnewapp_root_walkswholetree_reachesrootandsubmoduleroutes",
-      "internal_app_app_test_testnewapp_twooptsarguments_panics",
-      "internal_app_app_test_testnewapp_twosequentialunrelatedcalls_donotleakpendingedges",
-      "internal_app_app_test_testnewapp_zerocontrollers_bootstrapsnormally",
-      "internal_app_app_test_testnewapp_zerovalueappoptions_bootstrapsidenticallytopret2behavior"
+      "inject_fakepinger",
+      "inject_fakepinger_ping",
+      "inject_fakeservice",
+      "inject_otherservice",
+      "inject_pingable",
+      "internal_inject_inject_findallrefs",
+      "internal_inject_inject_go_module",
+      "internal_inject_inject_markresolving",
+      "internal_inject_inject_pendingedgesfor",
+      "internal_inject_inject_reset",
+      "internal_inject_inject_resetpendingedges",
+      "internal_inject_inject_test",
+      "internal_inject_inject_test_go_provider",
+      "internal_inject_inject_test_go_t",
+      "internal_inject_inject_test_newdeclaredprovider",
+      "internal_inject_inject_test_newowner",
+      "internal_inject_inject_test_testfindallrefs_diamondimport_dedups",
+      "internal_inject_inject_test_testfindallrefs_importexportedmatch",
+      "internal_inject_inject_test_testfindallrefs_ownmodulematch",
+      "internal_inject_inject_test_testfindallrefs_providerasref_unwrappedtoconcreteref",
+      "internal_inject_inject_test_testfindallrefs_unexportedimportprovider_notmatched",
+      "internal_inject_inject_test_testmust_calledduringresolvingphase_panics",
+      "internal_inject_inject_test_testmust_notresolvingphase_stillworks",
+      "internal_inject_inject_test_testmustall_calledduringresolvingphase_panics",
+      "internal_inject_inject_test_testmustall_notresolvingphase_stillworks",
+      "internal_inject_inject_test_testmustallprovider_singletonmatches_returnssliceandrecordsedge",
+      "internal_inject_inject_test_testmustallprovider_transientmatch_panicsbeforerecordingedge",
+      "internal_inject_inject_test_testmustallprovider_zeromatches_returnsemptynonnilslice_nopanic",
+      "internal_inject_inject_test_testmustinject_multiplecallsdonotcollide",
+      "internal_inject_inject_test_testmustinject_nonpointerbuiltintype_panicswithdynamictypename",
+      "internal_inject_inject_test_testmustinject_nonpointertype_messageisdynamicnothardcoded",
+      "internal_inject_inject_test_testmustinject_nonpointertype_panicswithdynamictypename",
+      "internal_inject_inject_test_testmustinject_placeholderisusable",
+      "internal_inject_inject_test_testmustinject_registersexactlyonependingedge",
+      "internal_inject_inject_test_testmustinject_returnsnonnilplaceholderforpointertype",
+      "internal_inject_inject_test_testpendingalledges_returnscopynotaliasinginternalstate",
+      "internal_inject_inject_test_testpendingedge_retainsplaceholderusableforcopyinplace",
+      "internal_inject_inject_test_testpendingedges_returnscopynotaliasinginternalstate",
+      "internal_inject_inject_test_testreset_clearsallpendingedges",
+      "internal_inject_inject_test_testreset_clearspendingalledges"
     ],
     "20": [
       "examples_full_text_search_shared_search_search",
@@ -1169,46 +1139,6 @@
       "w"
     ],
     "21": [
-      "internal_module_module_new",
-      "internal_module_module_test",
-      "internal_module_module_test_go_t",
-      "internal_module_module_test_testassemble_autowiresownermoduleoncontrollers",
-      "internal_module_module_test_testassemble_autowiresownermoduleonproviders",
-      "internal_module_module_test_testassemble_diamondimport_visitssharedmoduleonce",
-      "internal_module_module_test_testassemble_exportdeclaredinproviders_noerror",
-      "internal_module_module_test_testassemble_exportnotdeclaredinproviders_returnserror",
-      "internal_module_module_test_testassemble_simplebfs_visitsimportedmodule",
-      "internal_module_module_test_testmodule_controllers_registerscontrollers",
-      "internal_module_module_test_testmodule_controllers_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_exports_returnsexportedproviders",
-      "internal_module_module_test_testmodule_exports_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_filters_storesfiltersinregistrationorder",
-      "internal_module_module_test_testmodule_filters_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_imports_returnsimportedmodules",
-      "internal_module_module_test_testmodule_imports_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_listeners_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_name_calledtwice_lastcallwins",
-      "internal_module_module_test_testmodule_name_emptystring_fallsbacktopointeraddress",
-      "internal_module_module_test_testmodule_name_makesmodulenamereturngivenname",
-      "internal_module_module_test_testmodule_name_nevercalled_fallsbacktopointeraddress",
-      "internal_module_module_test_testmodule_owncontrollers_returnsregisteredcontrollers",
-      "internal_module_module_test_testmodule_ownfilters_returnscopynotinternalslice",
-      "internal_module_module_test_testmodule_ownmiddleware_returnscopynotinternalslice",
-      "internal_module_module_test_testmodule_ownproviders_returnscopynotinternalslice",
-      "internal_module_module_test_testmodule_ownproviders_returnsregisteredproviders",
-      "internal_module_module_test_testmodule_ownresolvers_returnsregisteredresolvers",
-      "internal_module_module_test_testmodule_providers_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_resolvers_registersresolvers",
-      "internal_module_module_test_testmodule_resolvers_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_schedulers_wrongtokenkind_panics",
-      "internal_module_module_test_testmodule_use_storesmiddlewareinregistrationorder",
-      "internal_module_module_test_testmodule_use_wrongtokenkind_panics",
-      "internal_module_module_test_testnew_doesnotexecutefnoncall",
-      "internal_module_module_test_testnew_executesfnonlyafterassemble",
-      "internal_resolver_resolver_modulename",
-      "module_dummytype"
-    ],
-    "22": [
       "internal_schema_array_test",
       "internal_schema_array_test_go_addressentity",
       "internal_schema_array_test_go_schema",
@@ -1248,7 +1178,7 @@
       "schema_arrayentity",
       "schema_objectentity"
     ],
-    "23": [
+    "22": [
       "internal_validate_validate_test_go_ctx",
       "internal_validate_validate_test_go_reader",
       "internal_validate_validate_test_go_writer",
@@ -1284,9 +1214,86 @@
       "validate_httpfiberresponder_sendstring",
       "validate_httpfiberresponder_setheadervalue",
       "validate_httpfiberresponder_setstatus",
+      "validate_httpfiberresponder_upgrade",
       "validate_httpfiberresponder_writestream"
     ],
+    "23": [
+      "app_app_adapter",
+      "app_app_listen",
+      "app_app_mustlisten",
+      "app_app_root",
+      "app_declarable",
+      "app_httpadapter",
+      "app_httpadapterptr",
+      "app_pipelinestagetype",
+      "app_routablecontroller",
+      "internal_app_app",
+      "internal_app_app_asfilters",
+      "internal_app_app_asmiddleware",
+      "internal_app_app_composehandler",
+      "internal_app_app_counttree",
+      "internal_app_app_declarecontrollers",
+      "internal_app_app_declarelisteners",
+      "internal_app_app_declarepipelinestagetypes",
+      "internal_app_app_declareresolvers",
+      "internal_app_app_declareschedulers",
+      "internal_app_app_discoverpipelinestageownership",
+      "internal_app_app_displayaddr",
+      "internal_app_app_filteredhandler",
+      "internal_app_app_findcatch",
+      "internal_app_app_gatedhandler",
+      "internal_app_app_go_app_app",
+      "internal_app_app_go_module",
+      "internal_app_app_go_once",
+      "internal_app_app_go_t",
+      "internal_app_app_go_type",
+      "internal_app_app_go_value",
+      "internal_app_app_interceptedhandler",
+      "internal_app_app_mustnewapp",
+      "internal_app_app_printbanner",
+      "internal_app_app_registerframeworksingletons",
+      "internal_app_app_registerroutes",
+      "internal_app_app_versionlabel"
+    ],
     "24": [
+      "internal_module_module",
+      "internal_module_module_effectiveexports",
+      "internal_module_module_go_module_module",
+      "internal_module_module_test_testmodule_owncontrollers_returnscopynotinternalslice",
+      "internal_module_module_test_testmodule_owncontrollers_returnsregisteredcontrollers",
+      "internal_module_module_test_testmodule_ownresolvers_returnscopynotinternalslice",
+      "internal_module_module_test_testmodule_ownresolvers_returnsregisteredresolvers",
+      "module_controllerref",
+      "module_filterref",
+      "module_listenerref",
+      "module_middlewareref",
+      "module_module_controllers",
+      "module_module_effectiveexports",
+      "module_module_exportedproviders",
+      "module_module_exports",
+      "module_module_filters",
+      "module_module_importedmodules",
+      "module_module_imports",
+      "module_module_istoken",
+      "module_module_listeners",
+      "module_module_name",
+      "module_module_owncontrollers",
+      "module_module_ownexportedmodules",
+      "module_module_ownfilters",
+      "module_module_ownlisteners",
+      "module_module_ownmiddleware",
+      "module_module_ownproviders",
+      "module_module_ownresolvers",
+      "module_module_ownschedulers",
+      "module_module_providers",
+      "module_module_resolvers",
+      "module_module_schedulers",
+      "module_module_use",
+      "module_resolverref",
+      "module_schedulerref",
+      "module_tokenref"
+    ],
+    "25": [
       "graphql_closecall",
       "graphql_ordercreatedevent",
       "graphql_protofakewsconn",
@@ -1323,116 +1330,43 @@
       "internal_graphql_ws_protocol_test_testwsprotocolhandler_unknownmessagetype_closes4400",
       "internal_graphql_ws_protocol_wsprotocolhandler"
     ],
-    "25": [
-      "internal_resolver_direct_finddirect",
-      "internal_resolver_direct_test",
-      "internal_resolver_direct_test_animalifacetype",
-      "internal_resolver_direct_test_go_fakeprovider",
-      "internal_resolver_direct_test_go_t",
-      "internal_resolver_direct_test_go_type",
-      "internal_resolver_direct_test_go_value",
-      "internal_resolver_direct_test_newresolved",
-      "internal_resolver_direct_test_testfinddirect_importednotreexported_stillinvisible",
-      "internal_resolver_direct_test_testfinddirect_interface_exactmatchtakesprecedenceoverimplements",
-      "internal_resolver_direct_test_testfinddirect_interface_singleimplementor_resolves",
-      "internal_resolver_direct_test_testfinddirect_interface_twoimplementors_ambiguousnotfoundhere",
-      "internal_resolver_direct_test_testfinddirect_pointer_exactmatch",
-      "internal_resolver_direct_test_testfinddirect_pointer_nomatch",
-      "internal_resolver_direct_test_testfinddirect_reexportedmodule_resolvestransitivelythrougheffectiveexports",
-      "internal_resolver_direct_test_testfinddirect_unexportedimports_notvisible",
-      "internal_resolver_direct_test_testfinddirect_unionscope_findsproviderfromeithermodule",
-      "internal_resolver_direct_test_testfinddirectall_interface_returnseveryimplementor",
-      "internal_resolver_direct_test_testfinddirectall_interface_zeroimplementors_returnsempty",
-      "internal_resolver_direct_test_testfinddirectall_reexportedmodule_resolvestransitivelythrougheffectiveexports",
-      "internal_resolver_direct_test_testresolvewithoverrides_interfaceoverride_skipsrealconstructor",
-      "internal_resolver_direct_test_testresolvewithoverrides_matchingpointeroverride_skipsrealconstructor",
-      "internal_resolver_direct_test_testresolvewithoverrides_nomatch_runsrealconstructor",
-      "resolver_animaliface",
-      "resolver_catanimal",
-      "resolver_catanimal_talk",
-      "resolver_doganimal",
-      "resolver_doganimal_talk",
-      "resolver_fakeresolvedprovider",
-      "resolver_fakeresolvedprovider_resolvedvalue",
-      "resolver_overridefooiface",
-      "resolver_overridefooservice",
-      "resolver_overridefooservice_isoverridefoo",
-      "resolver_overridefooservicemock",
-      "resolver_overridefooservicemock_isoverridefoo"
-    ],
     "26": [
-      "app_app_adapter",
-      "app_app_listen",
-      "app_app_mustlisten",
-      "app_app_root",
-      "app_declarable",
-      "app_pipelinestagetype",
-      "app_routablecontroller",
-      "internal_app_app",
-      "internal_app_app_asfilters",
-      "internal_app_app_asmiddleware",
-      "internal_app_app_composehandler",
-      "internal_app_app_counttree",
-      "internal_app_app_declarecontrollers",
-      "internal_app_app_declarelisteners",
-      "internal_app_app_declarepipelinestagetypes",
-      "internal_app_app_declareresolvers",
-      "internal_app_app_declareschedulers",
-      "internal_app_app_discoverpipelinestageownership",
-      "internal_app_app_displayaddr",
-      "internal_app_app_filteredhandler",
-      "internal_app_app_findcatch",
-      "internal_app_app_gatedhandler",
-      "internal_app_app_go_app_app",
-      "internal_app_app_go_module",
-      "internal_app_app_go_once",
-      "internal_app_app_go_type",
-      "internal_app_app_go_value",
-      "internal_app_app_interceptedhandler",
-      "internal_app_app_mustnewapp",
-      "internal_app_app_printbanner",
-      "internal_app_app_registerframeworksingletons",
-      "internal_app_app_registerroutes",
-      "internal_app_app_versionlabel",
-      "internal_app_test_app_mustnewtestapp"
+      "app_consumermarker",
+      "app_listenspyadapter_listen",
+      "app_onlisten",
+      "internal_app_app_new",
+      "internal_app_app_test",
+      "internal_app_app_test_go_app_nameparams",
+      "internal_app_app_test_go_app_useridnameparams",
+      "internal_app_app_test_go_app_useridparams",
+      "internal_app_app_test_go_t",
+      "internal_app_app_test_testdisplayaddr_bareport_printslocalhostnotwildcard",
+      "internal_app_app_test_testdisplayaddr_explicithost_passesthroughunchanged",
+      "internal_app_app_test_testlisten_returnserrorwithoutpanicking",
+      "internal_app_app_test_testlisten_variadicnoonlisten_doesnotpanic",
+      "internal_app_app_test_testmustlisten_disablebanner_skipsbannerstilllogsandfires",
+      "internal_app_app_test_testmustlisten_disableloaded_skipsloadedcountsstilllogsandfires",
+      "internal_app_app_test_testmustlisten_firesonlistenonceandblocks",
+      "internal_app_app_test_testmustlisten_listenerror_panicswithaddranderror",
+      "internal_app_app_test_testmustlisten_nilonlisten_blockswithoutpanicorcall",
+      "internal_app_app_test_testmustnewapp_nooptsargument_doesnotpanic",
+      "internal_app_app_test_testmustnewapp_panicsonassembleerror",
+      "internal_app_app_test_testmustnewapp_returnsapponsuccess",
+      "internal_app_app_test_testnewapp_circulardependency_returnserror",
+      "internal_app_app_test_testnewapp_constructorerror_returnserror",
+      "internal_app_app_test_testnewapp_controllerwithroutes_registerseachonadapter",
+      "internal_app_app_test_testnewapp_duplicateroute_returnserrorbeforeregistering",
+      "internal_app_app_test_testnewapp_emptypathprefix_registersroutewithbarepath",
+      "internal_app_app_test_testnewapp_nonzeroappoptions_storedonapp",
+      "internal_app_app_test_testnewapp_nooptsargument_behaveslikezerovalueappoptions",
+      "internal_app_app_test_testnewapp_root_returnssamemodulepassedtonewapp",
+      "internal_app_app_test_testnewapp_root_walkswholetree_reachesrootandsubmoduleroutes",
+      "internal_app_app_test_testnewapp_twooptsarguments_panics",
+      "internal_app_app_test_testnewapp_twosequentialunrelatedcalls_donotleakpendingedges",
+      "internal_app_app_test_testnewapp_zerocontrollers_bootstrapsnormally",
+      "internal_app_app_test_testnewapp_zerovalueappoptions_bootstrapsidenticallytopret2behavior"
     ],
     "27": [
-      "internal_module_module",
-      "internal_module_module_effectiveexports",
-      "internal_module_module_go_module_module",
-      "internal_module_module_test_testmodule_owncontrollers_returnscopynotinternalslice",
-      "internal_module_module_test_testmodule_ownresolvers_returnscopynotinternalslice",
-      "module_controllerref",
-      "module_filterref",
-      "module_listenerref",
-      "module_middlewareref",
-      "module_module_controllers",
-      "module_module_effectiveexports",
-      "module_module_exportedproviders",
-      "module_module_exports",
-      "module_module_filters",
-      "module_module_importedmodules",
-      "module_module_imports",
-      "module_module_istoken",
-      "module_module_listeners",
-      "module_module_name",
-      "module_module_owncontrollers",
-      "module_module_ownexportedmodules",
-      "module_module_ownfilters",
-      "module_module_ownlisteners",
-      "module_module_ownmiddleware",
-      "module_module_ownproviders",
-      "module_module_ownresolvers",
-      "module_module_ownschedulers",
-      "module_module_providers",
-      "module_module_resolvers",
-      "module_module_schedulers",
-      "module_module_use",
-      "module_resolverref",
-      "module_schedulerref",
-      "module_tokenref"
-    ],
-    "28": [
       "internal_openapi_generate_adddescriptionandexamples",
       "internal_openapi_generate_applynullable",
       "internal_schema_value_go_schema_schema",
@@ -1468,7 +1402,7 @@
       "schema_schema_isvalue",
       "schema_schema_valueproperty"
     ],
-    "29": [
+    "28": [
       "internal_route_route",
       "internal_route_route_go_schema",
       "route_resolver",
@@ -1481,8 +1415,6 @@
       "route_route_excludefromdocs",
       "route_route_formbody",
       "route_route_formbodyschema",
-      "route_route_handler",
-      "route_route_handlerfunc",
       "route_route_hasbearerauth",
       "route_route_hasparam",
       "route_route_httpcode",
@@ -1503,42 +1435,42 @@
       "route_route_summarytext",
       "route_route_tags"
     ],
-    "30": [
-      "execution_bodysource",
-      "execution_bodysource_form",
-      "execution_bodysource_json",
-      "execution_bodysource_raw",
-      "execution_bodysource_text",
-      "execution_httpcontext_request",
-      "execution_parseable",
-      "execution_request",
-      "execution_request_body",
-      "execution_request_formstream",
-      "execution_request_header",
-      "execution_request_headers",
-      "execution_request_method",
-      "execution_request_param",
-      "execution_request_params",
-      "execution_request_path",
-      "execution_request_queries",
-      "execution_request_query",
-      "execution_request_route",
-      "execution_request_withroute",
-      "execution_request_withsources",
-      "execution_responder",
-      "graphql_context_args",
-      "internal_app_testhelpers_test",
-      "internal_app_testhelpers_test_go_schema",
-      "internal_app_testhelpers_test_go_t",
-      "internal_app_testhelpers_test_mustparse",
-      "internal_execution_request",
-      "internal_execution_request_go_reader",
-      "internal_execution_request_newrequest"
+    "29": [
+      "controller_controller",
+      "controller_controller_bearerauth",
+      "controller_controller_declare",
+      "controller_controller_filters",
+      "controller_controller_guards",
+      "controller_controller_hasbearerauth",
+      "controller_controller_interceptors",
+      "controller_controller_iscontroller",
+      "controller_controller_istoken",
+      "controller_controller_ownermodule",
+      "controller_controller_ownroutes",
+      "controller_controller_owntags",
+      "controller_controller_path",
+      "controller_controller_pathprefix",
+      "controller_controller_route",
+      "controller_controller_routeconnect",
+      "controller_controller_routedelete",
+      "controller_controller_routeget",
+      "controller_controller_routehead",
+      "controller_controller_routeoptions",
+      "controller_controller_routepatch",
+      "controller_controller_routepost",
+      "controller_controller_routeput",
+      "controller_controller_routequery",
+      "controller_controller_routetrace",
+      "controller_controller_setownermodule",
+      "controller_controller_tags",
+      "controller_controller_use",
+      "internal_controller_controller",
+      "internal_controller_controller_go_module"
     ],
-    "31": [
+    "30": [
       "internal_app_lifecycle_go_module",
       "internal_app_lifecycle_runapplicationbootstrapphase",
-      "internal_app_lifecycle_runapplicationshutdownphase",
+      "internal_app_lifecycle_runbeforeapplicationshutdownphase",
       "internal_app_lifecycle_runmoduledestroyphase",
       "internal_app_lifecycle_runmoduleinitphase",
       "internal_app_lifecycle_test_go_app",
@@ -1552,8 +1484,8 @@
       "internal_app_lifecycle_test_testrunapplicationbootstrapphase_failfast",
       "internal_app_lifecycle_test_testrunapplicationbootstrapphase_leaffirstorder",
       "internal_app_lifecycle_test_testrunapplicationbootstrapphase_mixedhookedandunhooked",
-      "internal_app_lifecycle_test_testrunapplicationshutdownphase_failfast",
-      "internal_app_lifecycle_test_testrunapplicationshutdownphase_rootfirstorderandsignal",
+      "internal_app_lifecycle_test_testrunbeforeapplicationshutdownphase_failfast",
+      "internal_app_lifecycle_test_testrunbeforeapplicationshutdownphase_rootfirstorderandsignal",
       "internal_app_lifecycle_test_testrunmoduledestroyphase_failfast",
       "internal_app_lifecycle_test_testrunmoduledestroyphase_rootfirstorder",
       "internal_app_lifecycle_test_testrunmoduleinitphase_failfast",
@@ -1567,7 +1499,7 @@
       "internal_app_lifecycle_test_testshutdown_runsonlyonce",
       "internal_app_lifecycle_test_testshutdown_runsonlyonce_sameerroronrepeat"
     ],
-    "32": [
+    "31": [
       "app_orderlog",
       "app_orderlog_add",
       "app_orderlog_indexof",
@@ -1598,38 +1530,7 @@
       "internal_graphql_scalar_test_testnativescalarname_barestringhasnoscalar",
       "internal_graphql_scalar_test_testnativescalarname_knownformat"
     ],
-    "33": [
-      "controller_controller",
-      "controller_controller_bearerauth",
-      "controller_controller_declare",
-      "controller_controller_filters",
-      "controller_controller_guards",
-      "controller_controller_hasbearerauth",
-      "controller_controller_interceptors",
-      "controller_controller_iscontroller",
-      "controller_controller_istoken",
-      "controller_controller_ownermodule",
-      "controller_controller_ownroutes",
-      "controller_controller_owntags",
-      "controller_controller_path",
-      "controller_controller_pathprefix",
-      "controller_controller_route",
-      "controller_controller_routeconnect",
-      "controller_controller_routedelete",
-      "controller_controller_routeget",
-      "controller_controller_routehead",
-      "controller_controller_routeoptions",
-      "controller_controller_routepatch",
-      "controller_controller_routepost",
-      "controller_controller_routeput",
-      "controller_controller_routequery",
-      "controller_controller_routetrace",
-      "controller_controller_setownermodule",
-      "controller_controller_tags",
-      "controller_controller_use",
-      "internal_controller_controller_go_module"
-    ],
-    "34": [
+    "32": [
       "fiber_customtestexception",
       "internal_adapter_fiber_fiber_test",
       "internal_adapter_fiber_fiber_test_go_httpexception",
@@ -1660,7 +1561,7 @@
       "internal_adapter_fiber_fiber_test_testregisterroute_websocketupgrade_negotiatessubprotocol",
       "internal_adapter_fiber_fiber_test_testshutdown_unblocksreallistencall"
     ],
-    "35": [
+    "33": [
       "graphql_genemailonlyentity",
       "graphql_genpostentity",
       "graphql_genuserentity",
@@ -1691,7 +1592,7 @@
       "internal_graphql_resolver_test_testresolver_satisfiesmoduleowner",
       "internal_schema_registry_deregister"
     ],
-    "36": [
+    "34": [
       "internal_resolver_stage3_resolve",
       "internal_resolver_stage3_test",
       "internal_resolver_stage3_test_go_t",
@@ -1722,37 +1623,7 @@
       "resolver_transientsingletondep",
       "resolver_transientwithdepservice"
     ],
-    "37": [
-      "execution_fakeresponder_queries",
-      "internal_execution_reply_new",
-      "internal_execution_reply_test",
-      "internal_execution_reply_test_go_t",
-      "internal_execution_reply_test_testreply_html_delegatestoresponder",
-      "internal_execution_reply_test_testreply_json_delegatestoresponder",
-      "internal_execution_reply_test_testreply_request_returnsoriginatingrequest",
-      "internal_execution_reply_test_testreply_setheader_writestoresponder",
-      "internal_execution_reply_test_testreply_status_ischainableandsetscode",
-      "internal_execution_reply_test_testreply_status_json_chained",
-      "internal_execution_reply_test_testreply_statuscode_readscurrentstatus",
-      "internal_execution_reply_test_testreply_text_setsplaintextcontenttype",
-      "internal_execution_request_test",
-      "internal_execution_request_test_go_t",
-      "internal_execution_request_test_newfakeresponder",
-      "internal_execution_request_test_testbodysource_raw_emptybydefault",
-      "internal_execution_request_test_testbodysource_raw_returnsrawbytes",
-      "internal_execution_request_test_testbodysource_text_returnsstringofraw",
-      "internal_execution_request_test_testrequest_body_returnsbodysource",
-      "internal_execution_request_test_testrequest_header_readsfromresponder",
-      "internal_execution_request_test_testrequest_iswebsocketupgrade_delegatestoresponder",
-      "internal_execution_request_test_testrequest_param_readsfromresponder",
-      "internal_execution_request_test_testrequest_queries_emptybydefault",
-      "internal_execution_request_test_testrequest_queries_readsfromresponder",
-      "internal_execution_request_test_testrequest_route_nilbydefault",
-      "internal_execution_request_test_testrequest_withroute_ischainableandstoresroute",
-      "internal_execution_request_test_testresponse_upgradewebsocket_delegatestoresponder",
-      "internal_execution_request_test_testresponse_upgradewebsocket_passessubprotocolsthrough"
-    ],
-    "38": [
+    "35": [
       "internal_schema_array",
       "internal_schema_array_go_schema",
       "schema_arrayschema",
@@ -1782,7 +1653,7 @@
       "schema_arrayschema_uuid",
       "schema_propertybuilder_array"
     ],
-    "39": [
+    "36": [
       "app_ableaftype",
       "app_abmxhookedtype",
       "app_abmxunhookedtype",
@@ -1811,36 +1682,7 @@
       "app_shp3type",
       "internal_app_lifecycle_test"
     ],
-    "40": [
-      "execution_fakeresponder",
-      "execution_fakeresponder_bodystream",
-      "execution_fakeresponder_getheader",
-      "execution_fakeresponder_getmethod",
-      "execution_fakeresponder_getparam",
-      "execution_fakeresponder_getpath",
-      "execution_fakeresponder_getstatus",
-      "execution_fakeresponder_html",
-      "execution_fakeresponder_isupgraderequest",
-      "execution_fakeresponder_json",
-      "execution_fakeresponder_rawbody",
-      "execution_fakeresponder_sendstring",
-      "execution_fakeresponder_setheadervalue",
-      "execution_fakeresponder_setstatus",
-      "execution_fakeresponder_upgrade",
-      "execution_fakeresponder_writestream",
-      "execution_reply_upgradewebsocket",
-      "execution_wsconn",
-      "filter_fakeresponder_upgrade",
-      "graphql_fakesseresponder_upgrade",
-      "guard_fakeresponder_upgrade",
-      "internal_execution_request_test_go_reader",
-      "internal_execution_request_test_go_writer",
-      "internal_execution_wsconn",
-      "route_fakeresponder_upgrade",
-      "validate_formfakeresponder_upgrade",
-      "validate_httpfiberresponder_upgrade"
-    ],
-    "41": [
+    "37": [
       "graphql_resolver",
       "graphql_resolver_declare",
       "graphql_resolver_isresolver",
@@ -1869,7 +1711,36 @@
       "internal_graphql_subscription_go_schema",
       "internal_graphql_subscription_newsubscription"
     ],
-    "42": [
+    "38": [
+      "internal_execution_httpcontext_newhttpcontext",
+      "internal_graphql_reservation_newreservationregistry",
+      "internal_graphql_reservation_test",
+      "internal_graphql_reservation_test_go_t",
+      "internal_graphql_reservation_test_testreservationregistry_attachthenroute_returnswritefunc",
+      "internal_graphql_reservation_test_testreservationregistry_concurrentreserveattachroute_norace",
+      "internal_graphql_reservation_test_testreservationregistry_reserve_returnsuniquetoken",
+      "internal_graphql_reservation_test_testreservationregistry_routebeforeattach_returnsnotok",
+      "internal_graphql_sse_fixtures_test_newfakesseresponder",
+      "internal_graphql_sse_single_go_schema",
+      "internal_graphql_sse_single_ssesingleconnecthandler",
+      "internal_graphql_sse_single_ssesingleoperationhandler",
+      "internal_graphql_sse_single_test",
+      "internal_graphql_sse_single_test_attachanddraintoken",
+      "internal_graphql_sse_single_test_go_reader",
+      "internal_graphql_sse_single_test_go_t",
+      "internal_graphql_sse_single_test_newssesingletestschema",
+      "internal_graphql_sse_single_test_testssesinglecancelhandler_activeoperationid_stopsthatsubscriptiononly",
+      "internal_graphql_sse_single_test_testssesinglecancelhandler_unknownoperationid_respondserror",
+      "internal_graphql_sse_single_test_testssesingleconnecthandler_clientdisconnects_releasesreservation",
+      "internal_graphql_sse_single_test_testssesingleconnecthandler_unknowntoken_respondserror",
+      "internal_graphql_sse_single_test_testssesingleconnecthandler_validtoken_attachesconnection",
+      "internal_graphql_sse_single_test_testssesingleoperationhandler_concurrentoperations_norace",
+      "internal_graphql_sse_single_test_testssesingleoperationhandler_queryoperation_routesnextcompletetotoken",
+      "internal_graphql_sse_single_test_testssesingleoperationhandler_subscriptionoperation_routesmultiplenexttotoken",
+      "internal_graphql_sse_single_test_testssesingleoperationhandler_unknowntoken_respondserror",
+      "internal_graphql_sse_single_test_testssesinglereservehandler_put_responds201withtoken"
+    ],
+    "39": [
       "accessor_dirty_tracking",
       "gonest",
       "gonest_go_emitter",
@@ -1883,7 +1754,6 @@
       "gonest_mustoverride",
       "gonest_mustparse",
       "gonest_newaccessor",
-      "gonest_newbadgatewayexception",
       "gonest_newgraphqlresolver",
       "gonest_newlistener",
       "gonest_newloggermiddleware",
@@ -1892,40 +1762,41 @@
       "gonest_provideras",
       "gonest_recoverafter",
       "gonest_schema",
+      "gonest_schemafor",
       "gonest_subscribe",
       "gonest_syncaccessorfields",
       "graphqlresolver",
       "next"
     ],
-    "43": [
-      "app_graphqlpostbodypeek",
-      "app_graphqlrequestbody",
-      "app_graphqlresponsebody",
-      "app_resolvableresolver",
-      "formfile",
-      "internal_app_graphql",
-      "internal_app_graphql_go_schema",
-      "internal_app_graphql_graphqlgetdispatcher",
-      "internal_app_graphql_graphqlhandler",
-      "internal_app_graphql_graphqlpostdispatcher",
-      "internal_app_graphql_requestcarrieseventstreamtoken",
-      "internal_validate_form",
-      "internal_validate_form_go_parseable",
-      "internal_validate_form_go_request",
-      "internal_validate_form_newformbodysource",
-      "internal_validate_headers_go_parseable",
-      "internal_validate_headers_go_request",
-      "internal_validate_headers_newheaderssource",
-      "internal_validate_query",
-      "internal_validate_query_go_parseable",
-      "internal_validate_query_go_request",
-      "internal_validate_query_newquerysource",
-      "internal_validate_validate_go_parseable",
-      "internal_validate_validate_newjsonbodysource",
-      "validate_formbodysource",
-      "validate_querysource"
+    "40": [
+      "app_test_adapter",
+      "app_test_close",
+      "app_test_resolvedirect",
+      "app_test_resolvedirectall",
+      "app_testbuilder",
+      "gonest_mustnewtestapp",
+      "gonest_test_newinsighthealthmodule",
+      "gonest_test_newinsighttestusermodule",
+      "gonest_test_testhealthcontroller_rootalias_insightexample_livez_alwaysok",
+      "gonest_test_testhealthcontroller_rootalias_insightexample_readyz_allup",
+      "gonest_test_testhealthcontroller_rootalias_insightexample_readyz_onedown",
+      "gonest_test_testmustnewtestapp_nilconfigure_behaveslikenewappminuslisten",
+      "gonest_test_testmustnewtestapp_nooverride_directmustinject_unitstyle",
+      "gonest_test_testmustnewtestapp_overridebyinterface_realhttpdispatch",
+      "gonest_test_testmustrequest_notfound_statuspropagatesgenericexception",
+      "gonest_test_testmustrequest_rootalias_insighttestusercontrollerexample",
+      "internal_app_test_app",
+      "internal_app_test_app_go_app_test",
+      "internal_app_test_app_go_module",
+      "internal_app_test_app_go_t",
+      "internal_app_test_app_go_type",
+      "internal_app_test_app_go_value",
+      "internal_app_test_app_mustnewtestapp",
+      "internal_app_test_app_mustoverride",
+      "module",
+      "testapp"
     ],
-    "44": [
+    "41": [
       "graphql_context",
       "graphql_context_done",
       "internal_provider_lifecycle",
@@ -1953,35 +1824,35 @@
       "provider_provider_runmoduleinit",
       "provider_provider_runsignalhook"
     ],
-    "45": [
-      "internal_resolver_resolver",
-      "internal_resolver_resolver_find",
-      "internal_resolver_resolver_findexported",
-      "internal_resolver_resolver_findown",
-      "internal_resolver_resolver_go_module",
-      "internal_resolver_resolver_go_type",
-      "internal_resolver_resolver_hasownunexported",
-      "internal_resolver_resolver_test",
-      "internal_resolver_resolver_test_bartype",
-      "internal_resolver_resolver_test_baztype",
-      "internal_resolver_resolver_test_footype",
-      "internal_resolver_resolver_test_go_t",
-      "internal_resolver_resolver_test_go_type",
-      "internal_resolver_resolver_test_testfind_diamondimport_directimporterresolvessharedprovider",
-      "internal_resolver_resolver_test_testfind_diamondimport_resolvesdirectimportonly",
-      "internal_resolver_resolver_test_testfind_importedbutnotexported_panics",
-      "internal_resolver_resolver_test_testfind_importedexportedprovider_resolvescorrectly",
-      "internal_resolver_resolver_test_testfind_importednotreexported_stillpanics_noproviderregistered",
-      "internal_resolver_resolver_test_testfind_ownmodulehaspriorityoverimports",
-      "internal_resolver_resolver_test_testfind_ownmoduleprovider_resolvesdirectly",
-      "internal_resolver_resolver_test_testfind_plainnotexported_stillpanicsexistsbutnotexported",
-      "internal_resolver_resolver_test_testfind_reexportedmodule_resolvestransitivelythrougheffectiveexports",
-      "internal_resolver_resolver_test_testfind_typenowhere_panics",
-      "resolver_barservice",
-      "resolver_bazservice",
-      "resolver_fooservice"
+    "42": [
+      "internal_module_module_test",
+      "internal_module_module_test_go_t",
+      "internal_module_module_test_testassemble_autowiresownermoduleoncontrollers",
+      "internal_module_module_test_testassemble_autowiresownermoduleonproviders",
+      "internal_module_module_test_testassemble_exportdeclaredinproviders_noerror",
+      "internal_module_module_test_testmodule_controllers_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_exports_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_filters_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_imports_returnsimportedmodules",
+      "internal_module_module_test_testmodule_imports_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_listeners_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_name_calledtwice_lastcallwins",
+      "internal_module_module_test_testmodule_name_emptystring_fallsbacktopointeraddress",
+      "internal_module_module_test_testmodule_name_makesmodulenamereturngivenname",
+      "internal_module_module_test_testmodule_name_nevercalled_fallsbacktopointeraddress",
+      "internal_module_module_test_testmodule_ownfilters_returnscopynotinternalslice",
+      "internal_module_module_test_testmodule_ownmiddleware_returnscopynotinternalslice",
+      "internal_module_module_test_testmodule_providers_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_resolvers_registersresolvers",
+      "internal_module_module_test_testmodule_resolvers_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_schedulers_wrongtokenkind_panics",
+      "internal_module_module_test_testmodule_use_storesmiddlewareinregistrationorder",
+      "internal_module_module_test_testmodule_use_wrongtokenkind_panics",
+      "internal_module_module_test_testnew_doesnotexecutefnoncall",
+      "internal_resolver_resolver_modulename",
+      "module_dummytype"
     ],
-    "46": [
+    "43": [
       "app_mustinjectallcacheadapter",
       "app_mustinjectallcacheadapter_ping",
       "app_mustinjectallorderingadaptera",
@@ -2008,34 +1879,7 @@
       "internal_app_must_inject_all_provider_test_testmustinjectall_zeromatches_returnsemptyslicenopanic",
       "internal_app_must_inject_all_provider_test_testmustnewapp_transientmember_panics"
     ],
-    "47": [
-      "gonest_go_module",
-      "gonest_newapp",
-      "gonest_newcontroller",
-      "gonest_newmodule",
-      "gonest_test_testapp_mustlisten_nilonlisten_throughrootalias",
-      "gonest_test_testapp_mustlisten_promotedthroughrootalias",
-      "gonest_test_testauthguard_rootalias_insightcallshape",
-      "gonest_test_testfooexamplefilter_rootalias_insightcallshape",
-      "gonest_test_testmustinject_emitter_resolvesfromanymodule_noregistration",
-      "gonest_test_testmustinject_routecallback_panicswhennoproviderregistered",
-      "gonest_test_testmustinjectall_pointertype_rootalias_panics",
-      "gonest_test_testmustinjectall_rootalias_insightconnectableexample",
-      "gonest_test_testmustinjectall_zeromatches_returnsemptyslice",
-      "gonest_test_testmustjsonbody_rootalias_userentityinsightcallshape",
-      "gonest_test_testmustnewtestapp_realproviderconstructor_neverrunswhenoverridden",
-      "gonest_test_testmustparams_rootpackage_realhttpdispatch",
-      "gonest_test_testmustparamsandmustquery_rootalias_insightcallshape",
-      "gonest_test_testnewapp_rootalias_insightcallshape",
-      "gonest_test_testnewgraphqlresolver_rootalias_realhttpdispatch",
-      "gonest_test_testnewloggermiddleware_realhttpdispatch_logsmethodpathstatusduration",
-      "gonest_test_testnewloggermiddleware_realhttpdispatch_logsrealstatuswhenguardrejects",
-      "gonest_test_testrequestidmiddleware_rootalias_insightcallshape",
-      "gonest_test_testtiminginterceptor_rootalias_insightcallshape",
-      "internal_logger_logger_go_writer",
-      "internal_logger_logger_setoutput"
-    ],
-    "48": [
+    "44": [
       "internal_schema_string",
       "schema_arrayschema_ipv4",
       "schema_propertybuilder_binary",
@@ -2062,33 +1906,111 @@
       "schema_stringschema_patternvalue",
       "schema_stringschema_required"
     ],
-    "49": [
-      "exception_fooexampleerror",
-      "exception_httpexception",
-      "exception_httpexception_details",
-      "exception_httpexception_error",
-      "exception_httpexception_marshaljson",
-      "exception_httpexception_message",
-      "exception_httpexception_setdetails",
-      "exception_httpexception_setmessage",
-      "exception_httpexception_setname",
-      "exception_httpexception_setstatus",
-      "exception_httpexception_status",
-      "exception_notacceptableexception",
-      "exception_proxyauthrequiredexception",
-      "exception_requestedrangenotsatisfiableexception",
-      "exception_upgraderequiredexception",
-      "gonest_newhttpexception",
-      "gonest_newnotacceptableexception",
-      "gonest_newproxyauthrequiredexception",
-      "gonest_newrequestedrangenotsatisfiableexception",
-      "gonest_newupgraderequiredexception",
-      "internal_exception_builtin_newnotacceptableexception",
-      "internal_exception_builtin_newproxyauthrequiredexception",
-      "internal_exception_builtin_newrequestedrangenotsatisfiableexception",
-      "internal_exception_builtin_newupgraderequiredexception"
+    "45": [
+      "execution_bodysource",
+      "execution_bodysource_json",
+      "execution_bodysource_raw",
+      "execution_bodysource_text",
+      "execution_parseable",
+      "execution_request",
+      "execution_request_body",
+      "execution_request_formstream",
+      "execution_request_header",
+      "execution_request_headers",
+      "execution_request_method",
+      "execution_request_param",
+      "execution_request_params",
+      "execution_request_path",
+      "execution_request_queries",
+      "execution_request_query",
+      "execution_request_route",
+      "execution_request_withroute",
+      "execution_request_withsources",
+      "execution_responder",
+      "graphql_context_args",
+      "internal_execution_request",
+      "internal_execution_request_go_reader",
+      "internal_execution_request_newrequest"
     ],
-    "50": [
+    "46": [
+      "gonest_go_module",
+      "gonest_newapp",
+      "gonest_newcontroller",
+      "gonest_newmodule",
+      "gonest_test_testapp_mustlisten_nilonlisten_throughrootalias",
+      "gonest_test_testapp_mustlisten_promotedthroughrootalias",
+      "gonest_test_testauthguard_rootalias_insightcallshape",
+      "gonest_test_testfooexamplefilter_rootalias_insightcallshape",
+      "gonest_test_testgenerateopenapischema_rootalias_insightexample",
+      "gonest_test_testmustinject_emitter_resolvesfromanymodule_noregistration",
+      "gonest_test_testmustinject_routecallback_panicswhennoproviderregistered",
+      "gonest_test_testmustinjectall_pointertype_rootalias_panics",
+      "gonest_test_testmustinjectall_rootalias_insightconnectableexample",
+      "gonest_test_testmustinjectall_zeromatches_returnsemptyslice",
+      "gonest_test_testmustjsonbody_rootalias_userentityinsightcallshape",
+      "gonest_test_testmustparams_rootpackage_realhttpdispatch",
+      "gonest_test_testmustparamsandmustquery_rootalias_insightcallshape",
+      "gonest_test_testnewapp_rootalias_insightcallshape",
+      "gonest_test_testnewloggermiddleware_realhttpdispatch_logsmethodpathstatusduration",
+      "gonest_test_testnewloggermiddleware_realhttpdispatch_logsrealstatuswhenguardrejects",
+      "gonest_test_testrequestidmiddleware_rootalias_insightcallshape",
+      "gonest_test_testtiminginterceptor_rootalias_insightcallshape",
+      "internal_logger_logger_go_writer",
+      "internal_logger_logger_setoutput"
+    ],
+    "47": [
+      "inject_allasview",
+      "inject_constructable",
+      "inject_declarable",
+      "inject_directresolver",
+      "inject_lazyresolvedsetter",
+      "inject_lazyscoped",
+      "inject_pendingalledge",
+      "inject_pendingedge",
+      "internal_inject_direct_dispatch_test_testmustinjectall_fromproviderowner_dispatchestomustallprovider",
+      "internal_inject_inject",
+      "internal_inject_inject_globalsingletonfor",
+      "internal_inject_inject_go_t",
+      "internal_inject_inject_go_type",
+      "internal_inject_inject_go_value",
+      "internal_inject_inject_lazyresolvedvalue",
+      "internal_inject_inject_must",
+      "internal_inject_inject_mustall",
+      "internal_inject_inject_mustallprovider",
+      "internal_inject_inject_mustlazy",
+      "internal_inject_inject_pendingalledges",
+      "internal_inject_inject_pendingedges",
+      "internal_inject_inject_registerglobalsingleton",
+      "internal_inject_inject_test_pendingalledgesfor",
+      "module_owner"
+    ],
+    "48": [
+      "internal_module_assemble_assemble",
+      "internal_module_module_new",
+      "internal_module_module_test_testassemble_diamondimport_visitssharedmoduleonce",
+      "internal_module_module_test_testassemble_exportnotdeclaredinproviders_returnserror",
+      "internal_module_module_test_testassemble_simplebfs_visitsimportedmodule",
+      "internal_module_module_test_testmodule_controllers_registerscontrollers",
+      "internal_module_module_test_testmodule_exports_returnsexportedproviders",
+      "internal_module_module_test_testmodule_filters_storesfiltersinregistrationorder",
+      "internal_module_module_test_testmodule_ownproviders_returnscopynotinternalslice",
+      "internal_module_module_test_testmodule_ownproviders_returnsregisteredproviders",
+      "internal_module_module_test_testnew_executesfnonlyafterassemble",
+      "internal_module_reexport_test",
+      "internal_module_reexport_test_go_t",
+      "internal_module_reexport_test_testassemble_exportmodulesimported_noerror",
+      "internal_module_reexport_test_testassemble_exportmodulesnotimported_returnserror",
+      "internal_module_reexport_test_testmodule_effectiveexports_diamond_dedupessharedreexportedmodule",
+      "internal_module_reexport_test_testmodule_effectiveexports_mutualreexportcycle_doesnothang",
+      "internal_module_reexport_test_testmodule_effectiveexports_noreexports_matchesexportedproviders",
+      "internal_module_reexport_test_testmodule_effectiveexports_selfreexport_doesnothang",
+      "internal_module_reexport_test_testmodule_effectiveexports_threehopchain_istransitive",
+      "internal_module_reexport_test_testmodule_effectiveexports_twohopchain_includesreexportedmodulesownexports",
+      "internal_module_reexport_test_testmodule_effectiveexports_undeclaredexportonreexportedmodule_notincluded",
+      "internal_module_reexport_test_testmodule_exportmodules_storesreexportedmodules",
+      "internal_module_reexport_test_testmodule_ownexportedmodules_returnscopynotinternalslice"
+    ],
+    "49": [
       "internal_module_module_test_go_module",
       "internal_module_module_test_go_type",
       "internal_module_module_test_testproviderref_resolvedtype_exposesunderlyingtype",
@@ -2114,7 +2036,7 @@
       "module_fakescheduler_istoken",
       "module_fakescheduler_setownermodule"
     ],
-    "51": [
+    "50": [
       "internal_schema_schema_test",
       "internal_schema_schema_test_go_schema",
       "internal_schema_schema_test_go_t",
@@ -2140,56 +2062,7 @@
       "schema_mixinb",
       "schema_userentity"
     ],
-    "52": [
-      "exception_badrequestexception",
-      "exception_builtincase",
-      "exception_conflictexception",
-      "exception_forbiddenexception",
-      "exception_notfoundexception",
-      "exception_unauthorizedexception",
-      "gonest_newbadrequestexception",
-      "gonest_newconflictexception",
-      "gonest_newforbiddenexception",
-      "gonest_newnotfoundexception",
-      "gonest_newunauthorizedexception",
-      "internal_exception_builtin_newbadrequestexception",
-      "internal_exception_builtin_newconflictexception",
-      "internal_exception_builtin_newforbiddenexception",
-      "internal_exception_builtin_newnotfoundexception",
-      "internal_exception_builtin_newunauthorizedexception",
-      "internal_exception_builtin_test",
-      "internal_exception_builtin_test_builtincases",
-      "internal_exception_builtin_test_go_t",
-      "internal_exception_builtin_test_testbuiltinexception_constructoracceptsnildetails",
-      "internal_exception_builtin_test_testbuiltinexception_constructorfixedfields",
-      "internal_exception_builtin_test_testbuiltinexception_panicrecoverroundtrip",
-      "internal_exception_builtin_test_testbuiltinexception_satisfiesexception"
-    ],
-    "53": [
-      "context",
-      "gonest_insightconnectable",
-      "gonest_insightconnectableservice",
-      "gonest_insightconnectableservice_pingall",
-      "gonest_insighthealthdb",
-      "gonest_insighthealthdb_name",
-      "gonest_insighthealthdb_ping",
-      "gonest_insighthealthredis",
-      "gonest_insighthealthredis_name",
-      "gonest_insighthealthredis_ping",
-      "gonest_insightscheduleruserservice",
-      "gonest_insightscheduleruserservice_ping",
-      "gonest_insightscheduleruserservice_purgeexpired",
-      "gonest_insightscheduleruserservice_warmupcache",
-      "gonest_test_go_module",
-      "gonest_test_newinsighthealthmodule",
-      "gonest_test_testfooexampleerror_rootalias_insightcallshape",
-      "gonest_test_testhealthcontroller_rootalias_insightexample_livez_alwaysok",
-      "gonest_test_testhealthcontroller_rootalias_insightexample_readyz_allup",
-      "gonest_test_testhealthcontroller_rootalias_insightexample_readyz_onedown",
-      "gonest_test_testscheduler_rootalias_insightcleanupschedulerexample",
-      "mutex"
-    ],
-    "54": [
+    "51": [
       "inject_directiface",
       "inject_directimpl",
       "inject_directimpl_name",
@@ -2213,7 +2086,7 @@
       "internal_inject_direct_dispatch_test_testmustinjectall_pointertype_panics",
       "internal_inject_direct_dispatch_test_testmustinjectall_unsupportedowner_panics"
     ],
-    "55": [
+    "52": [
       "internal_openapi_generate",
       "internal_openapi_generate_buildresponses",
       "internal_openapi_generate_defaulterrorresponse",
@@ -2237,7 +2110,7 @@
       "internal_openapi_generate_walkroute",
       "openapi_routablecontroller"
     ],
-    "56": [
+    "53": [
       "graphql_fakesseresponder",
       "graphql_fakesseresponder_bodystream",
       "graphql_fakesseresponder_disconnect",
@@ -2260,7 +2133,7 @@
       "pipereader",
       "pipewriter"
     ],
-    "57": [
+    "54": [
       "accessor_dirtyvalue",
       "accessor_personentity",
       "accessor_personprops",
@@ -2282,29 +2155,7 @@
       "internal_accessor_sync_test_testsyncaccessorfields_accessortorawandpointer",
       "internal_accessor_sync_test_testsyncaccessorfields_nilornonstructinputs"
     ],
-    "58": [
-      "exception_exception",
-      "exception_httpexception_name",
-      "gonest_exceptionname",
-      "internal_exception_exception",
-      "internal_exception_exception_effectivename",
-      "internal_exception_exception_newhttpexception",
-      "internal_exception_exception_test",
-      "internal_exception_exception_test_go_t",
-      "internal_exception_exception_test_testeffectivename_fallsbacktoconcretetypename_whennameunset",
-      "internal_exception_exception_test_testeffectivename_returnssetnamewhennonempty",
-      "internal_exception_exception_test_testfooexampleerror_satisfiesexception",
-      "internal_exception_exception_test_testhttpexception_error_emptywhennomessageandnodetails",
-      "internal_exception_exception_test_testhttpexception_error_fallsbacktojsondetails_whenmessageunset",
-      "internal_exception_exception_test_testhttpexception_error_returnsmessagewhenset",
-      "internal_exception_exception_test_testhttpexception_marshaljson_omitsstatusincludesrest",
-      "internal_exception_exception_test_testhttpexception_marshaljson_promotedthroughembedding",
-      "internal_exception_exception_test_testhttpexception_setmethods_chainandreturnindependentcopies",
-      "internal_exception_exception_test_testnewhttpexception_accessorsreturnwhatwaspassed",
-      "internal_exception_exception_test_testnewhttpexception_defaultsstatusto500",
-      "internal_exception_exception_test_testnonexceptionvalues_donotsatisfyexception"
-    ],
-    "59": [
+    "55": [
       "field",
       "fieldconfigargument",
       "fieldresolvefn",
@@ -2326,29 +2177,7 @@
       "scalar",
       "scalarconfig"
     ],
-    "60": [
-      "gonest_paramfakeresponder",
-      "gonest_paramfakeresponder_bodystream",
-      "gonest_paramfakeresponder_getheader",
-      "gonest_paramfakeresponder_getmethod",
-      "gonest_paramfakeresponder_getparam",
-      "gonest_paramfakeresponder_getpath",
-      "gonest_paramfakeresponder_getstatus",
-      "gonest_paramfakeresponder_html",
-      "gonest_paramfakeresponder_isupgraderequest",
-      "gonest_paramfakeresponder_json",
-      "gonest_paramfakeresponder_queries",
-      "gonest_paramfakeresponder_rawbody",
-      "gonest_paramfakeresponder_sendstring",
-      "gonest_paramfakeresponder_setheadervalue",
-      "gonest_paramfakeresponder_upgrade",
-      "gonest_paramfakeresponder_writestream",
-      "gonest_test_go_reader",
-      "gonest_test_testparserestformbody_realhttpdispatch_streamsfilewithoutfullbuffering",
-      "writer",
-      "wsconn"
-    ],
-    "61": [
+    "56": [
       "internal_schema_numeric",
       "schema_arrayschema_double",
       "schema_arrayschema_float",
@@ -2370,28 +2199,29 @@
       "schema_propertybuilder_int32",
       "schema_propertybuilder_integer"
     ],
-    "62": [
-      "app_httpadapter",
-      "app_httpadapterptr",
-      "app_test_adapter",
-      "app_test_close",
-      "app_test_resolvedirect",
-      "app_test_resolvedirectall",
-      "app_testbuilder",
-      "gonest_mustnewtestapp",
-      "internal_adapter_fiber_fiber_init",
-      "internal_app_app_go_t",
-      "internal_app_test_app",
-      "internal_app_test_app_go_app_test",
-      "internal_app_test_app_go_module",
-      "internal_app_test_app_go_t",
-      "internal_app_test_app_go_type",
-      "internal_app_test_app_go_value",
-      "internal_app_test_app_mustoverride",
-      "internal_app_test_app_registertestadapter",
-      "testapp"
+    "57": [
+      "internal_validate_headers",
+      "internal_validate_headers_go_parseable",
+      "internal_validate_headers_go_request",
+      "internal_validate_headers_newheaderssource",
+      "internal_validate_params",
+      "internal_validate_params_coerceparamstring",
+      "internal_validate_params_go_request",
+      "internal_validate_query",
+      "internal_validate_query_go_parseable",
+      "internal_validate_query_go_request",
+      "internal_validate_query_newquerysource",
+      "internal_validate_validate_tagkey",
+      "internal_validate_validate_tagkeyvisible",
+      "structfield",
+      "validate_headerssource",
+      "validate_headerssource_parseinto",
+      "validate_paramssource",
+      "validate_paramssource_parseinto",
+      "validate_querysource",
+      "validate_querysource_parseinto"
     ],
-    "63": [
+    "58": [
       "app_isproviderasview",
       "app_providerasvalidateanimal",
       "app_providerasvalidatecat",
@@ -2412,70 +2242,28 @@
       "internal_app_provider_as_validate_test_testvalidateproviderasrefs_wrappedtypedoesnotimplementtarget_returnserror",
       "internal_app_provider_as_validate_validateproviderasrefs"
     ],
-    "64": [
-      "examples_blog_api_main",
-      "examples_blog_api_main_main",
-      "examples_full_text_search_main",
-      "examples_full_text_search_main_main",
-      "gonest_controller",
-      "gonest_go_app",
-      "gonest_go_openapi",
-      "gonest_httpcontext",
-      "gonest_module",
-      "gonest_mustnewapp",
-      "gonest_mustsetupswagger",
-      "gonest_newopenapi",
-      "gonest_openapigenerate",
-      "gonest_provider",
-      "gonest_setupswagger",
-      "gonest_test_mapkeys",
-      "gonest_test_testgenerateopenapischema_rootalias_insightexample",
-      "gonest_test_testmustsetupswagger_success_doesnotpanic_registersroutes",
-      "gonest_test_testnewopenapi_rootalias_insightbootstrapexample"
+    "59": [
+      "gonest_paramfakeresponder",
+      "gonest_paramfakeresponder_bodystream",
+      "gonest_paramfakeresponder_getheader",
+      "gonest_paramfakeresponder_getmethod",
+      "gonest_paramfakeresponder_getparam",
+      "gonest_paramfakeresponder_getpath",
+      "gonest_paramfakeresponder_getstatus",
+      "gonest_paramfakeresponder_html",
+      "gonest_paramfakeresponder_isupgraderequest",
+      "gonest_paramfakeresponder_json",
+      "gonest_paramfakeresponder_queries",
+      "gonest_paramfakeresponder_rawbody",
+      "gonest_paramfakeresponder_sendstring",
+      "gonest_paramfakeresponder_setheadervalue",
+      "gonest_paramfakeresponder_upgrade",
+      "gonest_paramfakeresponder_writestream",
+      "reader",
+      "writer",
+      "wsconn"
     ],
-    "65": [
-      "execution_request_iswebsocketupgrade",
-      "fiber_fiberresponder",
-      "fiber_fiberresponder_bodystream",
-      "fiber_fiberresponder_getheader",
-      "fiber_fiberresponder_getmethod",
-      "fiber_fiberresponder_getpath",
-      "fiber_fiberresponder_getstatus",
-      "fiber_fiberresponder_html",
-      "fiber_fiberresponder_isupgraderequest",
-      "fiber_fiberresponder_json",
-      "fiber_fiberresponder_queries",
-      "fiber_fiberresponder_rawbody",
-      "fiber_fiberresponder_sendstring",
-      "fiber_fiberresponder_setheadervalue",
-      "fiber_fiberresponder_setstatus",
-      "fiber_fiberresponder_writestream",
-      "internal_adapter_fiber_fiber_go_ctx",
-      "internal_adapter_fiber_fiber_go_reader",
-      "internal_adapter_fiber_fiber_go_writer"
-    ],
-    "66": [
-      "internal_module_assemble",
-      "internal_module_assemble_assemble",
-      "internal_module_assemble_go_module_module",
-      "internal_module_assemble_modulename",
-      "internal_module_assemble_validateexports",
-      "internal_module_reexport_test",
-      "internal_module_reexport_test_go_t",
-      "internal_module_reexport_test_testassemble_exportmodulesimported_noerror",
-      "internal_module_reexport_test_testassemble_exportmodulesnotimported_returnserror",
-      "internal_module_reexport_test_testmodule_effectiveexports_diamond_dedupessharedreexportedmodule",
-      "internal_module_reexport_test_testmodule_effectiveexports_mutualreexportcycle_doesnothang",
-      "internal_module_reexport_test_testmodule_effectiveexports_noreexports_matchesexportedproviders",
-      "internal_module_reexport_test_testmodule_effectiveexports_selfreexport_doesnothang",
-      "internal_module_reexport_test_testmodule_effectiveexports_threehopchain_istransitive",
-      "internal_module_reexport_test_testmodule_effectiveexports_twohopchain_includesreexportedmodulesownexports",
-      "internal_module_reexport_test_testmodule_effectiveexports_undeclaredexportonreexportedmodule_notincluded",
-      "internal_module_reexport_test_testmodule_exportmodules_storesreexportedmodules",
-      "internal_module_reexport_test_testmodule_ownexportedmodules_returnscopynotinternalslice",
-      "module_module_assemble"
-    ],
-    "67": [
+    "60": [
       "internal_resolver_stage3",
       "internal_resolver_stage3_allproviders",
       "internal_resolver_stage3_callconstructor",
@@ -2496,7 +2284,7 @@
       "resolver_resolvedsetter",
       "resolver_scoped"
     ],
-    "68": [
+    "61": [
       "internal_schema_numeric_test",
       "internal_schema_numeric_test_go_schema",
       "internal_schema_numeric_test_go_t",
@@ -2517,49 +2305,68 @@
       "internal_schema_numeric_test_testnumericschema_minmaxdefaultunset",
       "schema_numericboolentity"
     ],
-    "69": [
-      "internal_validate_params_test_go_reader",
-      "internal_validate_params_test_go_writer",
-      "validate_paramfakeresponder",
-      "validate_paramfakeresponder_bodystream",
-      "validate_paramfakeresponder_getheader",
-      "validate_paramfakeresponder_getmethod",
-      "validate_paramfakeresponder_getparam",
-      "validate_paramfakeresponder_getpath",
-      "validate_paramfakeresponder_getstatus",
-      "validate_paramfakeresponder_html",
-      "validate_paramfakeresponder_isupgraderequest",
-      "validate_paramfakeresponder_json",
-      "validate_paramfakeresponder_queries",
-      "validate_paramfakeresponder_rawbody",
-      "validate_paramfakeresponder_sendstring",
-      "validate_paramfakeresponder_setheadervalue",
-      "validate_paramfakeresponder_setstatus",
-      "validate_paramfakeresponder_upgrade",
-      "validate_paramfakeresponder_writestream"
+    "62": [
+      "internal_validate_validate",
+      "internal_validate_validate_go_schema",
+      "internal_validate_validate_int64slicecontains",
+      "internal_validate_validate_isnumerickind",
+      "internal_validate_validate_parsedecoded",
+      "internal_validate_validate_populate",
+      "internal_validate_validate_populatevalue",
+      "internal_validate_validate_setfield",
+      "internal_validate_validate_stringslicecontains",
+      "internal_validate_validate_tofloat64",
+      "internal_validate_validate_validatearray",
+      "internal_validate_validate_validateobject",
+      "internal_validate_validate_validateprimitive",
+      "internal_validate_validate_validatestruct",
+      "internal_validate_validate_validatevalue",
+      "kind",
+      "propertybuilder",
+      "validate_violation",
+      "value"
     ],
-    "70": [
-      "internal_validate_query_test_go_reader",
-      "internal_validate_query_test_go_writer",
-      "validate_queryfakeresponder",
-      "validate_queryfakeresponder_bodystream",
-      "validate_queryfakeresponder_getheader",
-      "validate_queryfakeresponder_getmethod",
-      "validate_queryfakeresponder_getparam",
-      "validate_queryfakeresponder_getpath",
-      "validate_queryfakeresponder_getstatus",
-      "validate_queryfakeresponder_html",
-      "validate_queryfakeresponder_isupgraderequest",
-      "validate_queryfakeresponder_json",
-      "validate_queryfakeresponder_queries",
-      "validate_queryfakeresponder_rawbody",
-      "validate_queryfakeresponder_sendstring",
-      "validate_queryfakeresponder_setheadervalue",
-      "validate_queryfakeresponder_setstatus",
-      "validate_queryfakeresponder_upgrade",
-      "validate_queryfakeresponder_writestream"
+    "63": [
+      "examples_blog_api_main",
+      "examples_blog_api_main_main",
+      "examples_full_text_search_main",
+      "examples_full_text_search_main_main",
+      "gonest_controller",
+      "gonest_go_app",
+      "gonest_go_openapi",
+      "gonest_httpcontext",
+      "gonest_module",
+      "gonest_mustnewapp",
+      "gonest_mustsetupswagger",
+      "gonest_newopenapi",
+      "gonest_openapigenerate",
+      "gonest_provider",
+      "gonest_setupswagger",
+      "gonest_test_testmustsetupswagger_success_doesnotpanic_registersroutes",
+      "gonest_test_testnewopenapi_rootalias_insightbootstrapexample",
+      "gonest_test_testsetupswagger_rootalias_insightbootstrapcallshape"
     ],
-    "71": [
+    "64": [
+      "execution_fakeresponder_queries",
+      "internal_execution_reply_new",
+      "internal_execution_request_test",
+      "internal_execution_request_test_go_t",
+      "internal_execution_request_test_newfakeresponder",
+      "internal_execution_request_test_testbodysource_raw_emptybydefault",
+      "internal_execution_request_test_testbodysource_raw_returnsrawbytes",
+      "internal_execution_request_test_testbodysource_text_returnsstringofraw",
+      "internal_execution_request_test_testrequest_body_returnsbodysource",
+      "internal_execution_request_test_testrequest_header_readsfromresponder",
+      "internal_execution_request_test_testrequest_iswebsocketupgrade_delegatestoresponder",
+      "internal_execution_request_test_testrequest_param_readsfromresponder",
+      "internal_execution_request_test_testrequest_queries_emptybydefault",
+      "internal_execution_request_test_testrequest_queries_readsfromresponder",
+      "internal_execution_request_test_testrequest_route_nilbydefault",
+      "internal_execution_request_test_testrequest_withroute_ischainableandstoresroute",
+      "internal_execution_request_test_testresponse_upgradewebsocket_delegatestoresponder",
+      "internal_execution_request_test_testresponse_upgradewebsocket_passessubprotocolsthrough"
+    ],
+    "65": [
       "internal_schema_schema",
       "internal_schema_schema_cumulativeoffset",
       "internal_schema_schema_findfieldbyoffset",
@@ -2579,7 +2386,7 @@
       "schema_schema_title",
       "schema_schema_titletext"
     ],
-    "72": [
+    "66": [
       "internal_validate_form_test_go_reader",
       "internal_validate_form_test_go_writer",
       "validate_formfakeresponder",
@@ -2599,7 +2406,7 @@
       "validate_formfakeresponder_setstatus",
       "validate_formfakeresponder_writestream"
     ],
-    "73": [
+    "67": [
       "internal_validate_params_test",
       "internal_validate_params_test_decodeparamcode",
       "internal_validate_params_test_go_t",
@@ -2619,7 +2426,47 @@
       "validate_useronlyparams",
       "validate_userorderparams"
     ],
-    "74": [
+    "68": [
+      "internal_validate_params_test_go_reader",
+      "internal_validate_params_test_go_writer",
+      "validate_paramfakeresponder",
+      "validate_paramfakeresponder_bodystream",
+      "validate_paramfakeresponder_getheader",
+      "validate_paramfakeresponder_getmethod",
+      "validate_paramfakeresponder_getparam",
+      "validate_paramfakeresponder_getpath",
+      "validate_paramfakeresponder_getstatus",
+      "validate_paramfakeresponder_html",
+      "validate_paramfakeresponder_isupgraderequest",
+      "validate_paramfakeresponder_json",
+      "validate_paramfakeresponder_queries",
+      "validate_paramfakeresponder_rawbody",
+      "validate_paramfakeresponder_sendstring",
+      "validate_paramfakeresponder_setheadervalue",
+      "validate_paramfakeresponder_setstatus",
+      "validate_paramfakeresponder_writestream"
+    ],
+    "69": [
+      "internal_validate_query_test_go_reader",
+      "internal_validate_query_test_go_writer",
+      "validate_queryfakeresponder",
+      "validate_queryfakeresponder_bodystream",
+      "validate_queryfakeresponder_getheader",
+      "validate_queryfakeresponder_getmethod",
+      "validate_queryfakeresponder_getparam",
+      "validate_queryfakeresponder_getpath",
+      "validate_queryfakeresponder_getstatus",
+      "validate_queryfakeresponder_html",
+      "validate_queryfakeresponder_isupgraderequest",
+      "validate_queryfakeresponder_json",
+      "validate_queryfakeresponder_queries",
+      "validate_queryfakeresponder_rawbody",
+      "validate_queryfakeresponder_sendstring",
+      "validate_queryfakeresponder_setheadervalue",
+      "validate_queryfakeresponder_setstatus",
+      "validate_queryfakeresponder_writestream"
+    ],
+    "70": [
       "app_controllablelistenadapter",
       "app_controllablelistenadapter_init",
       "app_controllablelistenadapter_listen",
@@ -2638,26 +2485,64 @@
       "internal_app_wiring_test_testnewapp_invokesmoduleinitandapplicationbootstraphooks",
       "internal_app_wiring_test_testnewapp_moduleinithookerror_abortsnewapp"
     ],
-    "75": [
-      "app_fakeregisteredroute",
-      "app_listenspyadapter",
-      "app_listenspyadapter_init",
-      "app_listenspyadapter_registerroute",
-      "app_listenspyadapter_shutdown",
-      "app_listenspyadapter_test",
-      "app_options",
-      "app_recordingfakeadapter",
-      "app_recordingfakeadapter_init",
-      "app_recordingfakeadapter_listen",
-      "app_recordingfakeadapter_registerroute",
-      "app_recordingfakeadapter_shutdown",
-      "app_recordingfakeadapter_test",
-      "internal_app_app_newadapter",
-      "internal_app_app_test_go_mutex",
-      "internal_app_options",
-      "pt"
+    "71": [
+      "exception_badrequestexception",
+      "exception_conflictexception",
+      "exception_forbiddenexception",
+      "exception_notacceptableexception",
+      "exception_notfoundexception",
+      "exception_toomanyrequestsexception",
+      "exception_unauthorizedexception",
+      "gonest_newbadrequestexception",
+      "gonest_newconflictexception",
+      "gonest_newforbiddenexception",
+      "gonest_newnotacceptableexception",
+      "gonest_newnotfoundexception",
+      "gonest_newtoomanyrequestsexception",
+      "gonest_newunauthorizedexception",
+      "internal_exception_builtin_go_httpexception",
+      "internal_exception_builtin_newnotacceptableexception",
+      "internal_exception_builtin_newtoomanyrequestsexception"
     ],
-    "76": [
+    "72": [
+      "execution_fakeresponder",
+      "execution_fakeresponder_bodystream",
+      "execution_fakeresponder_getheader",
+      "execution_fakeresponder_getmethod",
+      "execution_fakeresponder_getparam",
+      "execution_fakeresponder_getpath",
+      "execution_fakeresponder_getstatus",
+      "execution_fakeresponder_html",
+      "execution_fakeresponder_isupgraderequest",
+      "execution_fakeresponder_json",
+      "execution_fakeresponder_rawbody",
+      "execution_fakeresponder_sendstring",
+      "execution_fakeresponder_setheadervalue",
+      "execution_fakeresponder_setstatus",
+      "execution_fakeresponder_writestream",
+      "internal_execution_request_test_go_reader",
+      "internal_execution_request_test_go_writer"
+    ],
+    "73": [
+      "execution_request_iswebsocketupgrade",
+      "fiber_fiberresponder",
+      "fiber_fiberresponder_bodystream",
+      "fiber_fiberresponder_getheader",
+      "fiber_fiberresponder_getmethod",
+      "fiber_fiberresponder_getpath",
+      "fiber_fiberresponder_getstatus",
+      "fiber_fiberresponder_isupgraderequest",
+      "fiber_fiberresponder_json",
+      "fiber_fiberresponder_queries",
+      "fiber_fiberresponder_rawbody",
+      "fiber_fiberresponder_setheadervalue",
+      "fiber_fiberresponder_setstatus",
+      "fiber_fiberresponder_writestream",
+      "internal_adapter_fiber_fiber_go_ctx",
+      "internal_adapter_fiber_fiber_go_reader",
+      "internal_adapter_fiber_fiber_go_writer"
+    ],
+    "74": [
       "graphql_wsprotocolmessage",
       "graphql_wssubscribepayload",
       "internal_graphql_context",
@@ -2676,7 +2561,7 @@
       "internal_graphql_ws_protocol_handlesubscribe",
       "internal_graphql_ws_protocol_wsrootfieldname"
     ],
-    "77": [
+    "75": [
       "internal_execution_request_newbodysource",
       "internal_validate_query_test",
       "internal_validate_query_test_decodequerycode",
@@ -2695,7 +2580,7 @@
       "validate_listusersquery",
       "validate_mismatchedquery"
     ],
-    "78": [
+    "76": [
       "app_app_close",
       "app_app_enableshutdownhooks",
       "app_app_runshutdownsequence",
@@ -2707,11 +2592,47 @@
       "app_moduleinitrunner",
       "internal_app_lifecycle",
       "internal_app_lifecycle_go_app_app",
-      "internal_app_lifecycle_runbeforeapplicationshutdownphase",
+      "internal_app_lifecycle_runapplicationshutdownphase",
       "internal_app_lifecycle_signalname",
-      "internal_app_lifecycle_test_testrunbeforeapplicationshutdownphase_failfast",
-      "internal_app_lifecycle_test_testrunbeforeapplicationshutdownphase_rootfirstorderandsignal",
+      "internal_app_lifecycle_test_testrunapplicationshutdownphase_failfast",
+      "internal_app_lifecycle_test_testrunapplicationshutdownphase_rootfirstorderandsignal",
       "signal"
+    ],
+    "77": [
+      "exception",
+      "exception_builtincase",
+      "gonest_test_testbuiltinexceptions_rootalias_withoutdetails",
+      "internal_exception_builtin_newbadrequestexception",
+      "internal_exception_builtin_newconflictexception",
+      "internal_exception_builtin_newforbiddenexception",
+      "internal_exception_builtin_newnotfoundexception",
+      "internal_exception_builtin_newunauthorizedexception",
+      "internal_exception_builtin_test",
+      "internal_exception_builtin_test_builtincases",
+      "internal_exception_builtin_test_go_t",
+      "internal_exception_builtin_test_testbuiltinexception_constructoracceptsnildetails",
+      "internal_exception_builtin_test_testbuiltinexception_constructorfixedfields",
+      "internal_exception_builtin_test_testbuiltinexception_constructorwithoutdetails",
+      "internal_exception_builtin_test_testbuiltinexception_panicrecoverroundtrip",
+      "internal_exception_builtin_test_testbuiltinexception_satisfiesexception"
+    ],
+    "78": [
+      "fiber_app",
+      "fiber_app_fiberapp",
+      "fiber_app_init",
+      "fiber_app_listen",
+      "fiber_app_registerroute",
+      "fiber_app_shutdown",
+      "fiber_app_test",
+      "fiber_fiberresponder_html",
+      "fiber_fiberresponder_sendstring",
+      "fiber_fiberresponder_upgrade",
+      "internal_adapter_fiber_fiber",
+      "internal_adapter_fiber_fiber_fibermethod",
+      "internal_adapter_fiber_fiber_init",
+      "internal_adapter_fiber_fiber_new",
+      "internal_adapter_fiber_fiber_test_testfibermethod_unknownhttpmethod_panics",
+      "internal_app_test_app_registertestadapter"
     ],
     "79": [
       "graphql_query",
@@ -2957,6 +2878,38 @@
       "internal_app_lifecycle_e2e_test_testlifecyclee2e_fullsequencevianewappandclose"
     ],
     "93": [
+      "app_fakeshutdownadapter",
+      "app_fakeshutdownadapter_init",
+      "app_fakeshutdownadapter_listen",
+      "app_fakeshutdownadapter_registerroute",
+      "app_fakeshutdownadapter_shutdown",
+      "app_fakeshutdownadapter_test",
+      "internal_route_response",
+      "internal_route_response_go_schema",
+      "route_response",
+      "route_response_description",
+      "route_response_descriptiontext",
+      "route_response_schema",
+      "route_response_schemavalue",
+      "route_route_responses"
+    ],
+    "94": [
+      "emitter",
+      "gonest_go_provider",
+      "gonest_insightemitteruserservice",
+      "gonest_insightemitteruserservice_create",
+      "gonest_insightloggerservice",
+      "gonest_insightloggerservice_log",
+      "gonest_insightloggerservice_snapshot",
+      "gonest_newprovider",
+      "gonest_routemustinjectusecase",
+      "gonest_routemustinjectusecase_greeting",
+      "gonest_test_testemitter_rootalias_insightusercreatedexample",
+      "gonest_test_testgetloggerfor_insideproviderconstructor_resolveswithoutmustinject",
+      "gonest_test_testmustinject_routecallback_resolvesfromowningcontrollerscope",
+      "gonest_test_testmustnewtestapp_realproviderconstructor_neverrunswhenoverridden"
+    ],
+    "95": [
       "entity_creatable",
       "entity_deletable",
       "entity_indexable",
@@ -2972,7 +2925,7 @@
       "examples_full_text_search_shared_entity_entity_newupdatable",
       "person_service_create"
     ],
-    "94": [
+    "96": [
       "entity_person",
       "examples_full_text_search_person_service",
       "examples_full_text_search_person_service_applysort",
@@ -2988,7 +2941,7 @@
       "person_service_update",
       "querydto"
     ],
-    "95": [
+    "97": [
       "examples_simple_todo_entity",
       "examples_simple_todo_stats",
       "examples_simple_todo_todo",
@@ -3004,7 +2957,7 @@
       "simple_todo_todostatsusecase",
       "simple_todo_todostatsusecase_run"
     ],
-    "96": [
+    "98": [
       "internal_schema_duration",
       "internal_schema_duration_go_duration",
       "schema_durationschema",
@@ -3020,7 +2973,23 @@
       "schema_durationschema_required",
       "schema_propertybuilder_duration"
     ],
-    "97": [
+    "99": [
+      "internal_validate_env",
+      "internal_validate_env_parseenvinto",
+      "internal_validate_env_test",
+      "internal_validate_env_test_go_t",
+      "internal_validate_env_test_testparseenvinto_allfieldsset_populatescorrectly",
+      "internal_validate_env_test_testparseenvinto_defaultusedwhenabsent_realvalueusedwhenpresent",
+      "internal_validate_env_test_testparseenvinto_emptybutsetenvvar_treatedaspresent",
+      "internal_validate_env_test_testparseenvinto_fieldwithoutenvtag_ignored",
+      "internal_validate_env_test_testparseenvinto_integercoercionfails_recordsviolation",
+      "internal_validate_env_test_testparseenvinto_tworequiredmissing_collectsbothviolations",
+      "validate_envallfieldsfixture",
+      "validate_envdefaultfixture",
+      "validate_envemptybutsetfixture",
+      "validate_envtworequiredfixture"
+    ],
+    "100": [
       "internal_validate_form_test",
       "internal_validate_form_test_buildmultipartbody",
       "internal_validate_form_test_go_buffer",
@@ -3035,51 +3004,6 @@
       "internal_validate_form_test_testparseformbody_streamunavailable_panics",
       "validate_createpostform",
       "validate_customformfixture"
-    ],
-    "98": [
-      "emitter",
-      "gonest_go_provider",
-      "gonest_insightemitteruserservice",
-      "gonest_insightemitteruserservice_create",
-      "gonest_insightloggerservice",
-      "gonest_insightloggerservice_log",
-      "gonest_insightloggerservice_snapshot",
-      "gonest_newprovider",
-      "gonest_routemustinjectusecase",
-      "gonest_routemustinjectusecase_greeting",
-      "gonest_test_testemitter_rootalias_insightusercreatedexample",
-      "gonest_test_testgetloggerfor_insideproviderconstructor_resolveswithoutmustinject",
-      "gonest_test_testmustinject_routecallback_resolvesfromowningcontrollerscope"
-    ],
-    "99": [
-      "gonest_schemafor",
-      "internal_schema_registry",
-      "internal_schema_registry_go_schema",
-      "internal_schema_registry_go_type",
-      "internal_schema_registry_lookup",
-      "internal_schema_registry_register",
-      "internal_schema_registry_test",
-      "internal_schema_registry_test_go_t",
-      "internal_schema_registry_test_testlookup_neverregisteredtype_returnsfalsenopanic",
-      "internal_schema_registry_test_testnew_calledtwiceforsametype_panics",
-      "internal_schema_registry_test_testregister_concurrentdistincttypes_norace",
-      "internal_schema_registry_test_testregister_recoverablevialookup",
-      "schema_registryuserentity"
-    ],
-    "100": [
-      "graphql_resolver_resolvedirect",
-      "graphql_resolver_resolvedirectall",
-      "internal_graphql_resolver_go_type",
-      "internal_graphql_resolver_go_value",
-      "internal_resolver_direct",
-      "internal_resolver_direct_candidateproviders",
-      "internal_resolver_direct_finddirectall",
-      "internal_resolver_direct_finddirectmatches",
-      "internal_resolver_direct_go_module",
-      "internal_resolver_direct_go_type",
-      "internal_resolver_direct_go_value",
-      "internal_resolver_direct_resolvedvalueof",
-      "resolver_resolvedgetter"
     ],
     "101": [
       "internal_schema_duration_test",
@@ -3112,7 +3036,21 @@
       "schema_kindentity"
     ],
     "103": [
-      "execution_httpcontext_response",
+      "internal_validate_testhelpers_test",
+      "internal_validate_testhelpers_test_go_schema",
+      "internal_validate_testhelpers_test_go_t",
+      "internal_validate_testhelpers_test_mustparseform",
+      "internal_validate_testhelpers_test_mustparseheaders",
+      "internal_validate_testhelpers_test_mustparsejson",
+      "internal_validate_testhelpers_test_mustparseparams",
+      "internal_validate_testhelpers_test_mustparsequery",
+      "internal_validate_testhelpers_test_parseform",
+      "internal_validate_testhelpers_test_parseheaders",
+      "internal_validate_testhelpers_test_parsejson",
+      "internal_validate_testhelpers_test_parseparams",
+      "internal_validate_testhelpers_test_parsequery"
+    ],
+    "104": [
       "execution_reply",
       "execution_reply_html",
       "execution_reply_json",
@@ -3122,10 +3060,11 @@
       "execution_reply_statuscode",
       "execution_reply_stream",
       "execution_reply_text",
+      "execution_reply_upgradewebsocket",
       "internal_execution_reply",
       "internal_execution_reply_go_writer"
     ],
-    "104": [
+    "105": [
       "internal_openapi_openapi_test",
       "internal_openapi_openapi_test_go_t",
       "internal_openapi_openapi_test_testbearerauth_setsflag",
@@ -3139,7 +3078,7 @@
       "internal_openapi_openapi_test_testtitle_setsandoverwrites",
       "internal_openapi_openapi_test_testversion_setsandoverwrites"
     ],
-    "105": [
+    "106": [
       "internal_openapi_swagger",
       "internal_openapi_swagger_go_app",
       "internal_openapi_swagger_go_openapi",
@@ -3153,7 +3092,7 @@
       "internal_openapi_swagger_test_testsetupswagger_realhttpdispatch",
       "openapi_swaggeroptions"
     ],
-    "106": [
+    "107": [
       "internal_schema_datetime_test",
       "internal_schema_datetime_test_go_schema",
       "internal_schema_datetime_test_go_t",
@@ -3167,7 +3106,7 @@
       "internal_schema_datetime_test_testintegerthendatetime_nopaniclastwins",
       "schema_datetimeentity"
     ],
-    "107": [
+    "108": [
       "internal_schema_object",
       "internal_schema_object_go_schema",
       "schema_objectschema",
@@ -3181,7 +3120,21 @@
       "schema_objectschema_schemaref",
       "schema_propertybuilder_object"
     ],
-    "108": [
+    "109": [
+      "internal_schema_registry",
+      "internal_schema_registry_go_schema",
+      "internal_schema_registry_go_type",
+      "internal_schema_registry_lookup",
+      "internal_schema_registry_register",
+      "internal_schema_registry_test",
+      "internal_schema_registry_test_go_t",
+      "internal_schema_registry_test_testlookup_neverregisteredtype_returnsfalsenopanic",
+      "internal_schema_registry_test_testnew_calledtwiceforsametype_panics",
+      "internal_schema_registry_test_testregister_concurrentdistincttypes_norace",
+      "internal_schema_registry_test_testregister_recoverablevialookup",
+      "schema_registryuserentity"
+    ],
+    "110": [
       "internal_validate_enum_test",
       "internal_validate_enum_test_enumfixturebody",
       "internal_validate_enum_test_go_t",
@@ -3195,34 +3148,60 @@
       "validate_enumfixture",
       "validate_enumfixturenullable"
     ],
-    "109": [
-      "internal_validate_testhelpers_test",
-      "internal_validate_testhelpers_test_go_schema",
-      "internal_validate_testhelpers_test_go_t",
-      "internal_validate_testhelpers_test_mustparseform",
-      "internal_validate_testhelpers_test_mustparseheaders",
-      "internal_validate_testhelpers_test_mustparsejson",
-      "internal_validate_testhelpers_test_mustparseparams",
-      "internal_validate_testhelpers_test_mustparsequery",
-      "internal_validate_testhelpers_test_parseheaders",
-      "internal_validate_testhelpers_test_parsejson",
-      "internal_validate_testhelpers_test_parseparams",
-      "internal_validate_testhelpers_test_parsequery"
-    ],
-    "110": [
-      "fiber_app",
-      "fiber_app_fiberapp",
-      "fiber_app_init",
-      "fiber_app_listen",
-      "fiber_app_shutdown",
-      "fiber_app_test",
-      "fiber_fiberresponder_upgrade",
-      "internal_adapter_fiber_fiber",
-      "internal_adapter_fiber_fiber_fibermethod",
-      "internal_adapter_fiber_fiber_new",
-      "internal_adapter_fiber_fiber_test_testfibermethod_unknownhttpmethod_panics"
-    ],
     "111": [
+      "internal_validate_graphql_args",
+      "internal_validate_graphql_args_newgraphqlargssource",
+      "internal_validate_graphql_args_normalizegraphqlvalue",
+      "internal_validate_graphql_args_test",
+      "internal_validate_graphql_args_test_go_schema",
+      "internal_validate_graphql_args_test_go_t",
+      "internal_validate_graphql_args_test_newgraphqlargstestschema",
+      "internal_validate_graphql_args_test_testnewgraphqlargssource_normalizesnativeintarg",
+      "internal_validate_graphql_args_test_testnewgraphqlargssource_normalizesnestedintargs",
+      "validate_graphqlargsentity",
+      "validate_mapargssource",
+      "validate_mapargssource_parseinto"
+    ],
+    "112": [
+      "app_listenspyadapter",
+      "app_listenspyadapter_init",
+      "app_listenspyadapter_registerroute",
+      "app_listenspyadapter_shutdown",
+      "app_listenspyadapter_test",
+      "app_options",
+      "app_recordingfakeadapter_init",
+      "internal_app_app_newadapter",
+      "internal_app_app_test_go_mutex",
+      "internal_app_options",
+      "pt"
+    ],
+    "113": [
+      "execution_bodysource_form",
+      "execution_formfile",
+      "execution_formfile_contenttype",
+      "execution_formfile_fieldname",
+      "execution_formfile_filename",
+      "execution_formfile_reader",
+      "internal_execution_formfile",
+      "internal_execution_formfile_go_reader",
+      "internal_execution_formfile_newformfile",
+      "part",
+      "validate_formbodysource_parseinto"
+    ],
+    "114": [
+      "gonest_gonesttestspylogger",
+      "gonest_gonesttestspylogger_debug",
+      "gonest_gonesttestspylogger_error",
+      "gonest_gonesttestspylogger_info",
+      "gonest_gonesttestspylogger_record",
+      "gonest_gonesttestspylogger_snapshot",
+      "gonest_gonesttestspylogger_verbose",
+      "gonest_gonesttestspylogger_warn",
+      "gonest_insighthealthdb",
+      "gonest_insighthealthdb_name",
+      "mutex"
+    ],
+    "115": [
       "internal_schema_sanitize_refine_test",
       "internal_schema_sanitize_refine_test_go_schema",
       "internal_schema_sanitize_refine_test_go_t",
@@ -3235,7 +3214,7 @@
       "internal_schema_sanitize_refine_test_testschema_refine_accumulatesinregistrationorder",
       "schema_sanitizerefineentity"
     ],
-    "112": [
+    "116": [
       "internal_validate_custom_test",
       "internal_validate_custom_test_decodev1code",
       "internal_validate_custom_test_go_t",
@@ -3248,7 +3227,7 @@
       "validate_customcodefixture",
       "validate_customwrongtypefixture"
     ],
-    "113": [
+    "117": [
       "accessor_accessor_t",
       "accessor_accessor_t_apply",
       "accessor_accessor_t_get",
@@ -3260,19 +3239,19 @@
       "accessor_accessor_t_unmarshaljson",
       "internal_accessor_accessor_go_t"
     ],
-    "114": [
-      "app_fakeshutdownadapter",
-      "app_fakeshutdownadapter_init",
-      "app_fakeshutdownadapter_listen",
-      "app_fakeshutdownadapter_registerroute",
-      "app_fakeshutdownadapter_shutdown",
-      "app_fakeshutdownadapter_test",
+    "118": [
+      "app_fakeregisteredroute",
+      "app_recordingfakeadapter",
+      "app_recordingfakeadapter_listen",
+      "app_recordingfakeadapter_registerroute",
+      "app_recordingfakeadapter_shutdown",
+      "app_recordingfakeadapter_test",
       "internal_route_method",
       "route_httpmethod",
       "route_httpmethod_string",
       "route_route_method"
     ],
-    "115": [
+    "119": [
       "blog_graphql_postcreatedevent",
       "blog_graphql_postentity",
       "blog_graphql_service",
@@ -3284,31 +3263,67 @@
       "examples_blog_graphql_service_go_emitter",
       "examples_blog_graphql_service_go_mutex"
     ],
-    "116": [
-      "examples_blog_api_module_user_service",
-      "examples_blog_api_module_user_service_go_db",
-      "examples_blog_api_module_user_service_go_entity",
-      "examples_blog_api_shared_exception",
-      "examples_blog_api_shared_exception_newduplicateemailexception",
-      "shared_duplicateemailexception",
-      "user_service",
-      "user_service_create",
-      "user_service_get",
-      "user_service_list"
+    "120": [
+      "context",
+      "gonest_insightconnectable",
+      "gonest_insightconnectableservice",
+      "gonest_insightconnectableservice_pingall",
+      "gonest_insighthealthdb_ping",
+      "gonest_insightscheduleruserservice",
+      "gonest_insightscheduleruserservice_ping",
+      "gonest_insightscheduleruserservice_purgeexpired",
+      "gonest_insightscheduleruserservice_warmupcache",
+      "gonest_test_testscheduler_rootalias_insightcleanupschedulerexample"
     ],
-    "117": [
-      "execution_formfile",
-      "execution_formfile_contenttype",
-      "execution_formfile_fieldname",
-      "execution_formfile_filename",
-      "execution_formfile_reader",
-      "internal_execution_formfile",
-      "internal_execution_formfile_go_reader",
-      "internal_execution_formfile_newformfile",
-      "internal_validate_testhelpers_test_parseform",
-      "part"
+    "121": [
+      "execution_fakeresponder_upgrade",
+      "execution_wsconn",
+      "graphql_fakesseresponder_upgrade",
+      "guard_fakeresponder_upgrade",
+      "internal_execution_wsconn",
+      "middleware_fakeresponder_upgrade",
+      "route_fakeresponder_upgrade",
+      "validate_formfakeresponder_upgrade",
+      "validate_paramfakeresponder_upgrade",
+      "validate_queryfakeresponder_upgrade"
     ],
-    "118": [
+    "122": [
+      "gonest_fooexampleerror",
+      "gonest_insighthealthredis",
+      "gonest_insighthealthredis_name",
+      "gonest_insighthealthredis_ping",
+      "gonest_paramfakeresponder_setstatus",
+      "gonest_test_go_httpexception",
+      "gonest_test_newfooexampleerror",
+      "gonest_test_testfooexampleerror_rootalias_insightcallshape",
+      "gonest_test_testhttpexception_rootalias_satisfiesexception",
+      "gonest_test_testnewfilter_rootalias_typecheck"
+    ],
+    "123": [
+      "inject_lazyconfig",
+      "inject_otherlazyconfig",
+      "internal_inject_lazy_test",
+      "internal_inject_lazy_test_go_t",
+      "internal_inject_lazy_test_testmustlazy_nestedmustinject_panics",
+      "internal_inject_lazy_test_testmustlazy_nomatchingprovider_panics",
+      "internal_inject_lazy_test_testmustlazy_nonpointertype_panics",
+      "internal_inject_lazy_test_testmustlazy_nonsingletonprovider_panics",
+      "internal_inject_lazy_test_testmustlazy_repeatedcall_reusescachedvalue",
+      "internal_inject_lazy_test_testmustlazy_successfuleagerresolve"
+    ],
+    "124": [
+      "internal_execution_reply_test",
+      "internal_execution_reply_test_go_t",
+      "internal_execution_reply_test_testreply_html_delegatestoresponder",
+      "internal_execution_reply_test_testreply_json_delegatestoresponder",
+      "internal_execution_reply_test_testreply_request_returnsoriginatingrequest",
+      "internal_execution_reply_test_testreply_setheader_writestoresponder",
+      "internal_execution_reply_test_testreply_status_ischainableandsetscode",
+      "internal_execution_reply_test_testreply_status_json_chained",
+      "internal_execution_reply_test_testreply_statuscode_readscurrentstatus",
+      "internal_execution_reply_test_testreply_text_setsplaintextcontenttype"
+    ],
+    "125": [
       "internal_module_lazy_test",
       "internal_module_lazy_test_go_t",
       "internal_module_lazy_test_testlazymodule_exports_landsonownermodule",
@@ -3320,7 +3335,7 @@
       "internal_module_lazy_test_testmodule_lazy_runsbeforeassemblereadsimportsexports",
       "internal_module_lazy_test_testmodule_lazy_runsfnsynchronously"
     ],
-    "119": [
+    "126": [
       "app_test_mustrequest",
       "app_testresponse",
       "app_testresponse_assertjsonpath",
@@ -3331,7 +3346,7 @@
       "internal_app_test_response_lookupjsonpath",
       "internal_app_test_response_normalizejsonvalue"
     ],
-    "120": [
+    "127": [
       "fiber_fiberresponder_getparam",
       "fiber_fiberwsconn",
       "fiber_fiberwsconn_close",
@@ -3342,7 +3357,7 @@
       "fiber_fiberwsconn_writemessage",
       "internal_adapter_fiber_fiber_go_conn"
     ],
-    "121": [
+    "128": [
       "internal_schema_default_test",
       "internal_schema_default_test_go_schema",
       "internal_schema_default_test_go_t",
@@ -3353,7 +3368,7 @@
       "internal_schema_default_test_testpropertybuilder_defaultvalue_nevercalled_returnsfalse",
       "schema_defaultentity"
     ],
-    "122": [
+    "129": [
       "app_lazydriverconfig",
       "internal_app_lazy_module_test",
       "internal_app_lazy_module_test_buildlazydrivenapp",
@@ -3363,7 +3378,7 @@
       "internal_app_lazy_module_test_testlazymodule_picksmodulea_realhttpdispatch",
       "internal_app_lazy_module_test_testlazymodule_picksmoduleb_realhttpdispatch"
     ],
-    "123": [
+    "130": [
       "examples_lifecycle_hooks_service",
       "lifecycle_hooks_dbservice",
       "lifecycle_hooks_dbservice_close",
@@ -3373,27 +3388,7 @@
       "lifecycle_hooks_dbservice_ping",
       "lifecycle_hooks_dbservice_ready"
     ],
-    "124": [
-      "gonest_gonesttestspylogger",
-      "gonest_gonesttestspylogger_debug",
-      "gonest_gonesttestspylogger_error",
-      "gonest_gonesttestspylogger_info",
-      "gonest_gonesttestspylogger_record",
-      "gonest_gonesttestspylogger_snapshot",
-      "gonest_gonesttestspylogger_verbose",
-      "gonest_gonesttestspylogger_warn"
-    ],
-    "125": [
-      "gonest_insighttestuserentity",
-      "gonest_insighttestuserservice",
-      "gonest_insighttestuserservice_get",
-      "gonest_insighttestuserservicemock",
-      "gonest_insighttestuserservicemock_get",
-      "gonest_test_testmustnewtestapp_nooverride_directmustinject_unitstyle",
-      "gonest_test_testsetupswagger_rootalias_insightbootstrapcallshape",
-      "gonest_test_testsyncaccessorfields_rootexport"
-    ],
-    "126": [
+    "131": [
       "internal_app_app_test_go_app_userentity",
       "internal_app_app_test_go_app_userservice",
       "internal_app_app_test_go_app_userservice_create",
@@ -3403,7 +3398,17 @@
       "internal_app_app_test_go_app_userservice_update",
       "internal_app_app_test_testnewapp_userproviderexample_resolvesusableuserservice"
     ],
-    "127": [
+    "132": [
+      "internal_module_lazy",
+      "internal_module_lazy_go_module",
+      "internal_module_lazy_go_module_module",
+      "module_lazymodule",
+      "module_lazymodule_exports",
+      "module_lazymodule_imports",
+      "module_lazymodule_ownproviders",
+      "module_module_lazy"
+    ],
+    "133": [
       "internal_route_method_test",
       "internal_route_method_test_go_t",
       "internal_route_method_test_testhttpdelete_string",
@@ -3413,17 +3418,7 @@
       "internal_route_method_test_testhttpput_string",
       "internal_route_method_test_testhttpquery_string"
     ],
-    "128": [
-      "internal_route_response",
-      "internal_route_response_go_schema",
-      "route_response",
-      "route_response_description",
-      "route_response_descriptiontext",
-      "route_response_schema",
-      "route_response_schemavalue",
-      "route_route_responses"
-    ],
-    "129": [
+    "134": [
       "internal_schema_custom_test",
       "internal_schema_custom_test_go_schema",
       "internal_schema_custom_test_go_t",
@@ -3433,7 +3428,7 @@
       "internal_schema_custom_test_testpropertybuilder_customfunc_nevercalled_returnsfalse",
       "schema_customentity"
     ],
-    "130": [
+    "135": [
       "lefthook",
       "taskfile_build",
       "taskfile_default",
@@ -3443,7 +3438,7 @@
       "taskfile_test_race",
       "taskfile_vet"
     ],
-    "131": [
+    "136": [
       "pkg_blog_api",
       "pkg_blog_graphql",
       "pkg_config_dotenv",
@@ -3453,7 +3448,7 @@
       "pkg_notification_driver",
       "pkg_simple_todo"
     ],
-    "132": [
+    "137": [
       "emitter_emitter_removesubscriber",
       "emitter_emitter_subscribersfor",
       "internal_emitter_subscribe",
@@ -3462,7 +3457,7 @@
       "internal_emitter_subscribe_go_type",
       "internal_emitter_subscribe_subscribe"
     ],
-    "133": [
+    "138": [
       "examples_blog_api_module_post_service",
       "examples_blog_api_module_post_service_go_db",
       "examples_blog_api_module_post_service_go_entity",
@@ -3471,7 +3466,7 @@
       "post_service_get",
       "post_service_list"
     ],
-    "134": [
+    "139": [
       "gonest_test_newparamfakeresponder",
       "gonest_test_testmustparams_rootpackage_happypath",
       "gonest_test_testmustparams_rootpackage_panicsonconversionfailure",
@@ -3480,16 +3475,7 @@
       "internal_validate_params_go_parseable",
       "internal_validate_params_newparamssource"
     ],
-    "135": [
-      "internal_resolver_resolver_test_go_module",
-      "resolver_fakeprovider",
-      "resolver_fakeprovider_isprovider",
-      "resolver_fakeprovider_istoken",
-      "resolver_fakeprovider_ownermodule",
-      "resolver_fakeprovider_resolvedtype",
-      "resolver_fakeprovider_setownermodule"
-    ],
-    "136": [
+    "140": [
       "internal_schema_graphql_scalar_test",
       "internal_schema_graphql_scalar_test_go_schema",
       "internal_schema_graphql_scalar_test_go_t",
@@ -3498,7 +3484,16 @@
       "internal_schema_graphql_scalar_test_testpropertybuilder_graphqlscalarvalue_nevercalled_returnsfalse",
       "schema_graphqlscalarentity"
     ],
-    "137": [
+    "141": [
+      "internal_validate_validate_go_parseable",
+      "internal_validate_validate_go_request",
+      "internal_validate_validate_newjsonbodysource",
+      "internal_validate_validate_resolveschema",
+      "type",
+      "validate_jsonbodysource",
+      "validate_jsonbodysource_parseinto"
+    ],
+    "142": [
       "specs_features_lifecycle_hooks_tasks_t1",
       "specs_features_lifecycle_hooks_tasks_t2",
       "specs_features_lifecycle_hooks_tasks_t3",
@@ -3507,7 +3502,7 @@
       "specs_features_lifecycle_hooks_tasks_t6",
       "specs_features_lifecycle_hooks_tasks_t7"
     ],
-    "138": [
+    "143": [
       "app_mustinjectinsideconstructorconsumer",
       "app_mustinjectinsideconstructordep",
       "internal_app_must_inject_inside_constructor_test",
@@ -3515,7 +3510,7 @@
       "internal_app_must_inject_inside_constructor_test_testmustinject_calledinsideconstructor_producesresolveerror",
       "internal_app_must_inject_inside_constructor_test_testmustnewapp_calledinsideconstructor_panics"
     ],
-    "139": [
+    "144": [
       "comment_service",
       "comment_service_create",
       "comment_service_list",
@@ -3523,751 +3518,864 @@
       "examples_blog_api_module_comment_service_go_db",
       "examples_blog_api_module_comment_service_go_entity"
     ],
-    "140": [
-      "exception_lockedexception",
-      "exception_serviceunavailableexception",
-      "gonest_newlockedexception",
-      "gonest_newserviceunavailableexception",
-      "internal_exception_builtin_newlockedexception",
-      "internal_exception_builtin_newserviceunavailableexception"
+    "145": [
+      "gonest_insighttestuserentity",
+      "gonest_insighttestuserservice",
+      "gonest_insighttestuserservice_get",
+      "gonest_insighttestuserservicemock",
+      "gonest_insighttestuserservicemock_get",
+      "gonest_test_testsyncaccessorfields_rootexport"
     ],
-    "141": [
-      "gonest_fooexampleerror",
-      "gonest_paramfakeresponder_setstatus",
-      "gonest_test_go_httpexception",
-      "gonest_test_newfooexampleerror",
-      "gonest_test_testhttpexception_rootalias_satisfiesexception",
-      "gonest_test_testnewfilter_rootalias_typecheck"
-    ],
-    "142": [
-      "internal_execution",
-      "internal_metadata",
-      "specs_features_json_body_validation_spec",
-      "specs_features_json_body_validation_tasks",
-      "specs_features_metadata_registration_core_spec",
-      "specs_features_metadata_registration_core_tasks"
-    ],
-    "143": [
-      "internal_graphql_reservation_test",
-      "internal_graphql_reservation_test_go_t",
-      "internal_graphql_reservation_test_testreservationregistry_attachthenroute_returnswritefunc",
-      "internal_graphql_reservation_test_testreservationregistry_concurrentreserveattachroute_norace",
-      "internal_graphql_reservation_test_testreservationregistry_reserve_returnsuniquetoken",
-      "internal_graphql_reservation_test_testreservationregistry_routebeforeattach_returnsnotok"
-    ],
-    "144": [
+    "146": [
       "examples_blog_api_module_post_dto",
       "post_createbodydto",
       "post_listquerydto",
       "post_paramsdto",
       "post_uploadattachmentformdto"
     ],
-    "145": [
+    "147": [
       "exception_schemashape",
       "internal_exception_schema",
       "internal_exception_schema_go_schema",
       "internal_exception_schema_go_t",
       "internal_exception_schema_newschema"
     ],
-    "146": [
+    "148": [
       "gonest_consumer",
       "gonest_grpccontext",
       "gonest_grpcservice",
       "gonest_microservicecontext",
       "gonest_parseable"
     ],
-    "147": [
+    "149": [
       "internal_app_options_test",
       "internal_app_options_test_go_t",
       "internal_app_options_test_testappoptions_zerovalue",
       "internal_app_options_test_testonlisten_invocable",
       "internal_app_options_test_testonlisten_nilsafe"
     ],
-    "148": [
+    "150": [
+      "internal_module_assemble",
+      "internal_module_assemble_go_module_module",
+      "internal_module_assemble_modulename",
+      "internal_module_assemble_validateexports",
+      "module_module_assemble"
+    ],
+    "151": [
       "controller_controller_resolvedirect",
       "controller_controller_resolvedirectall",
       "internal_controller_controller_go_type",
       "internal_controller_controller_go_value"
     ],
-    "149": [
+    "152": [
       "examples_simple_todo_controller",
       "simple_todo_createtodobody",
       "simple_todo_todoidparams",
       "simple_todo_updatetodobody"
     ],
-    "150": [
+    "153": [
+      "internal_app_testhelpers_test",
+      "internal_app_testhelpers_test_go_schema",
+      "internal_app_testhelpers_test_go_t",
+      "internal_app_testhelpers_test_mustparse"
+    ],
+    "154": [
       "internal_route_route_go_type",
       "internal_route_route_go_value",
       "route_route_resolvedirect",
       "route_route_resolvedirectall"
     ],
-    "151": [
+    "155": [
       "blog_graphql_createpostargs",
       "blog_graphql_postidargs",
       "examples_blog_graphql_dto"
     ],
-    "152": [
+    "156": [
       "comment_createbodydto",
       "comment_listquerydto",
       "examples_blog_api_module_comment_dto"
     ],
-    "153": [
+    "157": [
       "email_service",
       "email_service_send",
       "examples_notification_driver_notifier_impl_email_service"
     ],
-    "154": [
+    "158": [
       "examples_blog_api_module_user_dto",
       "user_createbodydto",
       "user_paramsdto"
     ],
-    "155": [
+    "159": [
       "examples_blog_api_shared_database",
       "examples_blog_api_shared_database_go_db",
       "examples_blog_api_shared_database_opendb"
     ],
-    "156": [
+    "160": [
       "examples_notification_driver_notifier_impl_sms_service",
       "sms_service",
       "sms_service_send"
     ],
-    "157": [
+    "161": [
+      "exception_expectationfailedexception",
+      "gonest_newexpectationfailedexception",
+      "internal_exception_builtin_newexpectationfailedexception"
+    ],
+    "162": [
+      "exception_faileddependencyexception",
+      "gonest_newfaileddependencyexception",
+      "internal_exception_builtin_newfaileddependencyexception"
+    ],
+    "163": [
+      "exception_httpversionnotsupportedexception",
+      "gonest_newhttpversionnotsupportedexception",
+      "internal_exception_builtin_newhttpversionnotsupportedexception"
+    ],
+    "164": [
       "exception_insufficientstorageexception",
       "gonest_newinsufficientstorageexception",
       "internal_exception_builtin_newinsufficientstorageexception"
     ],
-    "158": [
+    "165": [
+      "exception_internalservererrorexception",
+      "gonest_newinternalservererrorexception",
+      "internal_exception_builtin_newinternalservererrorexception"
+    ],
+    "166": [
       "exception_lengthrequiredexception",
       "gonest_newlengthrequiredexception",
       "internal_exception_builtin_newlengthrequiredexception"
     ],
-    "159": [
+    "167": [
       "exception_loopdetectedexception",
       "gonest_newloopdetectedexception",
       "internal_exception_builtin_newloopdetectedexception"
     ],
-    "160": [
+    "168": [
+      "exception_methodnotallowedexception",
+      "gonest_newmethodnotallowedexception",
+      "internal_exception_builtin_newmethodnotallowedexception"
+    ],
+    "169": [
       "exception_misdirectedrequestexception",
       "gonest_newmisdirectedrequestexception",
       "internal_exception_builtin_newmisdirectedrequestexception"
     ],
-    "161": [
-      "exception_notextendedexception",
-      "gonest_newnotextendedexception",
-      "internal_exception_builtin_newnotextendedexception"
+    "170": [
+      "exception_networkauthenticationrequiredexception",
+      "gonest_newnetworkauthenticationrequiredexception",
+      "internal_exception_builtin_newnetworkauthenticationrequiredexception"
     ],
-    "162": [
-      "exception_preconditionrequiredexception",
-      "gonest_newpreconditionrequiredexception",
-      "internal_exception_builtin_newpreconditionrequiredexception"
+    "171": [
+      "exception_notimplementedexception",
+      "gonest_newnotimplementedexception",
+      "internal_exception_builtin_newnotimplementedexception"
     ],
-    "163": [
-      "exception_requestheaderfieldstoolargeexception",
-      "gonest_newrequestheaderfieldstoolargeexception",
-      "internal_exception_builtin_newrequestheaderfieldstoolargeexception"
+    "172": [
+      "exception_paymentrequiredexception",
+      "gonest_newpaymentrequiredexception",
+      "internal_exception_builtin_newpaymentrequiredexception"
     ],
-    "164": [
-      "exception_requesttimeoutexception",
-      "gonest_newrequesttimeoutexception",
-      "internal_exception_builtin_newrequesttimeoutexception"
+    "173": [
+      "exception_preconditionfailedexception",
+      "gonest_newpreconditionfailedexception",
+      "internal_exception_builtin_newpreconditionfailedexception"
     ],
-    "165": [
-      "exception_toomanyrequestsexception",
-      "gonest_newtoomanyrequestsexception",
-      "internal_exception_builtin_newtoomanyrequestsexception"
+    "174": [
+      "exception_requestentitytoolargeexception",
+      "gonest_newrequestentitytoolargeexception",
+      "internal_exception_builtin_newrequestentitytoolargeexception"
     ],
-    "166": [
-      "exception_unavailableforlegalreasonsexception",
-      "gonest_newunavailableforlegalreasonsexception",
-      "internal_exception_builtin_newunavailableforlegalreasonsexception"
+    "175": [
+      "exception_requesturitoolongexception",
+      "gonest_newrequesturitoolongexception",
+      "internal_exception_builtin_newrequesturitoolongexception"
     ],
-    "167": [
+    "176": [
+      "exception_serviceunavailableexception",
+      "gonest_newserviceunavailableexception",
+      "internal_exception_builtin_newserviceunavailableexception"
+    ],
+    "177": [
+      "exception_teapotexception",
+      "gonest_newteapotexception",
+      "internal_exception_builtin_newteapotexception"
+    ],
+    "178": [
       "exception_unprocessableentityexception",
       "gonest_newunprocessableentityexception",
       "internal_exception_builtin_newunprocessableentityexception"
     ],
-    "168": [
+    "179": [
       "exception_unsupportedmediatypeexception",
       "gonest_newunsupportedmediatypeexception",
       "internal_exception_builtin_newunsupportedmediatypeexception"
     ],
-    "169": [
-      "gonest_jsonbodyaddressentity",
-      "gonest_jsonbodyuserentity",
-      "time"
+    "180": [
+      "exception_upgraderequiredexception",
+      "gonest_newupgraderequiredexception",
+      "internal_exception_builtin_newupgraderequiredexception"
     ],
-    "170": [
-      "internal_execution_response",
-      "specs_features_request_response_split_spec",
-      "specs_features_request_response_split_tasks_t2"
+    "181": [
+      "internal_execution_context",
+      "specs_features_unified_parse_api_context",
+      "specs_features_unified_parse_api_tasks"
     ],
-    "171": [
+    "182": [
       "internal_openapi_generate_go_openapi_openapi",
       "internal_openapi_generate_hasanybearerauth",
       "openapi_openapi_document"
     ],
-    "172": [
+    "183": [
       "internal_schema",
       "specs_project_state_archive_ad_048",
       "specs_project_state_archive_ad_049"
     ],
-    "173": [
+    "184": [
       "module_fakefilter",
       "module_fakefilter_isfilter",
       "module_fakefilter_istoken"
     ],
-    "174": [
+    "185": [
       "module_fakemiddleware",
       "module_fakemiddleware_ismiddleware",
       "module_fakemiddleware_istoken"
     ],
-    "175": [
+    "186": [
       "specs_features_filter_design",
       "specs_features_filter_spec",
       "specs_features_filter_tasks"
     ],
-    "176": [
+    "187": [
       "specs_features_graphql_realtime_protocols_design",
       "specs_features_graphql_realtime_protocols_spec",
       "specs_features_graphql_realtime_protocols_tasks"
     ],
-    "177": [
+    "188": [
       "specs_features_object_builder_design",
       "specs_features_object_builder_spec",
       "specs_features_object_builder_tasks"
     ],
-    "178": [
+    "189": [
       "comment_entity",
       "examples_blog_api_module_comment_entity"
     ],
-    "179": [
+    "190": [
       "config_dotenv_databaseconfig",
       "examples_config_dotenv_config"
     ],
-    "180": [
+    "191": [
       "examples_blog_api_module_post_entity",
       "post_entity"
     ],
-    "181": [
+    "192": [
       "examples_blog_api_module_user_entity",
       "user_entity"
     ],
-    "182": [
+    "193": [
       "examples_blog_graphql_main",
       "examples_blog_graphql_main_main"
     ],
-    "183": [
+    "194": [
       "examples_config_dotenv_main",
       "examples_config_dotenv_main_main"
     ],
-    "184": [
+    "195": [
       "examples_lifecycle_hooks_main",
       "examples_lifecycle_hooks_main_main"
     ],
-    "185": [
+    "196": [
       "examples_notification_driver_controller",
       "notification_driver_sendbody"
     ],
-    "186": [
+    "197": [
       "examples_notification_driver_main",
       "examples_notification_driver_main_main"
     ],
-    "187": [
+    "198": [
       "examples_notification_driver_notifier_config",
       "notifier_config"
     ],
-    "188": [
+    "199": [
       "examples_notification_driver_notifier_port_port",
       "port_notifier"
     ],
-    "189": [
+    "200": [
       "examples_simple_todo_main",
       "examples_simple_todo_main_main"
     ],
-    "190": [
-      "internal_execution_context",
-      "specs_features_request_response_split_tasks_t3"
+    "201": [
+      "internal_metadata_array",
+      "internal_metadata_metadata"
     ],
-    "191": [
-      "internal_fiberapp_fiberapp",
-      "specs_features_panic_recovery_default_handler_design"
-    ],
-    "192": [
-      "internal_value_accessor",
-      "specs_features_schema_value_support_spec"
-    ],
-    "193": [
+    "202": [
       "internal_version_version",
       "internal_version_version_string"
     ],
-    "194": [
+    "203": [
       "specs_features_dotenv_loading_tasks",
       "specs_features_env_schema_binding_tasks"
     ],
-    "195": [
+    "204": [
       "specs_features_enum_branches_spec",
       "specs_features_enum_branches_tasks"
     ],
-    "196": [
+    "205": [
       "specs_features_env_schema_binding_design",
       "specs_features_env_schema_binding_spec"
     ],
-    "197": [
+    "206": [
       "specs_features_graphql_support_design",
       "specs_features_graphql_support_spec"
     ],
-    "198": [
+    "207": [
       "specs_features_interceptor_spec",
       "specs_features_interceptor_tasks"
     ],
-    "199": [
+    "208": [
+      "specs_features_json_body_validation_spec",
+      "specs_features_json_body_validation_tasks"
+    ],
+    "209": [
       "specs_features_lifecycle_hooks_context",
       "specs_features_lifecycle_hooks_spec"
     ],
-    "200": [
+    "210": [
+      "specs_features_metadata_registration_core_spec",
+      "specs_features_metadata_registration_core_tasks"
+    ],
+    "211": [
       "specs_features_middleware_spec",
       "specs_features_middleware_tasks"
     ],
-    "201": [
+    "212": [
       "specs_features_module_lazy_loading_design",
       "specs_features_module_lazy_loading_tasks"
     ],
-    "202": [
+    "213": [
       "specs_features_module_reexport_spec",
       "specs_features_module_reexport_tasks"
     ],
-    "203": [
+    "214": [
       "specs_features_multipart_form_streaming_spec",
       "specs_features_multipart_form_streaming_tasks"
     ],
-    "204": [
+    "215": [
       "specs_features_numeric_boolean_branches_design",
       "specs_features_numeric_boolean_branches_tasks"
     ],
-    "205": [
+    "216": [
       "specs_features_provider_interface_export_design",
       "specs_features_provider_must_inject_all_design"
     ],
-    "206": [
+    "217": [
+      "specs_features_schema_generation_design",
+      "specs_features_schema_generation_tasks"
+    ],
+    "218": [
+      "specs_features_schema_value_support_design",
+      "specs_features_schema_value_support_tasks"
+    ],
+    "219": [
+      "specs_features_string_family_branches_design",
+      "specs_features_string_family_branches_tasks"
+    ],
+    "220": [
+      "specs_features_test_app_bootstrap_context",
+      "specs_features_test_app_bootstrap_tasks"
+    ],
+    "221": [
+      "specs_features_unified_exportable_refs_design",
+      "specs_features_unified_exportable_refs_tasks"
+    ],
+    "222": [
       "specs_project_state_archive_ad_002",
       "specs_project_state_archive_ad_011"
     ],
-    "207": [
+    "223": [
       "specs_project_state_archive_ad_008",
       "specs_project_state_archive_ad_015"
     ],
-    "208": [
+    "224": [
       "specs_project_state_archive_ad_012",
       "specs_project_state_archive_ad_013"
     ],
-    "209": [
+    "225": [
       "specs_project_state_archive_ad_051",
       "specs_project_state_archive_ad_052"
     ],
-    "210": [
+    "226": [
       "examples_blog_api_module_comment_controller"
     ],
-    "211": [
+    "227": [
       "examples_blog_api_module_comment_module"
     ],
-    "212": [
+    "228": [
       "examples_blog_api_module_post_controller"
     ],
-    "213": [
+    "229": [
       "examples_blog_api_module_post_module"
     ],
-    "214": [
+    "230": [
       "examples_blog_api_module_user_controller"
     ],
-    "215": [
+    "231": [
       "examples_blog_api_module_user_module"
     ],
-    "216": [
+    "232": [
       "examples_blog_api_shared_guard"
     ],
-    "217": [
+    "233": [
       "examples_blog_api_shared_interceptor"
     ],
-    "218": [
+    "234": [
       "examples_blog_api_shared_middleware"
     ],
-    "219": [
+    "235": [
       "examples_blog_graphql_module"
     ],
-    "220": [
+    "236": [
       "examples_blog_graphql_readme"
     ],
-    "221": [
+    "237": [
       "examples_blog_graphql_resolver"
     ],
-    "222": [
+    "238": [
       "examples_config_dotenv_controller"
     ],
-    "223": [
+    "239": [
       "examples_full_text_search_person_controller"
     ],
-    "224": [
+    "240": [
       "examples_full_text_search_person_module"
     ],
-    "225": [
+    "241": [
       "examples_lifecycle_hooks_controller"
     ],
-    "226": [
+    "242": [
       "examples_notification_driver_module"
     ],
-    "227": [
+    "243": [
       "examples_notification_driver_notifier_impl_email_module"
     ],
-    "228": [
+    "244": [
       "examples_notification_driver_notifier_impl_sms_module"
     ],
-    "229": [
+    "245": [
       "examples_notification_driver_notifier_module"
     ],
-    "230": [
+    "246": [
       "gonest_clientproxy"
     ],
-    "231": [
+    "247": [
       "gonest_mustlisten"
     ],
-    "232": [
+    "248": [
       "gonest_test_go_emitter"
     ],
-    "233": [
-      "gonest_test_go_mutex"
-    ],
-    "234": [
-      "gonest_test_go_time"
-    ],
-    "235": [
-      "gonest_test_go_writer"
-    ],
-    "236": [
-      "insight_grpc_md"
-    ],
-    "237": [
-      "insight_microservice_md"
-    ],
-    "238": [
-      "internal_app"
-    ],
-    "239": [
-      "internal_app_fiber_dispatch_test_go_app"
-    ],
-    "240": [
-      "internal_app_fiber_dispatch_test_go_conn"
-    ],
-    "241": [
-      "internal_app_fiber_dispatch_test_go_duration"
-    ],
-    "242": [
-      "internal_fiberapp"
-    ],
-    "243": [
-      "internal_graphql_transport"
-    ],
-    "244": [
-      "internal_inject"
-    ],
-    "245": [
-      "internal_metadata_array"
-    ],
-    "246": [
-      "internal_metadata_metadata"
-    ],
-    "247": [
-      "internal_module"
-    ],
-    "248": [
-      "internal_resolver"
-    ],
     "249": [
-      "internal_validate_validate_go_structfield"
+      "gonest_test_go_module"
     ],
     "250": [
-      "internal_validate_validate_go_type"
+      "gonest_test_go_mutex"
     ],
     "251": [
-      "internal_validate_validate_go_value"
+      "gonest_test_go_reader"
     ],
     "252": [
-      "readme_md"
+      "gonest_test_go_time"
     ],
     "253": [
-      "specs_features_duration_branch_spec"
+      "gonest_test_go_writer"
     ],
     "254": [
-      "specs_features_emitter_spec"
+      "insight_grpc_md"
     ],
     "255": [
-      "specs_features_env_schema_binding_context"
+      "insight_microservice_md"
     ],
     "256": [
-      "specs_features_graphql_realtime_protocols_context"
+      "internal_app"
     ],
     "257": [
-      "specs_features_graphql_support_context"
+      "internal_app_fiber_dispatch_test_go_app"
     ],
     "258": [
-      "specs_features_http_test_client_spec"
+      "internal_app_fiber_dispatch_test_go_conn"
     ],
     "259": [
-      "specs_features_json_body_validation_context"
+      "internal_app_fiber_dispatch_test_go_duration"
     ],
     "260": [
-      "specs_features_logger_spec"
+      "internal_fiberapp_fiberapp"
     ],
     "261": [
-      "specs_features_logger_tasks"
+      "internal_graphql_transport"
     ],
     "262": [
-      "specs_features_metadata_registration_core_design"
+      "internal_inject"
     ],
     "263": [
-      "specs_features_middleware_design"
+      "internal_module"
     ],
     "264": [
-      "specs_features_module_composition_spec"
+      "internal_resolver"
     ],
     "265": [
-      "specs_features_module_lazy_loading_spec"
+      "internal_validate_validate_go_structfield"
     ],
     "266": [
-      "specs_features_module_reexport_design"
+      "internal_validate_validate_go_type"
     ],
     "267": [
-      "specs_features_multipart_form_streaming_design"
+      "internal_validate_validate_go_value"
     ],
     "268": [
-      "specs_features_numeric_boolean_branches_spec"
+      "readme_md"
     ],
     "269": [
-      "specs_features_openapi_document_builder_spec"
+      "specs_features_duration_branch_spec"
     ],
     "270": [
-      "specs_features_panic_recovery_default_handler_spec"
+      "specs_features_emitter_spec"
     ],
     "271": [
-      "specs_features_param_query_validation_context"
+      "specs_features_env_schema_binding_context"
     ],
     "272": [
-      "specs_features_param_query_validation_design"
+      "specs_features_graphql_realtime_protocols_context"
     ],
     "273": [
-      "specs_features_param_query_validation_spec"
+      "specs_features_graphql_support_context"
     ],
     "274": [
-      "specs_features_pipeline_ordering_spec"
+      "specs_features_http_test_client_spec"
     ],
     "275": [
-      "specs_features_provider_di_graph_design"
+      "specs_features_json_body_validation_context"
     ],
     "276": [
-      "specs_features_provider_di_graph_spec"
+      "specs_features_logger_spec"
     ],
     "277": [
-      "specs_features_provider_interface_export_spec"
+      "specs_features_logger_tasks"
     ],
     "278": [
-      "specs_features_provider_must_inject_all_spec"
+      "specs_features_metadata_registration_core_design"
     ],
     "279": [
-      "specs_features_request_response_split_tasks_t1"
+      "specs_features_middleware_design"
     ],
     "280": [
-      "specs_features_route_must_inject_spec"
+      "specs_features_module_composition_spec"
     ],
     "281": [
-      "specs_features_scheduler_spec"
+      "specs_features_module_lazy_loading_spec"
     ],
     "282": [
-      "specs_features_schema_generation_spec"
+      "specs_features_module_reexport_design"
     ],
     "283": [
-      "specs_features_schema_sanitize_refine_spec"
+      "specs_features_multipart_form_streaming_design"
     ],
     "284": [
-      "specs_features_string_family_branches_spec"
+      "specs_features_numeric_boolean_branches_spec"
     ],
     "285": [
-      "specs_features_swagger_ui_setup_spec"
+      "specs_features_openapi_document_builder_spec"
     ],
     "286": [
-      "specs_features_terminus_health_spec"
+      "specs_features_panic_recovery_default_handler_design"
     ],
     "287": [
-      "specs_features_test_app_bootstrap_spec"
+      "specs_features_panic_recovery_default_handler_spec"
     ],
     "288": [
-      "specs_features_unified_parse_api_spec"
+      "specs_features_param_query_validation_context"
     ],
     "289": [
-      "specs_features_unified_token_ref_spec"
+      "specs_features_param_query_validation_design"
     ],
     "290": [
-      "specs_handoff"
+      "specs_features_param_query_validation_spec"
     ],
     "291": [
-      "specs_insight_provider_md"
+      "specs_features_pipeline_ordering_spec"
     ],
     "292": [
-      "specs_insight_schema_md"
+      "specs_features_provider_di_graph_design"
     ],
     "293": [
-      "specs_project_project_md"
+      "specs_features_provider_di_graph_spec"
     ],
     "294": [
-      "specs_project_roadmap_md"
+      "specs_features_provider_di_graph_tasks"
     ],
     "295": [
-      "specs_project_state_archive_ad_001"
+      "specs_features_provider_interface_export_spec"
     ],
     "296": [
-      "specs_project_state_archive_ad_003"
+      "specs_features_provider_interface_export_tasks"
     ],
     "297": [
-      "specs_project_state_archive_ad_004"
+      "specs_features_provider_must_inject_all_spec"
     ],
     "298": [
-      "specs_project_state_archive_ad_005"
+      "specs_features_provider_must_inject_all_tasks"
     ],
     "299": [
-      "specs_project_state_archive_ad_006"
+      "specs_features_request_response_split_context"
     ],
     "300": [
-      "specs_project_state_archive_ad_007"
+      "specs_features_request_response_split_spec"
     ],
     "301": [
-      "specs_project_state_archive_ad_009"
+      "specs_features_request_response_split_tasks_t1"
     ],
     "302": [
-      "specs_project_state_archive_ad_010"
+      "specs_features_request_response_split_tasks_t2"
     ],
     "303": [
-      "specs_project_state_archive_ad_014"
+      "specs_features_request_response_split_tasks_t3"
     ],
     "304": [
-      "specs_project_state_archive_ad_050"
+      "specs_features_route_must_inject_spec"
     ],
     "305": [
-      "specs_project_state_archive_ad_053"
+      "specs_features_scheduler_spec"
     ],
     "306": [
-      "specs_project_state_archive_ad_054"
+      "specs_features_schema_generation_context"
     ],
     "307": [
-      "specs_project_state_archive_ad_055"
+      "specs_features_schema_generation_spec"
     ],
     "308": [
-      "specs_project_state_archive_ad_056"
+      "specs_features_schema_sanitize_refine_spec"
     ],
     "309": [
-      "specs_project_state_archive_ad_057"
+      "specs_features_schema_sanitize_refine_tasks"
     ],
     "310": [
-      "specs_project_state_archive_ad_058"
+      "specs_features_schema_value_support_context"
     ],
     "311": [
-      "specs_project_state_archive_ad_059"
+      "specs_features_schema_value_support_spec"
     ],
     "312": [
-      "specs_project_state_archive_ad_060"
+      "specs_features_string_family_branches_spec"
     ],
     "313": [
-      "specs_project_state_archive_ad_061"
+      "specs_features_swagger_ui_setup_spec"
     ],
     "314": [
-      "specs_project_state_md"
+      "specs_features_terminus_health_spec"
     ],
     "315": [
-      "specs_testing"
+      "specs_features_test_app_bootstrap_spec"
     ],
     "316": [
-      "taskfile"
+      "specs_features_unified_exportable_refs_spec"
     ],
     "317": [
+      "specs_features_unified_parse_api_spec"
+    ],
+    "318": [
+      "specs_features_unified_token_ref_spec"
+    ],
+    "319": [
+      "specs_features_unified_token_ref_tasks"
+    ],
+    "320": [
+      "specs_handoff"
+    ],
+    "321": [
+      "specs_insight_config"
+    ],
+    "322": [
+      "specs_insight_dynamic_md"
+    ],
+    "323": [
+      "specs_insight_graphql_md"
+    ],
+    "324": [
+      "specs_insight_lazy_md"
+    ],
+    "325": [
+      "specs_insight_logger_md"
+    ],
+    "326": [
+      "specs_insight_module_md"
+    ],
+    "327": [
+      "specs_insight_openapi_md"
+    ],
+    "328": [
+      "specs_insight_parse_md"
+    ],
+    "329": [
+      "specs_insight_provider_md"
+    ],
+    "330": [
+      "specs_insight_redirect_md"
+    ],
+    "331": [
+      "specs_insight_schema_md"
+    ],
+    "332": [
+      "specs_project_project_md"
+    ],
+    "333": [
+      "specs_project_roadmap_md"
+    ],
+    "334": [
+      "specs_project_state_archive_ad_001"
+    ],
+    "335": [
+      "specs_project_state_archive_ad_003"
+    ],
+    "336": [
+      "specs_project_state_archive_ad_004"
+    ],
+    "337": [
+      "specs_project_state_archive_ad_005"
+    ],
+    "338": [
+      "specs_project_state_archive_ad_006"
+    ],
+    "339": [
+      "specs_project_state_archive_ad_007"
+    ],
+    "340": [
+      "specs_project_state_archive_ad_009"
+    ],
+    "341": [
+      "specs_project_state_archive_ad_010"
+    ],
+    "342": [
+      "specs_project_state_archive_ad_014"
+    ],
+    "343": [
+      "specs_project_state_archive_ad_050"
+    ],
+    "344": [
+      "specs_project_state_archive_ad_053"
+    ],
+    "345": [
+      "specs_project_state_archive_ad_054"
+    ],
+    "346": [
+      "specs_project_state_archive_ad_055"
+    ],
+    "347": [
+      "specs_project_state_archive_ad_056"
+    ],
+    "348": [
+      "specs_project_state_archive_ad_057"
+    ],
+    "349": [
+      "specs_project_state_archive_ad_058"
+    ],
+    "350": [
+      "specs_project_state_archive_ad_059"
+    ],
+    "351": [
+      "specs_project_state_archive_ad_060"
+    ],
+    "352": [
+      "specs_project_state_archive_ad_061"
+    ],
+    "353": [
+      "specs_project_state_md"
+    ],
+    "354": [
+      "specs_testing"
+    ],
+    "355": [
+      "taskfile"
+    ],
+    "356": [
       "unified_parse_api"
     ]
   },
   "cohesion": {
     "0": 0.05877167205406994,
-    "1": 0.057512797350195724,
+    "1": 0.05895061728395062,
     "2": 0.07108478341355054,
     "3": 0.06760316066725197,
     "4": 0.07374890254609306,
-    "5": 0.0726775956284153,
+    "5": 0.06429070580013976,
     "6": 0.07127882599580712,
-    "7": 0.06219426974143955,
-    "8": 0.08525506638714186,
-    "9": 0.0660377358490566,
-    "10": 0.07616892911010557,
-    "11": 0.1320921985815603,
-    "12": 0.15169082125603864,
-    "13": 0.06666666666666667,
-    "14": 0.07087486157253599,
-    "15": 0.12846068660022147,
+    "7": 0.08525506638714186,
+    "8": 0.07184325108853411,
+    "9": 0.1320921985815603,
+    "10": 0.07536231884057971,
+    "11": 0.06871035940803383,
+    "12": 0.15961945031712474,
+    "13": 0.07087486157253599,
+    "14": 0.07781649245063879,
+    "15": 0.07317073170731707,
     "16": 0.07195121951219512,
-    "17": 0.11951219512195121,
+    "17": 0.12435897435897436,
     "18": 0.10256410256410256,
-    "19": 0.11806543385490754,
+    "19": 0.1294871794871795,
     "20": 0.07823613086770982,
-    "21": 0.14793741109530584,
-    "22": 0.13940256045519203,
-    "23": 0.05873015873015873,
-    "24": 0.1865546218487395,
-    "25": 0.12941176470588237,
-    "26": 0.11586452762923351,
-    "27": 0.0944741532976827,
-    "28": 0.058823529411764705,
-    "29": 0.07575757575757576,
-    "30": 0.10114942528735632,
-    "31": 0.13793103448275862,
-    "32": 0.1206896551724138,
-    "33": 0.09852216748768473,
-    "34": 0.12807881773399016,
-    "35": 0.1748768472906404,
-    "36": 0.1330049261083744,
-    "37": 0.23015873015873015,
-    "38": 0.07407407407407407,
-    "39": 0.07407407407407407,
-    "40": 0.07692307692307693,
-    "41": 0.11396011396011396,
-    "42": 0.1076923076923077,
-    "43": 0.11384615384615385,
-    "44": 0.18769230769230769,
-    "45": 0.2,
-    "46": 0.1,
-    "47": 0.18333333333333332,
-    "48": 0.08,
-    "49": 0.08333333333333333,
-    "50": 0.10507246376811594,
-    "51": 0.1956521739130435,
-    "52": 0.13043478260869565,
-    "53": 0.11688311688311688,
-    "54": 0.15584415584415584,
-    "55": 0.24675324675324675,
-    "56": 0.09523809523809523,
-    "57": 0.21578947368421053,
-    "58": 0.23157894736842105,
-    "59": 0.24736842105263157,
-    "60": 0.1,
-    "61": 0.1,
-    "62": 0.14619883040935672,
-    "63": 0.16374269005847952,
-    "64": 0.15789473684210525,
-    "65": 0.1111111111111111,
-    "66": 0.25146198830409355,
-    "67": 0.2573099415204678,
-    "68": 0.27485380116959063,
-    "69": 0.10526315789473684,
-    "70": 0.10526315789473684,
-    "71": 0.1568627450980392,
+    "21": 0.13940256045519203,
+    "22": 0.057057057057057055,
+    "23": 0.10317460317460317,
+    "24": 0.0873015873015873,
+    "25": 0.1865546218487395,
+    "26": 0.13725490196078433,
+    "27": 0.058823529411764705,
+    "28": 0.08172043010752689,
+    "29": 0.09425287356321839,
+    "30": 0.13793103448275862,
+    "31": 0.1206896551724138,
+    "32": 0.12807881773399016,
+    "33": 0.1748768472906404,
+    "34": 0.1330049261083744,
+    "35": 0.07407407407407407,
+    "36": 0.07407407407407407,
+    "37": 0.11396011396011396,
+    "38": 0.24216524216524216,
+    "39": 0.11076923076923077,
+    "40": 0.12307692307692308,
+    "41": 0.18769230769230769,
+    "42": 0.15076923076923077,
+    "43": 0.1,
+    "44": 0.08,
+    "45": 0.13405797101449277,
+    "46": 0.1956521739130435,
+    "47": 0.15579710144927536,
+    "48": 0.2246376811594203,
+    "49": 0.10507246376811594,
+    "50": 0.1956521739130435,
+    "51": 0.15584415584415584,
+    "52": 0.24675324675324675,
+    "53": 0.09523809523809523,
+    "54": 0.21578947368421053,
+    "55": 0.24736842105263157,
+    "56": 0.1,
+    "57": 0.13157894736842105,
+    "58": 0.16374269005847952,
+    "59": 0.10526315789473684,
+    "60": 0.2573099415204678,
+    "61": 0.27485380116959063,
+    "62": 0.28654970760233917,
+    "63": 0.16339869281045752,
+    "64": 0.35947712418300654,
+    "65": 0.1568627450980392,
+    "66": 0.11764705882352941,
+    "67": 0.21568627450980393,
+    "68": 0.1111111111111111,
+    "69": 0.1111111111111111,
+    "70": 0.17647058823529413,
+    "71": 0.11764705882352941,
     "72": 0.11764705882352941,
-    "73": 0.21568627450980393,
-    "74": 0.17647058823529413,
-    "75": 0.11764705882352941,
-    "76": 0.16911764705882354,
-    "77": 0.22058823529411764,
+    "73": 0.11764705882352941,
+    "74": 0.16911764705882354,
+    "75": 0.22058823529411764,
+    "76": 0.15833333333333333,
+    "77": 0.2833333333333333,
     "78": 0.15833333333333333,
     "79": 0.175,
     "80": 0.24166666666666667,
@@ -4283,67 +4391,67 @@
     "90": 0.20952380952380953,
     "91": 0.1978021978021978,
     "92": 0.27472527472527475,
-    "93": 0.2857142857142857,
-    "94": 0.32967032967032966,
-    "95": 0.1978021978021978,
-    "96": 0.18681318681318682,
-    "97": 0.3516483516483517,
-    "98": 0.1794871794871795,
-    "99": 0.24358974358974358,
-    "100": 0.2692307692307692,
+    "93": 0.16483516483516483,
+    "94": 0.16483516483516483,
+    "95": 0.2857142857142857,
+    "96": 0.32967032967032966,
+    "97": 0.1978021978021978,
+    "98": 0.18681318681318682,
+    "99": 0.25274725274725274,
+    "100": 0.3516483516483517,
     "101": 0.4358974358974359,
     "102": 0.3717948717948718,
-    "103": 0.16666666666666666,
-    "104": 0.30303030303030304,
+    "103": 0.38461538461538464,
+    "104": 0.16666666666666666,
     "105": 0.30303030303030304,
-    "106": 0.36363636363636365,
-    "107": 0.18181818181818182,
-    "108": 0.3484848484848485,
-    "109": 0.4090909090909091,
-    "110": 0.21818181818181817,
-    "111": 0.41818181818181815,
-    "112": 0.32727272727272727,
-    "113": 0.28888888888888886,
-    "114": 0.2,
-    "115": 0.28888888888888886,
-    "116": 0.26666666666666666,
-    "117": 0.24444444444444444,
-    "118": 0.35555555555555557,
-    "119": 0.3055555555555556,
-    "120": 0.25,
-    "121": 0.4722222222222222,
-    "122": 0.4642857142857143,
-    "123": 0.25,
-    "124": 0.42857142857142855,
-    "125": 0.32142857142857145,
-    "126": 0.5,
-    "127": 0.42857142857142855,
-    "128": 0.32142857142857145,
-    "129": 0.5,
-    "130": 0.2857142857142857,
-    "131": 0.25,
-    "132": 0.38095238095238093,
+    "106": 0.30303030303030304,
+    "107": 0.36363636363636365,
+    "108": 0.18181818181818182,
+    "109": 0.2727272727272727,
+    "110": 0.3484848484848485,
+    "111": 0.25757575757575757,
+    "112": 0.18181818181818182,
+    "113": 0.21818181818181817,
+    "114": 0.2727272727272727,
+    "115": 0.41818181818181815,
+    "116": 0.32727272727272727,
+    "117": 0.28888888888888886,
+    "118": 0.2222222222222222,
+    "119": 0.28888888888888886,
+    "120": 0.28888888888888886,
+    "121": 0.2,
+    "122": 0.2,
+    "123": 0.3111111111111111,
+    "124": 0.35555555555555557,
+    "125": 0.35555555555555557,
+    "126": 0.3055555555555556,
+    "127": 0.25,
+    "128": 0.4722222222222222,
+    "129": 0.4642857142857143,
+    "130": 0.25,
+    "131": 0.5,
+    "132": 0.25,
     "133": 0.42857142857142855,
-    "134": 0.42857142857142855,
-    "135": 0.38095238095238093,
-    "136": 0.5238095238095238,
+    "134": 0.5,
+    "135": 0.2857142857142857,
+    "136": 0.25,
     "137": 0.38095238095238093,
-    "138": 0.4,
-    "139": 0.4,
-    "140": 0.26666666666666666,
+    "138": 0.42857142857142855,
+    "139": 0.42857142857142855,
+    "140": 0.5238095238095238,
     "141": 0.3333333333333333,
-    "142": 0.3333333333333333,
-    "143": 0.5333333333333333,
+    "142": 0.38095238095238093,
+    "143": 0.4,
     "144": 0.4,
-    "145": 0.4,
+    "145": 0.4666666666666667,
     "146": 0.4,
-    "147": 0.6,
-    "148": 0.6666666666666666,
-    "149": 0.5,
-    "150": 0.6666666666666666,
+    "147": 0.4,
+    "148": 0.4,
+    "149": 0.6,
+    "150": 0.6,
     "151": 0.6666666666666666,
-    "152": 0.6666666666666666,
-    "153": 0.6666666666666666,
+    "152": 0.5,
+    "153": 0.5,
     "154": 0.6666666666666666,
     "155": 0.6666666666666666,
     "156": 0.6666666666666666,
@@ -4361,24 +4469,24 @@
     "168": 0.6666666666666666,
     "169": 0.6666666666666666,
     "170": 0.6666666666666666,
-    "171": 1.0,
+    "171": 0.6666666666666666,
     "172": 0.6666666666666666,
     "173": 0.6666666666666666,
     "174": 0.6666666666666666,
     "175": 0.6666666666666666,
     "176": 0.6666666666666666,
     "177": 0.6666666666666666,
-    "178": 1.0,
-    "179": 1.0,
-    "180": 1.0,
-    "181": 1.0,
+    "178": 0.6666666666666666,
+    "179": 0.6666666666666666,
+    "180": 0.6666666666666666,
+    "181": 0.6666666666666666,
     "182": 1.0,
-    "183": 1.0,
-    "184": 1.0,
-    "185": 1.0,
-    "186": 1.0,
-    "187": 1.0,
-    "188": 1.0,
+    "183": 0.6666666666666666,
+    "184": 0.6666666666666666,
+    "185": 0.6666666666666666,
+    "186": 0.6666666666666666,
+    "187": 0.6666666666666666,
+    "188": 0.6666666666666666,
     "189": 1.0,
     "190": 1.0,
     "191": 1.0,
@@ -4507,7 +4615,46 @@
     "314": 1.0,
     "315": 1.0,
     "316": 1.0,
-    "317": 1.0
+    "317": 1.0,
+    "318": 1.0,
+    "319": 1.0,
+    "320": 1.0,
+    "321": 1.0,
+    "322": 1.0,
+    "323": 1.0,
+    "324": 1.0,
+    "325": 1.0,
+    "326": 1.0,
+    "327": 1.0,
+    "328": 1.0,
+    "329": 1.0,
+    "330": 1.0,
+    "331": 1.0,
+    "332": 1.0,
+    "333": 1.0,
+    "334": 1.0,
+    "335": 1.0,
+    "336": 1.0,
+    "337": 1.0,
+    "338": 1.0,
+    "339": 1.0,
+    "340": 1.0,
+    "341": 1.0,
+    "342": 1.0,
+    "343": 1.0,
+    "344": 1.0,
+    "345": 1.0,
+    "346": 1.0,
+    "347": 1.0,
+    "348": 1.0,
+    "349": 1.0,
+    "350": 1.0,
+    "351": 1.0,
+    "352": 1.0,
+    "353": 1.0,
+    "354": 1.0,
+    "355": 1.0,
+    "356": 1.0
   },
   "gods": [
     {
@@ -4524,11 +4671,6 @@
       "id": "module_providerref",
       "label": "ProviderRef",
       "degree": 59
-    },
-    {
-      "id": "exception_httpexception",
-      "label": "HttpException",
-      "degree": 58
     },
     {
       "id": "route_route",
@@ -4556,9 +4698,14 @@
       "degree": 46
     },
     {
-      "id": "internal_exception_builtin_newbuiltin",
-      "label": "newBuiltin()",
+      "id": "internal_validate_validate_test_newctx",
+      "label": "newCtx()",
       "degree": 45
+    },
+    {
+      "id": "internal_openapi_openapi_new",
+      "label": "New()",
+      "degree": 44
     }
   ],
   "surprises": [
@@ -4571,7 +4718,7 @@
       ],
       "confidence": "INFERRED",
       "relation": "conceptually_related_to",
-      "why": "inferred connection - not explicitly stated in source; crosses file types (code ↔ doc); connects across different repos/directories"
+      "why": "inferred connection - not explicitly stated in source; crosses file types (code \u2194 doc); connects across different repos/directories"
     },
     {
       "source": "MustParse()",
@@ -4582,7 +4729,7 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "calls",
-      "why": "crosses file types (code ↔ doc); connects across different repos/directories; bridges separate communities"
+      "why": "crosses file types (code \u2194 doc); connects across different repos/directories; bridges separate communities"
     },
     {
       "source": "MustParse()",
@@ -4593,7 +4740,7 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "calls",
-      "why": "crosses file types (code ↔ doc); connects across different repos/directories; peripheral node `gonest.Schema` unexpectedly reaches hub `MustParse()`"
+      "why": "crosses file types (code \u2194 doc); connects across different repos/directories; peripheral node `gonest.Schema` unexpectedly reaches hub `MustParse()`"
     },
     {
       "source": "objectSchemaFor()",
@@ -4618,41 +4765,8 @@
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
     }
   ],
-  "questions": [
-    {
-      "type": "bridge_node",
-      "question": "Why does `Deregister()` connect `New` to `Bootstrap Order Tracking`, `newCustomTestSchema`, `fiber_dispatch_test.go`, `Lookup`, `route_test.go`, `newDurationTestSchema`, `New`, `newNumericTestSchema`, `newGraphqlScalarTestSchema`, `validate.go`, `newDateTimeTestSchema`, `New`, `newSanitizeRefineTestSchema`, `schema_test.go`, `newStringTestSchema`, `newArrayTestSchema`, `newDefaultTestSchema`, `newTestValueSchema`?",
-      "why": "High betweenness centrality (0.119) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `Context` connect `Context` to `stage3.go`, `Resolve`, `Event Emitter System`, `Subscription`, `wiring_test.go`, `Options`, `handleSubscribe`, `app/lifecycle.go`, `App`, `Query`, `HttpMethod`, `NewRequestScope`, `Scheduler`, `ws_protocol_test.go`, `builder`, `Request`, `T`?",
-      "why": "High betweenness centrality (0.100) - this node is a cross-community bridge."
-    },
-    {
-      "type": "bridge_node",
-      "question": "Why does `Request` connect `Request` to `fiberResponder`, `form_test.go`, `New`, `Reply`, `params_test.go`, `wiring_test.go`, `Options`, `graphqlPostDispatcher`, `NewBodySource`, `App`, `HttpContext`, `validate/testhelpers_test.go`, `validate_test.go`, `HttpMethod`, `FormFile`?",
-      "why": "High betweenness centrality (0.088) - this node is a cross-community bridge."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 69 inferred relationships involving `New()` (e.g. with `registerGraphql()` and `runApplicationBootstrapPhase()`) actually correct?",
-      "why": "`New()` has 69 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 27 inferred relationships involving `ProviderRef` (e.g. with `TestFindAllRefs_DiamondImport_Dedups()` and `TestFindAllRefs_ImportExportedMatch()`) actually correct?",
-      "why": "`ProviderRef` has 27 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "isolated_nodes",
-      "question": "What connects `blog-api`, `CreateBodyDTO`, `ListQueryDTO` to the rest of the system?",
-      "why": "288 weakly-connected nodes found - possible documentation gaps or missing edges."
-    },
-    {
-      "type": "low_cohesion",
-      "question": "Should `Provider Lifecycle Testing` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.05877167205406994 - nodes in this community are weakly interconnected."
-    }
-  ]
+  "tokens": {
+    "input": 167118,
+    "output": 4974
+  }
 }

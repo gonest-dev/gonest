@@ -817,6 +817,71 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 	}
 }
 
+// TestRedirect_RootAlias_DynamicAndStatic proves gonest.Reply.Redirect
+// (dynamic, called from inside a Handler) and gonest.Route.Redirect (static,
+// declared on the Route itself) both work through the root gonest aliases,
+// dispatched via a REAL app.Test request -- redirect feature,
+// .specs/features/redirect. Reply/Route are type aliases
+// (type Reply = execution.Reply, type Route = route.Route), so no root-level
+// code was added for this feature -- this test is what proves that claim.
+func TestRedirect_RootAlias_DynamicAndStatic(t *testing.T) {
+	controller := NewController(func(c *Controller) {
+		c.Route(route.HttpGet, "/dynamic", func(r *route.Route) {
+			r.Handler(func(c *HttpContext) {
+				c.Response().Redirect("/target")
+			})
+		})
+		c.Route(route.HttpGet, "/docs", func(r *route.Route) {
+			r.Redirect("/docs/", http.StatusMovedPermanently)
+		})
+	})
+
+	root := NewModule(func(s *Module) {
+		s.Controllers(controller)
+	})
+
+	app, err := NewApp[fiber.App](root, AppOptions{})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+
+	fiberAdapter, ok := app.Adapter().(*fiber.App)
+	if !ok {
+		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
+	}
+	t.Cleanup(func() {
+		_ = fiberAdapter.FiberApp().Shutdown()
+	})
+
+	dynReq := httptest.NewRequest(http.MethodGet, "/dynamic", nil)
+	dynResp, err := fiberAdapter.FiberApp().Test(dynReq)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer dynResp.Body.Close()
+
+	if dynResp.StatusCode != http.StatusFound {
+		t.Fatalf("dynamic redirect status = %d, want %d", dynResp.StatusCode, http.StatusFound)
+	}
+	if got := dynResp.Header.Get("Location"); got != "/target" {
+		t.Fatalf("dynamic redirect Location = %q, want %q", got, "/target")
+	}
+
+	staticReq := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	staticResp, err := fiberAdapter.FiberApp().Test(staticReq)
+	if err != nil {
+		t.Fatalf("app.Test error = %v", err)
+	}
+	defer staticResp.Body.Close()
+
+	if staticResp.StatusCode != http.StatusMovedPermanently {
+		t.Fatalf("static redirect status = %d, want %d", staticResp.StatusCode, http.StatusMovedPermanently)
+	}
+	if got := staticResp.Header.Get("Location"); got != "/docs/" {
+		t.Fatalf("static redirect Location = %q, want %q", got, "/docs/")
+	}
+}
+
 // TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration
 // proves gonest.NewLoggerMiddleware() logs one line per request -- method,
 // full path, response status and duration -- through a REAL app.Test

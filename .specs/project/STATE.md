@@ -5,20 +5,20 @@ Last synced commit: e904dc9
 
 ## Current Work
 
-**Feature:** built-in HTTP exceptions (v0.35.1 fix).
+**Feature:** Redirect nativo (`Reply.Redirect` + `Route.Redirect`).
 
 Concluído nesta sessão:
-1. `New*Exception(message)` sem `details` causava index out of range (`det[0]` em slice vazia) no helper `newBuiltin` em `internal/exception/builtin.go`.
-2. Corrigido para checar `len(details) > 0` antes de atribuir `details[0]`, caso contrário `det = nil`.
-3. Removido helper `cond` não utilizado.
-4. Adicionados testes unitários e de integração em `internal/exception/builtin_test.go` e `gonest_test.go` cobrindo todas as 40 exceções chamadas com apenas 1 argumento de mensagem.
-5. Versão lançada: `v0.35.1`.
+1. Brainstorm (`.specs/insight/REDIRECT.md`) motivado por `erc/ctrl/api/.../sso/controller.go` reimplementando manualmente `SetHeader("Location")+Status+Text("")` rota a rota.
+2. `.specs/features/redirect/{spec,design,tasks}.md` — pipeline Specify→Design→Tasks completo, papéis PO/DEV/QA (pedido explícito do usuário, substitui Planner/Implementer/Evaluator só nesta feature).
+3. `Reply.Redirect(url string, status ...int) error` (`internal/execution/reply.go`) — default `http.StatusFound` (302, paridade com NestJS `@Redirect()`, não 308 como o `erc` usava).
+4. `Route.Redirect(url string, status ...int) *Route` (`internal/route/route.go`) — sugar estático, chama `Reply.Redirect` internamente, documenta status via `Response(code)`.
+5. `gonest.Reply`/`gonest.Route` (aliases) expõem os dois métodos automaticamente — zero código novo na raiz, provado por smoke test end-to-end (`TestRedirect_RootAlias_DynamicAndStatic`, `gonest_test.go`).
+6. Testes: `reply_test.go` (T1), `route_test.go` (T2), smoke root — todos QA PASS. Gate: `go test ./...` verde, 25 pacotes.
 
 ## Todos
 
-- [x] Fazer commit das mudanças desta sessão (`feat(exception): add SetMessage to all builtin constructors and add all HTTP 4xx/5xx exceptions`) — commit e904dc9
-- [x] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — 6 arquivos `.mdx` (EN/PT/ES) — commit 802299c
-- [ ] Nenhum outro pendente (ver Deferred Ideas para trabalho futuro não priorizado)
+- [ ] Bump de versão + tag (`minor`, feature nova) + commit+push no gonest
+- [ ] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `.mdx` EN/PT/ES cobrindo Redirect — commit+push
 
 ## Active Blockers
 
@@ -31,6 +31,12 @@ Concluído nesta sessão:
 **Resolution:** definitivo seria reiniciar a sessão do harness.
 
 ## Recent Decisions (Last 15)
+
+### AD-066: Redirect nativo — `Reply.Redirect`/`Route.Redirect`, default 302 (2026-08-22)
+
+**Decision:** `Reply.Redirect(url string, status ...int) error` (dinâmico, `internal/execution/reply.go`) e `Route.Redirect(url string, status ...int) *Route` (estático, `internal/route/route.go`, chama `Reply.Redirect` internamente). Default de status `http.StatusFound` (302).
+**Reason:** motivado por `.specs/insight/REDIRECT.md` — código consumidor (`erc`) reimplementava manualmente `SetHeader("Location")+Status+Text("")` por rota. Premissa geral do gonest é espelhar ergonomia do NestJS (`@Redirect()` default 302), não o `308` que o código consumidor usava.
+**Trade-off:** sem `RedirectException`/redirect disparado de camada interna (usecase/filter) — YAGNI, NestJS também não tem isso.
 
 ### AD-065: builtin HttpException — SetMessage padrão + cobertura completa 4xx/5xx (2026-08-22)
 
@@ -75,6 +81,7 @@ _(Ver `STATE_ARCHIVE.md` para AD-061 até AD-001 completos.)_
 
 ## Recent Progress (Last 10)
 
+- [2026-08-22] Redirect nativo (Reply.Redirect + Route.Redirect, default 302). Gate: `go test ./...` verde, 25 pacotes. Ver AD-066.
 - [2026-08-22] Fix builtin exception panic on missing details (v0.35.1). Gate: `go test ./...` verde, 25 pacotes.
 - [2026-08-22] Built-in HTTP exceptions: SetMessage padrão + 35 novos tipos 4xx/5xx (v0.35.0). Gate: `go test ./...` verde, 25 pacotes.
 - [2026-08-20] MustInject/MustInjectAll guard fail-fast dentro de Constructor. Gate: `go test ./... -race -count=1` verde, 25 pacotes. Ver AD-064.
@@ -84,9 +91,6 @@ _(Ver `STATE_ARCHIVE.md` para AD-061 até AD-001 completos.)_
 - [2026-07-23] Milestone 22 (Provider Interface Export) + Milestone 23 (Thing_ Naming) complete. Gate: `go test ./... -race -count=1` verde. Ver AD-053.
 - [2026-07-21] Pós-Milestone 21: `.examples/full-text-search` + Swagger + 2 bugs fix. Gate: verde, 24 pacotes. Ver AD-048.
 - [2026-07-21] Milestone 21 (Enum Branches) T1-T4 complete. Gate: verde, 24 pacotes. Ver AD-047.
-- [2026-07-20] Housekeeping pós-Milestone 20: renames públicos, `internal/value`→`internal/accessor`. Gate: verde. Ver AD-046.
-- [2026-07-19] Milestone 20 (Lifecycle Hooks) T1-T7 complete. Gate: `go test ./... -race` verde, 25 pacotes. Ver AD-044.
-
 ## Lessons Learned (Last 5)
 
 ### L-008: `Context.route any` + assertion — deveria ter sido interface tipada (2026-07-13)

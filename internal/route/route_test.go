@@ -15,20 +15,22 @@ import (
 // in internal/execution/context_test.go (that one is unexported to its own
 // package, so route's tests need their own).
 type fakeResponder struct {
-	params map[string]string
+	params     map[string]string
+	headers    map[string]string
+	statusCode int
 }
 
 func newFakeResponder() *fakeResponder {
-	return &fakeResponder{params: map[string]string{}}
+	return &fakeResponder{params: map[string]string{}, headers: map[string]string{}, statusCode: 200}
 }
 
 func (f *fakeResponder) JSON(v any) error                                                    { return nil }
-func (f *fakeResponder) SetStatus(code int)                                                  {}
-func (f *fakeResponder) GetStatus() int                                                      { return 200 }
+func (f *fakeResponder) SetStatus(code int)                                                  { f.statusCode = code }
+func (f *fakeResponder) GetStatus() int                                                      { return f.statusCode }
 func (f *fakeResponder) GetMethod() string                                                   { return "GET" }
 func (f *fakeResponder) GetPath() string                                                     { return "" }
 func (f *fakeResponder) GetHeader(name string) string                                        { return "" }
-func (f *fakeResponder) SetHeaderValue(name, value string)                                   {}
+func (f *fakeResponder) SetHeaderValue(name, value string)                                   { f.headers[name] = value }
 func (f *fakeResponder) GetParam(name string) string                                         { return f.params[name] }
 func (f *fakeResponder) RawBody() []byte                                                     { return nil }
 func (f *fakeResponder) Queries() map[string]string                                          { return nil }
@@ -56,6 +58,47 @@ func TestNew_RunsFnImmediately(t *testing.T) {
 	}
 	if !ran {
 		t.Fatal("expected fn passed to New to run immediately, not be deferred")
+	}
+}
+
+// TestRoute_Redirect_DefaultsTo302AndDocuments proves Redirect(url) with no
+// status argument populates r.handler AND documents the response status
+// (302, http.StatusFound -- NestJS's own @Redirect() default) via
+// Response(code), same mechanism HttpCode/Response already use.
+func TestRoute_Redirect_DefaultsTo302AndDocuments(t *testing.T) {
+	r := New(nil, HttpGet, "/docs", func(r *Route) {
+		r.Redirect("/docs/")
+	})
+
+	if r.HandlerFunc() == nil {
+		t.Fatal("expected Redirect to populate r.handler")
+	}
+	if _, ok := r.Responses()[302]; !ok {
+		t.Fatalf("expected Redirect to document status 302, got %+v", r.Responses())
+	}
+}
+
+// TestRoute_Redirect_StatusOverridesDefault proves a passed status overrides
+// the 302 default, both for documentation and for the handler it installs.
+func TestRoute_Redirect_StatusOverridesDefault(t *testing.T) {
+	r := New(nil, HttpGet, "/docs", func(r *Route) {
+		r.Redirect("/docs/", 301)
+	})
+
+	if _, ok := r.Responses()[301]; !ok {
+		t.Fatalf("expected Redirect(url, 301) to document status 301, got %+v", r.Responses())
+	}
+
+	fake := newFakeResponder()
+	_, res := execution.New(fake)
+	ctx := execution.NewHttpContext(res.Request(), res)
+	r.HandlerFunc()(ctx)
+
+	if fake.statusCode != 301 {
+		t.Fatalf("expected handler to set status 301, got %d", fake.statusCode)
+	}
+	if fake.headers["Location"] != "/docs/" {
+		t.Fatalf("expected handler to set Location %q, got %q", "/docs/", fake.headers["Location"])
 	}
 }
 

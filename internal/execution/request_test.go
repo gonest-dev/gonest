@@ -20,6 +20,7 @@ type fakeResponder struct {
 	htmlErr    error
 	method     string
 	path       string
+	sentString string
 
 	isUpgradeRequest    bool
 	isUpgradeCalled     bool
@@ -82,6 +83,7 @@ func (f *fakeResponder) HTML(s string) error {
 }
 
 func (f *fakeResponder) SendString(s string) error {
+	f.sentString = s
 	return nil
 }
 

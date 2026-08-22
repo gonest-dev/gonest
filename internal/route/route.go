@@ -1,6 +1,7 @@
 package route
 
 import (
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -194,6 +195,27 @@ func (r *Route) Handler(fn func(c *execution.HttpContext)) {
 // never called.
 func (r *Route) HandlerFunc() func(c *execution.HttpContext) {
 	return r.handler
+}
+
+// Redirect registers this Route as a static redirect to url -- sugar over
+// Handler that also documents the response status (Response(code)) for
+// OpenAPI, so callers don't need to write a Handler by hand for a fixed
+// target (e.g. "/docs" -> "/docs/"). status, when given, overrides the
+// default http.StatusFound (302) -- same optional-trailing-arg shape as
+// Reply.Redirect, which this delegates to internally (no header/status
+// logic duplicated here). Redirect and Handler are mutually exclusive --
+// both write to the same r.handler field, so calling either after the
+// other simply replaces it, same as calling Handler twice already does.
+func (r *Route) Redirect(url string, status ...int) *Route {
+	code := http.StatusFound
+	if len(status) > 0 {
+		code = status[0]
+	}
+	r.Response(code)
+	r.handler = func(c *execution.HttpContext) {
+		c.Response().Redirect(url, code)
+	}
+	return r
 }
 
 // HasParam reports whether this Route's declared path pattern contains a
