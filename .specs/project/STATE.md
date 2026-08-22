@@ -1,6 +1,6 @@
 # State
 
-Last synced commit: e904dc9
+Last synced commit: 3645ab9 (tag v0.36.0)
 **Last Updated:** 2026-08-22
 
 ## Current Work
@@ -17,8 +17,9 @@ Concluído nesta sessão:
 
 ## Todos
 
-- [ ] Bump de versão + tag (`minor`, feature nova) + commit+push no gonest
-- [ ] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `.mdx` EN/PT/ES cobrindo Redirect — commit+push
+- [x] Bump de versão + tag (`minor`, feature nova) — `v0.36.0`, commit e904dc9..3645ab9 + push no gonest
+- [x] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `controller.{mdx,pt.mdx,es.mdx}` documentando Redirect — commit 4e2cf24, push
+- [ ] Nenhum outro pendente (ver Deferred Ideas para trabalho futuro não priorizado)
 
 ## Active Blockers
 
