@@ -61,7 +61,7 @@ func NewFormBodySource(req *execution.Request, onFile func(*execution.FormFile) 
 //     the stream at all is collected as a violation (same convention
 //     validateStruct/paramsSource/querySource already use for absent
 //     Required fields).
-//  5. If any violations were collected: return exception.NewBadRequestException(violations)
+//  5. If any violations were collected: return exception.NewBadRequestException("", violations)
 //     as the error.
 //  6. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="form"), using the SAME raw/coerced value already produced
@@ -97,7 +97,7 @@ func (src *formBodySource) ParseInto(dst any, schemaArg any) error {
 			break
 		}
 		if err != nil {
-			return exception.NewBadRequestException([]violation{
+			return exception.NewBadRequestException("", []violation{
 				{Field: "", Message: fmt.Sprintf("invalid multipart body: %v", err)},
 			})
 		}
@@ -106,7 +106,7 @@ func (src *formBodySource) ParseInto(dst any, schemaArg any) error {
 			if src.onFile != nil {
 				file := execution.NewFormFile(part)
 				if err := src.onFile(file); err != nil {
-					return exception.NewBadRequestException([]violation{
+					return exception.NewBadRequestException("", []violation{
 						{Field: part.FormName(), Message: err.Error()},
 					})
 				}
@@ -156,7 +156,7 @@ func (src *formBodySource) ParseInto(dst any, schemaArg any) error {
 	}
 
 	if len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	if err := populate(dstVal, presence, s, "form"); err != nil {
@@ -164,7 +164,7 @@ func (src *formBodySource) ParseInto(dst any, schemaArg any) error {
 		// paramsSource's/jsonBodySource's own equivalent case: the validate
 		// pass above already proved every present field's shape matches
 		// what T expects.
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate form: %v", err)},
 		})
 	}

@@ -664,35 +664,35 @@ func TestRegisterRoute_HandlerPanicsWithException_RespondsWithStructuredBody(t *
 	}{
 		{
 			name:        "NotFoundException",
-			panicValue:  exception.NewNotFoundException(map[string]any{"id": "42"}),
+			panicValue:  exception.NewNotFoundException("", map[string]any{"id": "42"}),
 			wantStatus:  http.StatusNotFound,
 			wantName:    "NotFoundException",
 			wantDetails: map[string]any{"id": "42"},
 		},
 		{
 			name:        "BadRequestException",
-			panicValue:  exception.NewBadRequestException("bad input"),
+			panicValue:  exception.NewBadRequestException("", "bad input"),
 			wantStatus:  http.StatusBadRequest,
 			wantName:    "BadRequestException",
 			wantDetails: "bad input",
 		},
 		{
 			name:        "ConflictException",
-			panicValue:  exception.NewConflictException("already exists"),
+			panicValue:  exception.NewConflictException("", "already exists"),
 			wantStatus:  http.StatusConflict,
 			wantName:    "ConflictException",
 			wantDetails: "already exists",
 		},
 		{
 			name:        "UnauthorizedException",
-			panicValue:  exception.NewUnauthorizedException("no token"),
+			panicValue:  exception.NewUnauthorizedException("", "no token"),
 			wantStatus:  http.StatusUnauthorized,
 			wantName:    "UnauthorizedException",
 			wantDetails: "no token",
 		},
 		{
 			name:        "ForbiddenException",
-			panicValue:  exception.NewForbiddenException("nope"),
+			panicValue:  exception.NewForbiddenException("", "nope"),
 			wantStatus:  http.StatusForbidden,
 			wantName:    "ForbiddenException",
 			wantDetails: "nope",
@@ -770,7 +770,7 @@ func TestRegisterRoute_ExceptionWithNilDetails_SerializesDetailsAsJsonNull(t *te
 	app := New()
 
 	if err := app.RegisterRoute(route.HttpGet, "/boom", func(c *execution.HttpContext) {
-		panic(exception.NewNotFoundException(nil))
+		panic(exception.NewNotFoundException("", nil))
 	}); err != nil {
 		t.Fatalf("RegisterRoute returned error: %v", err)
 	}

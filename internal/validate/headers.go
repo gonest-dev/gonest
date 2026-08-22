@@ -48,7 +48,7 @@ func NewHeadersSource(req *execution.Request) execution.Parseable {
 //  4. Collect ALL violations across every field (context.md's Decision 2 --
 //     never stop early).
 //  5. If any violations were collected: return
-//     exception.NewBadRequestException(violations).
+//     exception.NewBadRequestException("", violations).
 //  6. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="header").
 func (src *headersSource) ParseInto(dst any, schemaArg any) error {
@@ -90,13 +90,13 @@ func (src *headersSource) ParseInto(dst any, schemaArg any) error {
 	}
 
 	if len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	if err := populate(dstVal, presence, s, "header"); err != nil {
 		// Should be unreachable in practice, same rationale as
 		// jsonBodySource's own equivalent case.
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate headers: %v", err)},
 		})
 	}

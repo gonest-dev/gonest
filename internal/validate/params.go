@@ -56,7 +56,7 @@ func NewParamsSource(req *execution.Request) execution.Parseable {
 //  5. Collect ALL violations across every field (same collect-all behavior
 //     as jsonBodySource, context.md's Decision 2 -- never stop early).
 //  6. If any violations were collected: return
-//     exception.NewBadRequestException(violations).
+//     exception.NewBadRequestException("", violations).
 //  7. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="param"), using the SAME raw/coerced value already produced
 //     during validation as the presence map's value.
@@ -102,7 +102,7 @@ func (src *paramsSource) ParseInto(dst any, schemaArg any) error {
 	}
 
 	if len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	if err := populate(dstVal, presence, s, "param"); err != nil {
@@ -111,7 +111,7 @@ func (src *paramsSource) ParseInto(dst any, schemaArg any) error {
 		// already proved every present field's shape matches what T
 		// expects. Returning an error here keeps failures loud instead of
 		// masking a genuine bug in the validation pass.
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate params: %v", err)},
 		})
 	}

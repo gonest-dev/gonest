@@ -11,51 +11,58 @@ import (
 // constructor itself (returning an Exception so all five can share one table),
 // and the fixed status/name it must always produce regardless of details.
 type builtinCase struct {
-	name       string
-	construct  func(details any) exception.Exception
-	wantStatus int
-	wantName   string
+	name        string
+	construct   func(details any) exception.Exception
+	wantStatus  int
+	wantName    string
+	wantMessage string
 }
 
 func builtinCases() []builtinCase {
 	return []builtinCase{
 		{
-			name:       "NotFoundException",
-			construct:  func(details any) exception.Exception { return exception.NewNotFoundException(details) },
-			wantStatus: http.StatusNotFound,
-			wantName:   "NotFoundException",
+			name:        "NotFoundException",
+			construct:   func(details any) exception.Exception { return exception.NewNotFoundException("", details) },
+			wantStatus:  http.StatusNotFound,
+			wantName:    "NotFoundException",
+			wantMessage: "Resource not found",
 		},
 		{
-			name:       "BadRequestException",
-			construct:  func(details any) exception.Exception { return exception.NewBadRequestException(details) },
-			wantStatus: http.StatusBadRequest,
-			wantName:   "BadRequestException",
+			name:        "BadRequestException",
+			construct:   func(details any) exception.Exception { return exception.NewBadRequestException("", details) },
+			wantStatus:  http.StatusBadRequest,
+			wantName:    "BadRequestException",
+			wantMessage: "Bad request",
 		},
 		{
-			name:       "ConflictException",
-			construct:  func(details any) exception.Exception { return exception.NewConflictException(details) },
-			wantStatus: http.StatusConflict,
-			wantName:   "ConflictException",
+			name:        "ConflictException",
+			construct:   func(details any) exception.Exception { return exception.NewConflictException("", details) },
+			wantStatus:  http.StatusConflict,
+			wantName:    "ConflictException",
+			wantMessage: "Conflict",
 		},
 		{
-			name:       "UnauthorizedException",
-			construct:  func(details any) exception.Exception { return exception.NewUnauthorizedException(details) },
-			wantStatus: http.StatusUnauthorized,
-			wantName:   "UnauthorizedException",
+			name:        "UnauthorizedException",
+			construct:   func(details any) exception.Exception { return exception.NewUnauthorizedException("", details) },
+			wantStatus:  http.StatusUnauthorized,
+			wantName:    "UnauthorizedException",
+			wantMessage: "Unauthorized",
 		},
 		{
-			name:       "ForbiddenException",
-			construct:  func(details any) exception.Exception { return exception.NewForbiddenException(details) },
-			wantStatus: http.StatusForbidden,
-			wantName:   "ForbiddenException",
+			name:        "ForbiddenException",
+			construct:   func(details any) exception.Exception { return exception.NewForbiddenException("", details) },
+			wantStatus:  http.StatusForbidden,
+			wantName:    "ForbiddenException",
+			wantMessage: "Forbidden",
 		},
 	}
 }
 
 // TestBuiltinException_ConstructorFixedFields verifies each built-in
 // constructor sets the correct fixed status code and name, defaults the
-// message to empty string, and passes details through unchanged -- including
-// when details is nil (mirrors INSIGHT.md's NewUnauthorizedException(nil)).
+// message to the built-in default string, and passes details through
+// unchanged -- including when details is nil (mirrors INSIGHT.md's
+// NewUnauthorizedException(nil)).
 func TestBuiltinException_ConstructorFixedFields(t *testing.T) {
 	details := map[string]any{"userId": "abc123"}
 
@@ -69,8 +76,8 @@ func TestBuiltinException_ConstructorFixedFields(t *testing.T) {
 			if got := exc.Name(); got != tc.wantName {
 				t.Errorf("Name() = %q, want %q", got, tc.wantName)
 			}
-			if got := exc.Message(); got != "" {
-				t.Errorf("Message() = %q, want empty string", got)
+			if got := exc.Message(); got != tc.wantMessage {
+				t.Errorf("Message() = %q, want %q", got, tc.wantMessage)
 			}
 			if got := exc.Details(); got == nil {
 				t.Errorf("Details() = nil, want %v", details)
@@ -132,7 +139,7 @@ func TestBuiltinException_PanicRecoverRoundTrip(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", exc.Name(), "NotFoundException")
 			}
 		}()
-		panic(exception.NewNotFoundException(map[string]any{"userId": "abc123"}))
+		panic(exception.NewNotFoundException("", map[string]any{"userId": "abc123"}))
 	})
 
 	t.Run("BadRequestException", func(t *testing.T) {
@@ -149,7 +156,7 @@ func TestBuiltinException_PanicRecoverRoundTrip(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", exc.Name(), "BadRequestException")
 			}
 		}()
-		panic(exception.NewBadRequestException(nil))
+		panic(exception.NewBadRequestException("", nil))
 	})
 
 	t.Run("ConflictException", func(t *testing.T) {
@@ -166,7 +173,7 @@ func TestBuiltinException_PanicRecoverRoundTrip(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", exc.Name(), "ConflictException")
 			}
 		}()
-		panic(exception.NewConflictException(nil))
+		panic(exception.NewConflictException("", nil))
 	})
 
 	t.Run("UnauthorizedException", func(t *testing.T) {
@@ -183,7 +190,7 @@ func TestBuiltinException_PanicRecoverRoundTrip(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", exc.Name(), "UnauthorizedException")
 			}
 		}()
-		panic(exception.NewUnauthorizedException(nil))
+		panic(exception.NewUnauthorizedException("", nil))
 	})
 
 	t.Run("ForbiddenException", func(t *testing.T) {
@@ -200,6 +207,6 @@ func TestBuiltinException_PanicRecoverRoundTrip(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", exc.Name(), "ForbiddenException")
 			}
 		}()
-		panic(exception.NewForbiddenException(map[string]any{"reason": "no access"}))
+		panic(exception.NewForbiddenException("", map[string]any{"reason": "no access"}))
 	})
 }

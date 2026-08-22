@@ -95,7 +95,7 @@ func NewJSONBodySource(req *execution.Request) execution.Parseable {
 //     collecting every violation (context.md's Decision 2 -- never stops
 //     at the first).
 //  4. If any violations were collected: return
-//     exception.NewBadRequestException(violations) as the error.
+//     exception.NewBadRequestException("", violations) as the error.
 //  5. Otherwise: populate dst field-by-field via the shared populate core
 //     (param-query-validation feature's P0) instead of a second opaque
 //     json.Unmarshal call, so Custom(fn)'s transformed value can actually
@@ -109,7 +109,7 @@ func (src *jsonBodySource) ParseInto(dst any, schemaArg any) error {
 
 	var parsed any
 	if err := json.Unmarshal(bodyRaw, &parsed); err != nil {
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("invalid JSON: %v", err)},
 		})
 	}
@@ -149,7 +149,7 @@ func parseDecoded(dst any, dstVal reflect.Value, s *schema.Schema, parsed any) e
 
 	violations := validateStruct(presence, s, "")
 	if len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	if err := populate(dstVal, presence, s, "json"); err != nil {
@@ -158,7 +158,7 @@ func parseDecoded(dst any, dstVal reflect.Value, s *schema.Schema, parsed any) e
 		// matches what T expects. Returning an error here (rather than
 		// silently leaving dst at its zero value) keeps failures loud
 		// instead of masking a genuine bug in the validation pass above.
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to decode request body: %v", err)},
 		})
 	}
@@ -179,7 +179,7 @@ func parseDecoded(dst any, dstVal reflect.Value, s *schema.Schema, parsed any) e
 			}
 		}
 		if len(refineViolations) > 0 {
-			return exception.NewBadRequestException(refineViolations)
+			return exception.NewBadRequestException("", refineViolations)
 		}
 	}
 
@@ -608,7 +608,7 @@ func populate(dest reflect.Value, presence map[string]any, s *schema.Schema, tag
 // way populate already does: once during validateValue, once here.
 func populateValue(dest reflect.Value, raw any, p *schema.PropertyBuilder) error {
 	if violations := validateValue(raw, p, ""); len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	// schema-sanitize-refine feature: same placement as validateValue's own
@@ -626,7 +626,7 @@ func populateValue(dest reflect.Value, raw any, p *schema.PropertyBuilder) error
 			// Unreachable in practice (validateValue's own Custom check
 			// already proved fn succeeds for this raw input), same
 			// "structured error, never crash" stance as populate above.
-			return exception.NewBadRequestException([]violation{
+			return exception.NewBadRequestException("", []violation{
 				{Field: "", Message: fmt.Sprintf("Custom(fn) failed on population pass: %v", err)},
 			})
 		}
@@ -634,7 +634,7 @@ func populateValue(dest reflect.Value, raw any, p *schema.PropertyBuilder) error
 	}
 
 	if err := setField(dest, value); err != nil {
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to decode request body: %v", err)},
 		})
 	}

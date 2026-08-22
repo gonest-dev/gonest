@@ -191,7 +191,7 @@ var pipelineIDParamsSchema = func() *schema.Schema {
 	s.Property(&f.ID).Custom(func(raw any) (any, error) {
 		str, _ := raw.(string)
 		if str == "bad" {
-			panic(exception.NewBadRequestException(map[string]string{"reason": "invalid id"}))
+			panic(exception.NewBadRequestException("", map[string]string{"reason": "invalid id"}))
 		}
 		return 42, nil
 	})
@@ -1210,7 +1210,7 @@ func TestNewApp_GlobalMiddleware_RunsBeforeControllerMiddleware(t *testing.T) {
 func TestNewApp_PanickingMiddleware_CaughtBySameRecoverWrapper(t *testing.T) {
 	panicky := middleware.New(func(m *middleware.Middleware) {
 		m.Handler(func(c *execution.HttpContext, next middleware.Next) {
-			panic(exception.NewBadRequestException("bad input from middleware"))
+			panic(exception.NewBadRequestException("", "bad input from middleware"))
 		})
 	})
 
@@ -1350,8 +1350,8 @@ func TestNewApp_SingleGuardReturnsFalse_Produces403AndSkipsHandler(t *testing.T)
 	if body["name"] != "ForbiddenException" {
 		t.Fatalf("body[name] = %v, want %q", body["name"], "ForbiddenException")
 	}
-	if body["message"] != "" {
-		t.Fatalf("body[message] = %v, want empty string", body["message"])
+	if body["message"] != "Forbidden" {
+		t.Fatalf("body[message] = %v, want %q", body["message"], "Forbidden")
 	}
 	if body["details"] != nil {
 		t.Fatalf("body[details] = %v, want nil", body["details"])
@@ -1367,7 +1367,7 @@ func TestNewApp_SingleGuardReturnsFalse_Produces403AndSkipsHandler(t *testing.T)
 func TestNewApp_GuardPanicsWithCustomException_ProducesThatExceptionsStatus(t *testing.T) {
 	unauthorized := guard.New(func(g *guard.Guard) {
 		g.Handler(func(c *execution.HttpContext) bool {
-			panic(exception.NewUnauthorizedException(nil))
+			panic(exception.NewUnauthorizedException("", nil))
 		})
 	})
 
@@ -1861,7 +1861,7 @@ func TestNewApp_GuardRejects_InterceptorBeforeNeverRuns(t *testing.T) {
 func TestNewApp_InterceptorPanicsBeforeNext_CaughtBySameRecoverWrapper(t *testing.T) {
 	panicky := interceptor.New(func(i *interceptor.Interceptor) {
 		i.Handler(func(c *execution.HttpContext, next interceptor.Next) {
-			panic(exception.NewBadRequestException(nil))
+			panic(exception.NewBadRequestException("", nil))
 		})
 	})
 

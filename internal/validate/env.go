@@ -52,7 +52,7 @@ import (
 //  6. Collect ALL violations across every field (collect-all, never stop
 //     early -- same convention every other *Source in this package uses).
 //  7. If any violations were collected: return
-//     exception.NewBadRequestException(violations).
+//     exception.NewBadRequestException("", violations).
 //  8. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="env", REUSED unchanged).
 func ParseEnvInto(dst any, schemaArg any) error {
@@ -98,7 +98,7 @@ func ParseEnvInto(dst any, schemaArg any) error {
 	}
 
 	if len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	if err := populate(dstVal, presence, s, "env"); err != nil {
@@ -107,7 +107,7 @@ func ParseEnvInto(dst any, schemaArg any) error {
 		// pass above already proved every present field's shape matches
 		// what T expects. Returning an error here keeps failures loud
 		// instead of masking a genuine bug in the validation pass.
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate env: %v", err)},
 		})
 	}

@@ -50,7 +50,7 @@ func NewQuerySource(req *execution.Request) execution.Parseable {
 //     as jsonBodySource/paramsSource, context.md's Decision 2 -- never stop
 //     early).
 //  6. If any violations were collected: return
-//     exception.NewBadRequestException(violations) as the error.
+//     exception.NewBadRequestException("", violations) as the error.
 //  7. Otherwise: populate dst field-by-field via the shared populate core
 //     (tag="query"), using the SAME raw/coerced value already produced
 //     during validation as the presence map's value.
@@ -95,7 +95,7 @@ func (src *querySource) ParseInto(dst any, schemaArg any) error {
 	}
 
 	if len(violations) > 0 {
-		return exception.NewBadRequestException(violations)
+		return exception.NewBadRequestException("", violations)
 	}
 
 	if err := populate(dstVal, presence, s, "query"); err != nil {
@@ -104,7 +104,7 @@ func (src *querySource) ParseInto(dst any, schemaArg any) error {
 		// pass above already proved every present field's shape matches
 		// what T expects. Returning an error here keeps failures loud
 		// instead of masking a genuine bug in the validation pass.
-		return exception.NewBadRequestException([]violation{
+		return exception.NewBadRequestException("", []violation{
 			{Field: "", Message: fmt.Sprintf("failed to populate query: %v", err)},
 		})
 	}

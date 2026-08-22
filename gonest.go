@@ -510,64 +510,324 @@ func ExceptionName(exc Exception) string {
 	return exception.EffectiveName(exc)
 }
 
-// NotFoundException is the framework's built-in exception for a missing
-// resource.
-type NotFoundException = exception.NotFoundException
-
-// NewNotFoundException builds a *NotFoundException fixed at
-// http.StatusNotFound with name "NotFoundException". See
-// internal/exception.NewNotFoundException's doc comment for the
-// pointer-return and empty-message rationale.
-func NewNotFoundException(details any) *NotFoundException {
-	return exception.NewNotFoundException(details)
-}
-
-// BadRequestException is the framework's built-in exception for a malformed
-// or invalid request.
+// BadRequestException is the framework's built-in exception for 400.
 type BadRequestException = exception.BadRequestException
 
-// NewBadRequestException builds a *BadRequestException fixed at
-// http.StatusBadRequest with name "BadRequestException". See
-// internal/exception.NewBadRequestException's doc comment for the
-// pointer-return and empty-message rationale.
-func NewBadRequestException(details any) *BadRequestException {
-	return exception.NewBadRequestException(details)
+// NewBadRequestException builds a *BadRequestException (HTTP 400).
+func NewBadRequestException(message string, details ...any) *BadRequestException {
+	return exception.NewBadRequestException(message, details...)
 }
 
-// ConflictException is the framework's built-in exception for a request
-// that conflicts with the current state of a resource.
-type ConflictException = exception.ConflictException
-
-// NewConflictException builds a *ConflictException fixed at
-// http.StatusConflict with name "ConflictException". See
-// internal/exception.NewConflictException's doc comment for the
-// pointer-return and empty-message rationale.
-func NewConflictException(details any) *ConflictException {
-	return exception.NewConflictException(details)
-}
-
-// UnauthorizedException is the framework's built-in exception for a missing
-// or invalid authentication credential.
+// UnauthorizedException is the framework's built-in exception for 401.
 type UnauthorizedException = exception.UnauthorizedException
 
-// NewUnauthorizedException builds a *UnauthorizedException fixed at
-// http.StatusUnauthorized with name "UnauthorizedException". See
-// internal/exception.NewUnauthorizedException's doc comment for the
-// pointer-return and empty-message rationale.
-func NewUnauthorizedException(details any) *UnauthorizedException {
-	return exception.NewUnauthorizedException(details)
+// NewUnauthorizedException builds a *UnauthorizedException (HTTP 401).
+func NewUnauthorizedException(message string, details ...any) *UnauthorizedException {
+	return exception.NewUnauthorizedException(message, details...)
 }
 
-// ForbiddenException is the framework's built-in exception for a request
-// that is authenticated but not permitted.
+// PaymentRequiredException is the framework's built-in exception for 402.
+type PaymentRequiredException = exception.PaymentRequiredException
+
+// NewPaymentRequiredException builds a *PaymentRequiredException (HTTP 402).
+func NewPaymentRequiredException(message string, details ...any) *PaymentRequiredException {
+	return exception.NewPaymentRequiredException(message, details...)
+}
+
+// ForbiddenException is the framework's built-in exception for 403.
 type ForbiddenException = exception.ForbiddenException
 
-// NewForbiddenException builds a *ForbiddenException fixed at
-// http.StatusForbidden with name "ForbiddenException". See
-// internal/exception.NewForbiddenException's doc comment for the
-// pointer-return and empty-message rationale.
-func NewForbiddenException(details any) *ForbiddenException {
-	return exception.NewForbiddenException(details)
+// NewForbiddenException builds a *ForbiddenException (HTTP 403).
+func NewForbiddenException(message string, details ...any) *ForbiddenException {
+	return exception.NewForbiddenException(message, details...)
+}
+
+// NotFoundException is the framework's built-in exception for 404.
+type NotFoundException = exception.NotFoundException
+
+// NewNotFoundException builds a *NotFoundException (HTTP 404).
+func NewNotFoundException(message string, details ...any) *NotFoundException {
+	return exception.NewNotFoundException(message, details...)
+}
+
+// MethodNotAllowedException is the framework's built-in exception for 405.
+type MethodNotAllowedException = exception.MethodNotAllowedException
+
+// NewMethodNotAllowedException builds a *MethodNotAllowedException (HTTP 405).
+func NewMethodNotAllowedException(message string, details ...any) *MethodNotAllowedException {
+	return exception.NewMethodNotAllowedException(message, details...)
+}
+
+// NotAcceptableException is the framework's built-in exception for 406.
+type NotAcceptableException = exception.NotAcceptableException
+
+// NewNotAcceptableException builds a *NotAcceptableException (HTTP 406).
+func NewNotAcceptableException(message string, details ...any) *NotAcceptableException {
+	return exception.NewNotAcceptableException(message, details...)
+}
+
+// ProxyAuthRequiredException is the framework's built-in exception for 407.
+type ProxyAuthRequiredException = exception.ProxyAuthRequiredException
+
+// NewProxyAuthRequiredException builds a *ProxyAuthRequiredException (HTTP 407).
+func NewProxyAuthRequiredException(message string, details ...any) *ProxyAuthRequiredException {
+	return exception.NewProxyAuthRequiredException(message, details...)
+}
+
+// RequestTimeoutException is the framework's built-in exception for 408.
+type RequestTimeoutException = exception.RequestTimeoutException
+
+// NewRequestTimeoutException builds a *RequestTimeoutException (HTTP 408).
+func NewRequestTimeoutException(message string, details ...any) *RequestTimeoutException {
+	return exception.NewRequestTimeoutException(message, details...)
+}
+
+// ConflictException is the framework's built-in exception for 409.
+type ConflictException = exception.ConflictException
+
+// NewConflictException builds a *ConflictException (HTTP 409).
+func NewConflictException(message string, details ...any) *ConflictException {
+	return exception.NewConflictException(message, details...)
+}
+
+// GoneException is the framework's built-in exception for 410.
+type GoneException = exception.GoneException
+
+// NewGoneException builds a *GoneException (HTTP 410).
+func NewGoneException(message string, details ...any) *GoneException {
+	return exception.NewGoneException(message, details...)
+}
+
+// LengthRequiredException is the framework's built-in exception for 411.
+type LengthRequiredException = exception.LengthRequiredException
+
+// NewLengthRequiredException builds a *LengthRequiredException (HTTP 411).
+func NewLengthRequiredException(message string, details ...any) *LengthRequiredException {
+	return exception.NewLengthRequiredException(message, details...)
+}
+
+// PreconditionFailedException is the framework's built-in exception for 412.
+type PreconditionFailedException = exception.PreconditionFailedException
+
+// NewPreconditionFailedException builds a *PreconditionFailedException (HTTP 412).
+func NewPreconditionFailedException(message string, details ...any) *PreconditionFailedException {
+	return exception.NewPreconditionFailedException(message, details...)
+}
+
+// RequestEntityTooLargeException is the framework's built-in exception for 413.
+type RequestEntityTooLargeException = exception.RequestEntityTooLargeException
+
+// NewRequestEntityTooLargeException builds a *RequestEntityTooLargeException (HTTP 413).
+func NewRequestEntityTooLargeException(message string, details ...any) *RequestEntityTooLargeException {
+	return exception.NewRequestEntityTooLargeException(message, details...)
+}
+
+// RequestURITooLongException is the framework's built-in exception for 414.
+type RequestURITooLongException = exception.RequestURITooLongException
+
+// NewRequestURITooLongException builds a *RequestURITooLongException (HTTP 414).
+func NewRequestURITooLongException(message string, details ...any) *RequestURITooLongException {
+	return exception.NewRequestURITooLongException(message, details...)
+}
+
+// UnsupportedMediaTypeException is the framework's built-in exception for 415.
+type UnsupportedMediaTypeException = exception.UnsupportedMediaTypeException
+
+// NewUnsupportedMediaTypeException builds a *UnsupportedMediaTypeException (HTTP 415).
+func NewUnsupportedMediaTypeException(message string, details ...any) *UnsupportedMediaTypeException {
+	return exception.NewUnsupportedMediaTypeException(message, details...)
+}
+
+// RequestedRangeNotSatisfiableException is the framework's built-in exception for 416.
+type RequestedRangeNotSatisfiableException = exception.RequestedRangeNotSatisfiableException
+
+// NewRequestedRangeNotSatisfiableException builds a *RequestedRangeNotSatisfiableException (HTTP 416).
+func NewRequestedRangeNotSatisfiableException(message string, details ...any) *RequestedRangeNotSatisfiableException {
+	return exception.NewRequestedRangeNotSatisfiableException(message, details...)
+}
+
+// ExpectationFailedException is the framework's built-in exception for 417.
+type ExpectationFailedException = exception.ExpectationFailedException
+
+// NewExpectationFailedException builds a *ExpectationFailedException (HTTP 417).
+func NewExpectationFailedException(message string, details ...any) *ExpectationFailedException {
+	return exception.NewExpectationFailedException(message, details...)
+}
+
+// TeapotException is the framework's built-in exception for 418.
+type TeapotException = exception.TeapotException
+
+// NewTeapotException builds a *TeapotException (HTTP 418).
+func NewTeapotException(message string, details ...any) *TeapotException {
+	return exception.NewTeapotException(message, details...)
+}
+
+// MisdirectedRequestException is the framework's built-in exception for 421.
+type MisdirectedRequestException = exception.MisdirectedRequestException
+
+// NewMisdirectedRequestException builds a *MisdirectedRequestException (HTTP 421).
+func NewMisdirectedRequestException(message string, details ...any) *MisdirectedRequestException {
+	return exception.NewMisdirectedRequestException(message, details...)
+}
+
+// UnprocessableEntityException is the framework's built-in exception for 422.
+type UnprocessableEntityException = exception.UnprocessableEntityException
+
+// NewUnprocessableEntityException builds a *UnprocessableEntityException (HTTP 422).
+func NewUnprocessableEntityException(message string, details ...any) *UnprocessableEntityException {
+	return exception.NewUnprocessableEntityException(message, details...)
+}
+
+// LockedException is the framework's built-in exception for 423.
+type LockedException = exception.LockedException
+
+// NewLockedException builds a *LockedException (HTTP 423).
+func NewLockedException(message string, details ...any) *LockedException {
+	return exception.NewLockedException(message, details...)
+}
+
+// FailedDependencyException is the framework's built-in exception for 424.
+type FailedDependencyException = exception.FailedDependencyException
+
+// NewFailedDependencyException builds a *FailedDependencyException (HTTP 424).
+func NewFailedDependencyException(message string, details ...any) *FailedDependencyException {
+	return exception.NewFailedDependencyException(message, details...)
+}
+
+// TooEarlyException is the framework's built-in exception for 425.
+type TooEarlyException = exception.TooEarlyException
+
+// NewTooEarlyException builds a *TooEarlyException (HTTP 425).
+func NewTooEarlyException(message string, details ...any) *TooEarlyException {
+	return exception.NewTooEarlyException(message, details...)
+}
+
+// UpgradeRequiredException is the framework's built-in exception for 426.
+type UpgradeRequiredException = exception.UpgradeRequiredException
+
+// NewUpgradeRequiredException builds a *UpgradeRequiredException (HTTP 426).
+func NewUpgradeRequiredException(message string, details ...any) *UpgradeRequiredException {
+	return exception.NewUpgradeRequiredException(message, details...)
+}
+
+// PreconditionRequiredException is the framework's built-in exception for 428.
+type PreconditionRequiredException = exception.PreconditionRequiredException
+
+// NewPreconditionRequiredException builds a *PreconditionRequiredException (HTTP 428).
+func NewPreconditionRequiredException(message string, details ...any) *PreconditionRequiredException {
+	return exception.NewPreconditionRequiredException(message, details...)
+}
+
+// TooManyRequestsException is the framework's built-in exception for 429.
+type TooManyRequestsException = exception.TooManyRequestsException
+
+// NewTooManyRequestsException builds a *TooManyRequestsException (HTTP 429).
+func NewTooManyRequestsException(message string, details ...any) *TooManyRequestsException {
+	return exception.NewTooManyRequestsException(message, details...)
+}
+
+// RequestHeaderFieldsTooLargeException is the framework's built-in exception for 431.
+type RequestHeaderFieldsTooLargeException = exception.RequestHeaderFieldsTooLargeException
+
+// NewRequestHeaderFieldsTooLargeException builds a *RequestHeaderFieldsTooLargeException (HTTP 431).
+func NewRequestHeaderFieldsTooLargeException(message string, details ...any) *RequestHeaderFieldsTooLargeException {
+	return exception.NewRequestHeaderFieldsTooLargeException(message, details...)
+}
+
+// UnavailableForLegalReasonsException is the framework's built-in exception for 451.
+type UnavailableForLegalReasonsException = exception.UnavailableForLegalReasonsException
+
+// NewUnavailableForLegalReasonsException builds a *UnavailableForLegalReasonsException (HTTP 451).
+func NewUnavailableForLegalReasonsException(message string, details ...any) *UnavailableForLegalReasonsException {
+	return exception.NewUnavailableForLegalReasonsException(message, details...)
+}
+
+// InternalServerErrorException is the framework's built-in exception for 500.
+type InternalServerErrorException = exception.InternalServerErrorException
+
+// NewInternalServerErrorException builds a *InternalServerErrorException (HTTP 500).
+func NewInternalServerErrorException(message string, details ...any) *InternalServerErrorException {
+	return exception.NewInternalServerErrorException(message, details...)
+}
+
+// NotImplementedException is the framework's built-in exception for 501.
+type NotImplementedException = exception.NotImplementedException
+
+// NewNotImplementedException builds a *NotImplementedException (HTTP 501).
+func NewNotImplementedException(message string, details ...any) *NotImplementedException {
+	return exception.NewNotImplementedException(message, details...)
+}
+
+// BadGatewayException is the framework's built-in exception for 502.
+type BadGatewayException = exception.BadGatewayException
+
+// NewBadGatewayException builds a *BadGatewayException (HTTP 502).
+func NewBadGatewayException(message string, details ...any) *BadGatewayException {
+	return exception.NewBadGatewayException(message, details...)
+}
+
+// ServiceUnavailableException is the framework's built-in exception for 503.
+type ServiceUnavailableException = exception.ServiceUnavailableException
+
+// NewServiceUnavailableException builds a *ServiceUnavailableException (HTTP 503).
+func NewServiceUnavailableException(message string, details ...any) *ServiceUnavailableException {
+	return exception.NewServiceUnavailableException(message, details...)
+}
+
+// GatewayTimeoutException is the framework's built-in exception for 504.
+type GatewayTimeoutException = exception.GatewayTimeoutException
+
+// NewGatewayTimeoutException builds a *GatewayTimeoutException (HTTP 504).
+func NewGatewayTimeoutException(message string, details ...any) *GatewayTimeoutException {
+	return exception.NewGatewayTimeoutException(message, details...)
+}
+
+// HTTPVersionNotSupportedException is the framework's built-in exception for 505.
+type HTTPVersionNotSupportedException = exception.HTTPVersionNotSupportedException
+
+// NewHTTPVersionNotSupportedException builds a *HTTPVersionNotSupportedException (HTTP 505).
+func NewHTTPVersionNotSupportedException(message string, details ...any) *HTTPVersionNotSupportedException {
+	return exception.NewHTTPVersionNotSupportedException(message, details...)
+}
+
+// VariantAlsoNegotiatesException is the framework's built-in exception for 506.
+type VariantAlsoNegotiatesException = exception.VariantAlsoNegotiatesException
+
+// NewVariantAlsoNegotiatesException builds a *VariantAlsoNegotiatesException (HTTP 506).
+func NewVariantAlsoNegotiatesException(message string, details ...any) *VariantAlsoNegotiatesException {
+	return exception.NewVariantAlsoNegotiatesException(message, details...)
+}
+
+// InsufficientStorageException is the framework's built-in exception for 507.
+type InsufficientStorageException = exception.InsufficientStorageException
+
+// NewInsufficientStorageException builds a *InsufficientStorageException (HTTP 507).
+func NewInsufficientStorageException(message string, details ...any) *InsufficientStorageException {
+	return exception.NewInsufficientStorageException(message, details...)
+}
+
+// LoopDetectedException is the framework's built-in exception for 508.
+type LoopDetectedException = exception.LoopDetectedException
+
+// NewLoopDetectedException builds a *LoopDetectedException (HTTP 508).
+func NewLoopDetectedException(message string, details ...any) *LoopDetectedException {
+	return exception.NewLoopDetectedException(message, details...)
+}
+
+// NotExtendedException is the framework's built-in exception for 510.
+type NotExtendedException = exception.NotExtendedException
+
+// NewNotExtendedException builds a *NotExtendedException (HTTP 510).
+func NewNotExtendedException(message string, details ...any) *NotExtendedException {
+	return exception.NewNotExtendedException(message, details...)
+}
+
+// NetworkAuthenticationRequiredException is the framework's built-in exception for 511.
+type NetworkAuthenticationRequiredException = exception.NetworkAuthenticationRequiredException
+
+// NewNetworkAuthenticationRequiredException builds a *NetworkAuthenticationRequiredException (HTTP 511).
+func NewNetworkAuthenticationRequiredException(message string, details ...any) *NetworkAuthenticationRequiredException {
+	return exception.NewNetworkAuthenticationRequiredException(message, details...)
 }
 
 // ---------------------------------------------------------------------------

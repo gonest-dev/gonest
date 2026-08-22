@@ -742,7 +742,7 @@ func gatedHandler(controllerGuards []*guard.Guard, routeHandler func(c *executio
 	return func(c *execution.HttpContext) {
 		for _, g := range controllerGuards {
 			if !g.HandlerFunc()(c) {
-				panic(exception.NewForbiddenException(nil))
+				panic(exception.NewForbiddenException("", nil))
 			}
 		}
 		routeHandler(c)

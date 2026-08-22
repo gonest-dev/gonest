@@ -661,7 +661,7 @@ func TestNewNotFoundException_RootAlias_PanicRecoverRoundTrip(t *testing.T) {
 		}
 	}()
 
-	panic(NewNotFoundException(map[string]any{"userId": "abc123"}))
+	panic(NewNotFoundException("", map[string]any{"userId": "abc123"}))
 }
 
 // TestHttpException_RootAlias_SatisfiesException proves the root-aliased
@@ -971,7 +971,7 @@ var stubAuthService = &authService{}
 // (no MustInject): rather than gonest.MustInject[*AuthService](guard), it
 // closes over the package-level stubAuthService directly. The rest of the
 // example is faithful: missing Authorization header panics a custom
-// gonest.NewUnauthorizedException(nil) (proving the custom-exception-on-
+// gonest.NewUnauthorizedException("", nil) (proving the custom-exception-on-
 // invalid path), otherwise it returns authService.Validate(token) as a
 // plain bool (proving the false->automatic 403 path and the true->Handler-
 // runs path).
@@ -980,7 +980,7 @@ var AuthGuard = NewGuard(func(guard *Guard) {
 		req := c.Request()
 		token := req.Header("Authorization")
 		if token == "" {
-			panic(NewUnauthorizedException(nil))
+			panic(NewUnauthorizedException("", nil))
 		}
 		return stubAuthService.Validate(token)
 	})
@@ -1305,7 +1305,7 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 		})
 		c.Route(route.HttpGet, "/uncaught", func(r *route.Route) {
 			r.Handler(func(c *HttpContext) {
-				panic(NewNotFoundException(nil))
+				panic(NewNotFoundException("", nil))
 			})
 		})
 	})
@@ -3285,7 +3285,7 @@ func (s *insightTestUserService) Get(userID int64) *insightTestUserEntity {
 			return u
 		}
 	}
-	panic(NewNotFoundException(nil))
+	panic(NewNotFoundException("", nil))
 }
 
 type insightTestUserServiceMock struct {
