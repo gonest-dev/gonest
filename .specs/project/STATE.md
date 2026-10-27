@@ -1,6 +1,6 @@
 # State
 
-Last synced commit: 419e73f (tag v0.37.0)
+Last synced commit: cadda74 (tag v0.38.0)
 **Last Updated:** 2026-10-26
 
 ## Current Work
