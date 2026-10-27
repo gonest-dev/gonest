@@ -30,6 +30,6 @@ package main
 import "gonest.dev/gonest"
 
 func main() {
-	app := gonest.MustNewApp[gonest.FiberApp](AppModule)
-	app.MustListen(":3002")
+	app := gonest.NewApp[gonest.FiberApp](AppModule)
+	app.Listen(":3002")
 }

@@ -25,13 +25,13 @@ var sendBodySchema = gonest.NewSchema(func(t *sendBody, s *gonest.Schema) {
 var NotificationController_ = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/notifications")
 
-	notify := gonest.MustInject[notifier.Port](controller)
+	notify := controller.Inject[notifier.Port]()
 	// *notifier.Config is exported unconditionally by notifier.Module_ (see
 	// its own doc comment) -- resolved here DIRECTLY (Controller phase runs
 	// after Stage 3, no placeholder), same single *Config instance
 	// notifier.Module_'s own Lazy callback already eagerly constructed
 	// (LAZY-03: its Constructor never runs twice).
-	config := gonest.MustInject[*notifier.Config](controller)
+	config := controller.Inject[*notifier.Config]()
 
 	controller.Route(gonest.HttpPost, "/", func(r *gonest.Route) {
 		r.Summary("Send a notification through whichever driver is active")
@@ -39,7 +39,7 @@ var NotificationController_ = gonest.NewController(func(controller *gonest.Contr
 
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			body := gonest.MustParse[sendBody](req.Body().Json(), sendBodySchema)
+			body := req.Body().Json().Parse[sendBody](sendBodySchema)
 
 			if err := notify.Send(body.To, body.Message); err != nil {
 				res.Status(http.StatusInternalServerError).Json(map[string]any{"error": err.Error()})

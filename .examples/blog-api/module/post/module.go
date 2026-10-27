@@ -10,8 +10,8 @@ import (
 )
 
 var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
-	db := gonest.MustInject[*sql.DB](provider)
-	userService := gonest.MustInject[*user.Service](provider)
+	db := provider.Inject[*sql.DB]()
+	userService := provider.Inject[*user.Service]()
 	provider.Constructor(func() *Service { return &Service{db: db, userService: userService} })
 })
 

@@ -38,29 +38,8 @@ func (e *Emitter) removeSubscriber(t reflect.Type, raw chan any) {
 }
 
 // Subscribe registers a dynamic, per-connection channel that receives
-// every future Emit(T{...}) call until done closes (graphql-support
-// feature, Milestone 17) -- complementary to the static, app-lifetime
-// *Listener/Emit pair: a Subscribe[T] channel is cancelable and lives only
-// as long as its caller's own done channel stays open (typically one
-// GraphQL Subscription connection), the same context.Context-like
-// done-channel idiom Go's own stdlib uses.
-//
-// A free function (not a method) for the same reason NewListener is one --
-// Go disallows a type parameter on a method (L-001 in STATE.md).
-//
-// The returned channel is buffered (subscribeBufferSize) and CLOSED when
-// done fires -- a range over it terminates on its own once the caller's
-// connection ends, with no separate signal needed. The internal raw
-// forwarding channel Subscribe registers with the Emitter is, by
-// contrast, deliberately NEVER closed (see removeSubscriber's own doc
-// comment) -- only the returned, caller-owned channel is.
-//
-// The goroutine Subscribe starts here is the ONE place responsible for
-// noticing done and cleaning up -- without it, the registration in
-// e.subscribers would never be removed and the goroutine forwarding
-// raw->out would leak for the lifetime of the process (Emitter itself is
-// process-long-lived).
-func Subscribe[T any](e *Emitter, done <-chan struct{}) <-chan T {
+// every future Emit(T{...}) call until done closes.
+func (e *Emitter) Subscribe[T any](done <-chan struct{}) <-chan T {
 	t := reflect.TypeFor[T]()
 	raw := make(chan any, subscribeBufferSize)
 	out := make(chan T, subscribeBufferSize)

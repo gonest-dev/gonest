@@ -10,8 +10,8 @@ import "gonest.dev/gonest"
 // SAME gonest.MustParse[T] REST already uses, just fed by ctx.Args()
 // instead of req.Body().Json()/req.Params().
 var PostResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolver) {
-	service := gonest.MustInject[*Service](resolver)
-	emitter := gonest.MustInject[*gonest.Emitter](resolver)
+	service := resolver.Inject[*Service]()
+	emitter := resolver.Inject[*gonest.Emitter]()
 
 	resolver.Query("posts", func(query *gonest.GraphqlQuery) {
 		query.ReturnsList(postSchema) // Handler returns a []*PostEntity, not a single value
@@ -24,7 +24,7 @@ var PostResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 		query.Args(postIDArgsSchema)
 		query.Returns(postSchema)
 		query.Handler(func(ctx *gonest.GraphqlContext) any {
-			args := gonest.MustParse[PostIDArgs](ctx.Args(), postIDArgsSchema)
+			args := ctx.Args().Parse[PostIDArgs](postIDArgsSchema)
 			p := service.Get(args.ID)
 			if p == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -37,13 +37,13 @@ var PostResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 		mutation.Args(createPostArgsSchema)
 		mutation.Returns(postSchema)
 		mutation.Handler(func(ctx *gonest.GraphqlContext) any {
-			args := gonest.MustParse[CreatePostArgs](ctx.Args(), createPostArgsSchema)
+			args := ctx.Args().Parse[CreatePostArgs](createPostArgsSchema)
 			return service.Create(args.Title, args.Body)
 		})
 	})
 
 	// Subscription: a STREAM, not request-response -- Handler's signature
-	// is (ctx, emit), not (ctx) any. gonest.Subscribe[T](emitter, done) is
+	// is (ctx, emit), not (ctx) any. emitter.Subscribe[T](done) is
 	// Emitter's dynamic counterpart to NewListener/Emit: a channel that lives
 	// only as long as ctx.Done() stays open (this ONE connection),
 	// cancelled automatically when the client disconnects (SSE: write
@@ -51,7 +51,7 @@ var PostResolver = gonest.NewGraphqlResolver(func(resolver *gonest.GraphqlResolv
 	resolver.Subscription("postCreated", func(subscription *gonest.GraphqlSubscription) {
 		subscription.Returns(postSchema)
 		subscription.Handler(func(ctx *gonest.GraphqlContext, emit func(any)) {
-			for event := range gonest.Subscribe[PostCreatedEvent](emitter, ctx.Done()) {
+			for event := range emitter.Subscribe[PostCreatedEvent](ctx.Done()) {
 				emit(event.Post)
 			}
 		})

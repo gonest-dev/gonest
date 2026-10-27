@@ -217,3 +217,45 @@ func isValidConstructorSignature(t reflect.Type) bool {
 		return false
 	}
 }
+
+// InjectFn, InjectAllFn, and SafeInjectFn are wired by internal/inject's init to avoid import cycles.
+var (
+	InjectFn     func(owner any, t reflect.Type) any
+	InjectAllFn  func(owner any, t reflect.Type) any
+	SafeInjectFn func(owner any, t reflect.Type) (any, error)
+)
+
+// Inject declares a dependency on type T for this provider, panicking on resolution failure.
+func (p *Provider) Inject[T any]() T {
+	if InjectFn == nil {
+		panic("gonest: Provider.Inject called before inject package initialized")
+	}
+	return InjectFn(p, reflect.TypeFor[T]()).(T)
+}
+
+// InjectAll returns all providers matching interface T in scope for this provider.
+func (p *Provider) InjectAll[T any]() []T {
+	if InjectAllFn == nil {
+		panic("gonest: Provider.InjectAll called before inject package initialized")
+	}
+	return InjectAllFn(p, reflect.TypeFor[T]()).([]T)
+}
+
+// SafeInject declares a dependency on type T for this provider, returning (T, error) without panicking.
+func (p *Provider) SafeInject[T any]() (T, error) {
+	if SafeInjectFn == nil {
+		panic("gonest: Provider.SafeInject called before inject package initialized")
+	}
+	v, err := SafeInjectFn(p, reflect.TypeFor[T]())
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return v.(T), nil
+}
+
+// As wraps this Provider in an interface-resolving view for interface type T.
+func (p *Provider) As[T any]() module.ProviderRef {
+	return module.ProviderAs[T](p)
+}
+

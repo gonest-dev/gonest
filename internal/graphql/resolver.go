@@ -19,6 +19,7 @@ package graphql
 import (
 	"reflect"
 
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
@@ -131,4 +132,19 @@ func (r *Resolver) OwnMutations() []*Mutation {
 // via Subscription. Same defensive-copy pattern as OwnQueries.
 func (r *Resolver) OwnSubscriptions() []*Subscription {
 	return append([]*Subscription(nil), r.subscriptions...)
+}
+
+// Inject declares a dependency on type T for this resolver, panicking on resolution failure.
+func (r *Resolver) Inject[T any]() T {
+	return inject.Inject[T](r)
+}
+
+// InjectAll returns all providers matching interface T in scope for this resolver.
+func (r *Resolver) InjectAll[T any]() []T {
+	return inject.InjectAll[T](r)
+}
+
+// SafeInject declares a dependency on type T for this resolver, returning (T, error) without panicking.
+func (r *Resolver) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](r)
 }

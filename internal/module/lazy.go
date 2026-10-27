@@ -1,5 +1,7 @@
 package module
 
+import "reflect"
+
 // LazyModule is the callback argument to Module.Lazy: it exposes the same
 // Imports/Exports registration surface as *Module itself (delegating to the
 // owning module, owner is unexported so a LazyModule can never be mistaken
@@ -50,3 +52,31 @@ func (l *LazyModule) Exports(refs ...TokenRef) {
 func (l *LazyModule) OwnProviders() []ProviderRef {
 	return l.owner.OwnProviders()
 }
+
+// LazyInjectFn and LazySafeInjectFn are wired by internal/inject's init to avoid import cycles.
+var (
+	LazyInjectFn     func(owner any, t reflect.Type) any
+	LazySafeInjectFn func(owner any, t reflect.Type) (any, error)
+)
+
+// Inject declares a dependency on type T for this lazy module.
+func (l *LazyModule) Inject[T any]() T {
+	if LazyInjectFn == nil {
+		panic("gonest: LazyInjectFn not wired")
+	}
+	return LazyInjectFn(l, reflect.TypeFor[T]()).(T)
+}
+
+// SafeInject declares a dependency on type T for this lazy module.
+func (l *LazyModule) SafeInject[T any]() (T, error) {
+	if LazySafeInjectFn == nil {
+		panic("gonest: LazySafeInjectFn not wired")
+	}
+	v, err := LazySafeInjectFn(l, reflect.TypeFor[T]())
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return v.(T), nil
+}
+

@@ -203,9 +203,9 @@ func TestNewApp_NoOptsArgument_BehavesLikeZeroValueAppOptions(t *testing.T) {
 func TestMustNewApp_NoOptsArgument_DoesNotPanic(t *testing.T) {
 	root := module.New(func(m *module.Module) {})
 
-	app := MustNewApp[recordingFakeAdapter](root)
+	app := NewApp[recordingFakeAdapter](root)
 	if app == nil {
-		t.Fatalf("MustNewApp() with no opts returned nil *App")
+		t.Fatalf("NewApp() with no opts returned nil *App")
 	}
 }
 
@@ -244,11 +244,11 @@ func TestMustNewApp_PanicsOnAssembleError(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Fatalf("MustNewApp() did not panic for a Stage 1 assemble error")
+			t.Fatalf("NewApp() did not panic for a Stage 1 assemble error")
 		}
 	}()
 
-	MustNewApp[recordingFakeAdapter](root, Options{})
+	NewApp[recordingFakeAdapter](root, Options{})
 }
 
 func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
@@ -262,9 +262,9 @@ func TestMustNewApp_ReturnsAppOnSuccess(t *testing.T) {
 		m.Providers(p)
 	})
 
-	app := MustNewApp[recordingFakeAdapter](root, Options{})
+	app := NewApp[recordingFakeAdapter](root, Options{})
 	if app == nil {
-		t.Fatalf("MustNewApp() returned nil *App")
+		t.Fatalf("NewApp() returned nil *App")
 	}
 }
 
@@ -704,7 +704,7 @@ func TestMustListen_FiresOnListenOnceAndBlocks(t *testing.T) {
 
 	returned := make(chan struct{})
 	go func() {
-		a.MustListen(":0", onListen)
+		a.Listen(":0", onListen)
 		close(returned)
 	}()
 
@@ -752,7 +752,7 @@ func TestMustListen_NilOnListen_BlocksWithoutPanicOrCall(t *testing.T) {
 
 	returned := make(chan struct{})
 	go func() {
-		a.MustListen(":0", nil)
+		a.Listen(":0", nil)
 		close(returned)
 	}()
 
@@ -808,7 +808,7 @@ func TestMustListen_ListenError_PanicsWithAddrAndError(t *testing.T) {
 		}
 	}()
 
-	a.MustListen(":9999", nil)
+	a.Listen(":9999", nil)
 }
 
 // TestNewApp_ZeroMiddleware_BehavesIdenticallyToPreFeatureBehavior is the
@@ -947,7 +947,7 @@ func TestMustListen_DisableBanner_SkipsBannerStillLogsAndFires(t *testing.T) {
 
 	fired := make(chan struct{})
 	go func() {
-		a.MustListen(":0", OnListen(func() { close(fired) }))
+		a.Listen(":0", OnListen(func() { close(fired) }))
 	}()
 
 	select {
@@ -968,7 +968,7 @@ func TestMustListen_DisableLoaded_SkipsLoadedCountsStillLogsAndFires(t *testing.
 
 	fired := make(chan struct{})
 	go func() {
-		a.MustListen(":0", OnListen(func() { close(fired) }))
+		a.Listen(":0", OnListen(func() { close(fired) }))
 	}()
 
 	select {
@@ -980,19 +980,18 @@ func TestMustListen_DisableLoaded_SkipsLoadedCountsStillLogsAndFires(t *testing.
 	close(spy.unblock)
 }
 
-// TestListen_ReturnsErrorWithoutPanicking proves Listen (the non-panicking
-// counterpart to MustListen) returns the adapter's own error directly
-// instead of panicking.
-func TestListen_ReturnsErrorWithoutPanicking(t *testing.T) {
+// TestSafeListen_ReturnsErrorWithoutPanicking proves SafeListen
+// returns the adapter's own error directly instead of panicking.
+func TestSafeListen_ReturnsErrorWithoutPanicking(t *testing.T) {
 	spy := &listenSpyAdapter{err: errors.New("address already in use")}
 	a := &App{adapter: spy}
 
-	err := a.Listen(":0")
+	err := a.SafeListen(":0")
 	if err == nil {
-		t.Fatal("Listen() error = nil, want the adapter's own error")
+		t.Fatal("SafeListen() error = nil, want the adapter's own error")
 	}
 	if !strings.Contains(err.Error(), "address already in use") {
-		t.Fatalf("Listen() error = %v, want it to contain the adapter's own message", err)
+		t.Fatalf("SafeListen() error = %v, want it to contain the adapter's own message", err)
 	}
 }
 
@@ -1004,7 +1003,7 @@ func TestListen_VariadicNoOnListen_DoesNotPanic(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		_ = a.Listen(":0")
+		a.Listen(":0")
 		close(done)
 	}()
 

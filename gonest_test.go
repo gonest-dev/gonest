@@ -39,10 +39,7 @@ import (
 func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	root := NewModule(func(s *Module) {})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 	if app == nil {
 		t.Fatalf("NewApp() returned nil *App")
 	}
@@ -54,7 +51,7 @@ func TestNewApp_RootAlias_InsightCallShape(t *testing.T) {
 func TestMustNewApp_RootAlias_InsightCallShape(t *testing.T) {
 	root := NewModule(func(s *Module) {})
 
-	app := MustNewApp[fiber.App](root, AppOptions{
+	app := NewApp[fiber.App](root, AppOptions{
 		BufferLogs: true,
 		LogLevels:  []LoggerLevel{LoggerLevelWarn, LoggerLevelError},
 	})
@@ -106,7 +103,7 @@ func TestMustNewApp_AppOptionsLogger_BecomesTheActiveFrameworkLogger(t *testing.
 	root := NewModule(func(s *Module) {})
 
 	spy := &gonestTestSpyLogger{}
-	app := MustNewApp[fiber.App](root, AppOptions{Logger: spy})
+	app := NewApp[fiber.App](root, AppOptions{Logger: spy})
 	if app == nil {
 		t.Fatalf("MustNewApp() returned nil *App")
 	}
@@ -135,7 +132,7 @@ func TestGetLoggerFor_InsideProviderConstructor_ResolvesWithoutMustInject(t *tes
 	})
 	root := NewModule(func(s *Module) { s.Providers(widgetProvider) })
 
-	MustNewApp[fiber.App](root, AppOptions{Logger: spy})
+	NewApp[fiber.App](root, AppOptions{Logger: spy})
 
 	want := "INFO [widget] constructing widget"
 	for _, line := range spy.snapshot() {
@@ -154,10 +151,7 @@ func TestGetLoggerFor_InsideProviderConstructor_ResolvesWithoutMustInject(t *tes
 func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 	root := NewModule(func(s *Module) {})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -178,7 +172,7 @@ func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		app.MustListen(addr, onListen)
+		app.Listen(addr, onListen)
 	}()
 
 	select {
@@ -205,10 +199,7 @@ func TestApp_MustListen_PromotedThroughRootAlias(t *testing.T) {
 func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 	root := NewModule(func(s *Module) {})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -223,7 +214,7 @@ func TestApp_MustListen_NilOnListen_ThroughRootAlias(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		app.MustListen(addr, nil)
+		app.Listen(addr, nil)
 	}()
 
 	// Give MustListen a moment to bind, then confirm it's serving without
@@ -293,7 +284,7 @@ func TestMustParams_RootPackage_HappyPath(t *testing.T) {
 	ctx, _ := execution.New(res)
 	ctx = ctx.WithRoute(r)
 
-	got := MustParse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
+	got := NewParseable(validate.NewParamsSource(ctx)).Parse[idParams](idParamsSchema)
 	if got.ID != 42 {
 		t.Fatalf("MustParams[*idParams](ctx).ID = %d, want %d", got.ID, 42)
 	}
@@ -322,7 +313,7 @@ func TestMustParams_RootPackage_PanicsWhenParamNotDeclaredOnRoute(t *testing.T) 
 		}
 	}()
 
-	MustParse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
+	NewParseable(validate.NewParamsSource(ctx)).Parse[idParams](idParamsSchema)
 }
 
 // TestMustParams_RootPackage_PanicsOnConversionFailure proves the
@@ -345,7 +336,7 @@ func TestMustParams_RootPackage_PanicsOnConversionFailure(t *testing.T) {
 		}
 	}()
 
-	MustParse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
+	NewParseable(validate.NewParamsSource(ctx)).Parse[idParams](idParamsSchema)
 }
 
 // TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking proves
@@ -363,7 +354,7 @@ func TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking(t *testing.T
 		ctx, _ := execution.New(res)
 		ctx = ctx.WithRoute(r)
 
-		got, err := Parse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
+		got, err := NewParseable(validate.NewParamsSource(ctx)).SafeParse[idParams](idParamsSchema)
 		if err == nil {
 			t.Fatal("expected a non-nil error, got nil")
 		}
@@ -381,7 +372,7 @@ func TestParseRestParams_RootPackage_ReturnsErrorInsteadOfPanicking(t *testing.T
 		ctx, _ := execution.New(res)
 		ctx = ctx.WithRoute(r)
 
-		got, err := Parse[idParams](validate.NewParamsSource(ctx), idParamsSchema)
+		got, err := NewParseable(validate.NewParamsSource(ctx)).SafeParse[idParams](idParamsSchema)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -432,7 +423,7 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 		c.Route(route.HttpGet, "/items/:id", func(r *route.Route) {
 			r.Handler(func(c *HttpContext) {
 				req, res := c.Request(), c.Response()
-				p := MustParse[idParams](req.Params(), idParamsSchema)
+				p := req.Params().Parse[idParams](idParamsSchema)
 				gotID = p.ID
 				handlerRan = true
 				res.Json(map[string]int{"id": gotID})
@@ -444,10 +435,7 @@ func TestMustParams_RootPackage_RealHTTPDispatch(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -535,8 +523,8 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 		c.Route(route.HttpGet, "/users/:user_id/orders", func(r *route.Route) {
 			r.Handler(func(c *HttpContext) {
 				req, res := c.Request(), c.Response()
-				params := MustParse[insightUserIdParams](req.Params(), insightUserIdParamsSchema)
-				query := MustParse[insightListUsersQuery](req.Query(), insightListUsersQuerySchema)
+				params := req.Params().Parse[insightUserIdParams](insightUserIdParamsSchema)
+				query := req.Query().Parse[insightListUsersQuery](insightListUsersQuerySchema)
 				gotUserId = params.UserId
 				gotPage = query.Page
 				gotLimit = query.Limit
@@ -554,10 +542,7 @@ func TestMustParamsAndMustQuery_RootAlias_InsightCallShape(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -784,10 +769,7 @@ func TestRequestIdMiddleware_RootAlias_InsightCallShape(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -840,10 +822,7 @@ func TestRedirect_RootAlias_DynamicAndStatic(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -907,10 +886,7 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsMethodPathStatusDuration(t *te
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -970,10 +946,7 @@ func TestNewLoggerMiddleware_RealHTTPDispatch_LogsRealStatusWhenGuardRejects(t *
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -1102,10 +1075,7 @@ func TestAuthGuard_RootAlias_InsightCallShape(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -1273,10 +1243,7 @@ func TestTimingInterceptor_RootAlias_InsightCallShape(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -1407,10 +1374,7 @@ func TestFooExampleFilter_RootAlias_InsightCallShape(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -1693,10 +1657,7 @@ func TestNewGraphqlResolver_RootAlias_RealHTTPDispatch(t *testing.T) {
 		s.Resolvers(userResolver)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
 		t.Fatalf("app.Adapter() is not a *fiber.FiberApp: %T", app.Adapter())
@@ -2664,7 +2625,7 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		c.Route(route.HttpPost, "/users", func(r *route.Route) {
 			r.Handler(func(c *HttpContext) {
 				req, res := c.Request(), c.Response()
-				v := MustParse[jsonBodyUserEntity](req.Body().Json(), jsonBodyUserSchema)
+				v := req.Body().Json().Parse[jsonBodyUserEntity](jsonBodyUserSchema)
 				gotUser = &v
 				res.Json(gotUser)
 			})
@@ -2675,10 +2636,7 @@ func TestMustJsonBody_RootAlias_UserEntityInsightCallShape(t *testing.T) {
 		s.Controllers(controller)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -2964,10 +2922,7 @@ func TestGenerateOpenApiSchema_RootAlias_InsightExample(t *testing.T) {
 		s.Controllers(userController)
 	})
 
-	app, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](root, AppOptions{})
 
 	doc := NewOpenAPI("3.1.0", func(b *OpenAPI) {
 		b.Title("Example API")
@@ -3054,10 +3009,7 @@ func mapKeys(s map[string]any) []string {
 func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 	root := NewModule(func(s *Module) {})
 
-	appInstance, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	appInstance := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := appInstance.Adapter().(*fiber.App)
 	if !ok {
@@ -3072,12 +3024,12 @@ func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 		b.Version("1.0.0")
 	})
 
-	if err := SetupSwagger(appInstance, "/docs", doc, SwaggerOptions{
+	if err := SafeSetupSwagger(appInstance, "/docs", doc, SwaggerOptions{
 		JsonDocumentUrl: "/openapi.json",
 		PersistAuth:     true,
 		DocExpansion:    "none",
 	}); err != nil {
-		t.Fatalf("SetupSwagger() error = %v", err)
+		t.Fatalf("SafeSetupSwagger() error = %v", err)
 	}
 
 	t.Run("GET /openapi.json returns doc.Document() as JSON", func(t *testing.T) {
@@ -3141,10 +3093,7 @@ func TestSetupSwagger_RootAlias_InsightBootstrapCallShape(t *testing.T) {
 func TestMustSetupSwagger_Success_DoesNotPanic_RegistersRoutes(t *testing.T) {
 	root := NewModule(func(s *Module) {})
 
-	appInstance, err := NewApp[fiber.App](root, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	appInstance := NewApp[fiber.App](root, AppOptions{})
 
 	fiberAdapter, ok := appInstance.Adapter().(*fiber.App)
 	if !ok {
@@ -3164,7 +3113,7 @@ func TestMustSetupSwagger_Success_DoesNotPanic_RegistersRoutes(t *testing.T) {
 			t.Fatalf("MustSetupSwagger() panicked unexpectedly: %v", r)
 		}
 	}()
-	MustSetupSwagger(appInstance, "/docs", doc, SwaggerOptions{JsonDocumentUrl: "/openapi.json"})
+	SetupSwagger(appInstance, "/docs", doc, SwaggerOptions{JsonDocumentUrl: "/openapi.json"})
 
 	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
 	resp, err := fiberAdapter.FiberApp().Test(req)
@@ -3217,7 +3166,7 @@ var insightPostgresProvider = NewProvider(func(provider *Provider) {
 // is exclusively explicit now, via ProviderAs, no structural
 // reflect.Type.Implements() fallback (provider-interface-export feature,
 // PROVAS-02/PROVAS-07).
-var insightPostgresAsConnectable = ProviderAs[insightConnectable](insightPostgresProvider)
+var insightPostgresAsConnectable = insightPostgresProvider.As[insightConnectable]()
 
 type insightRedis struct{}
 
@@ -3231,7 +3180,7 @@ var insightRedisProvider = NewProvider(func(provider *Provider) {
 
 // insightRedisAsConnectable is insightPostgresAsConnectable's Redis
 // counterpart -- see its own doc comment.
-var insightRedisAsConnectable = ProviderAs[insightConnectable](insightRedisProvider)
+var insightRedisAsConnectable = insightRedisProvider.As[insightConnectable]()
 
 type insightConnectableService struct {
 	connectables []insightConnectable
@@ -3255,7 +3204,7 @@ func TestMustInjectAll_RootAlias_InsightConnectableExample(t *testing.T) {
 	systemController := NewController(func(controller *Controller) {
 		controller.Path("/health")
 
-		connectables := MustInjectAll[insightConnectable](controller)
+		connectables := controller.InjectAll[insightConnectable]()
 		service := &insightConnectableService{connectables: connectables}
 
 		controller.Route(route.HttpGet, "/ping", func(r *Route) {
@@ -3271,10 +3220,7 @@ func TestMustInjectAll_RootAlias_InsightConnectableExample(t *testing.T) {
 		module.Controllers(systemController)
 	})
 
-	app, err := NewApp[fiber.App](systemModule, AppOptions{})
-	if err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	app := NewApp[fiber.App](systemModule, AppOptions{})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -3311,16 +3257,14 @@ func TestMustInjectAll_ZeroMatches_ReturnsEmptySlice(t *testing.T) {
 	var got []insightConnectable
 
 	c := NewController(func(controller *Controller) {
-		got = MustInjectAll[insightConnectable](controller)
+		got = controller.InjectAll[insightConnectable]()
 	})
 
 	root := NewModule(func(s *Module) {
 		s.Controllers(c)
 	})
 
-	if _, err := NewApp[fiber.App](root, AppOptions{}); err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	NewApp[fiber.App](root, AppOptions{})
 
 	if len(got) != 0 {
 		t.Fatalf("MustInjectAll() = %v, want empty slice", got)
@@ -3337,7 +3281,7 @@ func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
 	}()
 
 	c := NewController(func(controller *Controller) {
-		MustInjectAll[*insightPostgres](controller)
+		controller.InjectAll[*insightPostgres]()
 	})
 
 	root := NewModule(func(s *Module) {
@@ -3345,7 +3289,7 @@ func TestMustInjectAll_PointerType_RootAlias_Panics(t *testing.T) {
 		s.Controllers(c)
 	})
 
-	MustNewApp[fiber.App](root, AppOptions{})
+	NewApp[fiber.App](root, AppOptions{})
 }
 
 // ---------------------------------------------------------------------------
@@ -3417,18 +3361,18 @@ func newInsightTestUserModule() *Module {
 	// concrete ResolvedType() against the interface override key via
 	// reflect.Type.Implements(), by this feature's own design (see
 	// design.md's overrideFor Tech Decision).
-	providerAsUserService := ProviderAs[insightTestIUserService](provider)
+	providerAsUserService := provider.As[insightTestIUserService]()
 
 	controller := NewController(func(controller *Controller) {
 		controller.Path("/user")
 
-		userService := MustInject[insightTestIUserService](controller)
+		userService := controller.Inject[insightTestIUserService]()
 
 		controller.Route(route.HttpGet, "/:id", func(r *route.Route) {
 			r.HttpCode(http.StatusOK)
 			r.Handler(func(c *HttpContext) {
 				req, res := c.Request(), c.Response()
-				p := MustParse[insightTestUserIDParam](req.Params(), insightTestUserIDParamSchema)
+				p := req.Params().Parse[insightTestUserIDParam](insightTestUserIDParamSchema)
 				res.Json(userService.Get(p.ID))
 			})
 		})
@@ -3453,8 +3397,8 @@ func TestMustNewTestApp_OverrideByInterface_RealHTTPDispatch(t *testing.T) {
 		},
 	}
 
-	tester := MustNewTestApp(newInsightTestUserModule(), func(b *TestBuilder) {
-		MustOverride[insightTestIUserService](b, mock)
+	tester := NewTestApp(newInsightTestUserModule(), func(b *TestBuilder) {
+		b.Override[insightTestIUserService](mock)
 	})
 	defer tester.Close()
 
@@ -3490,10 +3434,10 @@ func TestMustNewTestApp_OverrideByInterface_RealHTTPDispatch(t *testing.T) {
 // (unit-test style, no HTTP dispatch at all), and calling Get for a
 // missing ID panics the real NotFoundException.
 func TestMustNewTestApp_NoOverride_DirectMustInject_UnitStyle(t *testing.T) {
-	tester := MustNewTestApp(newInsightTestUserModule(), nil)
+	tester := NewTestApp(newInsightTestUserModule(), nil)
 	defer tester.Close()
 
-	service := MustInject[*insightTestUserService](tester)
+	service := tester.Inject[*insightTestUserService]()
 
 	defer func() {
 		exc, ok := recover().(*NotFoundException)
@@ -3518,16 +3462,16 @@ func TestMustNewTestApp_RealProviderConstructor_NeverRunsWhenOverridden(t *testi
 		})
 	})
 	c := NewController(func(controller *Controller) {
-		MustInject[insightTestIUserService](controller)
+		controller.Inject[insightTestIUserService]()
 	})
 	s := NewModule(func(module *Module) {
-		module.Providers(p, ProviderAs[insightTestIUserService](p))
+		module.Providers(p, p.As[insightTestIUserService]())
 		module.Controllers(c)
 	})
 
 	mock := &insightTestUserServiceMock{GetFn: func(int64) *insightTestUserEntity { return nil }}
-	tester := MustNewTestApp(s, func(b *TestBuilder) {
-		MustOverride[insightTestIUserService](b, mock)
+	tester := NewTestApp(s, func(b *TestBuilder) {
+		b.Override[insightTestIUserService](mock)
 	})
 	defer tester.Close()
 
@@ -3541,7 +3485,7 @@ func TestMustNewTestApp_RealProviderConstructor_NeverRunsWhenOverridden(t *testi
 // NewApp in every observable way (routes registered, DI resolved) except
 // not starting a real HTTP listener.
 func TestMustNewTestApp_NilConfigure_BehavesLikeNewAppMinusListen(t *testing.T) {
-	tester := MustNewTestApp(newInsightTestUserModule(), nil)
+	tester := NewTestApp(newInsightTestUserModule(), nil)
 	defer tester.Close()
 
 	fiberAdapter, ok := tester.Adapter().(*fiber.App)
@@ -3585,7 +3529,7 @@ func TestMustInject_RouteCallback_ResolvesFromOwningControllerScope(t *testing.T
 	controller := NewController(func(c *Controller) {
 		c.Path("/greet")
 		c.RouteGet("/hello", func(r *Route) {
-			usecase := MustInject[*routeMustInjectUsecase](r)
+			usecase := r.Inject[*routeMustInjectUsecase]()
 			r.Handler(func(c *HttpContext) {
 				c.Response().Json(map[string]string{"message": usecase.Greeting()})
 			})
@@ -3597,7 +3541,7 @@ func TestMustInject_RouteCallback_ResolvesFromOwningControllerScope(t *testing.T
 		s.Controllers(controller)
 	})
 
-	tester := MustNewTestApp(module, nil)
+	tester := NewTestApp(module, nil)
 	defer tester.Close()
 
 	fiberAdapter, ok := tester.Adapter().(*fiber.App)
@@ -3648,7 +3592,7 @@ func TestMustInject_RouteCallback_PanicsWhenNoProviderRegistered(t *testing.T) {
 	controller := NewController(func(c *Controller) {
 		c.Path("/missing")
 		c.RouteGet("/hello", func(r *Route) {
-			MustInject[*routeMustInjectUsecase](r)
+			r.Inject[*routeMustInjectUsecase]()
 		})
 	})
 
@@ -3658,16 +3602,16 @@ func TestMustInject_RouteCallback_PanicsWhenNoProviderRegistered(t *testing.T) {
 
 	defer func() {
 		rec := recover()
-		msg, ok := rec.(string)
-		if !ok {
-			t.Fatalf("expected a string panic, got %T: %v", rec, rec)
+		if rec == nil {
+			t.Fatal("expected panic, got nil")
 		}
+		msg := fmt.Sprint(rec)
 		if !strings.Contains(msg, "no provider registered for type") {
 			t.Fatalf("panic message = %q, want it to contain %q", msg, "no provider registered for type")
 		}
 	}()
 
-	tester := MustNewTestApp(module, nil)
+	tester := NewTestApp(module, nil)
 	defer tester.Close()
 }
 
@@ -3687,12 +3631,12 @@ func TestMustRequest_RootAlias_InsightTestUserControllerExample(t *testing.T) {
 		},
 	}
 
-	tester := MustNewTestApp(newInsightTestUserModule(), func(b *TestBuilder) {
-		MustOverride[insightTestIUserService](b, mock)
+	tester := NewTestApp(newInsightTestUserModule(), func(b *TestBuilder) {
+		b.Override[insightTestIUserService](mock)
 	})
 	defer tester.Close()
 
-	res := tester.MustRequest(HttpGet, "/user/42", nil)
+	res := tester.Request(HttpGet, "/user/42", nil)
 	res.AssertStatus(t, http.StatusOK)
 	res.AssertJsonPath(t, "id", int64(42))
 }
@@ -3704,10 +3648,10 @@ func TestMustRequest_RootAlias_InsightTestUserControllerExample(t *testing.T) {
 // path -- confirming AssertStatus reads the genuine dispatched status, not
 // a hardcoded 200.
 func TestMustRequest_NotFound_StatusPropagatesGenericException(t *testing.T) {
-	tester := MustNewTestApp(newInsightTestUserModule(), nil)
+	tester := NewTestApp(newInsightTestUserModule(), nil)
 	defer tester.Close()
 
-	res := tester.MustRequest(HttpGet, "/user/999", nil)
+	res := tester.Request(HttpGet, "/user/999", nil)
 	res.AssertStatus(t, http.StatusNotFound)
 }
 
@@ -3768,7 +3712,7 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 
 	ranCh := make(chan struct{})
 	userCreatedListener := NewListener(func(listener *Listener[insightUserCreatedEvent]) {
-		loggerDep := MustInject[*insightLoggerService](listener)
+		loggerDep := listener.Inject[*insightLoggerService]()
 		listener.MustOn(func(ctx context.Context, event insightUserCreatedEvent) {
 			loggerDep.Log("user created", event.UserID)
 			close(ranCh)
@@ -3777,7 +3721,7 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 
 	var userService *insightEmitterUserService
 	userProvider := NewProvider(func(provider *Provider) {
-		em := MustInject[*Emitter](provider)
+		em := provider.Inject[*Emitter]()
 		provider.Constructor(func() *insightEmitterUserService {
 			userService = &insightEmitterUserService{emitter: em}
 			return userService
@@ -3789,10 +3733,10 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 		module.Listeners(userCreatedListener)
 	})
 
-	tester := MustNewTestApp(userModule, nil)
+	tester := NewTestApp(userModule, nil)
 	defer tester.Close()
 
-	resolvedService := MustInject[*insightEmitterUserService](tester)
+	resolvedService := tester.Inject[*insightEmitterUserService]()
 	resolvedService.Create(42)
 
 	select {
@@ -3808,24 +3752,22 @@ func TestEmitter_RootAlias_InsightUserCreatedExample(t *testing.T) {
 }
 
 // TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration proves
-// spec.md EM-01: MustInject[*Emitter] resolves successfully from ANY
+// spec.md EM-01: Inject[*Emitter] resolves successfully from ANY
 // module, with zero explicit registration anywhere.
 func TestMustInject_Emitter_ResolvesFromAnyModule_NoRegistration(t *testing.T) {
 	var resolved *Emitter
 	c := NewController(func(controller *Controller) {
-		resolved = MustInject[*Emitter](controller)
+		resolved = controller.Inject[*Emitter]()
 	})
 
 	root := NewModule(func(s *Module) {
 		s.Controllers(c)
 	})
 
-	if _, err := NewApp[fiber.App](root, AppOptions{}); err != nil {
-		t.Fatalf("NewApp() error = %v", err)
-	}
+	_ = NewApp[fiber.App](root, AppOptions{})
 
 	if resolved == nil {
-		t.Fatal("MustInject[*Emitter] returned nil, want a real Emitter singleton")
+		t.Fatal("Inject[*Emitter] returned nil, want a real Emitter singleton")
 	}
 }
 
@@ -3874,15 +3816,15 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 	redisProvider := NewProvider(func(provider *Provider) {
 		provider.Constructor(func() *insightHealthRedis { return &insightHealthRedis{} })
 	})
-	// Explicit interface registrations -- MustInjectAll[insightPingable]
-	// below only finds providers wrapped via ProviderAs now (PROVAS-07).
-	dbAsPingable := ProviderAs[insightPingable](dbProvider)
-	redisAsPingable := ProviderAs[insightPingable](redisProvider)
+	// Explicit interface registrations -- InjectAll[insightPingable]
+	// below only finds providers wrapped via As now (PROVAS-07).
+	dbAsPingable := dbProvider.As[insightPingable]()
+	redisAsPingable := redisProvider.As[insightPingable]()
 
 	healthController := NewController(func(controller *Controller) {
 		controller.Path("/health")
 
-		pingables := MustInjectAll[insightPingable](controller)
+		pingables := controller.InjectAll[insightPingable]()
 
 		controller.Route(HttpGet, "/readyz", func(r *Route) {
 			r.Handler(func(ctx *HttpContext) {
@@ -3917,10 +3859,10 @@ func newInsightHealthModule(db *insightHealthDb) *Module {
 
 func TestHealthController_RootAlias_InsightExample_Readyz_AllUp(t *testing.T) {
 	db := &insightHealthDb{}
-	tester := MustNewTestApp(newInsightHealthModule(db), nil)
+	tester := NewTestApp(newInsightHealthModule(db), nil)
 	defer tester.Close()
 
-	res := tester.MustRequest(HttpGet, "/health/readyz", nil)
+	res := tester.Request(HttpGet, "/health/readyz", nil)
 	res.AssertStatus(t, http.StatusOK)
 	res.AssertJsonPath(t, "checks.database", "up")
 	res.AssertJsonPath(t, "checks.redis", "up")
@@ -3928,10 +3870,10 @@ func TestHealthController_RootAlias_InsightExample_Readyz_AllUp(t *testing.T) {
 
 func TestHealthController_RootAlias_InsightExample_Readyz_OneDown(t *testing.T) {
 	db := &insightHealthDb{down: true}
-	tester := MustNewTestApp(newInsightHealthModule(db), nil)
+	tester := NewTestApp(newInsightHealthModule(db), nil)
 	defer tester.Close()
 
-	res := tester.MustRequest(HttpGet, "/health/readyz", nil)
+	res := tester.Request(HttpGet, "/health/readyz", nil)
 	res.AssertStatus(t, http.StatusServiceUnavailable)
 	res.AssertJsonPath(t, "checks.database", "down")
 	res.AssertJsonPath(t, "checks.redis", "up")
@@ -3939,10 +3881,10 @@ func TestHealthController_RootAlias_InsightExample_Readyz_OneDown(t *testing.T) 
 
 func TestHealthController_RootAlias_InsightExample_Livez_AlwaysOk(t *testing.T) {
 	db := &insightHealthDb{}
-	tester := MustNewTestApp(newInsightHealthModule(db), nil)
+	tester := NewTestApp(newInsightHealthModule(db), nil)
 	defer tester.Close()
 
-	res := tester.MustRequest(HttpGet, "/health/livez", nil)
+	res := tester.Request(HttpGet, "/health/livez", nil)
 	res.AssertStatus(t, http.StatusOK)
 }
 
@@ -3952,7 +3894,7 @@ func TestHealthController_RootAlias_InsightExample_Livez_AlwaysOk(t *testing.T) 
 
 // insightSchedulerUserService/insightCleanupScheduler reproduce INSIGHT.md's
 // "exemplo de Schedule" section: a Scheduler depending on a service via
-// MustInject (same builder-time resolution as Controller/Listener), with
+// Inject (same builder-time resolution as Controller/Listener), with
 // Cron/Interval/Timeout jobs -- test uses millisecond-scale durations
 // instead of INSIGHT.md's real-world ones (time.Minute etc), same
 // adaptation this feature's own spec.md's Independent Test calls for.
@@ -3989,7 +3931,7 @@ func TestScheduler_RootAlias_InsightCleanupSchedulerExample(t *testing.T) {
 	})
 
 	cleanupScheduler := NewScheduler(func(scheduler *Scheduler) {
-		us := MustInject[*insightSchedulerUserService](scheduler)
+		us := scheduler.Inject[*insightSchedulerUserService]()
 		scheduler.Cron("cleanup-expired-users", "0 0 * * *", func(ctx context.Context) { us.PurgeExpired(ctx) })
 		scheduler.Interval("healthcheck-ping", 10*time.Millisecond, func(ctx context.Context) { us.Ping(ctx) })
 		scheduler.Timeout("warmup-cache", 20*time.Millisecond, func(ctx context.Context) { us.WarmupCache(ctx) })
@@ -4000,7 +3942,7 @@ func TestScheduler_RootAlias_InsightCleanupSchedulerExample(t *testing.T) {
 		module.Schedulers(cleanupScheduler)
 	})
 
-	tester := MustNewTestApp(appModule, nil)
+	tester := NewTestApp(appModule, nil)
 	defer tester.Close()
 
 	select {
@@ -4083,7 +4025,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 		controller.Route(HttpPost, "/", func(r *Route) {
 			r.Handler(func(c *HttpContext) {
 				req, res := c.Request(), c.Response()
-				result := MustParse[uploadForm](req.Body().Form(func(f *FormFile) error {
+				result := req.Body().Form(func(f *FormFile) error {
 					close(onFileReached)
 					gotFilename = f.Filename()
 					b, err := io.ReadAll(f.Reader())
@@ -4092,7 +4034,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 					}
 					gotContent = b
 					return nil
-				}), uploadSchema)
+				}).Parse[uploadForm](uploadSchema)
 				res.Json(map[string]string{"title": result.Title})
 			})
 		})
@@ -4102,7 +4044,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 		s.Controllers(uploadController)
 	})
 
-	app := MustNewApp[FiberApp](uploadModule, AppOptions{EnableFormStreaming: true})
+	app := NewApp[FiberApp](uploadModule, AppOptions{EnableFormStreaming: true})
 
 	fiberAdapter, ok := app.Adapter().(*fiber.App)
 	if !ok {
@@ -4118,7 +4060,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		app.MustListen(addr, onListen)
+		app.Listen(addr, onListen)
 	}()
 	t.Cleanup(func() {
 		if shutdownErr := fiberAdapter.FiberApp().Shutdown(); shutdownErr != nil {
@@ -4127,7 +4069,7 @@ func TestParseRestFormBody_RealHTTPDispatch_StreamsFileWithoutFullBuffering(t *t
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):
-			t.Errorf("MustListen goroutine did not return within timeout after Shutdown")
+			t.Errorf("Listen goroutine did not return within timeout after Shutdown")
 		}
 	})
 
@@ -4262,8 +4204,8 @@ func TestDotenv_CallableWithoutAnyAppBootstrap(t *testing.T) {
 		t.Fatalf("failed to write .env: %v", err)
 	}
 
-	if err := Dotenv().Load(path); err != nil {
-		t.Fatalf("Dotenv().Load() error = %v", err)
+	if err := Dotenv().SafeLoad(path); err != nil {
+		t.Fatalf("Dotenv().SafeLoad() error = %v", err)
 	}
 
 	if got := os.Getenv(key); got != "root-export-value" {
@@ -4272,9 +4214,9 @@ func TestDotenv_CallableWithoutAnyAppBootstrap(t *testing.T) {
 }
 
 // rootDotenvE2EConfig is the env-tagged target struct for
-// TestMustParse_DotenvEndToEnd_LoadThenBind -- 2 fields, one Required
+// TestParse_DotenvEndToEnd_LoadThenBind -- 2 fields, one Required
 // string, one Integer with a Default, proving both plain binding and
-// Default-value binding work through the exact same MustParse[T] call as
+// Default-value binding work through the exact same Parse[T] call as
 // any HTTP source.
 type rootDotenvE2EConfig struct {
 	Host string `env:"GONEST_ROOT_DOTENV_T11_HOST"`
@@ -4286,15 +4228,13 @@ var rootDotenvE2ESchema = NewSchema(func(c *rootDotenvE2EConfig, s *Schema) {
 	s.Property(&c.Port).Integer().Default(int64(5432))
 })
 
-// TestMustParse_DotenvEndToEnd_LoadThenBind proves the full env-schema-
+// TestParse_DotenvEndToEnd_LoadThenBind proves the full env-schema-
 // binding feature end to end: a REAL .env file (written via t.TempDir(),
-// not os.Setenv called directly) is loaded via gonest.Dotenv().MustLoad,
-// then bound into a struct via gonest.MustParse[T] using gonest.Dotenv()
-// itself as the Parseable source -- exactly the call shape T11's Done When
-// criteria describe: gonest.MustParse[DatabaseConfig](gonest.Dotenv(),
-// schema). PORT is deliberately left out of the file so its Default(5432)
-// is exercised too.
-func TestMustParse_DotenvEndToEnd_LoadThenBind(t *testing.T) {
+// not os.Setenv called directly) is loaded via gonest.Dotenv().Load,
+// then bound into a struct via gonest.Dotenv().Parse[T]
+// using gonest.Dotenv() itself as the Parseable source -- PORT is deliberately
+// left out of the file so its Default(5432) is exercised too.
+func TestParse_DotenvEndToEnd_LoadThenBind(t *testing.T) {
 	const key = "GONEST_ROOT_DOTENV_T11_HOST"
 	os.Unsetenv(key)
 	os.Unsetenv("GONEST_ROOT_DOTENV_T11_PORT")
@@ -4309,9 +4249,9 @@ func TestMustParse_DotenvEndToEnd_LoadThenBind(t *testing.T) {
 		t.Fatalf("failed to write .env: %v", err)
 	}
 
-	Dotenv().MustLoad(path)
+	Dotenv().Load(path)
 
-	got := MustParse[rootDotenvE2EConfig](Dotenv(), rootDotenvE2ESchema)
+	got := Dotenv().Parse[rootDotenvE2EConfig](rootDotenvE2ESchema)
 
 	if got.Host != "db.internal" {
 		t.Fatalf("got.Host = %q, want %q", got.Host, "db.internal")
@@ -4321,12 +4261,12 @@ func TestMustParse_DotenvEndToEnd_LoadThenBind(t *testing.T) {
 	}
 }
 
-// TestMustParse_PointerT_ReturnsPointerToParsedStruct proves
-// MustParse[*T]/Parse[*T] works alongside MustParse[T]/Parse[T]: T itself
+// TestParse_PointerT_ReturnsPointerToParsedStruct proves
+// Parse[*T] works alongside Parse[T]: T itself
 // may be a pointer to the schema's struct type, so a call site that wants
 // a *T back (e.g. to hand straight to a DI provider constructor) doesn't
 // need to Parse the struct value and take its own address afterward.
-func TestMustParse_PointerT_ReturnsPointerToParsedStruct(t *testing.T) {
+func TestParse_PointerT_ReturnsPointerToParsedStruct(t *testing.T) {
 	const key = "GONEST_ROOT_DOTENV_T11_HOST"
 	os.Unsetenv(key)
 	os.Unsetenv("GONEST_ROOT_DOTENV_T11_PORT")
@@ -4341,9 +4281,9 @@ func TestMustParse_PointerT_ReturnsPointerToParsedStruct(t *testing.T) {
 		t.Fatalf("failed to write .env: %v", err)
 	}
 
-	Dotenv().MustLoad(path)
+	Dotenv().Load(path)
 
-	got := MustParse[*rootDotenvE2EConfig](Dotenv(), rootDotenvE2ESchema)
+	got := Dotenv().Parse[*rootDotenvE2EConfig](rootDotenvE2ESchema)
 
 	if got == nil {
 		t.Fatal("got = nil, want a non-nil *rootDotenvE2EConfig")

@@ -19,21 +19,21 @@ func TestGet_ReturnsSameSingletonInstance(t *testing.T) {
 	}
 }
 
-func TestLoad_NonexistentPath_ReturnsError(t *testing.T) {
-	err := Get().Load("./path/does/not/exist.env")
+func TestSafeLoad_NonexistentPath_ReturnsError(t *testing.T) {
+	err := Get().SafeLoad("./path/does/not/exist.env")
 	if err == nil {
-		t.Fatal("expected Load with a nonexistent path to return a non-nil error")
+		t.Fatal("expected SafeLoad with a nonexistent path to return a non-nil error")
 	}
 }
 
-func TestMustLoad_NonexistentPath_Panics(t *testing.T) {
+func TestLoad_NonexistentPath_Panics(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
-			t.Fatal("expected MustLoad with a nonexistent path to panic")
+			t.Fatal("expected Load with a nonexistent path to panic")
 		}
 	}()
 
-	Get().MustLoad("./path/does/not/exist.env")
+	Get().Load("./path/does/not/exist.env")
 }
 
 // TestLoad_FourInlineCommentLines_MatchesSpecExamples mirrors, one per env
@@ -89,9 +89,7 @@ func TestLoad_ExistingEmptyPath_NoError(t *testing.T) {
 		t.Fatalf("failed to create empty test file: %v", err)
 	}
 
-	if err := Get().Load(path); err != nil {
-		t.Fatalf("expected Load with an existing empty path to return no error, got: %v", err)
-	}
+	Get().Load(path)
 }
 
 // TestLoad_MultiplePaths_FirstPathWinsSameKey proves T7's precedence rule:
@@ -118,9 +116,7 @@ func TestLoad_MultiplePaths_FirstPathWinsSameKey(t *testing.T) {
 		t.Fatalf("failed to write b.env: %v", err)
 	}
 
-	if err := Get().Load(pathA, pathB); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	Get().Load(pathA, pathB)
 
 	if got := os.Getenv(key); got != "from-a" {
 		t.Fatalf("expected %q (first path wins), got %q", "from-a", got)
@@ -141,9 +137,7 @@ func TestLoad_PreExistingProcessEnv_WinsOverFile(t *testing.T) {
 		t.Fatalf("failed to write a.env: %v", err)
 	}
 
-	if err := Get().Load(path); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	Get().Load(path)
 
 	if got := os.Getenv(key); got != "pre-existing" {
 		t.Fatalf("expected pre-existing process env %q to win, got %q", "pre-existing", got)
@@ -169,9 +163,7 @@ func TestLoad_KeyOnlyInSecondPath_IsSet(t *testing.T) {
 		t.Fatalf("failed to write b.env: %v", err)
 	}
 
-	if err := Get().Load(pathA, pathB); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	Get().Load(pathA, pathB)
 
 	if got := os.Getenv(key); got != "from-b" {
 		t.Fatalf("expected %q, got %q", "from-b", got)
@@ -214,9 +206,7 @@ func TestLoad_FourInlineCommentLines_MatchesSpecExamples_ViaRealLoad(t *testing.
 		t.Fatalf("failed to write .env: %v", err)
 	}
 
-	if err := Get().Load(path); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	Get().Load(path)
 
 	cases := map[string]string{
 		key1: "VAL",
@@ -233,15 +223,13 @@ func TestLoad_FourInlineCommentLines_MatchesSpecExamples_ViaRealLoad(t *testing.
 
 // --- T11 fixtures/tests -----------------------------------------------
 
-// TestDotenv_SatisfiesParseable is a compile-time-checked-at-runtime guard
-// mirroring the package-level `var _ execution.Parseable = (*Dotenv)(nil)`
-// declared in dotenv.go -- proves *Dotenv is usable anywhere an
-// execution.Parseable is expected (e.g. gonest.MustParse[T](gonest.Dotenv(),
-// schema)).
-func TestDotenv_SatisfiesParseable(t *testing.T) {
-	var p execution.Parseable = Get()
+// TestDotenv_SatisfiesParseableSource is a compile-time-checked-at-runtime guard
+// mirroring the package-level `var _ execution.ParseableSource = (*Dotenv)(nil)`
+// declared in dotenv.go.
+func TestDotenv_SatisfiesParseableSource(t *testing.T) {
+	var p execution.ParseableSource = Get()
 	if p == nil {
-		t.Fatal("expected Get() to satisfy execution.Parseable as a non-nil value")
+		t.Fatal("expected Get() to satisfy execution.ParseableSource as a non-nil value")
 	}
 }
 

@@ -43,7 +43,7 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 })
 
 func main() {
-	app := gonest.MustNewApp[gonest.FiberApp](AppModule, gonest.AppOptions{
+	app := gonest.NewApp[gonest.FiberApp](AppModule, gonest.AppOptions{
 		// Required for POST /posts/:post_id/attachment (Multipart Form
 		// Streaming) -- app-wide setting, doesn't change how any other
 		// existing route (JSON body/params/query) behaves.
@@ -58,11 +58,11 @@ func main() {
 	})
 
 	gonest.OpenapiGenerate(app, doc)
-	gonest.MustSetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
+	gonest.SetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
 		JsonDocumentUrl: "/openapi.json",
 		PersistAuth:     true,
 		DocExpansion:    "none",
 	})
 
-	app.MustListen(":3001")
+	app.Listen(":3001")
 }

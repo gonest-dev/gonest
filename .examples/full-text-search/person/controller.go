@@ -21,7 +21,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/person")
 	controller.Tags("person")
 
-	service := gonest.MustInject[*Service](controller)
+	service := controller.Inject[*Service]()
 
 	// POST /person/_search (Elasticsearch-style path), not the HTTP QUERY
 	// method (gonest.HttpQuery/RouteQuery) -- OpenAPI's Path Item Object
@@ -42,7 +42,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(resultSchema) })
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			q := gonest.MustParse[QueryDTO](req.Body().Json(), QueryDTOSchema)
+			q := req.Body().Json().Parse[QueryDTO](QueryDTOSchema)
 			res.Json(service.Search(q))
 		})
 	})
@@ -56,7 +56,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		})
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
+			p := req.Params().Parse[ParamsDTO](ParamsDTOSchema)
 			person := service.Get(p.PersonID)
 			if person == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -75,8 +75,8 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		})
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
-			body := gonest.MustParse[BodyUpdateDTO](req.Body().Json(), BodyUpdateDTOSchema)
+			p := req.Params().Parse[ParamsDTO](ParamsDTOSchema)
+			body := req.Body().Json().Parse[BodyUpdateDTO](BodyUpdateDTOSchema)
 			person := service.Update(p.PersonID, body)
 			if person == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -97,7 +97,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		})
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[ParamsDTO](req.Params(), ParamsDTOSchema)
+			p := req.Params().Parse[ParamsDTO](ParamsDTOSchema)
 			if !service.Delete(p.PersonID) {
 				panic(gonest.NewNotFoundException("", nil))
 			}
@@ -112,7 +112,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusCreated, func(response *gonest.Response) { response.Schema(entity.PersonSchema) })
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			body := gonest.MustParse[BodyCreateDTO](req.Body().Json(), BodyCreateDTOSchema)
+			body := req.Body().Json().Parse[BodyCreateDTO](BodyCreateDTOSchema)
 			res.Status(http.StatusCreated).Json(service.Create(body))
 		})
 	})

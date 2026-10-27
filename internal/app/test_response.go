@@ -98,21 +98,13 @@ func lookupJSONPath(decoded any, segments []string) (any, bool) {
 	return cur, true
 }
 
-// MustRequest dispatches an in-memory HTTP request (method, path, body)
-// against the app MustNewTestApp built -- no real network port is bound,
-// same mechanism every existing test in this codebase already uses via the
-// concrete Fiber adapter's own Test method (see internal/app.HttpAdapter's
-// new Test method, satisfied by every adapter implementation). body, if
-// non-nil, is JSON-encoded as the request body (same encoding
-// ctx.Json/MustJsonBody already use elsewhere). Panics on a transport-level
-// failure -- never on a non-2xx status, which is for the caller's own
-// AssertStatus to check.
-func (a *Test) MustRequest(method route.HttpMethod, path string, body any) *TestResponse {
+// SafeRequest dispatches an in-memory HTTP request against the test app, returning (*TestResponse, error).
+func (a *Test) SafeRequest(method route.HttpMethod, path string, body any) (*TestResponse, error) {
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			panic(fmt.Sprintf("gonest: MustRequest failed to JSON-encode body: %v", err))
+			return nil, fmt.Errorf("gonest: Request failed to JSON-encode body: %w", err)
 		}
 		reader = bytes.NewReader(b)
 	}
@@ -124,14 +116,23 @@ func (a *Test) MustRequest(method route.HttpMethod, path string, body any) *Test
 
 	resp, err := a.adapter.Test(req)
 	if err != nil {
-		panic(fmt.Sprintf("gonest: MustRequest transport error: %v", err))
+		return nil, fmt.Errorf("gonest: Request transport error: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(fmt.Sprintf("gonest: MustRequest failed to read response body: %v", err))
+		return nil, fmt.Errorf("gonest: Request failed to read response body: %w", err)
 	}
 
-	return &TestResponse{resp: resp, body: respBody}
+	return &TestResponse{resp: resp, body: respBody}, nil
+}
+
+// Request dispatches an in-memory HTTP request against the test app, panicking on transport failure.
+func (a *Test) Request(method route.HttpMethod, path string, body any) *TestResponse {
+	resp, err := a.SafeRequest(method, path, body)
+	if err != nil {
+		panic(err)
+	}
+	return resp
 }

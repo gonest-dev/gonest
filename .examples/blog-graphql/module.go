@@ -3,7 +3,7 @@ package main
 import "gonest.dev/gonest"
 
 var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
-	emitter := gonest.MustInject[*gonest.Emitter](provider)
+	emitter := provider.Inject[*gonest.Emitter]()
 	provider.Constructor(func() *Service { return &Service{emitter: emitter} })
 })
 

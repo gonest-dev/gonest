@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
@@ -97,4 +98,19 @@ func (m *Middleware) Handler(h func(c *execution.HttpContext, next Next)) {
 // never called (mirrors pipe.Pipe.HandlerFunc()'s zero-value contract).
 func (m *Middleware) HandlerFunc() func(c *execution.HttpContext, next Next) {
 	return m.handler
+}
+
+// Inject declares a dependency on type T for this middleware, panicking on resolution failure.
+func (m *Middleware) Inject[T any]() T {
+	return inject.Inject[T](m)
+}
+
+// InjectAll returns all providers matching interface T in scope for this middleware.
+func (m *Middleware) InjectAll[T any]() []T {
+	return inject.InjectAll[T](m)
+}
+
+// SafeInject declares a dependency on type T for this middleware, returning (T, error) without panicking.
+func (m *Middleware) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](m)
 }

@@ -250,7 +250,7 @@ func TestMustNewApp_TransientMember_Panics(t *testing.T) {
 		}
 	}()
 
-	MustNewApp[recordingFakeAdapter](root, Options{})
+	NewApp[recordingFakeAdapter](root, Options{})
 }
 
 // ---------------------------------------------------------------------------

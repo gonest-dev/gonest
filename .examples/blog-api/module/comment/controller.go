@@ -14,7 +14,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Guards(shared.AuthGuard)
 	controller.Interceptors(shared.TimingInterceptor)
 
-	service := gonest.MustInject[*Service](controller)
+	service := controller.Inject[*Service]()
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List comments, optionally filtered by post_id and/or user_id")
@@ -22,7 +22,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			q := gonest.MustParse[ListQueryDTO](req.Query(), listQueryDTOSchema)
+			q := req.Query().Parse[ListQueryDTO](listQueryDTOSchema)
 			res.Json(service.List(q.PostID, q.UserID))
 		})
 	})
@@ -35,7 +35,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusNotFound)
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			body := gonest.MustParse[CreateBodyDTO](req.Body().Json(), createBodyDTOSchema)
+			body := req.Body().Json().Parse[CreateBodyDTO](createBodyDTOSchema)
 			res.Status(http.StatusCreated).Json(service.Create(body.PostID, body.UserID, body.Body))
 		})
 	})

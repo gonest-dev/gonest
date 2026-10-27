@@ -12,6 +12,7 @@ import (
 
 	"gonest.dev/gonest/internal/filter"
 	"gonest.dev/gonest/internal/guard"
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/interceptor"
 	"gonest.dev/gonest/internal/middleware"
 	"gonest.dev/gonest/internal/module"
@@ -298,4 +299,19 @@ func (c *Controller) BearerAuth() *Controller {
 // HasBearerAuth reports whether BearerAuth was called on this controller.
 func (c *Controller) HasBearerAuth() bool {
 	return c.bearerAuth
+}
+
+// Inject declares a dependency on type T for this controller, panicking on resolution failure.
+func (c *Controller) Inject[T any]() T {
+	return inject.Inject[T](c)
+}
+
+// InjectAll returns all providers matching interface T for this controller.
+func (c *Controller) InjectAll[T any]() []T {
+	return inject.InjectAll[T](c)
+}
+
+// SafeInject declares a dependency on type T for this controller, returning (T, error) without panicking.
+func (c *Controller) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](c)
 }

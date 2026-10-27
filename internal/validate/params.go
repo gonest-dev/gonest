@@ -26,7 +26,7 @@ type paramsSource struct {
 // NewParamsSource builds a Parseable for ctx's path params. Exported so
 // internal/app can wire one into a Context per-request.
 func NewParamsSource(req *execution.Request) execution.Parseable {
-	return &paramsSource{req: req}
+	return execution.NewParseable(&paramsSource{req: req})
 }
 
 // ParseInto reads s.req's path params into dst (a *T) via T's `param:"name"`

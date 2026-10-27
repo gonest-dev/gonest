@@ -103,7 +103,7 @@ func TestMustInject_NonPointerType_PanicsWithDynamicTypeName(t *testing.T) {
 		if !ok {
 			t.Fatalf("panic value = %v (%T), want string", r, r)
 		}
-		want := "gonest: MustInject[T] requires T to be a pointer type, got inject.fakeService"
+		want := "gonest: Inject[T] requires T to be a pointer type, got inject.fakeService"
 		if msg != want {
 			t.Fatalf("panic message = %q, want %q", msg, want)
 		}
@@ -127,7 +127,7 @@ func TestMustInject_NonPointerType_MessageIsDynamicNotHardcoded(t *testing.T) {
 		if strings.Contains(msg, "fakeService") {
 			t.Fatalf("panic message = %q, mentions fakeService for a call with otherService -- message is hardcoded, not dynamic", msg)
 		}
-		want := "gonest: MustInject[T] requires T to be a pointer type, got inject.otherService"
+		want := "gonest: Inject[T] requires T to be a pointer type, got inject.otherService"
 		if msg != want {
 			t.Fatalf("panic message = %q, want %q", msg, want)
 		}
@@ -148,7 +148,7 @@ func TestMustInject_NonPointerBuiltinType_PanicsWithDynamicTypeName(t *testing.T
 		if !ok {
 			t.Fatalf("panic value = %v (%T), want string", r, r)
 		}
-		want := "gonest: MustInject[T] requires T to be a pointer type, got int"
+		want := "gonest: Inject[T] requires T to be a pointer type, got int"
 		if msg != want {
 			t.Fatalf("panic message = %q, want %q", msg, want)
 		}
@@ -548,7 +548,7 @@ func TestMust_CalledDuringResolvingPhase_Panics(t *testing.T) {
 		if !ok {
 			t.Fatalf("panic value = %v (%T), want string", r, r)
 		}
-		if !strings.Contains(msg, "MustInject[*inject.fakeService]") || !strings.Contains(msg, "inside a Constructor") {
+		if !strings.Contains(msg, "Inject[*inject.fakeService]") || !strings.Contains(msg, "inside a Constructor") {
 			t.Fatalf("panic message = %q, missing expected substrings", msg)
 		}
 	}()
@@ -571,7 +571,7 @@ func TestMustAll_CalledDuringResolvingPhase_Panics(t *testing.T) {
 		if !ok {
 			t.Fatalf("panic value = %v (%T), want string", r, r)
 		}
-		if !strings.Contains(msg, "MustInjectAll[inject.pingable]") || !strings.Contains(msg, "inside a Constructor") {
+		if !strings.Contains(msg, "InjectAll[inject.pingable]") || !strings.Contains(msg, "inside a Constructor") {
 			t.Fatalf("panic message = %q, missing expected substrings", msg)
 		}
 	}()

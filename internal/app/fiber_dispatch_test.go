@@ -625,7 +625,7 @@ func TestMustListen_RealFiberApp_IntegrationSmoke(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		app.MustListen(addr, onListen)
+		app.Listen(addr, onListen)
 	}()
 
 	select {
@@ -737,7 +737,7 @@ func TestNewApp_UserControllerRealHttpClient_EndToEndOverRealPort(t *testing.T) 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		app.MustListen(addr, onListen)
+		app.Listen(addr, onListen)
 	}()
 	t.Cleanup(func() {
 		if shutdownErr := fiberAdapter.FiberApp().Shutdown(); shutdownErr != nil {
@@ -2657,7 +2657,7 @@ func listenOnEphemeralPort(t *testing.T, app *coreapp.App) (addr string) {
 	fired := make(chan struct{})
 	listenErrCh := make(chan error, 1)
 	go func() {
-		listenErrCh <- app.Listen(addr, func() { close(fired) })
+		listenErrCh <- app.SafeListen(addr, func() { close(fired) })
 	}()
 
 	fiberAdapter := app.Adapter().(*fiber.App)

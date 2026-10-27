@@ -100,8 +100,8 @@ func TestSetupSwagger_RealHTTPDispatch(t *testing.T) {
 		DocExpansion:    "none",
 	}
 
-	if err := SetupSwagger(a, "/docs", doc, options); err != nil {
-		t.Fatalf("SetupSwagger() error = %v", err)
+	if err := SafeSetupSwagger(a, "/docs", doc, options); err != nil {
+		t.Fatalf("SafeSetupSwagger() error = %v", err)
 	}
 
 	t.Run("GET JsonDocumentUrl returns doc.Document() as JSON", func(t *testing.T) {
@@ -196,9 +196,7 @@ func TestSetupSwagger_EmptyDocument_StillReturnsValidJSON(t *testing.T) {
 
 	doc := New("3.1.0", nil)
 
-	if err := SetupSwagger(a, "/docs", doc, SwaggerOptions{JsonDocumentUrl: "/openapi.json"}); err != nil {
-		t.Fatalf("SetupSwagger() error = %v", err)
-	}
+	SetupSwagger(a, "/docs", doc, SwaggerOptions{JsonDocumentUrl: "/openapi.json"})
 
 	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
 	resp, err := fiberAdapter.FiberApp().Test(req)

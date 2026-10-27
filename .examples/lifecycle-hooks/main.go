@@ -35,9 +35,9 @@ import (
 )
 
 func main() {
-	app := gonest.MustNewApp[gonest.FiberApp](AppModule)
+	app := gonest.NewApp[gonest.FiberApp](AppModule)
 
 	app.EnableShutdownHooks()
 
-	app.MustListen(":3000")
+	app.Listen(":3000")
 }

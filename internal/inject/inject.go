@@ -14,8 +14,15 @@ import (
 	"sync/atomic"
 
 	"gonest.dev/gonest/internal/module"
+	"gonest.dev/gonest/internal/provider"
 	"gonest.dev/gonest/internal/scope"
 )
+
+func init() {
+	provider.InjectFn = InjectByType
+	provider.InjectAllFn = InjectAllByType
+	provider.SafeInjectFn = SafeInjectByType
+}
 
 // resolving is set by internal/resolver's Resolve/ResolveWithOverrides for
 // the exact duration of Stage 3 (every Provider's Constructor already
@@ -342,8 +349,12 @@ var lazyContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 // own doc comment for why imports are never searched (they are not
 // finalized yet, Lazy is literally what decides them).
 func mustLazy[T any](lm *module.LazyModule, t reflect.Type) T {
+	return mustLazyByType(lm, t).(T)
+}
+
+func mustLazyByType(lm *module.LazyModule, t reflect.Type) any {
 	if t.Kind() != reflect.Pointer {
-		panic(fmt.Sprintf("gonest: MustInject[T](l) requires T to be a pointer type, got %s", t.String()))
+		panic(fmt.Sprintf("gonest: Inject[T](l) requires T to be a pointer type, got %s", t.String()))
 	}
 
 	var match module.ProviderRef
@@ -357,30 +368,24 @@ func mustLazy[T any](lm *module.LazyModule, t reflect.Type) T {
 	}
 
 	if match == nil {
-		panic(fmt.Sprintf("gonest: MustInject[T](l) found no provider for type %s registered via this module's own Providers(...) earlier in the same fn -- Lazy only sees this module's own providers", t.String()))
+		panic(fmt.Sprintf("gonest: Inject[T](l) found no provider for type %s registered via this module's own Providers(...) earlier in the same fn -- Lazy only sees this module's own providers", t.String()))
 	}
 
-	// LAZY-08's repeated-call short-circuit is checked against lazyResolved
-	// (this bootstrap only), NOT match's own ResolvedValue() -- see
-	// lazyResolved's own doc comment (SPEC_DEVIATION) for why a permanent,
-	// never-cleared cache on *provider.Provider itself would incorrectly
-	// short-circuit a LATER, separate bootstrap reusing the same
-	// package-level Provider var.
 	if v, ok := LazyResolvedValue(match); ok {
-		return v.Interface().(T)
+		return v.Interface()
 	}
 
 	if sc, ok := match.(lazyScoped); ok && sc.ResolvedScope() != scope.Singleton {
-		panic(fmt.Sprintf("gonest: MustInject[T](l) requires a ScopeSingleton provider, type %s is scoped %v", t.String(), sc.ResolvedScope()))
+		panic(fmt.Sprintf("gonest: Inject[T](l) requires a ScopeSingleton provider, type %s is scoped %v", t.String(), sc.ResolvedScope()))
 	}
 
 	c, ok := match.(constructable)
 	if !ok {
-		panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s does not expose a Constructor", t.String()))
+		panic(fmt.Sprintf("gonest: Inject[T](l) matched provider for type %s does not expose a Constructor", t.String()))
 	}
 	fn := c.ConstructorFunc()
 	if !fn.IsValid() {
-		panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s has no Constructor registered", t.String()))
+		panic(fmt.Sprintf("gonest: Inject[T](l) matched provider for type %s has no Constructor registered", t.String()))
 	}
 
 	before := len(PendingEdges())
@@ -394,13 +399,13 @@ func mustLazy[T any](lm *module.LazyModule, t reflect.Type) T {
 	var real reflect.Value
 	if len(out) == 2 {
 		if errVal := out[1]; !errVal.IsNil() {
-			panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s returned an error during eager Lazy construction: %v", t.String(), errVal.Interface()))
+			panic(fmt.Sprintf("gonest: Inject[T](l) matched provider for type %s returned an error during eager Lazy construction: %v", t.String(), errVal.Interface()))
 		}
 	}
 	real = out[0]
 
 	if len(PendingEdges()) != before {
-		panic(fmt.Sprintf("gonest: MustInject[T](l) matched provider for type %s recorded a new dependency during eager construction -- Lazy only supports self-contained providers with no MustInject calls of their own", t.String()))
+		panic(fmt.Sprintf("gonest: Inject[T](l) matched provider for type %s recorded a new dependency during eager construction -- Lazy only supports self-contained providers with no Inject calls of their own", t.String()))
 	}
 
 	if rs, ok := match.(lazyResolvedSetter); ok {
@@ -414,7 +419,22 @@ func mustLazy[T any](lm *module.LazyModule, t reflect.Type) T {
 	lazyResolved[match] = real
 	lazyResolvedMu.Unlock()
 
-	return real.Interface().(T)
+	return real.Interface()
+}
+
+func init() {
+	module.LazyInjectFn = func(owner any, t reflect.Type) any {
+		return mustLazyByType(owner.(*module.LazyModule), t)
+	}
+	module.LazySafeInjectFn = func(owner any, t reflect.Type) (res any, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("%v", r)
+			}
+		}()
+		res = mustLazyByType(owner.(*module.LazyModule), t)
+		return res, nil
+	}
 }
 
 // mustAllProvider implements MustAll[T]'s *provider.Provider-owner dispatch
@@ -547,22 +567,19 @@ type directResolver interface {
 // dependency -- the only remaining caller, which DOES implement
 // module.Owner), behavior is UNCHANGED from before this dispatch existed: T
 // must be a pointer type (panics otherwise), a placeholder is allocated via
-// reflect and returned immediately, and a PendingEdge is recorded for
-// internal/resolver's Stage 3 (topological/errgroup/cycle-detecting) to
-// resolve and copy-in-place later.
-func Must[T any](owner any) T {
-	t := reflect.TypeFor[T]()
-
+// SafeInjectByType resolves a dependency by reflect.Type from owner's builder fn,
+// returning (any, error) without panicking.
+func SafeInjectByType(owner any, t reflect.Type) (any, error) {
 	if v, ok := GlobalSingletonFor(t); ok {
-		return v.Interface().(T)
+		return v.Interface(), nil
 	}
 
 	if resolving.Load() {
-		panic(fmt.Sprintf("gonest: MustInject[%s] called from inside a Constructor -- Stage 3 is already running, so a dependency requested this late is never resolved (the placeholder returned here would stay a permanent zero value). Call MustInject in the builder fn, BEFORE Constructor(...), and close over the result instead of calling MustInject inside the Constructor closure itself", t.String()))
+		return nil, fmt.Errorf("gonest: Inject[%s] called from inside a Constructor -- Stage 3 is already running, so a dependency requested this late is never resolved (the placeholder returned here would stay a permanent zero value). Call Inject in the builder fn, BEFORE Constructor(...), and close over the result instead of calling Inject inside the Constructor closure itself", t.String())
 	}
 
 	if lm, ok := owner.(*module.LazyModule); ok {
-		return mustLazy[T](lm, t)
+		return mustLazyByType(lm, t), nil
 	}
 
 	if dr, ok := owner.(directResolver); ok {
@@ -570,28 +587,28 @@ func Must[T any](owner any) T {
 			matches := dr.ResolveDirectAll(t)
 			switch len(matches) {
 			case 0:
-				panic(fmt.Sprintf("gonest: no provider implements interface %s", t.String()))
+				return nil, fmt.Errorf("gonest: no provider implements interface %s", t.String())
 			case 1:
-				return matches[0].Interface().(T)
+				return matches[0].Interface(), nil
 			default:
-				panic(fmt.Sprintf("gonest: ambiguous: %d providers implement interface %s, use MustInjectAll", len(matches), t.String()))
+				return nil, fmt.Errorf("gonest: ambiguous: %d providers implement interface %s, use InjectAll", len(matches), t.String())
 			}
 		}
 
 		v, ok := dr.ResolveDirect(t)
 		if !ok {
-			panic(fmt.Sprintf("gonest: no provider registered for type %s", t.String()))
+			return nil, fmt.Errorf("gonest: no provider registered for type %s", t.String())
 		}
-		return v.Interface().(T)
+		return v.Interface(), nil
 	}
 
 	if t.Kind() != reflect.Pointer {
-		panic(fmt.Sprintf("gonest: MustInject[T] requires T to be a pointer type, got %s", t.String()))
+		return nil, fmt.Errorf("gonest: Inject[T] requires T to be a pointer type, got %s", t.String())
 	}
 
 	moOwner, ok := owner.(module.Owner)
 	if !ok {
-		panic("gonest: MustInject[T] requires owner to be a *provider.Provider when T is a pointer type and owner is not a Controller/Middleware/Guard/Interceptor/Filter")
+		return nil, fmt.Errorf("gonest: Inject[T] requires owner to be a *provider.Provider when T is a pointer type and owner is not a Controller/Middleware/Guard/Interceptor/Filter")
 	}
 
 	placeholder := reflect.New(t.Elem())
@@ -600,64 +617,91 @@ func Must[T any](owner any) T {
 	pendingEdges = append(pendingEdges, PendingEdge{Owner: moOwner, TargetType: t, Placeholder: placeholder})
 	pendingEdgesMu.Unlock()
 
-	return placeholder.Interface().(T)
+	return placeholder.Interface(), nil
 }
 
-// MustAll returns every provider in owner's scope whose resolved
-// value satisfies interface T, as []T. T must be an interface kind (panics
-// otherwise -- multi-binding only makes sense for interfaces, a pointer
-// type has no "multiple implementations" concept, see MustInject's
-// single-match contract for that case).
-//
-// If owner satisfies directResolver (a Controller, Middleware, Guard,
-// Interceptor, or Filter), resolution happens DIRECTLY, right now, exactly
-// as before this feature (REQ-008: no behavior change to this path).
-//
-// If owner is a *module.LazyModule, MustInjectAll is explicitly
-// unsupported (out of scope, see this feature's (provider-must-inject-all)
-// spec.md Out of Scope) -- panics, rather than silently mis-dispatching if
-// LazyModule ever comes to structurally satisfy module.Owner.
-//
-// Otherwise, if owner satisfies module.Owner (a *provider.Provider calling
-// MustInjectAll from its own builder fn, Stage 2), resolution is DEFERRED
-// via the same placeholder+edge mechanism MustInject[T] already uses for
-// Provider-to-Provider dependencies -- generalized to a fixed-length slice,
-// see mustAllProvider's own doc comment for the full algorithm. The
-// returned slice's element ORDER IS NOT GUARANTEED (REQ-004) in this path.
-//
-// Otherwise, panics: owner is not supported.
-//
-// Returns an empty slice, never panics, if zero providers match -- "give me
-// all of them" reasonably tolerates "there are none", unlike MustInject[T]'s
-// single-match contract. This holds for both the directResolver path and
-// the Provider-owned deferred path.
-func MustAll[T any](owner any) []T {
-	t := reflect.TypeFor[T]()
+// InjectByType resolves dependency by reflect.Type, panicking on resolution failure.
+func InjectByType(owner any, t reflect.Type) any {
+	val, err := SafeInjectByType(owner, t)
+	if err != nil {
+		panic(err.Error())
+	}
+	return val
+}
 
+// InjectAllByType resolves all dependencies satisfying interface t by reflect.Type.
+func InjectAllByType(owner any, t reflect.Type) any {
 	if t.Kind() != reflect.Interface {
-		panic(fmt.Sprintf("gonest: MustInjectAll[T] requires T to be an interface type, got %s", t.String()))
+		panic(fmt.Sprintf("gonest: InjectAll[T] requires T to be an interface type, got %s", t.String()))
 	}
 
 	if resolving.Load() {
-		panic(fmt.Sprintf("gonest: MustInjectAll[%s] called from inside a Constructor -- Stage 3 is already running, so a dependency requested this late is never resolved (the slice returned here would stay permanently empty/unfilled). Call MustInjectAll in the builder fn, BEFORE Constructor(...), and close over the result instead of calling MustInjectAll inside the Constructor closure itself", t.String()))
+		panic(fmt.Sprintf("gonest: InjectAll[%s] called from inside a Constructor -- Stage 3 is already running, so a dependency requested this late is never resolved (the slice returned here would stay permanently empty/unfilled). Call InjectAll in the builder fn, BEFORE Constructor(...), and close over the result instead of calling InjectAll inside the Constructor closure itself", t.String()))
 	}
 
 	if dr, ok := owner.(directResolver); ok {
 		matches := dr.ResolveDirectAll(t)
-		out := make([]T, len(matches))
+		sliceType := reflect.SliceOf(t)
+		slice := reflect.MakeSlice(sliceType, len(matches), len(matches))
 		for i, v := range matches {
-			out[i] = v.Interface().(T)
+			slice.Index(i).Set(v)
 		}
-		return out
+		return slice.Interface()
 	}
 
 	if _, ok := owner.(*module.LazyModule); ok {
-		panic("gonest: MustInjectAll[T](l) is not supported from a Lazy owner")
+		panic("gonest: InjectAll[T](l) is not supported from a Lazy owner")
 	}
 
 	if moOwner, ok := owner.(module.Owner); ok {
-		return mustAllProvider[T](moOwner, t)
+		matches := findAllRefs(moOwner.OwnerModule(), t)
+
+		for _, m := range matches {
+			if sc, ok := m.(lazyScoped); ok && sc.ResolvedScope() != scope.Singleton {
+				panic(fmt.Sprintf("gonest: InjectAll[T](p) matched provider for type %s is scoped %v, only ScopeSingleton providers can be members of a Provider-owned MustInjectAll slice", t.String(), sc.ResolvedScope()))
+			}
+		}
+
+		slice := reflect.MakeSlice(reflect.SliceOf(t), len(matches), len(matches))
+
+		pendingAllEdgesMu.Lock()
+		pendingAllEdges = append(pendingAllEdges, PendingAllEdge{Owner: moOwner, InterfaceType: t, Matches: matches, Slice: slice})
+		pendingAllEdgesMu.Unlock()
+
+		return slice.Interface()
 	}
 
-	panic("gonest: MustInjectAll[T] is not supported from this owner (Provider-to-Provider dependencies stay single-value via MustInject)")
+	panic("gonest: InjectAll[T] is not supported from this owner (Provider-to-Provider dependencies stay single-value via Inject)")
 }
+
+// SafeInject declares a dependency on type T from owner's builder fn,
+// returning (T, error) without panicking.
+func SafeInject[T any](owner any) (T, error) {
+	var zero T
+	v, err := SafeInjectByType(owner, reflect.TypeFor[T]())
+	if err != nil {
+		return zero, err
+	}
+	return v.(T), nil
+}
+
+// Inject declares a dependency on type T from owner's builder fn, panicking on any resolution failure.
+func Inject[T any](owner any) T {
+	return InjectByType(owner, reflect.TypeFor[T]()).(T)
+}
+
+// InjectAll returns every provider in owner's scope whose resolved value satisfies interface T.
+func InjectAll[T any](owner any) []T {
+	return InjectAllByType(owner, reflect.TypeFor[T]()).([]T)
+}
+
+// Must is preserved for compatibility with internal resolver calls.
+func Must[T any](owner any) T {
+	return Inject[T](owner)
+}
+
+// MustAll returns every provider in owner's scope whose resolved value satisfies interface T.
+func MustAll[T any](owner any) []T {
+	return InjectAll[T](owner)
+}
+

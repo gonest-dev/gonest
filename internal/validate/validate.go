@@ -74,7 +74,7 @@ type jsonBodySource struct {
 // internal/app (the package that bridges execution and validate) can wire
 // one into a Context's BodySource per-request.
 func NewJSONBodySource(req *execution.Request) execution.Parseable {
-	return &jsonBodySource{req: req}
+	return execution.NewParseable(&jsonBodySource{req: req})
 }
 
 // ParseInto reads s.req's raw JSON body into dst (a *T), validating against

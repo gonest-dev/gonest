@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
@@ -135,4 +136,19 @@ func isValidCatchSignature(t reflect.Type, excType reflect.Type) bool {
 		return false
 	}
 	return t.NumOut() == 0
+}
+
+// Inject declares a dependency on type T for this filter, panicking on resolution failure.
+func (f *Filter) Inject[T any]() T {
+	return inject.Inject[T](f)
+}
+
+// InjectAll returns all providers matching interface T in scope for this filter.
+func (f *Filter) InjectAll[T any]() []T {
+	return inject.InjectAll[T](f)
+}
+
+// SafeInject declares a dependency on type T for this filter, returning (T, error) without panicking.
+func (f *Filter) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](f)
 }

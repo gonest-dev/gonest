@@ -51,7 +51,7 @@ func TestMustInject_CalledInsideConstructor_ProducesResolveError(t *testing.T) {
 	if app != nil {
 		t.Fatal("New() returned a non-nil *App alongside a non-nil error")
 	}
-	const want = "MustInject[*app.mustInjectInsideConstructorDep] called from inside a Constructor"
+	const want = "Inject[*app.mustInjectInsideConstructorDep] called from inside a Constructor"
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf("err = %q, want it to contain %q", err.Error(), want)
 	}
@@ -82,5 +82,5 @@ func TestMustNewApp_CalledInsideConstructor_Panics(t *testing.T) {
 		}
 	}()
 
-	MustNewApp[recordingFakeAdapter](root, Options{})
+	NewApp[recordingFakeAdapter](root, Options{})
 }

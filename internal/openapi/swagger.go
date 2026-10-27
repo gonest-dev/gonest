@@ -50,7 +50,8 @@ type SwaggerOptions struct {
 // Intended to be called AFTER NewApp (so app.Adapter() exists) and BEFORE
 // app.MustListen/Listen -- both routes are reachable once the server starts,
 // per spec.md AC3.
-func SetupSwagger(a *app.App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
+// SafeSetupSwagger registers two routes directly on app's adapter, returning an error on failure.
+func SafeSetupSwagger(a *app.App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
 	adapter := a.Adapter()
 
 	if err := adapter.RegisterRoute(route.HttpGet, options.JsonDocumentUrl, func(c *execution.HttpContext) {
@@ -67,6 +68,13 @@ func SetupSwagger(a *app.App, uiPath string, doc *OpenAPI, options SwaggerOption
 	}
 
 	return nil
+}
+
+// SetupSwagger calls SafeSetupSwagger and panics on failure.
+func SetupSwagger(a *app.App, uiPath string, doc *OpenAPI, options SwaggerOptions) {
+	if err := SafeSetupSwagger(a, uiPath, doc, options); err != nil {
+		panic(err)
+	}
 }
 
 // swaggerUITemplate is a minimal HTML page loading Swagger UI's bundle/CSS

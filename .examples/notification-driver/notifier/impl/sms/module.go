@@ -12,7 +12,7 @@ import (
 // old reflect.Type.Implements() structural fallback no longer exists).
 // Provider_'s own concrete registration (below) stays required too -- the
 // wrapper never drives construction itself.
-var AsNotifier_ = gonest.ProviderAs[port.Notifier](Provider_)
+var AsNotifier_ = Provider_.As[port.Notifier]()
 
 // Module_ owns+exports Provider_ (its own concrete registration) AND
 // AsNotifier_ (the explicit port.Notifier view of it). Never imported

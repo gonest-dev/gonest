@@ -15,34 +15,57 @@ package execution
 import (
 	"bufio"
 	"io"
+	"reflect"
 )
 
-// Parseable is the single contract every HTTP data source (params, query,
-// headers, JSON body, form body) satisfies -- unified-parse-api feature's
-// gonest.Parse[T]/gonest.MustParse[T] are source-agnostic and only ever call
-// ParseInto on whatever Parseable value req.Params()/req.Query()/etc. hand
-// them.
-//
-// SPEC_DEVIATION (context.md wanted a single UNEXPORTED method so only
-// internal/validate's source structs could implement it): Go's spec makes
-// two unexported identifiers "different" whenever they're declared in
-// different packages, even if spelled identically -- an unexported method
-// named e.g. "parse" declared HERE (package execution) can never be
-// satisfied by a method also named "parse" declared in internal/validate,
-// because that's a distinct identifier in Go's eyes. Since every concrete
-// Parseable implementation must live in internal/validate (to reuse
-// resolveSchema/validateValue/populate/etc. without duplicating that logic
-// here or introducing an execution->validate cycle), the method must be
-// EXPORTED so validate's types can actually satisfy this interface. The
-// concrete struct types themselves (paramsSource, querySource, ...) stay
-// unexported in validate, and are only ever handed out via constructor
-// functions returning Parseable -- so external callers still cannot
-// construct or type-assert a custom source without deliberately choosing to
-// implement ParseInto themselves (context.md's Deferred Ideas already
-// anticipates this exact scenario).
-type Parseable interface {
+// ParseableSource is the contract satisfied by underlying data sources (params, query, headers, body).
+type ParseableSource interface {
 	ParseInto(dst any, schema any) error
 }
+
+// Parseable is the carrier of request data sources providing type-safe Parse and SafeParse methods.
+type Parseable struct {
+	source ParseableSource
+}
+
+// NewParseable constructs a Parseable wrapping the given source.
+func NewParseable(source ParseableSource) Parseable {
+	return Parseable{source: source}
+}
+
+// ParseInto delegates directly to the underlying source.
+func (p Parseable) ParseInto(dst any, schema any) error {
+	if p.source == nil {
+		return nil
+	}
+	return p.source.ParseInto(dst, schema)
+}
+
+// SafeParse reads and validates data into type T against schema s, returning (T, error) without panicking.
+func (p Parseable) SafeParse[T any](s any) (T, error) {
+	var zero T
+	if t := reflect.TypeFor[T](); t.Kind() == reflect.Pointer {
+		ptr := reflect.New(t.Elem())
+		if err := p.ParseInto(ptr.Interface(), s); err != nil {
+			return zero, err
+		}
+		return ptr.Interface().(T), nil
+	}
+	if err := p.ParseInto(&zero, s); err != nil {
+		return zero, err
+	}
+	return zero, nil
+}
+
+// Parse reads and validates data into type T against schema s, panicking with the error on failure.
+func (p Parseable) Parse[T any](s any) T {
+	v, err := p.SafeParse[T](s)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 
 // BodySource is the intermediate type req.Body() returns, letting the
 // request body's FORMAT be picked explicitly and discoverably
@@ -270,14 +293,27 @@ func (req *Request) Headers() Parseable {
 	return req.headersSource
 }
 
+func toParseable(v any) Parseable {
+	if v == nil {
+		return Parseable{}
+	}
+	if p, ok := v.(Parseable); ok {
+		return p
+	}
+	if s, ok := v.(ParseableSource); ok {
+		return Parseable{source: s}
+	}
+	return Parseable{}
+}
+
 // WithSources attaches the per-request Parseable/BodySource values that
 // Params()/Query()/Headers()/Body() return, and returns req for chaining --
 // same pattern as WithRoute. Called once per request by internal/app (the
 // package that bridges execution and validate) right after WithRoute.
-func (req *Request) WithSources(params, query, headers Parseable, body BodySource) *Request {
-	req.paramsSource = params
-	req.querySource = query
-	req.headersSource = headers
+func (req *Request) WithSources(params, query, headers any, body BodySource) *Request {
+	req.paramsSource = toParseable(params)
+	req.querySource = toParseable(query)
+	req.headersSource = toParseable(headers)
 	req.bodySource = body
 	return req
 }

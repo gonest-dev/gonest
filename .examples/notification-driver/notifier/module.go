@@ -42,7 +42,7 @@ var Module_ = gonest.NewModule(func(m *gonest.Module) {
 	// instead.
 	m.Exports(Config_)
 	m.Lazy(func(l *gonest.LazyModule) {
-		config := gonest.MustInject[*Config](l)
+		config := l.Inject[*Config]()
 		switch config.Driver {
 		case "sms":
 			l.Imports(sms.Module_)

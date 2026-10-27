@@ -31,7 +31,7 @@ var configSchema = gonest.NewSchema(func(t *Config, s *gonest.Schema) {
 // guarantees this Constructor still only runs once for the whole bootstrap.
 var Config_ = gonest.NewProvider(func(p *gonest.Provider) {
 	p.Constructor(func() *Config {
-		config := gonest.MustParse[Config](gonest.Dotenv(), configSchema)
+		config := gonest.Dotenv().Parse[Config](configSchema)
 		fmt.Printf("loaded notifier.Config: %+v\n", config)
 		return &config
 	})

@@ -25,7 +25,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Guards(shared.AuthGuard)
 	controller.Interceptors(shared.TimingInterceptor)
 
-	service := gonest.MustInject[*Service](controller)
+	service := controller.Inject[*Service]()
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List posts, optionally filtered by user_id")
@@ -33,7 +33,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusOK, func(response *gonest.Response) { response.Schema(Schema) })
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			q := gonest.MustParse[ListQueryDTO](req.Query(), listQueryDTOSchema)
+			q := req.Query().Parse[ListQueryDTO](listQueryDTOSchema)
 			res.Json(service.List(q.UserID))
 		})
 	})
@@ -47,7 +47,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		})
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
+			p := req.Params().Parse[ParamsDTO](paramsDTOSchema)
 			post := service.Get(p.PostID)
 			if post == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -64,12 +64,12 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusNotFound)
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			body := gonest.MustParse[CreateBodyDTO](req.Body().Json(), createBodyDTOSchema)
+			body := req.Body().Json().Parse[CreateBodyDTO](createBodyDTOSchema)
 			res.Status(http.StatusCreated).Json(service.Create(body.UserID, body.Title, body.Body))
 		})
 	})
 
-	// Real usage of gonest.MustParse[T](ctx.Body().Form(onFile)) (Multipart Form Streaming feature):
+	// Real usage of req.Body().Form(onFile).Parse[T](schema) (Multipart Form Streaming feature):
 	// the uploaded file is streamed straight to disk via io.Copy as its bytes
 	// arrive -- onFile fires before the rest of the multipart body is even
 	// read, so gonest never buffers the whole file in memory first. Requires
@@ -84,14 +84,14 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		})
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
+			p := req.Params().Parse[ParamsDTO](paramsDTOSchema)
 			if service.Get(p.PostID) == nil {
 				panic(gonest.NewNotFoundException("", nil))
 			}
 
 			var savedFilename string
 			var savedSize int64
-			form := gonest.MustParse[UploadAttachmentFormDTO](req.Body().Form(func(f *gonest.FormFile) error {
+			form := req.Body().Form(func(f *gonest.FormFile) error {
 				if err := os.MkdirAll(uploadsDir, 0o755); err != nil {
 					return err
 				}
@@ -105,7 +105,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 				n, err := io.Copy(dst, f.Reader())
 				savedSize = n
 				return err
-			}), uploadAttachmentFormDTOSchema)
+			}).Parse[UploadAttachmentFormDTO](uploadAttachmentFormDTOSchema)
 
 			res.Status(http.StatusCreated).Json(map[string]any{
 				"filename":    savedFilename,

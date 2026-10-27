@@ -15,7 +15,7 @@ func TestSubscribe_ReceivesFutureEmit(t *testing.T) {
 	done := make(chan struct{})
 	defer close(done)
 
-	ch := Subscribe[subscribeTestEvent](e, done)
+	ch := e.Subscribe[subscribeTestEvent](done)
 
 	e.Emit(subscribeTestEvent{Value: "hello"})
 
@@ -34,7 +34,7 @@ func TestSubscribe_MultipleEmits_AllReceivedInOrder(t *testing.T) {
 	done := make(chan struct{})
 	defer close(done)
 
-	ch := Subscribe[subscribeTestEvent](e, done)
+	ch := e.Subscribe[subscribeTestEvent](done)
 
 	e.Emit(subscribeTestEvent{Value: "one"})
 	e.Emit(subscribeTestEvent{Value: "two"})
@@ -57,7 +57,7 @@ func TestSubscribe_ClosingDone_ClosesReturnedChannel(t *testing.T) {
 	e := New()
 	done := make(chan struct{})
 
-	ch := Subscribe[subscribeTestEvent](e, done)
+	ch := e.Subscribe[subscribeTestEvent](done)
 
 	close(done)
 
@@ -78,7 +78,7 @@ func TestSubscribe_DifferentTypesDontCrossDeliver(t *testing.T) {
 	done := make(chan struct{})
 	defer close(done)
 
-	ch := Subscribe[subscribeTestEvent](e, done)
+	ch := e.Subscribe[subscribeTestEvent](done)
 
 	e.Emit(otherEvent{N: 1})
 	e.Emit(subscribeTestEvent{Value: "real"})
@@ -105,7 +105,7 @@ func TestSubscribe_DoneClose_DoesNotLeakGoroutine(t *testing.T) {
 	dones := make([]chan struct{}, n)
 	for i := range dones {
 		dones[i] = make(chan struct{})
-		Subscribe[subscribeTestEvent](e, dones[i])
+		e.Subscribe[subscribeTestEvent](dones[i])
 	}
 
 	for _, d := range dones {

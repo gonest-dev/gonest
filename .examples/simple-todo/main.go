@@ -24,12 +24,6 @@ import (
 )
 
 func main() {
-	app, err := gonest.NewApp[gonest.FiberApp](AppModule)
-	if err != nil {
-		panic(err)
-	}
-	err = app.Listen(":3000")
-	if err != nil {
-		panic(err)
-	}
+	app := gonest.NewApp[gonest.FiberApp](AppModule)
+	app.Listen(":3000")
 }

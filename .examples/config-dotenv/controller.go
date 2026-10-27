@@ -10,7 +10,7 @@ import (
 var ConfigController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/config")
 
-	config := gonest.MustInject[*DatabaseConfig](controller)
+	config := controller.Inject[*DatabaseConfig]()
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Handler(func(c *gonest.HttpContext) {

@@ -152,7 +152,7 @@ func TestMustNewApp_ProviderAs_ConcreteMissing_Panics(t *testing.T) {
 		}
 	}()
 
-	MustNewApp[recordingFakeAdapter](root, Options{})
+	NewApp[recordingFakeAdapter](root, Options{})
 }
 
 // TestNewApp_ProviderAs_WellFormed_Succeeds proves the success path through

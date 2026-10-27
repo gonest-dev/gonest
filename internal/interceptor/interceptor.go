@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
@@ -91,4 +92,19 @@ func (i *Interceptor) Handler(h func(c *execution.HttpContext, next Next)) {
 // contract).
 func (i *Interceptor) HandlerFunc() func(c *execution.HttpContext, next Next) {
 	return i.handler
+}
+
+// Inject declares a dependency on type T for this interceptor, panicking on resolution failure.
+func (i *Interceptor) Inject[T any]() T {
+	return inject.Inject[T](i)
+}
+
+// InjectAll returns all providers matching interface T in scope for this interceptor.
+func (i *Interceptor) InjectAll[T any]() []T {
+	return inject.InjectAll[T](i)
+}
+
+// SafeInject declares a dependency on type T for this interceptor, returning (T, error) without panicking.
+func (i *Interceptor) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](i)
 }

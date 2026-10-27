@@ -34,7 +34,7 @@ var databaseConfigSchema = gonest.NewSchema(func(t *DatabaseConfig, s *gonest.Sc
 // doc comment), exactly the end-to-end flow this example demonstrates.
 var DatabaseConfigProvider = gonest.NewProvider(func(provider *gonest.Provider) {
 	provider.Constructor(func() *DatabaseConfig {
-		config := gonest.MustParse[DatabaseConfig](gonest.Dotenv(), databaseConfigSchema)
+		config := gonest.Dotenv().Parse[DatabaseConfig](databaseConfigSchema)
 		fmt.Printf("loaded DatabaseConfig: %+v\n", config)
 		return &config
 	})

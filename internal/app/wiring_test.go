@@ -137,7 +137,7 @@ func TestListen_ShutdownHooksDisabled_ReturnsAsSoonAsAdapterListenReturns(t *tes
 	close(adapter.unblock) // adapter.Listen returns immediately
 
 	done := make(chan error, 1)
-	go func() { done <- a.Listen(":0") }()
+	go func() { done <- a.SafeListen(":0") }()
 
 	select {
 	case err := <-done:
@@ -161,7 +161,7 @@ func TestListen_ShutdownHooksEnabled_BlocksUntilShutdownDoneThenReturnsShutdownE
 	a.EnableShutdownHooks()
 
 	listenDone := make(chan error, 1)
-	go func() { listenDone <- a.Listen(":0") }()
+	go func() { listenDone <- a.SafeListen(":0") }()
 
 	// Listen must NOT have returned yet -- adapter.Listen is still blocked on
 	// unblock, and even once that closes, shutdownHooksEnabled means Listen
@@ -211,7 +211,7 @@ func TestListen_AdapterListenError_ReturnsImmediatelyWithoutWaitingOnShutdownDon
 	close(adapter.unblock)        // adapter.Listen returns wantErr immediately
 
 	done := make(chan error, 1)
-	go func() { done <- a.Listen(":0") }()
+	go func() { done <- a.SafeListen(":0") }()
 
 	select {
 	case err := <-done:

@@ -32,7 +32,7 @@ type formBodySource struct {
 // skipped (spec.md's Edge Cases). Exported so internal/app can wire one into
 // a Context's BodySource per-request.
 func NewFormBodySource(req *execution.Request, onFile func(*execution.FormFile) error) execution.Parseable {
-	return &formBodySource{req: req, onFile: onFile}
+	return execution.NewParseable(&formBodySource{req: req, onFile: onFile})
 }
 
 // ParseInto walks s.req's raw multipart stream exactly ONCE

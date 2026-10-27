@@ -26,7 +26,7 @@ type headersSource struct {
 // NewHeadersSource builds a Parseable for ctx's HTTP headers. Exported so
 // internal/app can wire one into a Context per-request.
 func NewHeadersSource(req *execution.Request) execution.Parseable {
-	return &headersSource{req: req}
+	return execution.NewParseable(&headersSource{req: req})
 }
 
 // ParseInto reads s.req's headers into dst (a *T) via T's `header:"name"`

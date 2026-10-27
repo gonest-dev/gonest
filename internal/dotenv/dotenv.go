@@ -51,7 +51,9 @@ func Get() *Dotenv {
 //   - "pre-existing process env always wins": a key already set in the
 //     process environment before Load ever runs is present from the very
 //     first LookupEnv check, so no file value ever overwrites it.
-func (d *Dotenv) Load(paths ...string) error {
+// SafeLoad reads each path in paths, in order, and applies its resolved
+// key/value pairs to the process environment, returning an error on failure.
+func (d *Dotenv) SafeLoad(paths ...string) error {
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -76,27 +78,26 @@ func (d *Dotenv) Load(paths ...string) error {
 	return nil
 }
 
-// MustLoad calls Load and panics if it returns a non-nil error -- same
-// "Must-prefixed panics" convention as MustParse/MustNewApp across the
-// framework.
-func (d *Dotenv) MustLoad(paths ...string) {
-	if err := d.Load(paths...); err != nil {
+// Load calls SafeLoad and panics if it returns an error.
+func (d *Dotenv) Load(paths ...string) {
+	if err := d.SafeLoad(paths...); err != nil {
 		panic(err)
 	}
 }
 
-// ParseInto satisfies execution.Parseable, letting gonest.Parse[T]/
-// gonest.MustParse[T] accept gonest.Dotenv() as a source directly (e.g.
-// gonest.MustParse[DatabaseConfig](gonest.Dotenv(), schema)), exactly like
-// req.Params()/req.Query()/req.Headers()/req.Body().Json() already do for
-// HTTP sources -- env-schema-binding feature (T11). 100% delegation: all the
-// actual read/validate/populate logic lives in validate.ParseEnvInto (T10),
-// reused here unchanged.
+// ParseInto satisfies execution.ParseableSource.
 func (d *Dotenv) ParseInto(dst any, schema any) error {
 	return validate.ParseEnvInto(dst, schema)
 }
 
-// compile-time guard: *Dotenv must satisfy execution.Parseable, so
-// gonest.Dotenv() type-checks as a Parse[T]/MustParse[T] source at the call
-// site instead of only at generic-instantiation time.
-var _ execution.Parseable = (*Dotenv)(nil)
+// SafeParse parses environment variables into type T according to schema s, returning (T, error).
+func (d *Dotenv) SafeParse[T any](s any) (T, error) {
+	return execution.NewParseable(d).SafeParse[T](s)
+}
+
+// Parse parses environment variables into type T according to schema s, panicking on failure.
+func (d *Dotenv) Parse[T any](s any) T {
+	return execution.NewParseable(d).Parse[T](s)
+}
+
+var _ execution.ParseableSource = (*Dotenv)(nil)

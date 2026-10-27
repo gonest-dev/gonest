@@ -14,6 +14,7 @@ import (
 
 	cronlib "github.com/robfig/cron/v3"
 
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
@@ -108,6 +109,24 @@ func (s *Scheduler) ResolveDirect(t reflect.Type) (reflect.Value, bool) {
 // same single-module scope as ResolveDirect.
 func (s *Scheduler) ResolveDirectAll(t reflect.Type) []reflect.Value {
 	return resolver.FindDirectAll([]*module.Module{s.owner}, t)
+}
+
+// Inject resolves a dependency of pointer type T from this scheduler's owning
+// module scope, panicking if unresolved.
+func (s *Scheduler) Inject[T any]() T {
+	return inject.Inject[T](s)
+}
+
+// InjectAll resolves all dependencies matching interface type T from this
+// scheduler's owning module scope.
+func (s *Scheduler) InjectAll[T any]() []T {
+	return inject.InjectAll[T](s)
+}
+
+// SafeInject resolves a dependency of pointer type T from this scheduler's owning
+// module scope, returning an error if unresolved.
+func (s *Scheduler) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](s)
 }
 
 // register creates and stores a jobHandle for name, overwriting any

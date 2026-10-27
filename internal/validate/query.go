@@ -25,7 +25,7 @@ type querySource struct {
 // NewQuerySource builds a Parseable for ctx's query string. Exported so
 // internal/app can wire one into a Context per-request.
 func NewQuerySource(req *execution.Request) execution.Parseable {
-	return &querySource{req: req}
+	return execution.NewParseable(&querySource{req: req})
 }
 
 // ParseInto reads s.req's query string into dst (a *T) via T's

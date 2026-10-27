@@ -16,7 +16,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Guards(shared.AuthGuard)
 	controller.Interceptors(shared.TimingInterceptor)
 
-	service := gonest.MustInject[*Service](controller)
+	service := controller.Inject[*Service]()
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Summary("List users")
@@ -34,7 +34,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusNotFound)
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[ParamsDTO](req.Params(), paramsDTOSchema)
+			p := req.Params().Parse[ParamsDTO](paramsDTOSchema)
 			u := service.Get(p.UserID)
 			if u == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -51,7 +51,7 @@ var Controller = gonest.NewController(func(controller *gonest.Controller) {
 		r.Response(http.StatusConflict)
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			body := gonest.MustParse[CreateBodyDTO](req.Body().Json(), createBodyDTOSchema)
+			body := req.Body().Json().Parse[CreateBodyDTO](createBodyDTOSchema)
 			res.Status(http.StatusCreated).Json(service.Create(body.Name, body.Email))
 		})
 	})

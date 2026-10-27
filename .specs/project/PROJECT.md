@@ -46,7 +46,7 @@
 
 - Recursos: time pequeno/solo — tasks precisam ser atômicas e sequenciais, sem paralelismo de execução assumido por padrão.
 - Timeline: sem deadline fixo — prioridade é acertar a DX (design da API) antes de crescer escopo.
-- Técnico: Go não tem parâmetro de tipo em método (só em func/tipo livre) — todo design de builder precisa respeitar essa limitação (já resolvido no metadata builder via valor capturado em vez de `[T]` em método).
+- Técnico: a partir do Go 1.27, Go suporta generic methods em tipos concretos. Métodos em interfaces continuam sem type parameters (limitação da linguagem), logo métodos genéricos devem ser expostos via structs concretas.
 
 ## Workflow Conventions
 

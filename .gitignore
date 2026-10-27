@@ -5,3 +5,6 @@
 /.examples/blog-api/uploads/
 image.png
 .env
+.specs/.index/
+.specs/.cache/
+.specs/.memory/notes/

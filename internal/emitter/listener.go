@@ -156,3 +156,18 @@ func (l *Listener[EventType]) ResolveDirectAll(t reflect.Type) []reflect.Value {
 // via internal/inject's global-singleton registry (see Declare's own doc
 // comment).
 var emitterType = reflect.TypeFor[*Emitter]()
+
+// Inject declares a dependency on type T for this listener, panicking on resolution failure.
+func (l *Listener[EventType]) Inject[T any]() T {
+	return inject.Inject[T](l)
+}
+
+// InjectAll returns all providers matching interface T in scope for this listener.
+func (l *Listener[EventType]) InjectAll[T any]() []T {
+	return inject.InjectAll[T](l)
+}
+
+// SafeInject declares a dependency on type T for this listener, returning (T, error) without panicking.
+func (l *Listener[EventType]) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](l)
+}

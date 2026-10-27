@@ -26,7 +26,7 @@ import (
 	"gonest.dev/gonest/internal/filter"
 	"gonest.dev/gonest/internal/graphql"
 	"gonest.dev/gonest/internal/guard"
-	"gonest.dev/gonest/internal/inject"
+	_ "gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/interceptor"
 	"gonest.dev/gonest/internal/logger"
 	"gonest.dev/gonest/internal/middleware"
@@ -128,31 +128,6 @@ func NewProvider(fn func(*Provider)) *Provider {
 	return provider.New(fn)
 }
 
-// ProviderAs wraps ref, returning a ProviderRef that resolves as
-// TInterface -- via MustInject[TInterface]/MustInjectAll[TInterface] --
-// wherever it is registered (Module.Providers and/or Module.Exports),
-// instead of ref's own concrete type. This is now the ONLY way an
-// interface type resolves: MustInject/MustInjectAll no longer fall back to
-// structural reflect.Type.Implements() matching (see this feature's
-// (provider-interface-export) spec.md PROVAS-02).
-//
-// TInterface must be an interface kind -- panics immediately otherwise
-// (`"gonest: ProviderAs[T] requires T to be an interface type, got %s"`).
-// ref's concrete type must ALSO be registered via Module.Providers on its
-// own, in addition to being wrapped here -- ProviderAs never drives
-// construction itself, only the concrete registration does; a wrapped ref
-// whose concrete registration is missing, or whose concrete type does not
-// actually implement TInterface, fails loud at NewApp/MustNewApp bootstrap
-// time (a dedicated post-declare validation pass), not at first
-// MustInject[TInterface] call. Wrapping a ProviderRef that is ITSELF the
-// result of another ProviderAs call (chaining) panics immediately -- wrap
-// the original concrete ProviderRef separately for each interface it needs
-// to be resolvable as. Go cannot re-export a generic function via var, so
-// this is a real wrapper calling the internal one (same as MustInject's
-// own doc comment explains).
-func ProviderAs[T any](ref ProviderRef) ProviderRef {
-	return module.ProviderAs[T](ref)
-}
 
 // Scope defines the lifetime of a provider instance within the DI container.
 type Scope = scope.Scope
@@ -301,22 +276,6 @@ func NewController(fn func(*Controller)) *Controller {
 // deferred via the existing placeholder+topological mechanism. Go cannot
 // re-export a generic function via var, so this is a real wrapper calling
 // the internal one.
-func MustInject[T any](owner any) T {
-	return inject.Must[T](owner)
-}
-
-// MustInjectAll returns every provider whose resolved concrete type
-// satisfies interface T, as []T -- for a plugin/strategy pattern where the
-// exact count is intentionally open-ended (see INSIGHT.md's "exemplo de
-// MustInjectAll" section). T must be an interface kind (panics otherwise --
-// multi-binding only makes sense for interfaces, see MustInject's single-
-// match contract for the pointer case). owner must be a Controller,
-// Middleware, Guard, Interceptor, or Filter (panics otherwise -- Provider-
-// to-Provider dependencies stay single-value via MustInject). Returns an
-// empty slice, never panics, if zero providers match.
-func MustInjectAll[T any](owner any) []T {
-	return inject.MustAll[T](owner)
-}
 
 // ---------------------------------------------------------------------------
 // App / bootstrap (App Bootstrap & Listen feature)
@@ -414,19 +373,20 @@ type OnListen = app.OnListen
 //
 // opts is optional (at most one) and threaded straight through to
 // internal/app.NewApp -- this wrapper does not interpret it.
+// NewApp bootstraps root through all 3 DI stages plus Stage 2.5, panicking on failure.
 func NewApp[T any, PT interface {
 	*T
 	HttpAdapter
-}](root *Module, opts ...AppOptions) (*App, error) {
-	return app.New[T, PT](root, opts...)
+}](root *Module, opts ...AppOptions) *App {
+	return app.NewApp[T, PT](root, opts...)
 }
 
-// MustNewApp calls NewApp and panics if it returns an error.
-func MustNewApp[T any, PT interface {
+// SafeNewApp bootstraps root through all 3 DI stages plus Stage 2.5, returning (*App, error).
+func SafeNewApp[T any, PT interface {
 	*T
 	HttpAdapter
-}](root *Module, opts ...AppOptions) *App {
-	return app.MustNewApp[T, PT](root, opts...)
+}](root *Module, opts ...AppOptions) (*App, error) {
+	return app.SafeNewApp[T, PT](root, opts...)
 }
 
 // ---------------------------------------------------------------------------
@@ -444,22 +404,14 @@ type TestBuilder = app.TestBuilder
 // internal/app.Test's own doc comment.
 type TestApp = app.Test
 
-// MustOverride registers mockValue as the substitute for any Provider whose
-// resolved type exactly matches T (pointer override) or is implemented by
-// T (interface override) -- that Provider's real Constructor never runs.
-// Go cannot re-export a generic function via var, so this is a real
-// wrapper calling the internal one (same pattern as MustInject/
-// MustInjectAll, see AD-004 in STATE.md).
-func MustOverride[T any](b *TestBuilder, mockValue T) {
-	app.MustOverride(b, mockValue)
+// NewTestApp runs the same 3-phase bootstrap NewApp does, panicking on bootstrap error.
+func NewTestApp(root *Module, configure func(*TestBuilder)) *TestApp {
+	return app.NewTestApp(root, configure)
 }
 
-// MustNewTestApp runs the same 3-phase bootstrap NewApp does, with an
-// optional configure callback to register MustOverride calls before
-// provider resolution, and never binds a real network port (no Listen).
-// See internal/app.MustNewTestApp's own doc comment for the full contract.
-func MustNewTestApp(root *Module, configure func(*TestBuilder)) *TestApp {
-	return app.MustNewTestApp(root, configure)
+// SafeNewTestApp runs the same 3-phase bootstrap NewApp does, returning (*TestApp, error).
+func SafeNewTestApp(root *Module, configure func(*TestBuilder)) (*TestApp, error) {
+	return app.SafeNewTestApp(root, configure)
 }
 
 // TestResponse wraps the response TestApp.MustRequest dispatched, exposing
@@ -1298,65 +1250,14 @@ func SyncAccessorFields(dst any, src any) {
 // exported despite being meant as a sealed contract.
 type Parseable = execution.Parseable
 
-// FormFile is one file part from a multipart/form-data stream, still
-// un-consumed at the moment Body().Form(onFile)'s onFile callback runs --
-// reading FormFile.Reader() consumes the underlying multipart stream in
-// real time (Multipart Form Streaming feature, AD-022 in STATE.md). Not
-// safe to retain past onFile's own call. See execution.FormFile's doc
-// comment for the full contract.
+// FormFile is one file part from a multipart/form-data stream.
 type FormFile = execution.FormFile
 
-// Parse reads and validates src (one of ctx.Params(), ctx.Query(),
-// ctx.Headers(), ctx.Body().Json(), ctx.Body().Form(onFile)) against s (the
-// *Schema built via NewSchema[T] for that same T -- passed explicitly,
-// AD-019) and returns a populated T. Returns a non-nil *BadRequestException
-// (collecting EVERY violation found, not just the first) as the error on
-// any validation failure -- AD-021's non-panicking half of the family (see
-// MustParse for the panicking twin). Still panics with a plain string if s
-// was not built for T (a coding-error class of failure, not a
-// request-validation one) -- src.ParseInto itself calls resolveSchema
-// before touching anything else.
-//
-// Parse/MustParse contain NO source-specific logic: they declare `var zero
-// T`, call src.ParseInto(&zero, s), and return -- every ctx method
-// (unified-parse-api feature) hands back a Parseable that already knows how
-// to read and validate its own source, so adding a new source later (e.g.
-// ctx.Body().Xml()) never touches these two functions.
-//
-// T may be a struct (the schema's own StructType, the common case) or a
-// pointer to one (e.g. Parse[*DatabaseConfig] instead of
-// Parse[DatabaseConfig]) -- a call site that wants T back as a *T (to store
-// it, hand it to a DI provider, etc.) no longer has to Parse the struct
-// value and take its address itself. src.ParseInto always receives a
-// pointer-to-struct dst either way (ParseInto's own contract, unchanged);
-// when T is itself a pointer type, that dst IS the T being returned, just
-// allocated fresh via reflect.New instead of zero-valued via `var zero T`
-// (a nil *T has nowhere for ParseInto to write into).
-func Parse[T any](src Parseable, s *Schema) (T, error) {
-	var zero T
-	if t := reflect.TypeFor[T](); t.Kind() == reflect.Pointer {
-		ptr := reflect.New(t.Elem())
-		if err := src.ParseInto(ptr.Interface(), s); err != nil {
-			return zero, err
-		}
-		return ptr.Interface().(T), nil
-	}
-	if err := src.ParseInto(&zero, s); err != nil {
-		return zero, err
-	}
-	return zero, nil
-}
+// ParseableSource is the contract satisfied by underlying data sources.
+type ParseableSource = execution.ParseableSource
 
-// MustParse is Parse, panicking on any returned error instead of returning
-// it -- AD-021's panicking twin, for call sites that don't want to handle
-// the error themselves.
-func MustParse[T any](src Parseable, s *Schema) T {
-	v, err := Parse[T](src, s)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
+// NewParseable constructs a Parseable wrapping the given source.
+var NewParseable = execution.NewParseable
 
 // ---------------------------------------------------------------------------
 // OpenAPI (OpenAPI Document Builder feature)
@@ -1448,23 +1349,14 @@ type SwaggerOptions = openapi.SwaggerOptions
 // plain var alias -- it forwards app straight through. See
 // internal/openapi.SetupSwagger's doc comment for the full registration
 // contract.
-func SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
-	return openapi.SetupSwagger(app, uiPath, doc, options)
+// SafeSetupSwagger registers two routes directly on app's adapter, returning an error on failure.
+func SafeSetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions) error {
+	return openapi.SafeSetupSwagger(app, uiPath, doc, options)
 }
 
-// MustSetupSwagger calls SetupSwagger and panics, using the same
-// "Must"-prefixed panic-on-error convention as MustListen/MustInject/
-// MustParse/MustNewApp elsewhere in this package, if it returns an error --
-// the panic message contains both uiPath and the underlying error. For a
-// caller that has no recovery path for a failed route registration (the
-// only way SetupSwagger can fail -- see internal/openapi.SetupSwagger's doc
-// comment) this saves the `if err := ...; err != nil { panic(err) }`
-// boilerplate every other Must-prefixed call in this package already
-// avoids.
-func MustSetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions) {
-	if err := SetupSwagger(app, uiPath, doc, options); err != nil {
-		panic(fmt.Sprintf("gonest: failed to setup swagger at %q: %v", uiPath, err))
-	}
+// SetupSwagger registers two routes directly on app's adapter, panicking on failure.
+func SetupSwagger(app *App, uiPath string, doc *OpenAPI, options SwaggerOptions) {
+	openapi.SetupSwagger(app, uiPath, doc, options)
 }
 
 // ---------------------------------------------------------------------------
@@ -1505,14 +1397,6 @@ func NewListener[EventType any](fn func(*Listener[EventType])) *Listener[EventTy
 	return emitter.NewListener(fn)
 }
 
-// Subscribe registers a dynamic, per-connection channel that receives
-// every future Emit(EventType{...}) call until done closes (graphql-
-// support feature, Milestone 17) -- complementary to the static, app-
-// lifetime NewListener/Emit pair. Go cannot re-export a generic function
-// via var, so this is a real wrapper (same AD-004 precedent as NewListener).
-func Subscribe[EventType any](e *Emitter, done <-chan struct{}) <-chan EventType {
-	return emitter.Subscribe[EventType](e, done)
-}
 
 // ---------------------------------------------------------------------------
 // GraphQL (graphql-support feature, Milestone 17)

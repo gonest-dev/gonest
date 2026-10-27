@@ -148,7 +148,8 @@ func (a *App) Root() *module.Module {
 // accepting connections". A caller that never called EnableShutdownHooks
 // sees no behavior change at all: Listen returns exactly what the adapter
 // returned, exactly when the adapter returned it.
-func (a *App) Listen(addr string, optionalOnListen ...OnListen) error {
+// SafeListen starts the HTTP adapter and waits, returning an error if listening fails.
+func (a *App) SafeListen(addr string, optionalOnListen ...OnListen) error {
 	onListenFunc := func() {
 		if !a.opts.DisableBanner {
 			printBanner()
@@ -180,12 +181,9 @@ func (a *App) Listen(addr string, optionalOnListen ...OnListen) error {
 	return nil
 }
 
-// MustListen calls Listen and panics, using the same "Must"-prefixed
-// panic-on-error convention as MustNewApp/MustInject/MustParam, if it
-// returns an error -- the panic message contains both addr and the
-// underlying error.
-func (a *App) MustListen(addr string, optionalOnListen ...OnListen) {
-	if err := a.Listen(addr, optionalOnListen...); err != nil {
+// Listen starts the HTTP adapter and waits, panicking if listening fails.
+func (a *App) Listen(addr string, optionalOnListen ...OnListen) {
+	if err := a.SafeListen(addr, optionalOnListen...); err != nil {
 		panic(fmt.Sprintf("gonest: failed to listen on %q: %v", addr, err))
 	}
 }
@@ -498,10 +496,13 @@ func countTree(modules []*module.Module) (moduleCount, controllerCount, routeCou
 	return moduleCount, controllerCount, routeCount
 }
 
-// MustNewApp calls NewApp and panics if it returns an error. Convenience
-// for callers (typically main) that treat bootstrap failure as fatal. opts
-// is optional, same contract as NewApp's.
-func MustNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) *App {
+// SafeNewApp bootstraps root through all 3 DI stages plus Stage 2.5, returning (*App, error).
+func SafeNewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) (*App, error) {
+	return New[T, PT](root, opts...)
+}
+
+// NewApp bootstraps root through all 3 DI stages plus Stage 2.5, panicking on failure.
+func NewApp[T any, PT httpAdapterPtr[T]](root *module.Module, opts ...Options) *App {
 	app, err := New[T, PT](root, opts...)
 	if err != nil {
 		panic(err)

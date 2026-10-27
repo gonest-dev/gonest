@@ -37,15 +37,8 @@ func main() {
 	// Module.Lazy runs it eagerly during Stage 1 assembly (inside NewApp),
 	// so .env must already be loaded by the time NewApp starts (same
 	// ordering .examples/config-dotenv's own main.go already relies on).
-	gonest.Dotenv().MustLoad("./.env")
+	gonest.Dotenv().Load("./.env")
 
-	app, err := gonest.NewApp[gonest.FiberApp](AppModule_)
-	if err != nil {
-		panic(err)
-	}
-
-	err = app.Listen(":3000")
-	if err != nil {
-		panic(err)
-	}
+	app := gonest.NewApp[gonest.FiberApp](AppModule_)
+	app.Listen(":3000")
 }

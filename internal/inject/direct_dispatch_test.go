@@ -99,7 +99,7 @@ func TestMustInject_DirectResolver_Interface_TwoMatches_PanicsAmbiguous(t *testi
 			t.Fatalf("MustInject() did not panic, want panic (ambiguous)")
 		}
 		msg := r.(string)
-		if !strings.Contains(msg, "ambiguous") || !strings.Contains(msg, "MustInjectAll") {
+		if !strings.Contains(msg, "ambiguous") || !strings.Contains(msg, "InjectAll") {
 			t.Fatalf("panic message = %q, missing expected substrings", msg)
 		}
 	}()

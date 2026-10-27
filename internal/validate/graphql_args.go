@@ -28,7 +28,7 @@ type mapArgsSource struct {
 // gqlresolver.GraphqlContext.Args() to the same validation engine REST
 // already uses.
 func NewGraphqlArgsSource(parsed any) execution.Parseable {
-	return &mapArgsSource{parsed: parsed}
+	return execution.NewParseable(&mapArgsSource{parsed: parsed})
 }
 
 // ParseInto implements execution.Parseable.

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/schema"
 )
 
@@ -157,6 +158,24 @@ func (r *Route) ResolveDirectAll(t reflect.Type) []reflect.Value {
 		return nil
 	}
 	return dr.ResolveDirectAll(t)
+}
+
+// Inject resolves a dependency of pointer type T from this route's owning
+// module scope, panicking if unresolved.
+func (r *Route) Inject[T any]() T {
+	return inject.Inject[T](r)
+}
+
+// InjectAll resolves all dependencies matching interface type T from this
+// route's owning module scope.
+func (r *Route) InjectAll[T any]() []T {
+	return inject.InjectAll[T](r)
+}
+
+// SafeInject resolves a dependency of pointer type T from this route's owning
+// module scope, returning an error if unresolved.
+func (r *Route) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](r)
 }
 
 // Method returns this Route's HTTP method, as passed to New. Used by Stage

@@ -1,6 +1,6 @@
 module notification-driver
 
-go 1.25.0
+go 1.27.0
 
 require gonest.dev/gonest v0.0.0
 

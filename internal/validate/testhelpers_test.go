@@ -16,71 +16,41 @@ import (
 // at every call site.
 
 func mustParseParams[T any](ctx *execution.Request, s *schema.Schema) T {
-	v, err := parseParams[T](ctx, s)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return NewParamsSource(ctx).Parse[T](s)
 }
 
 func parseParams[T any](ctx *execution.Request, s *schema.Schema) (T, error) {
-	var zero T
-	err := NewParamsSource(ctx).ParseInto(&zero, s)
-	return zero, err
+	return NewParamsSource(ctx).SafeParse[T](s)
 }
 
 func mustParseQuery[T any](ctx *execution.Request, s *schema.Schema) T {
-	v, err := parseQuery[T](ctx, s)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return NewQuerySource(ctx).Parse[T](s)
 }
 
 func parseQuery[T any](ctx *execution.Request, s *schema.Schema) (T, error) {
-	var zero T
-	err := NewQuerySource(ctx).ParseInto(&zero, s)
-	return zero, err
+	return NewQuerySource(ctx).SafeParse[T](s)
 }
 
 func mustParseHeaders[T any](ctx *execution.Request, s *schema.Schema) T {
-	v, err := parseHeaders[T](ctx, s)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return NewHeadersSource(ctx).Parse[T](s)
 }
 
 func parseHeaders[T any](ctx *execution.Request, s *schema.Schema) (T, error) {
-	var zero T
-	err := NewHeadersSource(ctx).ParseInto(&zero, s)
-	return zero, err
+	return NewHeadersSource(ctx).SafeParse[T](s)
 }
 
 func mustParseJSON[T any](ctx *execution.Request, s *schema.Schema) T {
-	v, err := parseJSON[T](ctx, s)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return NewJSONBodySource(ctx).Parse[T](s)
 }
 
 func parseJSON[T any](ctx *execution.Request, s *schema.Schema) (T, error) {
-	var zero T
-	err := NewJSONBodySource(ctx).ParseInto(&zero, s)
-	return zero, err
+	return NewJSONBodySource(ctx).SafeParse[T](s)
 }
 
 func mustParseForm[T any](ctx *execution.Request, s *schema.Schema, onFile func(*execution.FormFile) error) T {
-	v, err := parseForm[T](ctx, s, onFile)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return NewFormBodySource(ctx, onFile).Parse[T](s)
 }
 
 func parseForm[T any](ctx *execution.Request, s *schema.Schema, onFile func(*execution.FormFile) error) (T, error) {
-	var zero T
-	err := NewFormBodySource(ctx, onFile).ParseInto(&zero, s)
-	return zero, err
+	return NewFormBodySource(ctx, onFile).SafeParse[T](s)
 }

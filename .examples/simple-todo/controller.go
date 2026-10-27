@@ -35,7 +35,7 @@ var todoIDParamsSchema = gonest.NewSchema(func(t *todoIDParams, s *gonest.Schema
 var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/todos")
 
-	service := gonest.MustInject[*TodoService](controller)
+	service := controller.Inject[*TodoService]()
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Handler(func(c *gonest.HttpContext) {
@@ -45,13 +45,13 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	})
 
 	// This route resolves *TodoService itself, directly, via
-	// gonest.MustInject[T](r) -- not through the Controller-level `service`
+	// r.Inject[T]() -- not through the Controller-level `service`
 	// variable above -- proving Route resolves from the exact same
 	// module scope a Controller would (route-must-inject feature). Only
 	// this one route pays for building a TodoStatsUsecase; every other
 	// route on TodoController never constructs one.
 	controller.Route(gonest.HttpGet, "/stats", func(r *gonest.Route) {
-		statsUsecase := &TodoStatsUsecase{service: gonest.MustInject[*TodoService](r)}
+		statsUsecase := &TodoStatsUsecase{service: r.Inject[*TodoService]()}
 		r.Handler(func(c *gonest.HttpContext) {
 			c.Response().Json(statsUsecase.Run())
 		})
@@ -60,7 +60,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpGet, "/:id", func(r *gonest.Route) {
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
+			p := req.Params().Parse[todoIDParams](todoIDParamsSchema)
 			todo := service.Get(p.ID)
 			if todo == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -73,7 +73,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 		r.HttpCode(http.StatusCreated)
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			body := gonest.MustParse[createTodoBody](req.Body().Json(), createTodoBodySchema)
+			body := req.Body().Json().Parse[createTodoBody](createTodoBodySchema)
 			res.Status(http.StatusCreated).Json(service.Create(body.Title))
 		})
 	})
@@ -81,8 +81,8 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Route(gonest.HttpPut, "/:id", func(r *gonest.Route) {
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
-			body := gonest.MustParse[updateTodoBody](req.Body().Json(), updateTodoBodySchema)
+			p := req.Params().Parse[todoIDParams](todoIDParamsSchema)
+			body := req.Body().Json().Parse[updateTodoBody](updateTodoBodySchema)
 			todo := service.Update(p.ID, body.Title, body.Done)
 			if todo == nil {
 				panic(gonest.NewNotFoundException("", nil))
@@ -95,7 +95,7 @@ var TodoController = gonest.NewController(func(controller *gonest.Controller) {
 		r.HttpCode(http.StatusNoContent)
 		r.Handler(func(c *gonest.HttpContext) {
 			req, res := c.Request(), c.Response()
-			p := gonest.MustParse[todoIDParams](req.Params(), todoIDParamsSchema)
+			p := req.Params().Parse[todoIDParams](todoIDParamsSchema)
 			if !service.Delete(p.ID) {
 				panic(gonest.NewNotFoundException("", nil))
 			}

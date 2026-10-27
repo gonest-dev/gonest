@@ -11,9 +11,9 @@ import (
 )
 
 var Provider = gonest.NewProvider(func(provider *gonest.Provider) {
-	db := gonest.MustInject[*sql.DB](provider)
-	userService := gonest.MustInject[*user.Service](provider)
-	postService := gonest.MustInject[*post.Service](provider)
+	db := provider.Inject[*sql.DB]()
+	userService := provider.Inject[*user.Service]()
+	postService := provider.Inject[*post.Service]()
 	provider.Constructor(func() *Service { return &Service{db: db, userService: userService, postService: postService} })
 })
 

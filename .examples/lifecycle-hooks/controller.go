@@ -10,7 +10,7 @@ import (
 var StatusController = gonest.NewController(func(controller *gonest.Controller) {
 	controller.Path("/status")
 
-	db := gonest.MustInject[*DbService](controller)
+	db := controller.Inject[*DbService]()
 
 	controller.Route(gonest.HttpGet, "/", func(r *gonest.Route) {
 		r.Handler(func(c *gonest.HttpContext) {

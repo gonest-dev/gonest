@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"gonest.dev/gonest/internal/execution"
+	"gonest.dev/gonest/internal/inject"
 	"gonest.dev/gonest/internal/module"
 	"gonest.dev/gonest/internal/resolver"
 )
@@ -77,4 +78,19 @@ func (g *Guard) Handler(h func(c *execution.HttpContext) bool) {
 // contract).
 func (g *Guard) HandlerFunc() func(c *execution.HttpContext) bool {
 	return g.handler
+}
+
+// Inject declares a dependency on type T for this guard, panicking on resolution failure.
+func (g *Guard) Inject[T any]() T {
+	return inject.Inject[T](g)
+}
+
+// InjectAll returns all providers matching interface T in scope for this guard.
+func (g *Guard) InjectAll[T any]() []T {
+	return inject.InjectAll[T](g)
+}
+
+// SafeInject declares a dependency on type T for this guard, returning (T, error) without panicking.
+func (g *Guard) SafeInject[T any]() (T, error) {
+	return inject.SafeInject[T](g)
 }

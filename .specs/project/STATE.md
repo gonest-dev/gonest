@@ -1,26 +1,32 @@
 # State
 
 Last synced commit: 419e73f (tag v0.37.0)
-**Last Updated:** 2026-08-22
+**Last Updated:** 2026-10-26
 
 ## Current Work
 
-**Feature:** Default response description no OpenAPI (`http.StatusText(status)`).
+**Feature:** Modernização Go 1.27 — Generic Methods & Convenção Parse/Safe.
 
-Concluído nesta sessão:
-1. Bug real achado pelo usuário via screenshot do Swagger UI (`POST /auth/register`, resposta `201` sem NENHUMA description).
-2. Causa raiz: `internal/openapi/generate.go`'s `buildResponses` só usava `http.StatusText(status)` no caminho de ERRO (`defaultErrorResponse`, ≥400 sem schema) — sucesso e o caminho sintetizado (rota sem `Response()`) caíam em `"description": ""` literal.
-3. Fix: os 2 pontos que hardcodeavam `""` agora usam `http.StatusText(status)`/`http.StatusText(r.Code())` — `response.Description(...)` explícito continua sobrescrevendo (comportamento inalterado).
-4. `.specs/features/response-default-description/{spec,design,tasks}.md` — mesmo pipeline PO/DEV/QA da feature `redirect`.
-5. Teste novo `TestGenerate_ResponseDescription_DefaultsToStatusText` (`internal/openapi/generate_test.go`) — 5 casos (sucesso sem schema, sucesso com schema, rota sem `Response()`, erro sem schema, override explícito). Gate: `go test ./...` verde, 25 pacotes.
-
-**Feature anterior (v0.36.0):** Redirect nativo (`Reply.Redirect`/`Route.Redirect`) — ver AD-066.
+Especificação concluída:
+1. Revogada restrição histórica em PROJECT.md referente à ausência de generic methods.
+2. Criado `.specs/features/generic-methods-safe-api/spec.md` (REQ-GEN-001 a REQ-GEN-011).
+3. Mapeamento de morte de todas as funções genéricas globais em `gonest.go` (`MustInject`, `MustInjectAll`, `ProviderAs`, `MustOverride`, `Subscribe`, `Parse`, `MustParse`).
+4. Inversão da convenção `Must*` em favor de `Parse` (lança `BadRequestException`) / `SafeParse` (tupla `(T, error)`), `NewApp` / `SafeNewApp`, `Listen` / `SafeListen`.
+5. Requisito estrito de sincronização total do site em `../site` com commit+push em ambos os repositórios.
 
 ## Todos
 
-- [x] Bump de versão + tag `v0.37.0` — commit 419e73f, push no gonest
-- [x] Atualizar site repo (`C:\dev\github.com\gonest-dev\site`) — `openapi/index.{mdx,pt.mdx,es.mdx}` documentando default description — commit a244787, push
-- [ ] Nenhum outro pendente (ver Deferred Ideas para trabalho futuro não priorizado)
+- [x] TASK-GEN-001: Atualizar runtime Go baseline para 1.27.0
+- [x] TASK-GEN-002: Implementar generic methods de DI em internal/inject e tipos proprietários
+- [x] TASK-GEN-003: Implementar Provider Interface Binding (p *Provider) As[T]()
+- [x] TASK-GEN-004: Remodelar execution.Parseable como struct com Parse[T] e SafeParse[T]
+- [x] TASK-GEN-005: Atualizar internal/app para padrão NewApp/SafeNewApp, Listen/SafeListen, e Test Helpers
+- [x] TASK-GEN-006: Adicionar (e *Emitter) Subscribe[T] e (d *Dotenv) Parse[T]
+- [x] TASK-GEN-007: Atualizar gonest.go público e limpar funções globais legadas
+- [x] TASK-GEN-008: Atualizar todos os testes internos do repositório
+- [x] TASK-GEN-009: Atualizar os exemplos em .examples/*
+- [x] TASK-GEN-010: Atualizar documentação do site ../site nos 3 idiomas
+- [x] TASK-GEN-011: Commit e Push em ambos os repositórios
 
 ## Active Blockers
 
@@ -33,6 +39,12 @@ Concluído nesta sessão:
 **Resolution:** definitivo seria reiniciar a sessão do harness.
 
 ## Recent Decisions (Last 15)
+
+### AD-068: Modernização Go 1.27 — Generic Methods & Convenção Parse/Safe (2026-10-26)
+
+**Decision:** Migração para Go 1.27 nativo. Todas as funções globais legadas criadas para contornar a falta de métodos genéricos (`gonest.MustInject`, `MustInjectAll`, `ProviderAs`, `MustOverride`, `Subscribe`, `Parse`, `MustParse`) são eliminadas sem retrocompatibilidade. Métodos genéricos são introduzidos diretamente nas structs receptoras (`c.Inject[T]()`, `p.As[T]()`, `b.Override[T]()`, `e.Subscribe[T]()`). O padrão ubíquo de `Must*` é invertido: o nome limpo (`Parse`, `NewApp`, `Listen`, `Request`) vira o fluxo padrão que delega erros para exceções/panics de ciclo de vida e HTTP, enquanto o prefixo `Safe*` (`SafeParse`, `SafeNewApp`, `SafeListen`, `SafeRequest`) passa a retornar tuplas com erro `(T, error)`.
+**Reason:** Go 1.27 liberou parâmetros de tipo em métodos de tipos concretos; alinhamento total com a DX do NestJS/Zod solicitada pelo usuário ("sem retrocompatibilidade").
+**Trade-off:** Breaking change total para call-sites anteriores. Exige sincronização obrigatória e simultânea do repositório `../site`.
 
 ### AD-067: OpenAPI — default response description = `http.StatusText(status)` pra todo status (2026-08-22)
 

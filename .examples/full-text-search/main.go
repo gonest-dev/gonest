@@ -37,7 +37,7 @@ var AppModule = gonest.NewModule(func(module *gonest.Module) {
 })
 
 func main() {
-	app := gonest.MustNewApp[gonest.FiberApp](AppModule)
+	app := gonest.NewApp[gonest.FiberApp](AppModule)
 
 	doc := gonest.NewOpenAPI("3.1.0", func(b *gonest.OpenAPI) {
 		b.Title("Full-Text Search Example")
@@ -45,10 +45,10 @@ func main() {
 		b.Version("1.0.0")
 	})
 	gonest.OpenapiGenerate(app, doc)
-	gonest.MustSetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
+	gonest.SetupSwagger(app, "/docs", doc, gonest.SwaggerOptions{
 		JsonDocumentUrl: "/openapi.json",
 		DocExpansion:    "list",
 	})
 
-	app.MustListen(":3002")
+	app.Listen(":3002")
 }
